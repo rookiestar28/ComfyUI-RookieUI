@@ -10,6 +10,11 @@ from rookieui.security.request_guard import (
     validate_seed_range,
 )
 from rookieui.services.asset_store import resolve_asset_path, store_uploaded_image
+from rookieui.services.coercion import (
+    coerce_bool as _coerce_bool,
+    coerce_float as _coerce_float,
+    coerce_int as _coerce_int,
+)
 from rookieui.services.model_inventory import discover_model_inventory
 from rookieui.services.parity_matrix import (
     get_parity_profile,
@@ -18,13 +23,10 @@ from rookieui.services.parity_matrix import (
 )
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
 from rookieui.services.txt2img import (
-    _coerce_bool,
     _coerce_cfg_scale,
     _coerce_dimension,
     _coerce_dtype_profile,
-    _coerce_float,
     _coerce_hires_steps,
-    _coerce_int,
     _coerce_lora_selector,
     _coerce_lora_strength,
     _coerce_steps,

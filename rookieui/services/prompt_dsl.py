@@ -4,6 +4,7 @@ import re
 
 from rookieui.contracts.prompt_dsl import PromptLoraActivation, PromptPreprocessResult
 from rookieui.security.request_guard import normalize_prompt_text, resolve_inventory_selector
+from rookieui.services.coercion import coerce_float, coerce_int
 
 _EXTRA_NETWORK_RE = re.compile(r"<(\w+):([^>]+)>")
 _AND_RE = re.compile(r"\bAND\b")
@@ -25,17 +26,11 @@ class _ExtraNetworkParams:
 
 
 def _coerce_float(value: str, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be numeric.") from exc
+    return coerce_float(value, field_name, error_label="numeric")
 
 
 def _coerce_int(value: str, field_name: str) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer.") from exc
+    return coerce_int(value, field_name)
 
 
 def _detect_prompt_feature_warnings(prompt_text: str) -> list[str]:

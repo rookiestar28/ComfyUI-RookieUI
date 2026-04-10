@@ -14,6 +14,11 @@ from rookieui.services.parity_matrix import (
     normalize_sampler_name,
     normalize_scheduler_name,
 )
+from rookieui.services.coercion import (
+    coerce_bool as _coerce_bool,
+    coerce_float as _coerce_float,
+    coerce_int as _coerce_int,
+)
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
 
 _MIN_DIMENSION = 64
@@ -45,37 +50,6 @@ _DTYPE_PROFILE_ALIASES = {
     "float8_e4m3fn": {"float8_e4m3fn", "float8-e4m3fn"},
     "float8_e5m2": {"float8_e5m2", "float8-e5m2"},
 }
-
-
-def _coerce_int(value: object, field_name: str) -> int:
-    if isinstance(value, bool):
-        raise ValueError(f"{field_name} must be an integer.")
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer.") from exc
-
-
-def _coerce_float(value: object, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be a float.") from exc
-
-
-def _coerce_bool(value: object, field_name: str) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-    if isinstance(value, (int, float)):
-        return bool(value)
-    raise ValueError(f"{field_name} must be a boolean.")
-
 
 def _coerce_dimension(
     value: int | None,

@@ -15,6 +15,7 @@ from rookieui.services.workflow_translation import (
     translate_img2img_request,
     translate_txt2img_request,
 )
+from rookieui.services.coercion import coerce_bool
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.compatibility import build_compatibility_payload
 from rookieui.security.asset_guard import normalize_metadata_text
@@ -101,18 +102,6 @@ def _get_prompt_server_for_submission() -> Any | None:
     except Exception:
         return None
     return _get_prompt_server_instance()
-
-
-def _coerce_bool(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-    return bool(value)
 
 
 def _json_response(payload: dict[str, Any], *, status: int = 200, request: Any | None = None) -> Any:
@@ -329,7 +318,7 @@ async def txt2img(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
         request_payload = dict(payload)
-        dry_run = _coerce_bool(request_payload.pop("dry_run", False))
+        dry_run = coerce_bool(request_payload.pop("dry_run", False), "dry_run", strict=False)
         client_id = normalize_client_id(request_payload.pop("client_id", None))
         normalized = normalize_txt2img_request(request_payload)
         translation = translate_txt2img_request(normalized)
@@ -357,7 +346,7 @@ async def img2img(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
         request_payload = dict(payload)
-        dry_run = _coerce_bool(request_payload.pop("dry_run", False))
+        dry_run = coerce_bool(request_payload.pop("dry_run", False), "dry_run", strict=False)
         client_id = normalize_client_id(request_payload.pop("client_id", None))
         normalized = normalize_img2img_request(request_payload)
         translation = translate_img2img_request(normalized)

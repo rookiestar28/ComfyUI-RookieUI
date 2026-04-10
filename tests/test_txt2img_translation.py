@@ -308,6 +308,21 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["payload"]["normalized_request"]["dtype_profile"], "automatic")
         self.assertEqual(response["payload"]["submission"]["mode"], "dry-run")
 
+    def test_txt2img_route_keeps_legacy_truthy_dry_run_string_behavior(self) -> None:
+        response = asyncio.run(
+            routes.txt2img(
+                _FakeJsonRequest(
+                    {
+                        "prompt": "forest shrine",
+                        "dry_run": "force-dry-run",
+                    }
+                )
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["submission"]["mode"], "dry-run")
+
     def test_txt2img_route_rejects_missing_prompt(self) -> None:
         response = asyncio.run(routes.txt2img(_FakeJsonRequest({"prompt": "   "})))
 

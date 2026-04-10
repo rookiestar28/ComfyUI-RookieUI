@@ -20,6 +20,11 @@ from rookieui.services.parity_matrix import (
     normalize_sampler_name,
     normalize_scheduler_name,
 )
+from rookieui.services.coercion import (
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+)
 
 _PARAM_RE = re.compile(r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
 _IMAGE_SIZE_RE = re.compile(r"^(\d+)x(\d+)$")
@@ -142,40 +147,28 @@ def _parse_generation_parameters(text: str) -> dict[str, object]:
 
 
 def _coerce_int(value: object, field_name: str, *, default: int | None = None) -> int:
-    if value in (None, ""):
-        if default is None:
-            raise ValueError(f"{field_name} is required.")
-        return default
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer.") from exc
+    return coerce_int(
+        value,
+        field_name,
+        default=default,
+        via_str=True,
+        required_if_empty=True,
+    )
 
 
 def _coerce_float(value: object, field_name: str, *, default: float | None = None) -> float:
-    if value in (None, ""):
-        if default is None:
-            raise ValueError(f"{field_name} is required.")
-        return default
-    try:
-        return round(float(str(value).strip()), 3)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be a float.") from exc
+    return coerce_float(
+        value,
+        field_name,
+        default=default,
+        via_str=True,
+        precision=3,
+        required_if_empty=True,
+    )
 
 
 def _coerce_bool(value: object, field_name: str, *, default: bool = False) -> bool:
-    if value in (None, ""):
-        return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    normalized = str(value).strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise ValueError(f"{field_name} must be a boolean value.")
+    return coerce_bool(value, field_name, default=default, error_label="a boolean value")
 
 
 def _normalize_label_with_aliases(

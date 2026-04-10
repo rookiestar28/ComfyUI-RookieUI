@@ -15,6 +15,11 @@ from rookieui.services.asset_store import (
     save_output_image,
     store_uploaded_image,
 )
+from rookieui.services.coercion import (
+    coerce_bool as _coerce_bool,
+    coerce_float as _coerce_float,
+    coerce_int as _coerce_int,
+)
 from rookieui.services.model_inventory import discover_model_inventory
 
 _DEFAULT_SCALE_BY = 2.0
@@ -23,38 +28,6 @@ _MAX_SCALE_BY = 8.0
 _MIN_TARGET_DIMENSION = 64
 _MAX_TARGET_DIMENSION = 4096
 _UPSCALE_NONE = "None"
-
-
-def _coerce_bool(value: object, field_name: str) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off", ""}:
-            return False
-    # IMPORTANT: keep numeric 0/1 parity with txt2img/img2img/pnginfo coercion to prevent cross-endpoint payload regressions.
-    if isinstance(value, (int, float)):
-        return bool(value)
-    raise ValueError(f"{field_name} must be a boolean.")
-
-
-def _coerce_float(value: object, field_name: str) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be a float.") from exc
-
-
-def _coerce_int(value: object, field_name: str) -> int:
-    if isinstance(value, bool):
-        raise ValueError(f"{field_name} must be an integer.")
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field_name} must be an integer.") from exc
-
 
 def _coerce_dimension(value: object, field_name: str) -> int:
     normalized = _coerce_int(value, field_name)
