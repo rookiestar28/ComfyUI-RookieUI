@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import types
 import unittest
+from unittest import mock
 
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    _reset_inventory_cache_for_tests,
+    discover_model_inventory,
+)
 from rookieui.services.presets import build_preset_payload
 
 
 class ModelInventoryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        _reset_inventory_cache_for_tests()
+
     def test_discover_model_inventory_uses_host_folder_paths_when_available(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
@@ -75,7 +82,7 @@ class ModelInventoryTests(unittest.TestCase):
             }.get(folder_name, [])
         )
 
-        with unittest.mock.patch(
+        with mock.patch(
             "rookieui.services.presets.discover_model_inventory",
             return_value=discover_model_inventory(folder_paths_module=module),
         ):
@@ -84,3 +91,27 @@ class ModelInventoryTests(unittest.TestCase):
         preset_ids = [preset["id"] for preset in payload["presets"]]
         self.assertIn("sd15", preset_ids)
         self.assertEqual(payload["presets"][0]["checkpoint_name"], "realvisxl.safetensors")
+
+    def test_discover_model_inventory_uses_ttl_cache_for_host_lookup(self) -> None:
+        call_count = 0
+
+        def _getter(folder_name: str) -> list[str]:
+            nonlocal call_count
+            call_count += 1
+            return {
+                "checkpoints": ["cache-checkpoint.safetensors"],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+
+        module = types.SimpleNamespace(get_filename_list=_getter)
+        with mock.patch(
+            "rookieui.services.model_inventory._load_folder_paths_module",
+            return_value=module,
+        ):
+            first = discover_model_inventory()
+            second = discover_model_inventory()
+
+        self.assertEqual(first.default_checkpoint, "cache-checkpoint.safetensors")
+        self.assertEqual(second.default_checkpoint, "cache-checkpoint.safetensors")
+        self.assertEqual(call_count, 12)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any
 
 from rookieui.contracts.models import ModelInventorySnapshot
@@ -18,6 +20,10 @@ _HOST_MODEL_FOLDERS = (
     "upscale_models",
     "vae",
 )
+_INVENTORY_CACHE_TTL_SECONDS = 5.0
+_inventory_cache_lock = threading.Lock()
+_inventory_cache_snapshot: ModelInventorySnapshot | None = None
+_inventory_cache_at: float = 0.0
 
 
 def _load_folder_paths_module() -> Any:
@@ -46,8 +52,7 @@ def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[
     return values
 
 
-def discover_model_inventory(*, folder_paths_module: Any | None = None) -> ModelInventorySnapshot:
-    module = folder_paths_module if folder_paths_module is not None else _load_folder_paths_module()
+def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
     # CRITICAL: keep these folder names aligned with ComfyUI host folder_paths keys; renaming them breaks host inventory discovery for non-checkpoint families.
     inventory_map = {
         folder_name: _safe_get_filename_list(module, folder_name)
@@ -94,3 +99,33 @@ def discover_model_inventory(*, folder_paths_module: Any | None = None) -> Model
         default_vae=vae[0],
         default_text_encoder=text_encoders[0],
     )
+
+
+def discover_model_inventory(*, folder_paths_module: Any | None = None) -> ModelInventorySnapshot:
+    global _inventory_cache_snapshot, _inventory_cache_at
+
+    if folder_paths_module is not None:
+        # IMPORTANT: explicit module injection is used by tests and controlled call-sites; bypass runtime cache to avoid hidden cross-test coupling.
+        return _build_inventory_snapshot(folder_paths_module)
+
+    now = time.monotonic()
+    with _inventory_cache_lock:
+        if (
+            _inventory_cache_snapshot is not None
+            and (now - _inventory_cache_at) < _INVENTORY_CACHE_TTL_SECONDS
+        ):
+            return _inventory_cache_snapshot
+
+    module = _load_folder_paths_module()
+    snapshot = _build_inventory_snapshot(module)
+    with _inventory_cache_lock:
+        _inventory_cache_snapshot = snapshot
+        _inventory_cache_at = now
+    return snapshot
+
+
+def _reset_inventory_cache_for_tests() -> None:
+    global _inventory_cache_snapshot, _inventory_cache_at
+    with _inventory_cache_lock:
+        _inventory_cache_snapshot = None
+        _inventory_cache_at = 0.0
