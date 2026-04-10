@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import NormalizedTxt2ImgRequest, Txt2ImgRequest
+from rookieui.contracts.aliases import (
+    HIRES_UPSCALE_METHODS as _HIRES_UPSCALE_METHODS,
+    TEXT_ENCODER_LOCKED_PROFILES as _TEXT_ENCODER_LOCKED_PROFILES,
+)
 from rookieui.security.request_guard import (
     normalize_option_label,
     normalize_prompt_text,
@@ -40,8 +44,6 @@ _DEFAULT_HIRES_SCALE = 1.5
 _DEFAULT_HIRES_DENOISE = 0.35
 _DEFAULT_HIRES_UPSCALE_METHOD = "bislerp"
 _DEFAULT_DTYPE_PROFILE = "automatic"
-_TEXT_ENCODER_LOCKED_PROFILES = {"sd15", "sdxl", "pony", "illustrious", "noob"}
-_HIRES_UPSCALE_METHODS = {"nearest-exact", "bilinear", "area", "bicubic", "bislerp"}
 _DTYPE_PROFILE_ALIASES = {
     "automatic": {"automatic"},
     "automatic_fp16_lora": {"automatic_fp16_lora", "automatic (fp16 lora)", "automatic fp16 lora"},

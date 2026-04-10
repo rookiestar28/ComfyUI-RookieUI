@@ -74,6 +74,27 @@ class PNGInfoParsingTests(unittest.TestCase):
         self.assertIn("image_asset", result["missing_inputs"])
         self.assertIn("mask_asset", result["missing_inputs"])
 
+    def test_parse_pnginfo_payload_accepts_underscore_inpaint_aliases(self) -> None:
+        result = parse_pnginfo_payload(
+            {
+                "metadata": {
+                    "parameters": (
+                        "portrait cleanup\n"
+                        "Negative prompt: bad hands\n"
+                        "Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7, Seed: 42, "
+                        "Denoising strength: 0.42, Resize mode: just_resize, Mask mode: inpaint_not_masked, "
+                        "Masked content: latent_noise, Inpaint area: only_masked, Masked area padding: 16, "
+                        "Model: ponyDiffusion.safetensors"
+                    )
+                }
+            }
+        ).to_payload()
+
+        self.assertEqual(result["payload"]["resize_mode"], "just_resize")
+        self.assertEqual(result["payload"]["inpaint_mask_mode"], "inpaint_not_masked")
+        self.assertEqual(result["payload"]["inpaint_masked_content"], "latent_noise")
+        self.assertEqual(result["payload"]["inpaint_area"], "only_masked")
+
     def test_parse_pnginfo_payload_reads_a1111_image_metadata(self) -> None:
         image_data = self._build_image_data_url(
             {

@@ -1,6 +1,18 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
+from rookieui.contracts.aliases import (
+    DEFAULT_INPAINT_AREA as _DEFAULT_INPAINT_AREA,
+    DEFAULT_MASKED_CONTENT as _DEFAULT_INPAINT_CONTENT,
+    DEFAULT_MASK_MODE as _DEFAULT_MASK_MODE,
+    DEFAULT_RESIZE_MODE as _DEFAULT_RESIZE_MODE,
+    HIRES_UPSCALE_METHODS as _HIRES_UPSCALE_METHODS,
+    INPAINT_AREA_ALIASES as _INPAINT_AREA_ALIASES,
+    MASKED_CONTENT_ALIASES as _INPAINT_CONTENT_ALIASES,
+    MASK_MODE_ALIASES as _MASK_MODE_ALIASES,
+    RESIZE_MODE_ALIASES as _RESIZE_MODE_ALIASES,
+    TEXT_ENCODER_LOCKED_PROFILES as _TEXT_ENCODER_LOCKED_PROFILES,
+)
 from rookieui.security.asset_guard import validate_asset_identifier
 from rookieui.security.request_guard import (
     normalize_option_label,
@@ -44,46 +56,6 @@ _MAX_HIRES_STEPS = 150
 _DEFAULT_HIRES_SCALE = 1.5
 _DEFAULT_HIRES_DENOISE = 0.35
 _DEFAULT_HIRES_UPSCALE_METHOD = "bislerp"
-_TEXT_ENCODER_LOCKED_PROFILES = {"sd15", "sdxl", "pony", "illustrious", "noob"}
-_HIRES_UPSCALE_METHODS = {"nearest-exact", "bilinear", "area", "bicubic", "bislerp"}
-
-_RESIZE_MODE_ALIASES = {
-    "just resize": "just_resize",
-    "just_resize": "just_resize",
-    "crop and resize": "crop_and_resize",
-    "crop_and_resize": "crop_and_resize",
-    "resize and fill": "resize_and_fill",
-    "resize_and_fill": "resize_and_fill",
-    "just resize (latent upscale)": "latent_upscale",
-    "latent_upscale": "latent_upscale",
-}
-_DEFAULT_RESIZE_MODE = "crop_and_resize"
-
-_MASK_MODE_ALIASES = {
-    "inpaint masked": "inpaint_masked",
-    "inpaint_masked": "inpaint_masked",
-    "inpaint not masked": "inpaint_not_masked",
-    "inpaint_not_masked": "inpaint_not_masked",
-}
-_DEFAULT_MASK_MODE = "inpaint_masked"
-
-_INPAINT_CONTENT_ALIASES = {
-    "fill": "fill",
-    "original": "original",
-    "latent noise": "latent_noise",
-    "latent_noise": "latent_noise",
-    "latent nothing": "latent_nothing",
-    "latent_nothing": "latent_nothing",
-}
-_DEFAULT_INPAINT_CONTENT = "original"
-
-_INPAINT_AREA_ALIASES = {
-    "whole picture": "whole_picture",
-    "whole_picture": "whole_picture",
-    "only masked": "only_masked",
-    "only_masked": "only_masked",
-}
-_DEFAULT_INPAINT_AREA = "only_masked"
 
 _IMG2IMG_MODE_ALIASES = {
     "img2img": "img2img",

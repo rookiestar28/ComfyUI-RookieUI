@@ -7,6 +7,12 @@ from typing import Any
 
 from PIL import Image
 
+from rookieui.contracts.aliases import (
+    INPAINT_AREA_ALIASES as _INPAINT_AREA_ALIASES,
+    MASKED_CONTENT_ALIASES as _MASKED_CONTENT_ALIASES,
+    MASK_MODE_ALIASES as _MASK_MODE_ALIASES,
+    RESIZE_MODE_ALIASES as _RESIZE_MODE_ALIASES,
+)
 from rookieui.contracts.pnginfo import PNGInfoParseResult
 from rookieui.security.request_guard import (
     normalize_infotext,
@@ -30,26 +36,6 @@ _PARAM_RE = re.compile(r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
 _IMAGE_SIZE_RE = re.compile(r"^(\d+)x(\d+)$")
 _SCHEDULER_SUFFIXES = (" karras", " exponential", " sgm uniform", " simple")
 _INPAINT_MARKERS = {"Mask mode", "Masked content", "Inpaint area", "Masked area padding"}
-_RESIZE_MODE_ALIASES = {
-    "just resize": "just_resize",
-    "crop and resize": "crop_and_resize",
-    "resize and fill": "resize_and_fill",
-    "just resize (latent upscale)": "latent_upscale",
-}
-_MASK_MODE_ALIASES = {
-    "inpaint masked": "inpaint_masked",
-    "inpaint not masked": "inpaint_not_masked",
-}
-_MASKED_CONTENT_ALIASES = {
-    "fill": "fill",
-    "original": "original",
-    "latent noise": "latent_noise",
-    "latent nothing": "latent_nothing",
-}
-_INPAINT_AREA_ALIASES = {
-    "whole picture": "whole_picture",
-    "only masked": "only_masked",
-}
 
 
 def _unquote_text(value: str) -> str:

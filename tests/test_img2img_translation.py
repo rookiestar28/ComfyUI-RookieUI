@@ -163,6 +163,25 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.mode, "inpaint_upload")
         self.assertEqual(normalized.execution_mode, "inpaint")
 
+    def test_normalize_img2img_request_accepts_human_readable_inpaint_aliases(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "image_asset": "portrait-input",
+                "mask_asset": "portrait-mask",
+                "mode": "inpaint",
+                "resize_mode": "Just resize",
+                "inpaint_mask_mode": "Inpaint not masked",
+                "inpaint_masked_content": "Latent noise",
+                "inpaint_area": "Whole picture",
+            }
+        )
+
+        self.assertEqual(normalized.resize_mode, "just_resize")
+        self.assertEqual(normalized.inpaint_mask_mode, "inpaint_not_masked")
+        self.assertEqual(normalized.inpaint_masked_content, "latent_noise")
+        self.assertEqual(normalized.inpaint_area, "whole_picture")
+
     def test_normalize_img2img_request_uses_batch_image_as_source_fallback(self) -> None:
         with mock.patch(
             "rookieui.services.img2img.store_uploaded_image",
