@@ -193,6 +193,16 @@ class Img2ImgTranslationTests(unittest.TestCase):
                 }
             )
 
+    def test_normalize_img2img_request_reports_field_error_for_invalid_denoise(self) -> None:
+        with self.assertRaisesRegex(ValueError, "denoise_strength must be a float"):
+            normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "denoise_strength": "oops",
+                }
+            )
+
     def test_normalize_img2img_request_clears_text_encoder_for_sd15(self) -> None:
         normalized = normalize_img2img_request(
             {

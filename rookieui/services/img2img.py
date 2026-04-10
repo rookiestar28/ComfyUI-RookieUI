@@ -261,7 +261,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     if not profile.supports_clip_skip:
         clip_skip = 1
 
-    denoise_strength = round(float(request.denoise_strength), 3)
+    # IMPORTANT: keep denoise coercion field-aware so invalid payloads report deterministic error surfaces across normalization paths.
+    denoise_strength = round(_coerce_float(request.denoise_strength, "denoise_strength"), 3)
     if denoise_strength < _MIN_DENOISE or denoise_strength > _MAX_DENOISE:
         raise ValueError("denoise_strength must be between 0.0 and 1.0.")
 
