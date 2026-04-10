@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+import unittest
+
+from rookieui.api.routes import build_capabilities_snapshot
+from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
+from rookieui.services.capabilities import build_capabilities_payload
+
+
+class CapabilitySnapshotTests(unittest.TestCase):
+    def test_capabilities_snapshot_enables_sidebar_shell(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        self.assertEqual(payload["service"], "rookieui")
+        self.assertTrue(payload["features"]["sidebarShell"])
+        self.assertTrue(payload["features"]["capabilityBootstrap"])
+        self.assertTrue(payload["features"]["compatibilityLayer"])
+        self.assertTrue(payload["features"]["img2img"])
+        self.assertTrue(payload["features"]["pngInfo"])
+        self.assertTrue(payload["features"]["queue"])
+        self.assertIn("/rookieui/capabilities", payload["routes"])
+
+    def test_capabilities_snapshot_contains_overview_tab(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        titles = [tab["title"] for tab in payload["tabs"]]
+        self.assertIn("Txt2Img", titles)
+        self.assertIn("Img2Img", titles)
+        self.assertIn("Extras", titles)
+        self.assertIn("PNG Info", titles)
+        self.assertIn("Queue", titles)
+
+    def test_capabilities_snapshot_exposes_parity_profiles(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        profile_ids = [profile["id"] for profile in payload["parity"]["profiles"]]
+        self.assertIn("sd15", profile_ids)
+        self.assertIn("pony", profile_ids)
+
+    def test_build_capabilities_payload_normalizes_host_surfaces(self) -> None:
+        payload = build_capabilities_payload(
+            routes=["/rookieui/capabilities"],
+            snapshot=RookieUICapabilitiesSnapshot(
+                host_surfaces=[" desktop ", "standalone-web", ""],
+                routes=["/rookieui/capabilities"],
+            ),
+        )
+
+        self.assertEqual(payload["host_surfaces"], ["desktop", "standalone-web"])

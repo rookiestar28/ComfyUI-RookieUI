@@ -1,0 +1,17 @@
+{
+  "name": "comfyui-rookieui",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,421 @@
+from __future__ import annotations
+
+from typing import Any
+
+from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.extras import execute_extras_request, normalize_extras_request
+from rookieui.services.parity_matrix import build_parity_payload
+from rookieui.services.presets import build_preset_payload
+from rookieui.services.img2img import normalize_img2img_request
+from rookieui.services.pnginfo import parse_pnginfo_payload
+from rookieui.services.queue_snapshot import build_queue_job_snapshot, build_queue_snapshot
+from rookieui.services.prompt_submission import submit_prompt_workflow
+from rookieui.services.txt2img import normalize_txt2img_request
+from rookieui.services.workflow_translation import (
+    translate_img2img_request,
+    translate_txt2img_request,
+)
+from rookieui.services.capabilities import build_capabilities_payload
+from rookieui.services.compatibility import build_compatibility_payload
+from rookieui.security.asset_guard import normalize_metadata_text
+from rookieui.security.request_guard import normalize_client_id, normalize_option_label
+from rookieui.security.route_guard import INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
+
+INTERNAL_ROUTE_PATHS = [
+    f"{INTERNAL_ROUTE_PREFIX}/health",
+    f"{INTERNAL_ROUTE_PREFIX}/bootstrap",
+    f"{INTERNAL_ROUTE_PREFIX}/capabilities",
+    f"{INTERNAL_ROUTE_PREFIX}/parity",
+    f"{INTERNAL_ROUTE_PREFIX}/compatibility",
+    f"{INTERNAL_ROUTE_PREFIX}/models",
+    f"{INTERNAL_ROUTE_PREFIX}/presets",
+    f"{INTERNAL_ROUTE_PREFIX}/queue",
+    f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}",
+    f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
+    f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
+    f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img",
+    f"{INTERNAL_ROUTE_PREFIX}/generate/img2img",
+    f"{INTERNAL_ROUTE_PREFIX}/extras/run",
+]
+
+
+def build_health_payload() -> dict[str, Any]:
+    return {
+        "service": normalize_metadata_text("rookieui"),
+        "status": normalize_metadata_text("ok"),
+    }
+
+
+def build_bootstrap_payload() -> dict[str, Any]:
+    return {
+        "service": normalize_metadata_text("rookieui"),
+        "status": normalize_metadata_text("bootstrap-ready"),
+        "visibility": normalize_metadata_text("internal"),
+        "routes": list(INTERNAL_ROUTE_PATHS),
+    }
+
+
+def build_capabilities_snapshot() -> dict[str, object]:
+    return build_capabilities_payload(routes=list(INTERNAL_ROUTE_PATHS))
+
+
+def build_parity_snapshot() -> dict[str, object]:
+    return build_parity_payload()
+
+
+def build_compatibility_snapshot() -> dict[str, object]:
+    return build_compatibility_payload()
+
+
+def build_models_snapshot() -> dict[str, object]:
+    return discover_model_inventory().to_payload()
+
+
+def build_presets_snapshot() -> dict[str, object]:
+    return build_preset_payload()
+
+
+def build_queue_snapshot_payload(*, client_id: str | None = None) -> dict[str, object]:
+    return build_queue_snapshot(
+        _get_prompt_server_for_submission(),
+        client_id=client_id,
+    )
+
+
+def build_queue_job_snapshot_payload(
+    prompt_id: str,
+    *,
+    client_id: str | None = None,
+) -> dict[str, object]:
+    normalized_prompt_id = normalize_option_label(prompt_id, "prompt_id", max_length=96)
+    return build_queue_job_snapshot(
+        _get_prompt_server_for_submission(),
+        normalized_prompt_id,
+        client_id=client_id,
+    )
+
+
+def _get_prompt_server_for_submission() -> Any | None:
+    try:
+        from rookieui.services.route_bootstrap import _get_prompt_server_instance
+    except Exception:
+        return None
+    return _get_prompt_server_instance()
+
+
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+    return bool(value)
+
+
+def _json_response(payload: dict[str, Any], *, status: int = 200, request: Any | None = None) -> Any:
+    try:
+        from aiohttp import web
+    except ImportError:
+        return {"status": status, "payload": payload}
+    if request is None or request.__class__.__module__.split(".", 1)[0] != "aiohttp":
+        return {"status": status, "payload": payload}
+    return web.json_response(payload, status=status)
+
+
+async def health(request: Any) -> Any:
+    return _json_response(build_health_payload(), request=request)
+
+
+async def bootstrap(request: Any) -> Any:
+    return _json_response(build_bootstrap_payload(), request=request)
+
+
+async def capabilities(request: Any) -> Any:
+    return _json_response(build_capabilities_snapshot(), request=request)
+
+
+async def parity(request: Any) -> Any:
+    return _json_response(build_parity_snapshot(), request=request)
+
+
+async def compatibility(request: Any) -> Any:
+    return _json_response(build_compatibility_snapshot(), request=request)
+
+
+async def models(request: Any) -> Any:
+    return _json_response(build_models_snapshot(), request=request)
+
+
+async def presets(request: Any) -> Any:
+    return _json_response(build_presets_snapshot(), request=request)
+
+
+async def queue(request: Any) -> Any:
+    try:
+        client_id = normalize_client_id(_read_request_query_value(request, "client_id"))
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    return _json_response(build_queue_snapshot_payload(client_id=client_id), request=request)
+
+
+async def queue_prompt(request: Any) -> Any:
+    prompt_id = _read_request_match_value(request, "prompt_id")
+    if not prompt_id:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text("prompt_id is required."),
+            },
+            status=400,
+            request=request,
+        )
+    try:
+        client_id = normalize_client_id(_read_request_query_value(request, "client_id"))
+        payload = build_queue_job_snapshot_payload(prompt_id, client_id=client_id)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(payload, request=request)
+
+
+async def pnginfo_parse(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = parse_pnginfo_payload(payload)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload = result.to_payload()
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
+async def pnginfo_inspect(request: Any) -> Any:
+    return await pnginfo_parse(request)
+
+
+async def _read_request_payload(request: Any) -> dict[str, object]:
+    if request is None:
+        return {}
+
+    json_loader = getattr(request, "json", None)
+    if callable(json_loader):
+        payload = await json_loader()
+        if isinstance(payload, dict):
+            return payload
+        raise ValueError("RookieUI generation payload must be an object.")
+
+    payload = getattr(request, "payload", {})
+    if isinstance(payload, dict):
+        return payload
+
+    raise ValueError("RookieUI generation payload must be an object.")
+
+
+def _read_request_query_value(request: Any, key: str) -> object | None:
+    if request is None:
+        return None
+
+    query = getattr(request, "query", None)
+    if isinstance(query, dict):
+        return query.get(key)
+
+    rel_url = getattr(request, "rel_url", None)
+    rel_query = getattr(rel_url, "query", None)
+    if isinstance(rel_query, dict):
+        return rel_query.get(key)
+    if rel_query is not None and hasattr(rel_query, "get"):
+        return rel_query.get(key)
+
+    return None
+
+
+def _read_request_match_value(request: Any, key: str) -> str:
+    if request is None:
+        return ""
+    match_info = getattr(request, "match_info", None)
+    if isinstance(match_info, dict):
+        raw_value = match_info.get(key)
+        return raw_value if isinstance(raw_value, str) else ""
+    if match_info is not None and hasattr(match_info, "get"):
+        raw_value = match_info.get(key)
+        return raw_value if isinstance(raw_value, str) else ""
+    return ""
+
+
+async def _submit_translation_payload(
+    *,
+    dry_run: bool,
+    client_id: object,
+    translation: Any,
+    surface: str,
+    request: Any | None = None,
+) -> Any:
+    response_payload = translation.to_payload()
+    if dry_run:
+        response_payload["submission"] = {
+            "accepted": False,
+            "mode": "dry-run",
+        }
+        return _json_response(response_payload, request=request)
+
+    try:
+        submission = await submit_prompt_workflow(
+            _get_prompt_server_for_submission(),
+            response_payload["workflow"],
+            client_id=client_id if isinstance(client_id, str) else None,
+            origin="rookieui",
+            surface=surface,
+            profile=str(response_payload.get("profile", "")),
+        )
+    except RuntimeError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("host-unavailable"),
+                "detail": normalize_metadata_text(str(exc)),
+                "translation": response_payload,
+            },
+            status=503,
+            request=request,
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("submission-rejected"),
+                "detail": normalize_metadata_text(str(exc)),
+                "translation": response_payload,
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload["mode"] = "queued"
+    response_payload["submission"] = submission
+    return _json_response(response_payload, request=request)
+
+
+async def txt2img(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        request_payload = dict(payload)
+        dry_run = _coerce_bool(request_payload.pop("dry_run", False))
+        client_id = normalize_client_id(request_payload.pop("client_id", None))
+        normalized = normalize_txt2img_request(request_payload)
+        translation = translate_txt2img_request(normalized)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    return await _submit_translation_payload(
+        dry_run=dry_run,
+        client_id=client_id,
+        translation=translation,
+        surface="txt2img",
+        request=request,
+    )
+
+
+async def img2img(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        request_payload = dict(payload)
+        dry_run = _coerce_bool(request_payload.pop("dry_run", False))
+        client_id = normalize_client_id(request_payload.pop("client_id", None))
+        normalized = normalize_img2img_request(request_payload)
+        translation = translate_img2img_request(normalized)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    return await _submit_translation_payload(
+        dry_run=dry_run,
+        client_id=client_id,
+        translation=translation,
+        surface="img2img",
+        request=request,
+    )
+
+
+async def extras_run(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        normalized = normalize_extras_request(payload)
+        result = execute_extras_request(normalized)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload = result.to_payload()
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
+def register_routes(prompt_server: Any) -> None:
+    registrar = SafeRouteRegistrar(prompt_server.app.router)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/health", health)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/bootstrap", bootstrap)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/capabilities", capabilities)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/parity", parity)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/compatibility", compatibility)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/models", models)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/presets", presets)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue", queue)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}", queue_prompt)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img", txt2img)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/img2img", img2img)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/extras/run", extras_run)
