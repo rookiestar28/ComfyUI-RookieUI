@@ -60,6 +60,19 @@ class ExtrasTests(unittest.TestCase):
         self.assertEqual(len(request.source_assets), 1)
         self.assertEqual(request.scale_mode, "scale_by")
 
+    def test_normalize_extras_request_accepts_numeric_boolean_payloads(self) -> None:
+        request = normalize_extras_request(
+            {
+                "mode": "single_image",
+                "image_data": self._build_image_data_url(),
+                "upscale_enabled": 1,
+                "color_correction": 0,
+            }
+        )
+
+        self.assertTrue(request.upscale_enabled)
+        self.assertFalse(request.color_correction)
+
     def test_execute_extras_request_writes_workspace_output(self) -> None:
         normalized = normalize_extras_request(
             {

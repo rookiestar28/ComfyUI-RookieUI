@@ -34,6 +34,9 @@ def _coerce_bool(value: object, field_name: str) -> bool:
             return True
         if normalized in {"0", "false", "no", "off", ""}:
             return False
+    # IMPORTANT: keep numeric 0/1 parity with txt2img/img2img/pnginfo coercion to prevent cross-endpoint payload regressions.
+    if isinstance(value, (int, float)):
+        return bool(value)
     raise ValueError(f"{field_name} must be a boolean.")
 
 
