@@ -7,6 +7,7 @@ from unittest import mock
 from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
+    resolve_primary_model_selector_context,
 )
 from rookieui.services.presets import build_preset_payload
 
@@ -95,6 +96,58 @@ class ModelInventoryTests(unittest.TestCase):
         preset_ids = [preset["id"] for preset in payload["presets"]]
         self.assertIn("sd15", preset_ids)
         self.assertEqual(payload["presets"][0]["checkpoint_name"], "realvisxl.safetensors")
+
+    def test_build_preset_payload_uses_diffusion_model_default_for_flux_family(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["flux1-dev.safetensors", "qwen-image.safetensors"],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+
+        with mock.patch(
+            "rookieui.services.presets.discover_model_inventory",
+            return_value=discover_model_inventory(folder_paths_module=module),
+        ):
+            payload = build_preset_payload()
+
+        preset_lookup = {preset["id"]: preset for preset in payload["presets"]}
+        self.assertEqual(preset_lookup["flux"]["checkpoint_name"], "flux1-dev.safetensors")
+        self.assertEqual(preset_lookup["qwen_image"]["checkpoint_name"], "flux1-dev.safetensors")
+
+    def test_resolve_primary_model_selector_context_uses_profile_mapped_category(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["flux1-dev.safetensors"],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        category_id, selectors, default_value = resolve_primary_model_selector_context("flux", snapshot)
+        self.assertEqual(category_id, "diffusion_models")
+        self.assertEqual(selectors, ["flux1-dev.safetensors"])
+        self.assertEqual(default_value, "flux1-dev.safetensors")
+
+    def test_resolve_primary_model_selector_context_falls_back_to_checkpoints(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": [],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        category_id, selectors, default_value = resolve_primary_model_selector_context("flux", snapshot)
+        self.assertEqual(category_id, "checkpoints")
+        self.assertEqual(selectors, ["realvisxl.safetensors"])
+        self.assertEqual(default_value, "realvisxl.safetensors")
 
     def test_discover_model_inventory_uses_ttl_cache_for_host_lookup(self) -> None:
         call_count = 0

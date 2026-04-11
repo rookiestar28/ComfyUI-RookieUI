@@ -295,6 +295,33 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.checkpoint_name, "SD15\\beautifulRealistic_v40.safetensors")
 
+    def test_normalize_img2img_request_resolves_profile_mapped_diffusion_model_selector(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["Automatic"],
+                text_encoders=["Automatic"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="Automatic",
+                default_text_encoder="Automatic",
+                controlnet=[],
+            ),
+        ):
+            request = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                }
+            )
+
+        self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
+
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {

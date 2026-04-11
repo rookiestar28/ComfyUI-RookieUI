@@ -260,6 +260,32 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.checkpoint_name, "SD15\\beautifulRealistic_v40.safetensors")
 
+    def test_normalize_txt2img_request_resolves_profile_mapped_diffusion_model_selector(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["Automatic"],
+                text_encoders=["Automatic"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="Automatic",
+                default_text_encoder="Automatic",
+                controlnet=[],
+            ),
+        ):
+            request = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                }
+            )
+
+        self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
+
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:
         request = normalize_txt2img_request(
             {

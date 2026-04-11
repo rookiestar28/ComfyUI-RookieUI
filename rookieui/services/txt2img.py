@@ -12,7 +12,10 @@ from rookieui.security.request_guard import (
     resolve_inventory_selector,
     validate_seed_range,
 )
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    discover_model_inventory,
+    resolve_primary_model_selector_context,
+)
 from rookieui.services.parity_matrix import (
     get_parity_profile,
     normalize_sampler_name,
@@ -242,11 +245,12 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         strict_model_match=inventory_is_host,
     )
 
+    _, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(profile.id, inventory)
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
-        default_value=inventory.default_checkpoint,
-        inventory_selectors=inventory.checkpoints,
+        default_value=primary_model_default,
+        inventory_selectors=primary_model_selectors,
         strict_match=inventory_is_host,
     )
     vae_name = resolve_inventory_selector(

@@ -3,6 +3,18 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+PRIMARY_MODEL_CATEGORY_BY_FAMILY: dict[str, str] = {
+    "sd15": "checkpoints",
+    "sdxl": "checkpoints",
+    "flux": "diffusion_models",
+    "qwen_image": "diffusion_models",
+    "klein": "diffusion_models",
+    "lumina": "diffusion_models",
+    "zit": "diffusion_models",
+    "wan": "diffusion_models",
+    "anima": "diffusion_models",
+}
+
 
 @dataclass(frozen=True)
 class ModelInventorySnapshot:
@@ -63,17 +75,7 @@ class ModelInventorySnapshot:
                     ],
                 },
             ],
-            "primary_model_category_by_family": {
-                "sd15": "checkpoints",
-                "sdxl": "checkpoints",
-                "flux": "diffusion_models",
-                "qwen_image": "diffusion_models",
-                "klein": "diffusion_models",
-                "lumina": "diffusion_models",
-                "zit": "diffusion_models",
-                "wan": "diffusion_models",
-                "anima": "diffusion_models",
-            },
+            "primary_model_category_by_family": dict(PRIMARY_MODEL_CATEGORY_BY_FAMILY),
             "categories": {
                 "checkpoints": {
                     "title": "Checkpoints",

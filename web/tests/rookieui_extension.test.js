@@ -210,6 +210,12 @@ describe("registerRookieUIBootstrapExtension", () => {
                     default_value: "dreamshaper.safetensors",
                     sidebar_visible: true,
                   },
+                  diffusion_models: {
+                    title: "Diffusion Models",
+                    items: ["flux1-dev.safetensors"],
+                    default_value: "flux1-dev.safetensors",
+                    sidebar_visible: false,
+                  },
                 },
               },
             };
@@ -600,6 +606,15 @@ describe("registerRookieUIBootstrapExtension", () => {
       expect(document.getElementById("rookieui-clip-skip").dataset.executionHint).toBe(
         matrixRow.ignoredHint ? "ignored" : undefined,
       );
+      if (matrixRow.id === "flux" || matrixRow.id === "qwen_image") {
+        expect(document.getElementById("rookieui-checkpoint").dataset.modelCategory).toBe("diffusion_models");
+        expect(
+          Array.from(document.getElementById("rookieui-checkpoint").options).map((option) => option.value),
+        ).toEqual(["flux1-dev.safetensors"]);
+        expect(document.getElementById("rookieui-checkpoint").value).toBe("flux1-dev.safetensors");
+      } else {
+        expect(document.getElementById("rookieui-checkpoint").dataset.modelCategory).toBe("checkpoints");
+      }
     }
     document.getElementById("rookieui-preset").value = "sd15";
     document.getElementById("rookieui-preset").dispatchEvent(new Event("change", { bubbles: true }));
@@ -676,6 +691,15 @@ describe("registerRookieUIBootstrapExtension", () => {
       expect(document.getElementById("rookieui-img2img-clip-skip").dataset.executionHint).toBe(
         matrixRow.ignoredHint ? "ignored" : undefined,
       );
+      if (matrixRow.id === "flux" || matrixRow.id === "qwen_image") {
+        expect(document.getElementById("rookieui-img2img-checkpoint").dataset.modelCategory).toBe("diffusion_models");
+        expect(
+          Array.from(document.getElementById("rookieui-img2img-checkpoint").options).map((option) => option.value),
+        ).toEqual(["flux1-dev.safetensors"]);
+        expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("flux1-dev.safetensors");
+      } else {
+        expect(document.getElementById("rookieui-img2img-checkpoint").dataset.modelCategory).toBe("checkpoints");
+      }
     }
     document.getElementById("rookieui-img2img-preset").value = "sd15";
     document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));

@@ -340,6 +340,59 @@ function setElementValue(element, value) {
   element.value = String(value);
 }
 
+function replaceSelectOptions(selectNode, values, selectedValue = "") {
+  if (!selectNode) {
+    return;
+  }
+  const normalizedValues = Array.isArray(values)
+    ? values.filter((value) => typeof value === "string" && value.trim()).map((value) => String(value))
+    : [];
+  const fallbackValue = selectedValue ? String(selectedValue) : "";
+  const resolvedValues = normalizedValues.length > 0 ? normalizedValues : [fallbackValue || "__host_default__"];
+  const nextValue = resolvedValues.includes(fallbackValue)
+    ? fallbackValue
+    : resolvedValues[0];
+
+  selectNode.replaceChildren();
+  resolvedValues.forEach((value) => {
+    const optionNode = document.createElement("option");
+    optionNode.value = value;
+    optionNode.textContent = value;
+    optionNode.selected = value === nextValue;
+    selectNode.appendChild(optionNode);
+  });
+  selectNode.value = nextValue;
+}
+
+function syncPrimaryModelSelectorForPreset(preset, elements, modelsPayload) {
+  if (!preset || !elements?.checkpoint) {
+    return;
+  }
+
+  const catalog = modelsPayload?.catalog ?? {};
+  const categoryByFamily = catalog.primary_model_category_by_family ?? {};
+  const categoryId = String(categoryByFamily[preset.profile] || "checkpoints");
+  const categories = catalog.categories ?? {};
+  const categoryPayload = categories[categoryId] ?? {};
+  const categoryItems = Array.isArray(categoryPayload.items) ? categoryPayload.items : [];
+  const fallbackCheckpointItems = Array.isArray(modelsPayload?.checkpoints) ? modelsPayload.checkpoints : [];
+  const candidateItems = categoryItems.length > 0 ? categoryItems : fallbackCheckpointItems;
+  const categoryDefaultValue =
+    typeof categoryPayload.default_value === "string" && categoryPayload.default_value.trim()
+      ? categoryPayload.default_value
+      : "";
+  const presetCheckpointValue = String(preset.checkpoint_name ?? "").trim();
+  const selectedValue = candidateItems.includes(presetCheckpointValue)
+    ? presetCheckpointValue
+    : categoryDefaultValue;
+
+  // IMPORTANT: preset/profile switch must rebuild model selector from the mapped
+  // inventory category; keeping stale checkpoint-only options causes non-SDXL presets
+  // to miss their real model path and surface empty/invalid model lists.
+  replaceSelectOptions(elements.checkpoint, candidateItems, selectedValue);
+  elements.checkpoint.dataset.modelCategory = categoryId;
+}
+
 function snapshotElementState(elements) {
   const snapshot = {};
   Object.entries(elements).forEach(([key, element]) => {
@@ -436,14 +489,18 @@ function createActionButton(id, text) {
   return button;
 }
 
-function updateFormFromPreset(presetLookup, presetId, elements, profileLookup) {
+function updateFormFromPreset(presetLookup, presetId, elements, profileLookup, modelsPayload = null) {
   const preset = presetLookup.get(presetId);
   if (!preset) {
     return;
   }
 
   setElementValue(elements.profileState, preset.profile);
-  setElementValue(elements.checkpoint, preset.checkpoint_name);
+  if (modelsPayload && typeof modelsPayload === "object") {
+    syncPrimaryModelSelectorForPreset(preset, elements, modelsPayload);
+  } else {
+    setElementValue(elements.checkpoint, preset.checkpoint_name);
+  }
   setElementValue(elements.vae, preset.vae_name);
   setElementValue(elements.textEncoder, preset.text_encoder_name);
   setElementValue(elements.width, preset.width);

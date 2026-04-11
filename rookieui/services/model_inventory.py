@@ -5,7 +5,7 @@ import threading
 import time
 from typing import Any
 
-from rookieui.contracts.models import ModelInventorySnapshot
+from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
 
 _HOST_MODEL_FOLDERS = (
     "checkpoints",
@@ -129,6 +129,27 @@ def discover_model_inventory(*, folder_paths_module: Any | None = None) -> Model
         _inventory_cache_snapshot = snapshot
         _inventory_cache_at = now
     return snapshot
+
+
+def resolve_primary_model_selector_context(
+    profile_id: str,
+    inventory: ModelInventorySnapshot,
+) -> tuple[str, list[str], str]:
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    category_id = PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id, "checkpoints")
+    category_values = list(getattr(inventory, category_id, []) or [])
+
+    # IMPORTANT: profile-driven selector category must be honored for non-SDXL presets
+    # (Flux/Qwen/etc.); forcing checkpoints here breaks preset-aware model-path switching.
+    if not category_values:
+        category_id = "checkpoints"
+        category_values = list(inventory.checkpoints or [])
+
+    if not category_values:
+        category_values = [inventory.default_checkpoint]
+
+    default_value = category_values[0] if category_values else inventory.default_checkpoint
+    return category_id, category_values, default_value
 
 
 def _reset_inventory_cache_for_tests() -> None:

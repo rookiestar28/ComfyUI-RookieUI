@@ -27,7 +27,10 @@ from rookieui.services.coercion import (
     coerce_float as _coerce_float,
     coerce_int as _coerce_int,
 )
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    discover_model_inventory,
+    resolve_primary_model_selector_context,
+)
 from rookieui.services.parity_matrix import (
     get_parity_profile,
     normalize_sampler_name,
@@ -345,11 +348,12 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         hires_denoise = _DEFAULT_HIRES_DENOISE
         hires_upscale_method = _DEFAULT_HIRES_UPSCALE_METHOD
 
+    _, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(profile.id, inventory)
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
-        default_value=inventory.default_checkpoint,
-        inventory_selectors=inventory.checkpoints,
+        default_value=primary_model_default,
+        inventory_selectors=primary_model_selectors,
         strict_match=inventory_is_host,
     )
     vae_name = resolve_inventory_selector(

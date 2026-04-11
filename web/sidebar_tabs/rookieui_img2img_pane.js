@@ -503,7 +503,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncBoundControls,
   });
 
-  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup);
+  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup, bootstrapState.models);
   syncFamilyAwareModuleQuicksetting(
     profileLookup,
     elements.profileState.value,
@@ -567,7 +567,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   });
   img2imgModeRouter.syncFromModeValue();
   elements.preset.addEventListener("change", () => {
-    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup);
+    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
       profileLookup,
       elements.profileState.value,

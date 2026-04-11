@@ -326,7 +326,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   statusNode.textContent = "Idle";
   actionRail.appendChild(statusNode);
 
-  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup);
+  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup, bootstrapState.models);
   syncFamilyAwareModuleQuicksetting(
     profileLookup,
     elements.profileState.value,
@@ -335,7 +335,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     elements.textEncoder,
   );
   elements.preset.addEventListener("change", () => {
-    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup);
+    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
       profileLookup,
       elements.profileState.value,

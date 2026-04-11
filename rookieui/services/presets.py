@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from rookieui.contracts.models import PresetDefinition
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    discover_model_inventory,
+    resolve_primary_model_selector_context,
+)
 from rookieui.services.parity_matrix import get_parity_profile
 
 _UI_PRESET_BLUEPRINTS: tuple[dict[str, object], ...] = (
@@ -110,13 +113,14 @@ def build_preset_payload() -> dict[str, object]:
     for blueprint in _UI_PRESET_BLUEPRINTS:
         profile_id = str(blueprint["profile"])
         profile = get_parity_profile(profile_id)
+        _, primary_models, primary_default = resolve_primary_model_selector_context(profile_id, inventory)
         presets.append(
             PresetDefinition(
                 id=str(blueprint["id"]),
                 title=str(blueprint["title"]),
                 profile=profile_id,
                 base_family=str(blueprint.get("base_family", profile.base_family)),
-                checkpoint_name=inventory.default_checkpoint,
+                checkpoint_name=primary_default if primary_models else inventory.default_checkpoint,
                 vae_name=inventory.default_vae,
                 text_encoder_name=inventory.default_text_encoder,
                 width=int(blueprint.get("width", profile.default_width)),
