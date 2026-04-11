@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.generation import (
     NormalizedImg2ImgRequest,
     NormalizedTxt2ImgRequest,
@@ -40,6 +41,12 @@ class NodeIdAllocator:
             while self._next in self._used:
                 self._next += 1
         return str(candidate)
+
+
+def _to_node_ref(node: str | list[object]) -> list[object]:
+    if isinstance(node, list) and len(node) == 2:
+        return node
+    return [str(node), 0]
 
 
 def _build_checkpoint_loader_node(checkpoint_name: str) -> dict[str, object]:
@@ -392,9 +399,9 @@ def _build_sampler_node(
     workflow: dict[str, object],
     *,
     node_id: str,
-    positive_id: str,
-    negative_id: str,
-    latent_id: str,
+    positive_id: str | list[object],
+    negative_id: str | list[object],
+    latent_id: str | list[object],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     denoise: float,
     model_source: list[object],
@@ -405,9 +412,9 @@ def _build_sampler_node(
         "class_type": "KSampler",
         "inputs": {
             "model": model_source,
-            "positive": [positive_id, 0],
-            "negative": [negative_id, 0],
-            "latent_image": [latent_id, 0],
+            "positive": _to_node_ref(positive_id),
+            "negative": _to_node_ref(negative_id),
+            "latent_image": _to_node_ref(latent_id),
             "seed": request.execution_seed if seed is None else seed,
             "steps": request.steps if steps is None else steps,
             "cfg": request.cfg_scale,
@@ -421,7 +428,7 @@ def _build_sampler_node(
 def _build_decode_and_save(
     workflow: dict[str, object],
     *,
-    sampler_id: str,
+    sampler_id: str | list[object],
     decode_id: str,
     save_id: str,
     vae_source: list[object],
@@ -429,7 +436,7 @@ def _build_decode_and_save(
     workflow[decode_id] = {
         "class_type": "VAEDecode",
         "inputs": {
-            "samples": [sampler_id, 0],
+            "samples": _to_node_ref(sampler_id),
             "vae": vae_source,
         },
     }
@@ -485,6 +492,84 @@ def _resolve_model_sources(
             clip_source = [node_id, 1]
 
     return model_source, clip_source, vae_source
+
+
+def _read_controlnet_unit_value(unit: NormalizedControlNetUnit | dict[str, object], key: str) -> object:
+    if isinstance(unit, dict):
+        return unit.get(key)
+    return getattr(unit, key, None)
+
+
+def _apply_controlnet_units(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    positive_ref: str | list[object],
+    negative_ref: str | list[object],
+    model_source: list[object],
+    vae_source: list[object],
+) -> tuple[str | list[object], str | list[object]]:
+    units = [
+        unit
+        for unit in request.controlnet_units
+        if bool(_read_controlnet_unit_value(unit, "enabled"))
+    ]
+    if not units:
+        return positive_ref, negative_ref
+
+    current_positive = positive_ref
+    current_negative = negative_ref
+    for unit in units:
+        image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
+        model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
+        if not image_asset or not model_name:
+            continue
+
+        image_id = allocator.next()
+        workflow[image_id] = {
+            "class_type": "RookieUILoadAssetImage",
+            "inputs": {
+                "asset_handle": image_asset,
+            },
+        }
+
+        loader_id = allocator.next()
+        if request.base_family in {"sd15", "sdxl"}:
+            workflow[loader_id] = {
+                "class_type": "DiffControlNetLoader",
+                "inputs": {
+                    "model": model_source,
+                    "control_net_name": model_name,
+                },
+            }
+        else:
+            workflow[loader_id] = {
+                "class_type": "ControlNetLoader",
+                "inputs": {
+                    "control_net_name": model_name,
+                },
+            }
+
+        apply_id = allocator.next()
+        workflow[apply_id] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": _to_node_ref(current_positive),
+                "negative": _to_node_ref(current_negative),
+                "control_net": [loader_id, 0],
+                "image": [image_id, 0],
+                "strength": float(_read_controlnet_unit_value(unit, "weight") or 1.0),
+                "start_percent": float(_read_controlnet_unit_value(unit, "guidance_start") or 0.0),
+                "end_percent": float(_read_controlnet_unit_value(unit, "guidance_end") or 1.0),
+                "vae": vae_source,
+            },
+        }
+        # IMPORTANT: keep positive/negative references split by output slot; flattening both to slot 0 silently drops half the ControlNet conditioning update.
+        current_positive = [apply_id, 0]
+        current_negative = [apply_id, 1]
+
+    return current_positive, current_negative
 
 
 def _append_img2img_resize_node(
@@ -554,6 +639,15 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
+    )
     latent_id = allocator.next()
     sampler_id = allocator.next()
 
@@ -568,8 +662,8 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=1.0,
@@ -594,8 +688,8 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -633,6 +727,15 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
+    )
     latent_id = allocator.next()
     workflow[latent_id] = {
         "class_type": "EmptyLatentImage",
@@ -646,8 +749,8 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=1.0,
@@ -670,8 +773,8 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -709,6 +812,15 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
+    )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -744,8 +856,8 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=request.denoise_strength,
@@ -770,8 +882,8 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -809,6 +921,15 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
+    )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -844,8 +965,8 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=request.denoise_strength,
@@ -870,8 +991,8 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -906,6 +1027,15 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
         clip_source=clip_source,
+    )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
     )
     image_id = allocator.next()
     workflow[image_id] = {
@@ -968,8 +1098,8 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=request.denoise_strength,
@@ -994,8 +1124,8 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1033,6 +1163,15 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    positive_ref, negative_ref = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_id,
+        negative_ref=negative_id,
+        model_source=model_source,
+        vae_source=vae_source,
+    )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1094,8 +1233,8 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
-        positive_id=positive_id,
-        negative_id=negative_id,
+        positive_id=positive_ref,
+        negative_id=negative_ref,
         latent_id=latent_id,
         request=request,
         denoise=request.denoise_strength,
@@ -1120,8 +1259,8 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,

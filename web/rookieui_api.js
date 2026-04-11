@@ -16,6 +16,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     compatibilityLayer: true,
     txt2img: true,
     img2img: true,
+    controlnet: true,
     pngInfo: true,
     queue: true,
   },
@@ -153,6 +154,10 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     "/rookieui/compatibility",
     "/rookieui/models",
     "/rookieui/presets",
+    "/rookieui/controlnet/model_list",
+    "/rookieui/controlnet/module_list",
+    "/rookieui/controlnet/control_types",
+    "/rookieui/controlnet/detect",
     "/rookieui/queue",
     "/rookieui/queue/{prompt_id}",
     "/rookieui/pnginfo/inspect",
@@ -436,6 +441,90 @@ export async function fetchRookieUICompatibility(fetchImpl = globalThis.fetch) {
     },
     fetchImpl,
   );
+}
+
+export async function fetchRookieUIControlNetModels(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/model_list",
+    {
+      source: "fallback",
+      model_list: [],
+      default_model: "",
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIControlNetModules(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/module_list",
+    {
+      source: "fallback",
+      module_list: ["none", "canny"],
+      default_module: "none",
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIControlNetTypes(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/control_types",
+    {
+      source: "fallback",
+      control_types: {
+        All: {
+          module_list: ["none", "canny"],
+          model_list: [],
+          default_option: "none",
+        },
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function detectRookieUIControlNet(payload, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.controlnet_detect", "Detect request skipped because fetch() is unavailable.");
+    return {
+      ok: false,
+      status: 0,
+      data: {
+        status: "network-unavailable",
+        detail: "RookieUI controlnet detect is unavailable without fetch().",
+      },
+    };
+  }
+
+  try {
+    const response = await fetchImpl("/rookieui/controlnet/detect", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (_error) {
+    rookieUIDebugWarn("api.controlnet_detect", "Detect request failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
+    return {
+      ok: false,
+      status: 0,
+      data: {
+        status: "network-unavailable",
+        detail: "RookieUI controlnet detect failed before reaching the backend.",
+      },
+    };
+  }
 }
 
 function buildQueuePath(clientId) {

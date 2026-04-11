@@ -35,6 +35,7 @@ class RookieUICapabilitiesSnapshot:
             "compatibilityLayer": True,
             "txt2img": True,
             "img2img": True,
+            "controlnet": True,
             "extras": True,
             "pngInfo": True,
             "queue": True,

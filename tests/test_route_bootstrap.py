@@ -38,13 +38,21 @@ class RouteBootstrapTests(unittest.TestCase):
                 "/rookieui/compatibility",
                 "/rookieui/models",
                 "/rookieui/presets",
+                "/rookieui/controlnet/model_list",
+                "/rookieui/controlnet/module_list",
+                "/rookieui/controlnet/control_types",
                 "/rookieui/queue",
                 "/rookieui/queue/{prompt_id}",
                 "/rookieui/pnginfo/parse",
                 "/rookieui/pnginfo/inspect",
+                "/rookieui/controlnet/detect",
                 "/rookieui/generate/txt2img",
                 "/rookieui/generate/img2img",
                 "/rookieui/extras/run",
+                "/controlnet/model_list",
+                "/controlnet/module_list",
+                "/controlnet/control_types",
+                "/controlnet/detect",
             ],
         )
 
@@ -63,4 +71,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 14)
+        self.assertEqual(len(prompt_server.app.router.routes), 22)

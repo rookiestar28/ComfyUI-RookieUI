@@ -1,4 +1,6 @@
-﻿export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f70-controlnet";
+
+export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
     buildProfileLookup,
     buildPresetLookup,
@@ -8,6 +10,7 @@
     createRangeInput,
     createTextarea,
     createCheckbox,
+    createInlineCheckboxField,
     createField,
     createSliderField,
     createHiresFixSection,
@@ -27,6 +30,7 @@
     transferPreviewToImg2Img,
     activateShellTab,
     submitTxt2Img,
+    readFileAsDataUrl,
     bindSliderPair,
     installPaneStateLock,
     applyPayloadToElements,
@@ -79,6 +83,7 @@
     previewPlaceholder: "Generation preview will update while the job is running.",
   });
   let txt2imgPreviewBox = null;
+  let txt2imgControlNetEditor = null;
 
   const elements = {
     prompt: createTextarea("rookieui-prompt", "", 4, {
@@ -189,7 +194,9 @@
       ],
       "bislerp",
     ),
+    controlnetUnits: createInput("hidden", "rookieui-controlnet-units", "[]"),
   };
+  form.appendChild(elements.controlnetUnits);
   bindSliderPair(elements.width, elements.widthSlider);
   bindSliderPair(elements.height, elements.heightSlider);
   bindSliderPair(elements.steps, elements.stepsSlider);
@@ -386,6 +393,24 @@
         createSliderField(advancedGrid, "Hires Steps", elements.hiresSteps, elements.hiresStepsSlider, "rookieui-hires-steps-field");
         createSliderField(advancedGrid, "Hires Denoise", elements.hiresDenoise, elements.hiresDenoiseSlider, "rookieui-hires-denoise-field");
         createField(advancedGrid, "Upscale Method", elements.hiresUpscaleMethod);
+
+        txt2imgControlNetEditor = createControlNetUnitEditor({
+          idPrefix: "rookieui-txt2img-controlnet",
+          parent: samplingSection,
+          hiddenInput: elements.controlnetUnits,
+          modelOptions: (inventory.controlnet ?? []).map((value) => ({ value, label: value })),
+          createInput,
+          createSelect,
+          createCheckbox,
+          createField,
+          createInlineCheckboxField,
+          appendTextElement,
+          readFileAsDataUrl,
+          syncBoundControls,
+          onStatusMessage: (message) => {
+            statusNode.textContent = message;
+          },
+        });
 
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";
@@ -611,6 +636,10 @@
         lora_strength_model: "loraStrengthModel",
         lora_strength_clip: "loraStrengthClip",
       });
+      if (Array.isArray(payload.controlnet_units)) {
+        elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);
+        txt2imgControlNetEditor?.setUnits(payload.controlnet_units);
+      }
       const resolvedPresetId = findPresetIdForProfile(allPresets, elements.profileState.value);
       if (resolvedPresetId) {
         setElementValue(elements.preset, resolvedPresetId);

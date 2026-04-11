@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
 
 
@@ -34,6 +35,8 @@ class Txt2ImgRequest:
     hires_steps: int | None = None
     hires_denoise: float = 0.35
     hires_upscale_method: str = "bislerp"
+    controlnet_units: list[dict[str, Any]] = field(default_factory=list)
+    alwayson_scripts: dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -87,6 +90,8 @@ class Img2ImgRequest:
     hires_steps: int | None = None
     hires_denoise: float = 0.35
     hires_upscale_method: str = "bislerp"
+    controlnet_units: list[dict[str, Any]] = field(default_factory=list)
+    alwayson_scripts: dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -126,6 +131,9 @@ class NormalizedTxt2ImgRequest:
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
     prompt_warning_codes: list[str] = field(default_factory=list)
+    controlnet_units: list[NormalizedControlNetUnit] = field(default_factory=list)
+    controlnet_warnings: list[str] = field(default_factory=list)
+    controlnet_warning_codes: list[str] = field(default_factory=list)
     prompt_semantics: dict[str, Any] = field(default_factory=dict)
     negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)
@@ -187,6 +195,9 @@ class NormalizedImg2ImgRequest:
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
     prompt_warning_codes: list[str] = field(default_factory=list)
+    controlnet_units: list[NormalizedControlNetUnit] = field(default_factory=list)
+    controlnet_warnings: list[str] = field(default_factory=list)
+    controlnet_warning_codes: list[str] = field(default_factory=list)
     prompt_semantics: dict[str, Any] = field(default_factory=dict)
     negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)

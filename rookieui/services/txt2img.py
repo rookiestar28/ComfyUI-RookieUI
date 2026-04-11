@@ -24,6 +24,7 @@ from rookieui.services.coercion import (
     coerce_int as _coerce_int,
 )
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
+from rookieui.services.controlnet import normalize_controlnet_units
 
 _MIN_DIMENSION = 64
 _MAX_DIMENSION = 2048
@@ -235,6 +236,12 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     if not profile.supports_clip_skip:
         clip_skip = 1
 
+    controlnet_units, controlnet_warning_codes, controlnet_warnings = normalize_controlnet_units(
+        payload,
+        inventory_models=inventory.controlnet,
+        strict_model_match=inventory_is_host,
+    )
+
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
@@ -321,6 +328,9 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         lora_activations=lora_activations,
         prompt_warnings=prompt_preprocess.prompt_warnings,
         prompt_warning_codes=prompt_preprocess.warning_codes,
+        controlnet_units=controlnet_units,
+        controlnet_warnings=controlnet_warnings,
+        controlnet_warning_codes=controlnet_warning_codes,
         prompt_semantics=prompt_preprocess.prompt_semantics.to_payload(),
         negative_prompt_semantics=prompt_preprocess.negative_prompt_semantics.to_payload(),
         applied_defaults=applied_defaults,

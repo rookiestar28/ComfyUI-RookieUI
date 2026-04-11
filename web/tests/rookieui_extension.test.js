@@ -565,10 +565,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     const txt2imgGenerationSection = document.getElementById("rookieui-txt2img-generation-section");
     const txt2imgHiresControls = document.getElementById("rookieui-advanced-controls");
+    const txt2imgControlNetSection = document.getElementById("rookieui-txt2img-controlnet-section");
     expect(txt2imgGenerationSection).not.toBeNull();
-    expect(txt2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-advanced-controls");
     expect(txt2imgGenerationSection?.contains(txt2imgHiresControls)).toBe(true);
+    expect(txt2imgGenerationSection?.contains(txt2imgControlNetSection)).toBe(true);
     expect(txt2imgHiresControls).not.toBeNull();
+    expect(txt2imgControlNetSection).not.toBeNull();
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
@@ -628,6 +630,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-txt2img-workspace-tab-generation").click();
     document.getElementById("rookieui-cfg-scale").value = "7.25";
     document.getElementById("rookieui-cfg-scale").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-controlnet-units").value = JSON.stringify([
+      {
+        enabled: true,
+        module: "canny",
+        model: "control_v11p_sd15_canny.safetensors",
+        image_asset: "txt2img-control-asset",
+      },
+    ]);
     document.getElementById("rookieui-txt2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
     );
@@ -644,10 +654,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     const img2imgGenerationSection = document.getElementById("rookieui-img2img-generation-section");
     const img2imgHiresControls = document.getElementById("rookieui-img2img-hires-controls");
+    const img2imgControlNetSection = document.getElementById("rookieui-img2img-controlnet-section");
     expect(img2imgGenerationSection).not.toBeNull();
-    expect(img2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-img2img-hires-controls");
     expect(img2imgGenerationSection?.contains(img2imgHiresControls)).toBe(true);
+    expect(img2imgGenerationSection?.contains(img2imgControlNetSection)).toBe(true);
     expect(img2imgHiresControls).not.toBeNull();
+    expect(img2imgControlNetSection).not.toBeNull();
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(document.querySelector("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
@@ -701,6 +713,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-img2img-hires-denoise").value = "0.4";
     document.getElementById("rookieui-image-asset").value = "source-asset";
     document.getElementById("rookieui-mask-asset").value = "mask-asset";
+    document.getElementById("rookieui-img2img-controlnet-units").value = JSON.stringify([
+      {
+        enabled: true,
+        module: "depth",
+        model: "control_v11p_sd15_canny.safetensors",
+        image_asset: "img2img-control-asset",
+      },
+    ]);
     document.getElementById("rookieui-img2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
     );
@@ -814,6 +834,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_model).toBe(0.9);
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_clip).toBe(0.7);
     expect(JSON.parse(txt2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(txt2imgCall[1].body).controlnet_units[0].image_asset).toBe("txt2img-control-asset");
     const img2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
     expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).hires_scale).toBe(1.7);
@@ -821,6 +842,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(img2imgCall[1].body).hires_denoise).toBe(0.4);
     expect(JSON.parse(img2imgCall[1].body).seed_extra).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(img2imgCall[1].body).controlnet_units[0].image_asset).toBe("img2img-control-asset");
     const extrasCall = fetchCalls.find(([url]) => url === "/rookieui/extras/run");
     expect(extrasCall).toBeDefined();
     expect(JSON.parse(extrasCall[1].body).upscale_enabled).toBe(false);

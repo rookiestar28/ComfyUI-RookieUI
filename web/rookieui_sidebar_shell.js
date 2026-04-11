@@ -24,8 +24,8 @@ import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
-import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260411-f62-pane-split";
-import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260411-f61-img2img-pane";
+import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260412-f70-controlnet";
+import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260412-f70-controlnet";
 import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
 import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
 import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";
@@ -554,6 +554,7 @@ function readTxt2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
 
@@ -1129,6 +1130,7 @@ function readImg2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
 
@@ -1541,6 +1543,25 @@ function buildLoraLibrary(parent, title, values, elements, idPrefix, statusNode)
   elements.loraStrengthModel.addEventListener("change", updateStatus);
   elements.loraStrengthClip.addEventListener("change", updateStatus);
   updateStatus();
+}
+
+function parseJsonObjectArrayField(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed)
+      ? parsed.filter((entry) => entry && typeof entry === "object")
+      : [];
+  } catch (_error) {
+    emitFrontendDebugWarning(
+      "shell.controlnet_units_parse",
+      "Failed to parse ControlNet units JSON field; returning empty list.",
+      _error,
+    );
+    return [];
+  }
 }
 
 function buildPaneModuleContext() {
