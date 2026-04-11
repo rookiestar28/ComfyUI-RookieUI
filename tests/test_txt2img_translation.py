@@ -134,6 +134,30 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(result["workflow"]["92"]["inputs"]["lora_name"], "hero_boost.safetensors")
         self.assertEqual(result["workflow"]["5"]["inputs"]["model"], ["92", 0])
 
+    def test_translate_txt2img_request_keeps_node_ids_unique_with_hires_and_loras(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline <lora:detail_tweaker.safetensors:0.8> <lora:cinematic_helper.safetensors:0.5>",
+                "lora_name": "hero_boost.safetensors",
+                "lora_strength_model": 0.7,
+                "lora_strength_clip": 0.6,
+                "hires_enabled": True,
+                "hires_steps": 12,
+                "hires_scale": 1.8,
+                "hires_denoise": 0.4,
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+
+        self.assertEqual(len(workflow), len(set(workflow.keys())))
+        self.assertEqual(workflow["90"]["class_type"], "LoraLoader")
+        self.assertEqual(workflow["91"]["class_type"], "LoraLoader")
+        self.assertEqual(workflow["92"]["class_type"], "LoraLoader")
+        self.assertEqual(workflow["7"]["class_type"], "KSampler")
+        self.assertEqual(workflow["7"]["inputs"]["model"], ["92", 0])
+
     def test_normalize_txt2img_request_uses_sdxl_profile_defaults(self) -> None:
         request = normalize_txt2img_request(
             {

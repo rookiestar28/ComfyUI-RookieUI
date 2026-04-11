@@ -8,6 +8,31 @@ from rookieui.contracts.generation import (
 from rookieui.services.parity_matrix import get_parity_profile, get_sampler_alias_payload
 
 
+class NodeIdAllocator:
+    def __init__(self, *, start: int = 1) -> None:
+        self._next = start
+        self._used: set[int] = set()
+
+    def next(self) -> str:
+        # CRITICAL: all workflow node IDs must come from one allocator seam; mixed hardcoded/manual arithmetic caused collision risk as graph variants expanded.
+        while self._next in self._used:
+            self._next += 1
+        node_id = self._next
+        self._used.add(node_id)
+        self._next += 1
+        return str(node_id)
+
+    def allocate_from(self, start: int) -> str:
+        candidate = max(1, start)
+        while candidate in self._used:
+            candidate += 1
+        self._used.add(candidate)
+        if candidate == self._next:
+            while self._next in self._used:
+                self._next += 1
+        return str(candidate)
+
+
 def _build_checkpoint_loader_node(checkpoint_name: str) -> dict[str, object]:
     return {
         "class_type": "CheckpointLoaderSimple",
@@ -21,13 +46,11 @@ def _build_sd15_conditioning(
     workflow: dict[str, object],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     *,
-    start_index: int,
+    allocator: NodeIdAllocator,
     clip_source: list[object],
 ) -> tuple[str, str]:
-    positive_id = str(start_index)
-
     if request.clip_skip > 1:
-        clip_node_id = str(start_index)
+        clip_node_id = allocator.next()
         workflow[clip_node_id] = {
             "class_type": "CLIPSetLastLayer",
             "inputs": {
@@ -36,9 +59,9 @@ def _build_sd15_conditioning(
             },
         }
         clip_source = [clip_node_id, 0]
-        positive_id = str(start_index + 1)
+    positive_id = allocator.next()
 
-    negative_id = str(int(positive_id) + 1)
+    negative_id = allocator.next()
     workflow[positive_id] = {
         "class_type": "CLIPTextEncode",
         "inputs": {
@@ -60,13 +83,13 @@ def _build_sdxl_conditioning(
     workflow: dict[str, object],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     *,
-    start_index: int,
+    allocator: NodeIdAllocator,
     width: int,
     height: int,
     clip_source: list[object],
 ) -> tuple[str, str]:
-    positive_id = str(start_index)
-    negative_id = str(start_index + 1)
+    positive_id = allocator.next()
+    negative_id = allocator.next()
     common_inputs = {
         "clip": clip_source,
         "width": width,
@@ -152,10 +175,13 @@ def _build_decode_and_save(
 def _resolve_model_sources(
     workflow: dict[str, object],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    *,
+    allocator: NodeIdAllocator,
+    checkpoint_id: str,
 ) -> tuple[list[object], list[object], list[object]]:
-    model_source: list[object] = ["1", 0]
-    clip_source: list[object] = ["1", 1]
-    vae_source: list[object] = ["1", 2]
+    model_source: list[object] = [checkpoint_id, 0]
+    clip_source: list[object] = [checkpoint_id, 1]
+    vae_source: list[object] = [checkpoint_id, 2]
 
     lora_activations = list(request.lora_activations)
     if not lora_activations and request.lora_name:
@@ -169,9 +195,8 @@ def _resolve_model_sources(
 
     if lora_activations:
         # IMPORTANT: prompt-side inline LoRA and sidebar-selected LoRA must converge here; collapsing back to one decorative prompt token would break the A1111 extra-network seam.
-        next_lora_id = 90
         for activation in lora_activations:
-            node_id = str(next_lora_id)
+            node_id = allocator.allocate_from(90)
             workflow[node_id] = {
                 "class_type": "LoraLoader",
                 "inputs": {
@@ -188,7 +213,6 @@ def _resolve_model_sources(
             }
             model_source = [node_id, 0]
             clip_source = [node_id, 1]
-            next_lora_id += 1
 
     return model_source, clip_source, vae_source
 
@@ -198,13 +222,13 @@ def _append_img2img_resize_node(
     *,
     source_image_id: str,
     request: NormalizedImg2ImgRequest,
-    next_node_id: int,
-) -> tuple[str, int]:
+    allocator: NodeIdAllocator,
+) -> str:
     if request.resize_mode == "latent_upscale":
-        return source_image_id, next_node_id
+        return source_image_id
 
     crop_mode = "center" if request.resize_mode == "crop_and_resize" else "disabled"
-    resize_id = str(next_node_id)
+    resize_id = allocator.next()
     # IMPORTANT: map A1111 img2img resize modes onto Comfy's stable ImageScale seam; "resize_and_fill" degrades to non-cropping resize for host-compatibility.
     workflow[resize_id] = {
         "class_type": "ImageScale",
@@ -216,7 +240,7 @@ def _append_img2img_resize_node(
             "crop": crop_mode,
         },
     }
-    return resize_id, next_node_id + 1
+    return resize_id
 
 
 def _append_latent_resize_node(
@@ -224,12 +248,12 @@ def _append_latent_resize_node(
     *,
     latent_id: str,
     request: NormalizedImg2ImgRequest,
-    next_node_id: int,
-) -> tuple[str, int]:
+    allocator: NodeIdAllocator,
+) -> str:
     if request.resize_mode != "latent_upscale":
-        return latent_id, next_node_id
+        return latent_id
 
-    upscale_id = str(next_node_id)
+    upscale_id = allocator.next()
     workflow[upscale_id] = {
         "class_type": "LatentUpscale",
         "inputs": {
@@ -240,20 +264,28 @@ def _append_latent_resize_node(
             "crop": "disabled",
         },
     }
-    return upscale_id, next_node_id + 1
+    return upscale_id
 
 
 def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         clip_source=clip_source,
     )
-    latent_id = str(int(negative_id) + 1)
-    sampler_id = str(int(latent_id) + 1)
+    latent_id = allocator.next()
+    sampler_id = allocator.next()
 
     workflow[latent_id] = {
         "class_type": "EmptyLatentImage",
@@ -274,13 +306,13 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         model_source=model_source,
     )
     final_sampler_id = sampler_id
-    decode_id = str(int(sampler_id) + 1)
-    save_id = str(int(decode_id) + 1)
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        upscale_id = str(int(sampler_id) + 1)
-        hires_sampler_id = str(int(upscale_id) + 1)
-        decode_id = str(int(hires_sampler_id) + 1)
-        save_id = str(int(decode_id) + 1)
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
         workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
@@ -313,17 +345,26 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
 
 
 def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         width=request.width,
         height=request.height,
         clip_source=clip_source,
     )
-    workflow["4"] = {
+    latent_id = allocator.next()
+    workflow[latent_id] = {
         "class_type": "EmptyLatentImage",
         "inputs": {
             "width": request.width,
@@ -331,43 +372,46 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
             "batch_size": request.batch_size,
         },
     }
+    sampler_id = allocator.next()
     _build_sampler_node(
         workflow,
-        node_id="5",
+        node_id=sampler_id,
         positive_id=positive_id,
         negative_id=negative_id,
-        latent_id="4",
+        latent_id=latent_id,
         request=request,
         denoise=1.0,
         model_source=model_source,
     )
-    final_sampler_id = "5"
-    decode_id = "6"
-    save_id = "7"
+    final_sampler_id = sampler_id
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        workflow["6"] = {
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
-                "samples": ["5", 0],
+                "samples": [sampler_id, 0],
                 "upscale_method": request.hires_upscale_method,
                 "scale_by": request.hires_scale,
             },
         }
         _build_sampler_node(
             workflow,
-            node_id="7",
+            node_id=hires_sampler_id,
             positive_id=positive_id,
             negative_id=negative_id,
-            latent_id="6",
+            latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
             model_source=model_source,
             seed=request.execution_seed,
             steps=request.hires_steps,
         )
-        final_sampler_id = "7"
-        decode_id = "8"
-        save_id = "9"
+        final_sampler_id = hires_sampler_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
     _build_decode_and_save(
         workflow,
         sampler_id=final_sampler_id,
@@ -379,32 +423,38 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
 
 
 def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         clip_source=clip_source,
     )
-    next_node_id = int(negative_id) + 1
-    image_id = str(next_node_id)
+    image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
         "inputs": {
             "asset_handle": request.image_asset,
         },
     }
-    next_node_id += 1
 
-    resized_image_id, next_node_id = _append_img2img_resize_node(
+    resized_image_id = _append_img2img_resize_node(
         workflow,
         source_image_id=image_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    encode_id = str(next_node_id)
+    encode_id = allocator.next()
     workflow[encode_id] = {
         "class_type": "VAEEncode",
         "inputs": {
@@ -412,16 +462,15 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "vae": vae_source,
         },
     }
-    next_node_id += 1
 
-    latent_id, next_node_id = _append_latent_resize_node(
+    latent_id = _append_latent_resize_node(
         workflow,
         latent_id=encode_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    sampler_id = str(next_node_id)
+    sampler_id = allocator.next()
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
@@ -432,15 +481,14 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         denoise=request.denoise_strength,
         model_source=model_source,
     )
-    next_node_id += 1
     final_sampler_id = sampler_id
-    decode_id = str(next_node_id)
-    save_id = str(next_node_id + 1)
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        upscale_id = str(next_node_id)
-        hires_sampler_id = str(next_node_id + 1)
-        decode_id = str(next_node_id + 2)
-        save_id = str(next_node_id + 3)
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
         workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
@@ -462,7 +510,6 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    next_node_id = int(save_id) + 1
     _build_decode_and_save(
         workflow,
         sampler_id=final_sampler_id,
@@ -474,33 +521,40 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
 
 
 def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         width=request.width,
         height=request.height,
         clip_source=clip_source,
     )
-    workflow["4"] = {
+    image_id = allocator.next()
+    workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
         "inputs": {
             "asset_handle": request.image_asset,
         },
     }
 
-    resized_image_id = "4"
-    next_node_id = 5
-    resized_image_id, next_node_id = _append_img2img_resize_node(
+    resized_image_id = _append_img2img_resize_node(
         workflow,
-        source_image_id=resized_image_id,
+        source_image_id=image_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    encode_id = str(next_node_id)
+    encode_id = allocator.next()
     workflow[encode_id] = {
         "class_type": "VAEEncode",
         "inputs": {
@@ -508,16 +562,15 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "vae": vae_source,
         },
     }
-    next_node_id += 1
 
-    latent_id, next_node_id = _append_latent_resize_node(
+    latent_id = _append_latent_resize_node(
         workflow,
         latent_id=encode_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    sampler_id = str(next_node_id)
+    sampler_id = allocator.next()
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
@@ -528,15 +581,14 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         denoise=request.denoise_strength,
         model_source=model_source,
     )
-    next_node_id += 1
     final_sampler_id = sampler_id
-    decode_id = str(next_node_id)
-    save_id = str(next_node_id + 1)
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        upscale_id = str(next_node_id)
-        hires_sampler_id = str(next_node_id + 1)
-        decode_id = str(next_node_id + 2)
-        save_id = str(next_node_id + 3)
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
         workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
@@ -558,37 +610,49 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(workflow, sampler_id=final_sampler_id, decode_id=decode_id, save_id=save_id, vae_source=vae_source)
+    _build_decode_and_save(
+        workflow,
+        sampler_id=final_sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=vae_source,
+    )
     return workflow
 
 
 def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         clip_source=clip_source,
     )
-    next_node_id = int(negative_id) + 1
-    image_id = str(next_node_id)
+    image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
         "inputs": {
             "asset_handle": request.image_asset,
         },
     }
-    next_node_id += 1
 
-    resized_image_id, next_node_id = _append_img2img_resize_node(
+    resized_image_id = _append_img2img_resize_node(
         workflow,
         source_image_id=image_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    mask_id = str(next_node_id)
+    mask_id = allocator.next()
     workflow[mask_id] = {
         "class_type": "RookieUILoadAssetMask",
         "inputs": {
@@ -598,13 +662,12 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "blur_radius": request.mask_blur,
         },
     }
-    next_node_id += 1
 
     grow_mask_by = request.grow_mask_by
     if request.inpaint_area == "only_masked":
         grow_mask_by = max(grow_mask_by, request.inpaint_padding)
 
-    encode_id = str(next_node_id)
+    encode_id = allocator.next()
     workflow[encode_id] = {
         "class_type": "RookieUIVAEEncodeForInpaint",
         "inputs": {
@@ -623,16 +686,15 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "soft_inpainting_difference_contrast": request.soft_inpainting_difference_contrast,
         },
     }
-    next_node_id += 1
 
-    latent_id, next_node_id = _append_latent_resize_node(
+    latent_id = _append_latent_resize_node(
         workflow,
         latent_id=encode_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    sampler_id = str(next_node_id)
+    sampler_id = allocator.next()
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
@@ -643,15 +705,14 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         denoise=request.denoise_strength,
         model_source=model_source,
     )
-    next_node_id += 1
     final_sampler_id = sampler_id
-    decode_id = str(next_node_id)
-    save_id = str(next_node_id + 1)
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        upscale_id = str(next_node_id)
-        hires_sampler_id = str(next_node_id + 1)
-        decode_id = str(next_node_id + 2)
-        save_id = str(next_node_id + 3)
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
         workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
@@ -673,7 +734,6 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    next_node_id = int(save_id) + 1
     _build_decode_and_save(
         workflow,
         sampler_id=final_sampler_id,
@@ -685,33 +745,40 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
 
 
 def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
-    workflow: dict[str, object] = {"1": _build_checkpoint_loader_node(request.checkpoint_name)}
-    model_source, clip_source, vae_source = _resolve_model_sources(workflow, request)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    checkpoint_id = allocator.next()
+    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+    model_source, clip_source, vae_source = _resolve_model_sources(
+        workflow,
+        request,
+        allocator=allocator,
+        checkpoint_id=checkpoint_id,
+    )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
         request,
-        start_index=2,
+        allocator=allocator,
         width=request.width,
         height=request.height,
         clip_source=clip_source,
     )
-    workflow["4"] = {
+    image_id = allocator.next()
+    workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
         "inputs": {
             "asset_handle": request.image_asset,
         },
     }
 
-    resized_image_id = "4"
-    next_node_id = 5
-    resized_image_id, next_node_id = _append_img2img_resize_node(
+    resized_image_id = _append_img2img_resize_node(
         workflow,
-        source_image_id=resized_image_id,
+        source_image_id=image_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    mask_id = str(next_node_id)
+    mask_id = allocator.next()
     workflow[mask_id] = {
         "class_type": "RookieUILoadAssetMask",
         "inputs": {
@@ -721,13 +788,12 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "blur_radius": request.mask_blur,
         },
     }
-    next_node_id += 1
 
     grow_mask_by = request.grow_mask_by
     if request.inpaint_area == "only_masked":
         grow_mask_by = max(grow_mask_by, request.inpaint_padding)
 
-    encode_id = str(next_node_id)
+    encode_id = allocator.next()
     workflow[encode_id] = {
         "class_type": "RookieUIVAEEncodeForInpaint",
         "inputs": {
@@ -746,16 +812,15 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             "soft_inpainting_difference_contrast": request.soft_inpainting_difference_contrast,
         },
     }
-    next_node_id += 1
 
-    latent_id, next_node_id = _append_latent_resize_node(
+    latent_id = _append_latent_resize_node(
         workflow,
         latent_id=encode_id,
         request=request,
-        next_node_id=next_node_id,
+        allocator=allocator,
     )
 
-    sampler_id = str(next_node_id)
+    sampler_id = allocator.next()
     _build_sampler_node(
         workflow,
         node_id=sampler_id,
@@ -766,15 +831,14 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         denoise=request.denoise_strength,
         model_source=model_source,
     )
-    next_node_id += 1
     final_sampler_id = sampler_id
-    decode_id = str(next_node_id)
-    save_id = str(next_node_id + 1)
+    decode_id = allocator.next()
+    save_id = allocator.next()
     if request.hires_enabled:
-        upscale_id = str(next_node_id)
-        hires_sampler_id = str(next_node_id + 1)
-        decode_id = str(next_node_id + 2)
-        save_id = str(next_node_id + 3)
+        upscale_id = decode_id
+        hires_sampler_id = save_id
+        decode_id = allocator.next()
+        save_id = allocator.next()
         workflow[upscale_id] = {
             "class_type": "LatentUpscaleBy",
             "inputs": {
@@ -796,7 +860,13 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(workflow, sampler_id=final_sampler_id, decode_id=decode_id, save_id=save_id, vae_source=vae_source)
+    _build_decode_and_save(
+        workflow,
+        sampler_id=final_sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=vae_source,
+    )
     return workflow
 
 
