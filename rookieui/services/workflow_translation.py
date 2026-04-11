@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import os
+
 from rookieui.contracts.generation import (
     NormalizedImg2ImgRequest,
     NormalizedTxt2ImgRequest,
     WorkflowTranslationResult,
 )
 from rookieui.services.parity_matrix import get_parity_profile, get_sampler_alias_payload
+
+_PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
+
+
+def _is_legacy_prompt_dsl_enabled() -> bool:
+    raw_value = str(os.getenv(_PROMPT_DSL_LEGACY_ENV, "")).strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
 
 
 class NodeIdAllocator:
@@ -87,6 +96,9 @@ def _coerce_semantic_feature(payload: dict[str, object], feature_name: str) -> b
 
 
 def _requires_conditioning_compiler(semantic_payload: dict[str, object]) -> bool:
+    # CRITICAL: compiler must honor the legacy rollback env switch even when semantic payloads are present; mixed parser/compiler modes cause hard-to-debug parity drift.
+    if _is_legacy_prompt_dsl_enabled():
+        return False
     return any(
         _coerce_semantic_feature(semantic_payload, feature_name)
         for feature_name in ("and_composition", "break_chunks", "prompt_scheduling")

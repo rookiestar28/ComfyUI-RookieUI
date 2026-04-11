@@ -172,6 +172,20 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("CLIPTextEncodeSDXL", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
+    def test_translate_txt2img_request_uses_legacy_roll_back_switch(self) -> None:
+        with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "hero AND villain BREAK [calm:chaos:0.4]",
+                }
+            )
+            result = translate_txt2img_request(normalized).to_payload()
+
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertNotIn("ConditioningCombine", class_types)
+        self.assertNotIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
+
     def test_translate_txt2img_request_keeps_node_ids_unique_with_hires_and_loras(self) -> None:
         normalized = normalize_txt2img_request(
             {

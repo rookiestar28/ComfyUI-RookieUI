@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from rookieui.services.prompt_dsl import (
     PROMPT_WARNING_AND_DETECTED,
     PROMPT_WARNING_ATTENTION_DETECTED,
     PROMPT_WARNING_BREAK_DETECTED,
+    PROMPT_WARNING_LEGACY_FALLBACK_ENABLED,
     PROMPT_WARNING_SCHEDULE_DETECTED,
     merge_lora_activations,
     preprocess_prompt_bundle,
@@ -83,6 +85,21 @@ class PromptDslTests(unittest.TestCase):
         self.assertTrue(semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(semantics["branches"]), 1)
         self.assertEqual(len(semantics["branches"][0]["chunks"]), 2)
+
+    def test_preprocess_prompt_bundle_honors_legacy_env_fallback_switch(self) -> None:
+        with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
+            result = preprocess_prompt_bundle(
+                "hero AND villain BREAK [calm:chaos:0.4]",
+                "",
+                inventory_loras=[],
+                strict_match=False,
+            )
+
+        semantics = result.prompt_semantics.to_payload()
+        self.assertFalse(semantics["features"]["and_composition"])
+        self.assertFalse(semantics["features"]["break_chunks"])
+        self.assertFalse(semantics["features"]["prompt_scheduling"])
+        self.assertIn(PROMPT_WARNING_LEGACY_FALLBACK_ENABLED, result.warning_codes)
 
     def test_merge_lora_activations_prefers_explicit_selector_for_matching_name(self) -> None:
         preprocessed = preprocess_prompt_bundle(

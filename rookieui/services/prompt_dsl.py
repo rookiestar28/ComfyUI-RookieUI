@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 
 from rookieui.contracts.prompt_dsl import (
@@ -23,6 +24,9 @@ PROMPT_WARNING_GUARD_BREAK_CHUNK_LIMIT = "PROMPT_GUARD_BREAK_CHUNK_LIMIT"
 PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT = "PROMPT_GUARD_SCHEDULE_SLICE_LIMIT"
 PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD = "PROMPT_SCHEDULE_INVALID_THRESHOLD"
 PROMPT_WARNING_EXTRA_NETWORK_UNSUPPORTED_REMOVED = "PROMPT_EXTRA_NETWORK_UNSUPPORTED_REMOVED"
+PROMPT_WARNING_LEGACY_FALLBACK_ENABLED = "PROMPT_LEGACY_FALLBACK_ENABLED"
+
+PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
 _EXTRA_NETWORK_RE = re.compile(r"<(\w+):([^>]+)>")
 _SCHEDULE_TOKEN_RE = re.compile(r"\[([^:\[\]]*):([^:\[\]]*):([^\[\]]+?)\]")
@@ -46,6 +50,7 @@ _WARNING_MESSAGES = {
     PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT: "Prompt scheduling expansion exceeded guardrail; slices were truncated.",
     PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD: "Prompt scheduling threshold was invalid and fell back to linear full-range slice.",
     PROMPT_WARNING_EXTRA_NETWORK_UNSUPPORTED_REMOVED: "Unsupported A1111 extra network was removed from the prompt.",
+    PROMPT_WARNING_LEGACY_FALLBACK_ENABLED: "Prompt semantic parser/compiler rollback switch is active (legacy mode).",
 }
 
 
@@ -426,6 +431,11 @@ def _warning_messages_from_codes(codes: list[str]) -> list[str]:
     return messages
 
 
+def _is_legacy_prompt_dsl_enabled() -> bool:
+    raw_value = str(os.getenv(PROMPT_DSL_LEGACY_ENV, "")).strip().lower()
+    return raw_value in {"1", "true", "yes", "on"}
+
+
 def preprocess_prompt_bundle(
     prompt: str,
     negative_prompt: str,
@@ -448,6 +458,36 @@ def preprocess_prompt_bundle(
         inventory_selectors=inventory_loras,
         strict_match=strict_match,
     )
+
+    if _is_legacy_prompt_dsl_enabled():
+        # CRITICAL: keep this environment switch as a deterministic parser/compiler rollback path for host/runtime incidents; removing it blocks emergency parity fallback.
+        warning_codes = list(
+            dict.fromkeys(
+                [
+                    PROMPT_WARNING_LEGACY_FALLBACK_ENABLED,
+                    *prompt_warning_codes,
+                    *negative_warning_codes,
+                ]
+            )
+        )
+        warnings = list(
+            dict.fromkeys(
+                [
+                    *_warning_messages_from_codes(warning_codes),
+                    *prompt_warning_messages,
+                    *negative_warning_messages,
+                ]
+            )
+        )
+        return PromptPreprocessResult(
+            cleaned_prompt=cleaned_prompt,
+            cleaned_negative_prompt=cleaned_negative_prompt,
+            lora_activations=[*prompt_loras, *negative_loras],
+            prompt_warnings=warnings,
+            warning_codes=warning_codes,
+            prompt_semantics=PromptSemanticPlan.empty(cleaned_prompt),
+            negative_prompt_semantics=PromptSemanticPlan.empty(cleaned_negative_prompt),
+        )
 
     prompt_semantics, prompt_semantic_codes = _build_prompt_semantic_plan(cleaned_prompt)
     negative_prompt_semantics, negative_semantic_codes = _build_prompt_semantic_plan(cleaned_negative_prompt)

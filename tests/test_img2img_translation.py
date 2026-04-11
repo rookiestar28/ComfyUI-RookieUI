@@ -342,6 +342,21 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("ConditioningCombine", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
+    def test_translate_img2img_request_uses_legacy_roll_back_switch(self) -> None:
+        with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait AND cinematic BREAK [soft:sharp:0.5]",
+                    "image_asset": "portrait-input",
+                }
+            )
+            result = translate_img2img_request(normalized).to_payload()
+
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertNotIn("ConditioningCombine", class_types)
+        self.assertNotIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
+
     def test_translate_img2img_request_builds_sdxl_img2img_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {
