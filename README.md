@@ -107,6 +107,11 @@ ComfyUI process (single runtime)
 
 ### Sidebar UI
 
+<div align="left">
+  <img src="assets/rookiesidebar.png" width="80%" />
+</div>
+<br>
+<br>
 - A1111/Forge-like compact tab rail and control panel layout
 - Hero `Generate` rail with compact action icons
 - Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
