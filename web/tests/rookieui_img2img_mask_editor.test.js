@@ -145,6 +145,36 @@ describe("createImg2ImgMaskCanvasEditor", () => {
     expect(document.getElementById("mask-editor-actions-undo").disabled).toBe(false);
   });
 
+  test("advanced selection actions stage updates and support transform nudge", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const stageMaskData = vi.fn(() => true);
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-advanced",
+      parent,
+      modeInput: createInput("inpaint"),
+      imageDataInput: createInput("data:image/png;base64,source"),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: () => "inpaint",
+      maskCanvasContract: {
+        stageMaskData,
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    await editor.refreshFromInputs();
+    editor.setSelectionRect({ x: 12, y: 10, width: 48, height: 36 });
+    document.getElementById("mask-editor-advanced-fill-selection").click();
+    document.getElementById("mask-editor-advanced-nudge-right").click();
+    expect(stageMaskData).toHaveBeenCalledTimes(2);
+    document.getElementById("mask-editor-advanced-clear-selection").click();
+    const selectionOverlay = document.querySelector("#mask-editor-advanced .rookieui-shell__mask-editor-selection");
+    expect(selectionOverlay.hidden).toBe(true);
+  });
+
   afterEach(() => {
     global.Image = originalImage;
     HTMLCanvasElement.prototype.getContext = originalGetContext;

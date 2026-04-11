@@ -2,6 +2,19 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function normalizeSelectionRect(startX, startY, endX, endY, canvasWidth, canvasHeight) {
+  const left = clamp(Math.min(startX, endX), 0, canvasWidth);
+  const top = clamp(Math.min(startY, endY), 0, canvasHeight);
+  const right = clamp(Math.max(startX, endX), 0, canvasWidth);
+  const bottom = clamp(Math.max(startY, endY), 0, canvasHeight);
+  return {
+    x: Math.floor(left),
+    y: Math.floor(top),
+    width: Math.max(0, Math.floor(right - left)),
+    height: Math.max(0, Math.floor(bottom - top)),
+  };
+}
+
 function createEditorButton(id, text, title, options = {}) {
   const button = document.createElement("button");
   button.type = "button";
@@ -79,9 +92,11 @@ export function createImg2ImgMaskCanvasEditor({
 
   const brushButton = createEditorButton(`${idPrefix}-tool-brush`, "🖌️", "Brush tool");
   const eraserButton = createEditorButton(`${idPrefix}-tool-eraser`, "🧽", "Eraser tool");
+  const selectButton = createEditorButton(`${idPrefix}-tool-select`, "⬚", "Rectangle selection tool");
   const panButton = createEditorButton(`${idPrefix}-tool-pan`, "✋", "Pan tool");
   toolbar.appendChild(brushButton);
   toolbar.appendChild(eraserButton);
+  toolbar.appendChild(selectButton);
   toolbar.appendChild(panButton);
 
   const controls = document.createElement("div");
@@ -136,6 +151,45 @@ export function createImg2ImgMaskCanvasEditor({
   actionRow.appendChild(fitButton);
   actionRow.appendChild(applyButton);
 
+  const advancedActionRow = document.createElement("div");
+  advancedActionRow.className = "rookieui-shell__mask-editor-actions rookieui-shell__mask-editor-actions--advanced";
+  root.appendChild(advancedActionRow);
+  const fillSelectionButton = createEditorButton(`${idPrefix}-fill-selection`, "Fill Sel", "Fill selected area", {
+    compact: true,
+  });
+  const eraseSelectionButton = createEditorButton(
+    `${idPrefix}-erase-selection`,
+    "Erase Sel",
+    "Erase selected area",
+    { compact: true },
+  );
+  const invertSelectionButton = createEditorButton(
+    `${idPrefix}-invert-selection`,
+    "Invert Sel",
+    "Invert selected area",
+    { compact: true },
+  );
+  const nudgeLeftButton = createEditorButton(`${idPrefix}-nudge-left`, "←", "Move selected area left", { compact: true });
+  const nudgeRightButton = createEditorButton(`${idPrefix}-nudge-right`, "→", "Move selected area right", {
+    compact: true,
+  });
+  const nudgeUpButton = createEditorButton(`${idPrefix}-nudge-up`, "↑", "Move selected area up", { compact: true });
+  const nudgeDownButton = createEditorButton(`${idPrefix}-nudge-down`, "↓", "Move selected area down", { compact: true });
+  const clearSelectionButton = createEditorButton(
+    `${idPrefix}-clear-selection`,
+    "Clear Sel",
+    "Clear selection box",
+    { compact: true },
+  );
+  advancedActionRow.appendChild(fillSelectionButton);
+  advancedActionRow.appendChild(eraseSelectionButton);
+  advancedActionRow.appendChild(invertSelectionButton);
+  advancedActionRow.appendChild(nudgeLeftButton);
+  advancedActionRow.appendChild(nudgeRightButton);
+  advancedActionRow.appendChild(nudgeUpButton);
+  advancedActionRow.appendChild(nudgeDownButton);
+  advancedActionRow.appendChild(clearSelectionButton);
+
   const viewport = document.createElement("div");
   viewport.className = "rookieui-shell__mask-editor-viewport";
   root.appendChild(viewport);
@@ -152,6 +206,11 @@ export function createImg2ImgMaskCanvasEditor({
   const canvas = document.createElement("canvas");
   canvas.className = "rookieui-shell__mask-editor-canvas";
   stage.appendChild(canvas);
+
+  const selectionBox = document.createElement("div");
+  selectionBox.className = "rookieui-shell__mask-editor-selection";
+  selectionBox.hidden = true;
+  stage.appendChild(selectionBox);
 
   const placeholder = document.createElement("span");
   placeholder.className = "rookieui-shell__mask-editor-placeholder";
@@ -191,16 +250,20 @@ export function createImg2ImgMaskCanvasEditor({
     historyLimit: 24,
     pendingApply: false,
     loadingToken: 0,
+    selection: null,
+    selectionAnchor: null,
   };
 
   const updateToolButtons = () => {
-    [brushButton, eraserButton, panButton].forEach((button) => {
+    [brushButton, eraserButton, selectButton, panButton].forEach((button) => {
       button.classList.remove("is-active");
     });
     if (state.tool === "brush") {
       brushButton.classList.add("is-active");
     } else if (state.tool === "eraser") {
       eraserButton.classList.add("is-active");
+    } else if (state.tool === "select") {
+      selectButton.classList.add("is-active");
     } else {
       panButton.classList.add("is-active");
     }
@@ -209,6 +272,47 @@ export function createImg2ImgMaskCanvasEditor({
   const updateUndoRedoState = () => {
     undoButton.disabled = state.undoStack.length === 0;
     redoButton.disabled = state.redoStack.length === 0;
+  };
+
+  const updateSelectionBox = () => {
+    const selection = state.selection;
+    if (!selection || selection.width <= 0 || selection.height <= 0) {
+      selectionBox.hidden = true;
+      return;
+    }
+    selectionBox.hidden = false;
+    selectionBox.style.left = `${selection.x}px`;
+    selectionBox.style.top = `${selection.y}px`;
+    selectionBox.style.width = `${selection.width}px`;
+    selectionBox.style.height = `${selection.height}px`;
+  };
+
+  const clearSelection = () => {
+    state.selection = null;
+    state.selectionAnchor = null;
+    updateSelectionBox();
+  };
+
+  const setSelection = (rect) => {
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      clearSelection();
+      return;
+    }
+    const x = clamp(Math.floor(rect.x), 0, canvas.width);
+    const y = clamp(Math.floor(rect.y), 0, canvas.height);
+    const width = clamp(Math.floor(rect.width), 0, Math.max(canvas.width - x, 0));
+    const height = clamp(Math.floor(rect.height), 0, Math.max(canvas.height - y, 0));
+    if (width <= 0 || height <= 0) {
+      clearSelection();
+      return;
+    }
+    state.selection = {
+      x,
+      y,
+      width,
+      height,
+    };
+    updateSelectionBox();
   };
 
   const updateStatus = (message) => {
@@ -249,6 +353,7 @@ export function createImg2ImgMaskCanvasEditor({
     fillMaskWithBlack();
     state.undoStack = [];
     state.redoStack = [];
+    clearSelection();
     updateUndoRedoState();
   };
 
@@ -438,6 +543,12 @@ export function createImg2ImgMaskCanvasEditor({
       state.panPointerY = event.clientY;
       return;
     }
+    if (state.tool === "select") {
+      const point = getCanvasPointer(event);
+      state.selectionAnchor = point;
+      setSelection({ x: point.x, y: point.y, width: 1, height: 1 });
+      return;
+    }
     event.preventDefault();
     pushUndoSnapshot();
     state.pointerDown = true;
@@ -459,6 +570,19 @@ export function createImg2ImgMaskCanvasEditor({
       return;
     }
     if (!state.pointerDown || state.tool === "pan") {
+      if (state.tool === "select" && state.selectionAnchor) {
+        const point = getCanvasPointer(event);
+        setSelection(
+          normalizeSelectionRect(
+            state.selectionAnchor.x,
+            state.selectionAnchor.y,
+            point.x,
+            point.y,
+            canvas.width,
+            canvas.height,
+          ),
+        );
+      }
       return;
     }
     event.preventDefault();
@@ -473,6 +597,15 @@ export function createImg2ImgMaskCanvasEditor({
       state.pointerDown = false;
       stageMask();
     }
+    if (state.tool === "select" && state.selectionAnchor) {
+      state.selectionAnchor = null;
+      if (!state.selection || state.selection.width < 2 || state.selection.height < 2) {
+        clearSelection();
+        updateStatus("Selection cleared.");
+      } else {
+        updateStatus("Selection ready.");
+      }
+    }
     if (state.panning) {
       state.panning = false;
     }
@@ -484,6 +617,10 @@ export function createImg2ImgMaskCanvasEditor({
   });
   eraserButton.addEventListener("click", () => {
     state.tool = "eraser";
+    updateToolButtons();
+  });
+  selectButton.addEventListener("click", () => {
+    state.tool = "select";
     updateToolButtons();
   });
   panButton.addEventListener("click", () => {
@@ -573,6 +710,34 @@ export function createImg2ImgMaskCanvasEditor({
     updateUndoRedoState();
   });
 
+  const getActiveSelection = () => {
+    const selection = state.selection;
+    if (!selection || selection.width <= 0 || selection.height <= 0) {
+      return null;
+    }
+    return selection;
+  };
+
+  const requireSelection = () => {
+    const selection = getActiveSelection();
+    if (!selection) {
+      updateStatus("Create a selection first.");
+      return null;
+    }
+    return selection;
+  };
+
+  const runSelectionMutation = (mutator, successMessage) => {
+    const selection = requireSelection();
+    if (!context || !selection) {
+      return;
+    }
+    pushUndoSnapshot();
+    mutator(selection);
+    stageMask();
+    updateStatus(successMessage);
+  };
+
   clearButton.addEventListener("click", () => {
     if (!context || !state.sourceSignature) {
       return;
@@ -597,6 +762,75 @@ export function createImg2ImgMaskCanvasEditor({
     }
     context.putImageData(imageData, 0, 0);
     stageMask();
+  });
+
+  fillSelectionButton.addEventListener("click", () => {
+    runSelectionMutation((selection) => {
+      context.save();
+      context.fillStyle = "rgba(255, 255, 255, 1)";
+      context.fillRect(selection.x, selection.y, selection.width, selection.height);
+      context.restore();
+    }, "Filled selected area.");
+  });
+
+  eraseSelectionButton.addEventListener("click", () => {
+    runSelectionMutation((selection) => {
+      context.save();
+      context.fillStyle = "rgba(0, 0, 0, 1)";
+      context.fillRect(selection.x, selection.y, selection.width, selection.height);
+      context.restore();
+    }, "Erased selected area.");
+  });
+
+  invertSelectionButton.addEventListener("click", () => {
+    runSelectionMutation((selection) => {
+      const selected = context.getImageData(selection.x, selection.y, selection.width, selection.height);
+      const pixels = selected.data;
+      for (let index = 0; index < pixels.length; index += 4) {
+        pixels[index] = 255 - pixels[index];
+        pixels[index + 1] = 255 - pixels[index + 1];
+        pixels[index + 2] = 255 - pixels[index + 2];
+        pixels[index + 3] = 255;
+      }
+      context.putImageData(selected, selection.x, selection.y);
+    }, "Inverted selected area.");
+  });
+
+  const nudgeSelection = (deltaX, deltaY) => {
+    const selection = requireSelection();
+    if (!context || !selection) {
+      return;
+    }
+    const nextX = clamp(selection.x + deltaX, 0, Math.max(canvas.width - selection.width, 0));
+    const nextY = clamp(selection.y + deltaY, 0, Math.max(canvas.height - selection.height, 0));
+    if (nextX === selection.x && nextY === selection.y) {
+      return;
+    }
+    // IMPORTANT: move selected mask region as pixel data, then clamp new selection bounds to avoid off-canvas writes.
+    pushUndoSnapshot();
+    const selectedRegion = context.getImageData(selection.x, selection.y, selection.width, selection.height);
+    context.save();
+    context.fillStyle = "rgba(0, 0, 0, 1)";
+    context.fillRect(selection.x, selection.y, selection.width, selection.height);
+    context.restore();
+    context.putImageData(selectedRegion, nextX, nextY);
+    setSelection({
+      x: nextX,
+      y: nextY,
+      width: selection.width,
+      height: selection.height,
+    });
+    stageMask();
+    updateStatus("Moved selected area.");
+  };
+
+  nudgeLeftButton.addEventListener("click", () => nudgeSelection(-8, 0));
+  nudgeRightButton.addEventListener("click", () => nudgeSelection(8, 0));
+  nudgeUpButton.addEventListener("click", () => nudgeSelection(0, -8));
+  nudgeDownButton.addEventListener("click", () => nudgeSelection(0, 8));
+  clearSelectionButton.addEventListener("click", () => {
+    clearSelection();
+    updateStatus("Selection cleared.");
   });
 
   fitButton.addEventListener("click", () => {
@@ -662,6 +896,9 @@ export function createImg2ImgMaskCanvasEditor({
     forceStageCurrentMask,
     handleExternalMaskMutation,
     refreshFromInputs,
+    setSelectionRect(rect) {
+      setSelection(rect);
+    },
     setMode,
     unmount() {
       window.removeEventListener("pointerup", stopDrawing);

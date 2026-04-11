@@ -721,6 +721,12 @@
   gap: 6px;
 }
 
+.rookieui-shell__mask-editor-actions--advanced {
+  margin-top: -2px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--rookieui-border);
+}
+
 .rookieui-shell__mask-editor-toolbar .rookieui-shell__mini-action.is-active {
   border-color: var(--rookieui-border-strong);
   background: var(--rookieui-accent-soft);
@@ -766,6 +772,13 @@
 .rookieui-shell__mask-editor-canvas {
   cursor: crosshair;
   opacity: 0.9;
+}
+
+.rookieui-shell__mask-editor-selection {
+  position: absolute;
+  border: 1px dashed color-mix(in srgb, var(--rookieui-accent) 72%, #ffffff);
+  background: color-mix(in srgb, var(--rookieui-accent) 16%, transparent);
+  pointer-events: none;
 }
 
 .rookieui-shell__mask-editor-placeholder {

@@ -627,6 +627,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     expect(document.getElementById("rookieui-img2img-hires-controls")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-mask-editor-tool-select")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     for (const matrixRow of presetClipSkipMatrix) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
