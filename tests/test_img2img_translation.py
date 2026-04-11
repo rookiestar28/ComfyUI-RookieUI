@@ -324,6 +324,39 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
         self.assertEqual(request.primary_model_category, "diffusion_models")
 
+    def test_translate_img2img_request_requires_explicit_text_encoder_for_diffusion_model_category(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["Automatic"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="Automatic",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "text_encoder_name": "Automatic",
+                    "vae_name": "flux_vae.safetensors",
+                }
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "text_encoder_name must be an explicit host selector when primary_model_category is diffusion_models",
+        ):
+            translate_img2img_request(normalized)
+
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {

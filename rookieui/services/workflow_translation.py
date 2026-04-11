@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.generation import (
@@ -54,6 +55,54 @@ def _build_checkpoint_loader_node(checkpoint_name: str) -> dict[str, object]:
         "class_type": "CheckpointLoaderSimple",
         "inputs": {
             "ckpt_name": checkpoint_name,
+        },
+    }
+
+
+def _build_unet_loader_node(unet_name: str) -> dict[str, object]:
+    return {
+        "class_type": "UNETLoader",
+        "inputs": {
+            "unet_name": unet_name,
+            "weight_dtype": "default",
+        },
+    }
+
+
+def _build_clip_loader_node(clip_name: str) -> dict[str, object]:
+    return {
+        "class_type": "CLIPLoader",
+        "inputs": {
+            "clip_name": clip_name,
+            "type": "stable_diffusion",
+            "device": "default",
+        },
+    }
+
+
+def _build_dual_clip_loader_node(
+    *,
+    clip_name_1: str,
+    clip_name_2: str,
+    profile: str,
+) -> dict[str, object]:
+    clip_type = "flux" if profile in {"flux", "klein"} else "sdxl"
+    return {
+        "class_type": "DualCLIPLoader",
+        "inputs": {
+            "clip_name1": clip_name_1,
+            "clip_name2": clip_name_2,
+            "type": clip_type,
+            "device": "default",
+        },
+    }
+
+
+def _build_vae_loader_node(vae_name: str) -> dict[str, object]:
+    return {
+        "class_type": "VAELoader",
+        "inputs": {
+            "vae_name": vae_name,
         },
     }
 
@@ -454,11 +503,20 @@ def _resolve_model_sources(
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     *,
     allocator: NodeIdAllocator,
-    checkpoint_id: str,
 ) -> tuple[list[object], list[object], list[object]]:
-    model_source: list[object] = [checkpoint_id, 0]
-    clip_source: list[object] = [checkpoint_id, 1]
-    vae_source: list[object] = [checkpoint_id, 2]
+    primary_model_category = str(request.primary_model_category or "checkpoints").strip().lower()
+    if primary_model_category == "diffusion_models":
+        model_source, clip_source, vae_source = _resolve_diffusion_model_sources(
+            workflow,
+            request=request,
+            allocator=allocator,
+        )
+    else:
+        checkpoint_id = allocator.next()
+        workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
+        model_source = [checkpoint_id, 0]
+        clip_source = [checkpoint_id, 1]
+        vae_source = [checkpoint_id, 2]
 
     lora_activations = list(request.lora_activations)
     if not lora_activations and request.lora_name:
@@ -491,6 +549,70 @@ def _resolve_model_sources(
             model_source = [node_id, 0]
             clip_source = [node_id, 1]
 
+    return model_source, clip_source, vae_source
+
+
+def _normalize_encoder_selector_values(raw_selector: str) -> list[str]:
+    selector = str(raw_selector or "").strip()
+    if not selector:
+        return []
+    return [token.strip() for token in re.split(r"[|,;+]", selector) if token.strip()]
+
+
+def _require_explicit_diffusion_selector(value: str, field_name: str) -> str:
+    selector = str(value or "").strip()
+    lowered_selector = selector.lower()
+    # IMPORTANT: diffusion-model path has no checkpoint-baked CLIP/VAE fallback;
+    # allow only explicit host selectors or the workflow will fail late in host validation/runtime.
+    if not selector or lowered_selector in {"automatic", "__host_default__"}:
+        raise ValueError(
+            f"{field_name} must be an explicit host selector when primary_model_category is diffusion_models."
+        )
+    return selector
+
+
+def _resolve_diffusion_model_sources(
+    workflow: dict[str, object],
+    *,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    allocator: NodeIdAllocator,
+) -> tuple[list[object], list[object], list[object]]:
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source: list[object] = [unet_id, 0]
+
+    text_encoder_selector = _require_explicit_diffusion_selector(
+        request.text_encoder_name,
+        "text_encoder_name",
+    )
+    text_encoder_values = _normalize_encoder_selector_values(text_encoder_selector)
+    if not text_encoder_values:
+        raise ValueError(
+            "text_encoder_name must include at least one selector when primary_model_category is diffusion_models."
+        )
+    if len(text_encoder_values) > 2:
+        raise ValueError(
+            "text_encoder_name supports up to two selectors for diffusion_models path (single or dual CLIP)."
+        )
+
+    clip_loader_id = allocator.next()
+    if len(text_encoder_values) == 1:
+        workflow[clip_loader_id] = _build_clip_loader_node(text_encoder_values[0])
+    else:
+        workflow[clip_loader_id] = _build_dual_clip_loader_node(
+            clip_name_1=text_encoder_values[0],
+            clip_name_2=text_encoder_values[1],
+            profile=request.profile,
+        )
+    clip_source: list[object] = [clip_loader_id, 0]
+
+    vae_selector = _require_explicit_diffusion_selector(
+        request.vae_name,
+        "vae_name",
+    )
+    vae_loader_id = allocator.next()
+    workflow[vae_loader_id] = _build_vae_loader_node(vae_selector)
+    vae_source: list[object] = [vae_loader_id, 0]
     return model_source, clip_source, vae_source
 
 
@@ -625,13 +747,10 @@ def _append_latent_resize_node(
 def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
@@ -711,13 +830,10 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
 def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
@@ -798,13 +914,10 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
 def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
@@ -905,13 +1018,10 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
 def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
@@ -1014,13 +1124,10 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
 def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sd15_conditioning(
         workflow,
@@ -1147,13 +1254,10 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
 def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    checkpoint_id = allocator.next()
-    workflow[checkpoint_id] = _build_checkpoint_loader_node(request.checkpoint_name)
     model_source, clip_source, vae_source = _resolve_model_sources(
         workflow,
         request,
         allocator=allocator,
-        checkpoint_id=checkpoint_id,
     )
     positive_id, negative_id = _build_sdxl_conditioning(
         workflow,
