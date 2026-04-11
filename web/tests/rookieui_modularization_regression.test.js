@@ -193,4 +193,24 @@ describe("rookieui modularization regression seams", () => {
     expect(document.getElementById("rookieui-img2img-mode")?.value).toBe("img2img");
     expect(document.getElementById("rookieui-queue-status")?.textContent).toContain("Applied history-image.png");
   });
+
+  test("keeps extras hires controls available and stateful after pane extraction", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    renderRookieUISidebar(container, createBootstrapState());
+
+    document.getElementById("rookieui-tab-extras")?.click();
+    const extrasHires = document.getElementById("rookieui-extras-hires-controls");
+    expect(extrasHires).not.toBeNull();
+    expect(extrasHires?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
+    expect(document.querySelector("#rookieui-extras-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
+
+    const hiresToggle = document.getElementById("rookieui-extras-hires-enabled");
+    hiresToggle.checked = false;
+    hiresToggle.dispatchEvent(new Event("change", { bubbles: true }));
+
+    document.getElementById("rookieui-tab-img2img")?.click();
+    document.getElementById("rookieui-tab-extras")?.click();
+    expect(document.getElementById("rookieui-extras-hires-enabled")?.checked).toBe(false);
+  });
 });

@@ -749,6 +749,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-image-asset").value).toBe("history-image.png");
     document.getElementById("rookieui-tab-extras").click();
     expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
+    const extrasHiresControls = document.getElementById("rookieui-extras-hires-controls");
+    expect(extrasHiresControls).not.toBeNull();
+    expect(extrasHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
+    expect(extrasHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
+    expect(document.querySelector("#rookieui-extras-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
+    document.getElementById("rookieui-extras-hires-enabled").checked = false;
+    document.getElementById("rookieui-extras-submit").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.querySelector(".rookieui-shell__footer").textContent).toContain("host: standalone-web");
     expect(fetchCalls.some(([url]) => url === "/rookieui/generate/txt2img")).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/generate/img2img")).toBe(true);
@@ -769,6 +777,10 @@ describe("registerRookieUIBootstrapExtension", () => {
     const img2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
     expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(false);
     expect(JSON.parse(img2imgCall[1].body).client_id).toBe("socket-client-2");
+    const extrasCall = fetchCalls.find(([url]) => url === "/rookieui/extras/run");
+    expect(extrasCall).toBeDefined();
+    expect(JSON.parse(extrasCall[1].body).upscale_enabled).toBe(false);
+    expect(JSON.parse(extrasCall[1].body).scale_mode).toBe("scale_by");
     expect(
       fetchCalls.some(
         ([url]) =>

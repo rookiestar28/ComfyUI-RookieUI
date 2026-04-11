@@ -1,10 +1,11 @@
-﻿export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
+export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
   const {
     appendTextElement,
     createSelect,
     createInput,
     createCheckbox,
     createInlineCheckboxField,
+    createHiresFixSection,
     createField,
     createList,
     createIconActionButton,
@@ -17,7 +18,8 @@
     activateShellTab,
     installPaneStateLock,
     emitFrontendDebugWarning,
-  } = context;  const inventory = bootstrapState.models ?? {};
+  } = context;
+  const inventory = bootstrapState.models ?? {};
   const section = document.createElement("section");
   section.className = "rookieui-shell__section";
   parent.appendChild(section);
@@ -126,7 +128,7 @@
   optionsSection.appendChild(optionsGrid);
 
   const elements = {
-    upscaleEnabled: createCheckbox("rookieui-extras-upscale-enabled", true),
+    hiresEnabled: createCheckbox("rookieui-extras-hires-enabled", true),
     scaleMode: createSelect(
       "rookieui-extras-scale-mode",
       [
@@ -170,14 +172,16 @@
     }),
   };
 
-  createInlineCheckboxField(optionsGrid, "Upscale", elements.upscaleEnabled);
-  createField(optionsGrid, "Scale Mode", elements.scaleMode);
-  createField(optionsGrid, "Scale By", elements.scaleBy);
-  createField(optionsGrid, "Target Width", elements.targetWidth);
-  createField(optionsGrid, "Target Height", elements.targetHeight);
-  createField(optionsGrid, "Upscaler 1", elements.upscaler1);
-  createField(optionsGrid, "Upscaler 2", elements.upscaler2);
-  createField(optionsGrid, "Upscaler 2 visibility", elements.upscaler2Visibility);
+  // IMPORTANT: keep Extras Hires.fix controls wired to existing upscale fields so this section executes real postprocessing behavior.
+  const extrasHiresGrid = createHiresFixSection(optionsSection, "rookieui-extras-hires-controls", elements.hiresEnabled);
+  extrasHiresGrid.parentElement?.classList.add("rookieui-shell__hires--integrated");
+  createField(extrasHiresGrid, "Scale Mode", elements.scaleMode);
+  createField(extrasHiresGrid, "Scale By", elements.scaleBy);
+  createField(extrasHiresGrid, "Target Width", elements.targetWidth);
+  createField(extrasHiresGrid, "Target Height", elements.targetHeight);
+  createField(extrasHiresGrid, "Upscaler 1", elements.upscaler1);
+  createField(extrasHiresGrid, "Upscaler 2", elements.upscaler2);
+  createField(extrasHiresGrid, "Upscaler 2 visibility", elements.upscaler2Visibility);
   createInlineCheckboxField(optionsGrid, "Color Correction", elements.colorCorrection);
   createField(optionsGrid, "Face Restoration", elements.faceRestoration);
   createField(optionsGrid, "CodeFormer Weight", elements.codeformerWeight);

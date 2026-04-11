@@ -27,7 +27,7 @@ import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v
 import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260411-f62-pane-split";
 import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260411-f61-img2img-pane";
 import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
-import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f62-pane-split";
+import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
 import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";
 import {
   assertTopLevelTabDefinitions,
@@ -1651,7 +1651,8 @@ async function submitExtras(bootstrapState, state, elements, statusNode, preview
   statusNode.textContent = "Running Extras...";
   const payload = {
     mode: state.mode,
-    upscale_enabled: elements.upscaleEnabled.checked,
+    // IMPORTANT: Extras Hires.fix toggle intentionally reuses upscale_enabled backend contract; avoid introducing a decorative frontend-only flag.
+    upscale_enabled: elements.hiresEnabled.checked,
     scale_mode: elements.scaleMode.value,
     scale_by: Number(elements.scaleBy.value),
     target_width: Number(elements.targetWidth.value),
