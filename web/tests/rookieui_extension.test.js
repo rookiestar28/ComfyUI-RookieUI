@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
 
@@ -54,13 +54,14 @@ describe("registerRookieUIBootstrapExtension", () => {
       }
 
       if (url === "/rookieui/generate/img2img") {
+        const requestPayload = JSON.parse(options.body);
         return {
           ok: true,
           status: 200,
           async json() {
             return {
               mode: "queued",
-              workflow_kind: "inpaint-sd15",
+              workflow_kind: requestPayload.hires_enabled ? "inpaint-sd15-hires" : "inpaint-sd15",
               submission: { accepted: true, prompt_id: "prompt-456" },
             };
           },
@@ -602,6 +603,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-preset").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("rookieui-modules-quicksetting").textContent).not.toContain("VAE / Text Encoder");
     expect(document.getElementById("rookieui-text-encoder").hidden).toBe(true);
+    expect(document.getElementById("rookieui-seed-random").textContent).toContain("🎲");
+    expect(document.getElementById("rookieui-seed-fixed").textContent).toContain("♻️");
+    document.getElementById("rookieui-seed").value = "-1";
+    document.getElementById("rookieui-seed-fixed").click();
+    expect(Number(document.getElementById("rookieui-seed").value)).toBeGreaterThanOrEqual(0);
+    document.getElementById("rookieui-seed-random").click();
+    expect(document.getElementById("rookieui-seed").value).toBe("-1");
+    document.getElementById("rookieui-seed-extra").checked = true;
     document.getElementById("rookieui-low-bits").value = "automatic";
     document.getElementById("rookieui-hires-enabled").checked = true;
     document.getElementById("rookieui-hires-scale").value = "1.8";
@@ -661,6 +670,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-modules-quicksetting").textContent).not.toContain("VAE / Text Encoder");
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-clip-skip").disabled).toBe(false);
+    expect(document.getElementById("rookieui-img2img-seed-random").textContent).toContain("🎲");
+    expect(document.getElementById("rookieui-img2img-seed-fixed").textContent).toContain("♻️");
+    document.getElementById("rookieui-img2img-seed").value = "-1";
+    document.getElementById("rookieui-img2img-seed-fixed").click();
+    expect(Number(document.getElementById("rookieui-img2img-seed").value)).toBeGreaterThanOrEqual(0);
+    document.getElementById("rookieui-img2img-seed-random").click();
+    expect(document.getElementById("rookieui-img2img-seed").value).toBe("-1");
+    document.getElementById("rookieui-img2img-seed-extra").checked = true;
     document.getElementById("rookieui-img2img-generation-mode-batch").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("batch");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(true);
@@ -678,6 +695,10 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/img2img")).toHaveLength(0);
     document.getElementById("rookieui-img2img-generation-mode-inpaint").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
+    document.getElementById("rookieui-img2img-hires-enabled").checked = true;
+    document.getElementById("rookieui-img2img-hires-scale").value = "1.7";
+    document.getElementById("rookieui-img2img-hires-steps").value = "10";
+    document.getElementById("rookieui-img2img-hires-denoise").value = "0.4";
     document.getElementById("rookieui-image-asset").value = "source-asset";
     document.getElementById("rookieui-mask-asset").value = "mask-asset";
     document.getElementById("rookieui-img2img-form").dispatchEvent(
@@ -769,13 +790,18 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(txt2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(txt2imgCall[1].body).hires_scale).toBe(1.8);
     expect(JSON.parse(txt2imgCall[1].body).batch_count).toBe(2);
+    expect(JSON.parse(txt2imgCall[1].body).seed_extra).toBe(true);
     expect(JSON.parse(txt2imgCall[1].body).dtype_profile).toBe("automatic");
     expect(JSON.parse(txt2imgCall[1].body).lora_name).toBe("detail_tweaker.safetensors");
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_model).toBe(0.9);
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_clip).toBe(0.7);
     expect(JSON.parse(txt2imgCall[1].body).client_id).toBe("socket-client-2");
     const img2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
-    expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(false);
+    expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(true);
+    expect(JSON.parse(img2imgCall[1].body).hires_scale).toBe(1.7);
+    expect(JSON.parse(img2imgCall[1].body).hires_steps).toBe(10);
+    expect(JSON.parse(img2imgCall[1].body).hires_denoise).toBe(0.4);
+    expect(JSON.parse(img2imgCall[1].body).seed_extra).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).client_id).toBe("socket-client-2");
     const extrasCall = fetchCalls.find(([url]) => url === "/rookieui/extras/run");
     expect(extrasCall).toBeDefined();
@@ -859,6 +885,180 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     expect(document.getElementById("rookieui-image-asset").value).toBe("fallback-image.png");
     expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("asset fallback");
+  });
+
+  test("adapts nested host preview payload variants and filters foreign prompt frames", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    let extensionDefinition;
+    const runtimeListeners = new Map();
+    const app = {
+      registerExtension(definition) {
+        extensionDefinition = definition;
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-preview-variants",
+        addEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          handlers.push(handler);
+          runtimeListeners.set(eventName, handlers);
+        },
+        removeEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          runtimeListeners.set(
+            eventName,
+            handlers.filter((entry) => entry !== handler),
+          );
+        },
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    const emitRuntimeEvent = (eventName, detail) => {
+      const handlers = runtimeListeners.get(eventName) || [];
+      handlers.forEach((handler) => handler({ detail }));
+    };
+
+    let resolveFirstQueuePoll;
+    const firstQueuePoll = new Promise((resolve) => {
+      resolveFirstQueuePoll = resolve;
+    });
+    let queueJobCallCount = 0;
+    const fetchImpl = async (url, options = {}) => {
+      if (url === "/rookieui/generate/txt2img") {
+        const requestPayload = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              mode: "queued",
+              workflow_kind: requestPayload.hires_enabled ? "txt2img-sd15-hires" : "txt2img-sd15",
+              submission: { accepted: true, prompt_id: "prompt-preview-1" },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue/prompt-preview-1")) {
+        queueJobCallCount += 1;
+        if (queueJobCallCount === 1) {
+          await firstQueuePoll;
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              queue_remaining: 0,
+              job: {
+                id: "prompt-preview-1",
+                status: "completed",
+                output_filenames: [],
+                reusable_outputs: [],
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/history/prompt-preview-1")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              "prompt-preview-1": {
+                outputs: {},
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              queue_remaining: 0,
+              jobs: [],
+            };
+          },
+        };
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        },
+      };
+    };
+
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:preview-variant-1");
+    URL.revokeObjectURL = vi.fn();
+
+    try {
+      await registerRookieUIBootstrapExtension({
+        app,
+        windowRef: window,
+        documentRef: document,
+        fetchImpl,
+      });
+
+      expect(extensionDefinition.name).toBe("ComfyUI-RookieUI");
+      const txt2imgForm = document.getElementById("rookieui-txt2img-form");
+      txt2imgForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      emitRuntimeEvent("b_preview_with_metadata", {
+        metadata: { prompt_id: "foreign-prompt-id" },
+        data: {
+          buffer: Uint8Array.from([137, 80, 78, 71]).buffer,
+          mime: "image/png",
+        },
+      });
+
+      emitRuntimeEvent("b_preview_with_metadata", {
+        metadata: { prompt_id: "prompt-preview-1" },
+        data: {
+          buffer: Uint8Array.from([137, 80, 78, 71]).buffer,
+          mime: "image/png",
+        },
+      });
+
+      resolveFirstQueuePoll();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      const previewImage = document.querySelector("#rookieui-txt2img-preview img");
+      expect(previewImage).not.toBeNull();
+      expect(previewImage?.getAttribute("src")).toBe("blob:preview-variant-1");
+      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("Completed: prompt-preview-1");
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
   });
 
   test("installs a legacy launcher when sidebar tabs are unavailable", async () => {

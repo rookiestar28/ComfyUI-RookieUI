@@ -51,36 +51,11 @@ def _unquote_text(value: str) -> str:
         return value
 
 
-def _extract_infotext_source(payload: dict[str, object]) -> tuple[str, str]:
-    if not isinstance(payload, dict):
-        raise ValueError("PNG info payload must be an object.")
-
-    direct_candidates = (
-        ("infotext", payload.get("infotext")),
-        ("parameters", payload.get("parameters")),
-        ("info", payload.get("info")),
-    )
-    for source, value in direct_candidates:
-        if isinstance(value, str) and value.strip():
-            return source, normalize_infotext(value)
-
-    metadata = payload.get("metadata")
-    if isinstance(metadata, dict):
-        metadata_candidates = (
-            ("metadata.parameters", metadata.get("parameters")),
-            ("metadata.info", metadata.get("info")),
-        )
-        for source, value in metadata_candidates:
-            if isinstance(value, str) and value.strip():
-                return source, normalize_infotext(value)
-
-    raise ValueError("infotext or metadata.parameters is required.")
-
-
 def _extract_image_source(payload: dict[str, object]) -> tuple[dict[str, str], str | None, str]:
     image_data = payload.get("image_data")
     if image_data in (None, ""):
-        return {}, None, ""
+        # IMPORTANT: PNG Info is image-first only; text-only inspection paths are intentionally retired to keep extraction behavior deterministic.
+        raise ValueError("image_data is required.")
 
     stored_asset = store_uploaded_image(image_data, prefix="pnginfo")
     image = Image.open(io.BytesIO(stored_asset.path.read_bytes()))
@@ -288,8 +263,7 @@ def parse_pnginfo_payload(payload: dict[str, object]) -> PNGInfoParseResult:
                 metadata_items=metadata_items,
                 asset_handle=asset_handle,
             )
-        source, infotext = _extract_infotext_source(payload)
-        source_type = "a1111"
+        raise ValueError("No A1111 parameters metadata found in image_data.")
 
     raw_parameters = _parse_generation_parameters(infotext)
     profile_id = _infer_profile(raw_parameters)

@@ -644,31 +644,116 @@ function extractRuntimePromptId(detail) {
   if (!detail || typeof detail !== "object") {
     return "";
   }
-  const keys = ["prompt_id", "promptId", "jobId", "id"];
-  for (const key of keys) {
-    const value = detail[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
+  // CRITICAL: host preview/progress events can nest identifiers under metadata/payload wrappers; keep recursive prompt-id extraction to prevent cross-job frame leakage.
+  const queue = [detail];
+  const visited = new Set();
+  const idKeys = ["prompt_id", "promptId", "jobId", "id"];
+  const nestedKeys = ["metadata", "meta", "payload", "data", "event", "job"];
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+    if (visited.has(candidate)) {
+      continue;
+    }
+    visited.add(candidate);
+    for (const key of idKeys) {
+      const value = candidate[key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+    for (const key of nestedKeys) {
+      const nested = candidate[key];
+      if (nested && typeof nested === "object") {
+        queue.push(nested);
+      }
     }
   }
   return "";
 }
 
+function decodeDataUrlToBlob(dataUrl) {
+  if (typeof dataUrl !== "string") {
+    return null;
+  }
+  const trimmed = dataUrl.trim();
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+)?;base64,(.+)$/i.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  try {
+    const mimeType = match[1] || "image/png";
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mimeType });
+  } catch (_error) {
+    return null;
+  }
+}
+
+function normalizeBinaryCandidate(candidate, fallbackMime = "image/png") {
+  if (candidate instanceof Blob) {
+    return candidate;
+  }
+  if (candidate instanceof ArrayBuffer) {
+    return new Blob([candidate], { type: fallbackMime });
+  }
+  if (ArrayBuffer.isView(candidate)) {
+    return new Blob([candidate], { type: fallbackMime });
+  }
+  if (Array.isArray(candidate) && candidate.length) {
+    const bytes = candidate.filter((value) => Number.isFinite(value)).map((value) => Number(value));
+    if (bytes.length) {
+      return new Blob([Uint8Array.from(bytes)], { type: fallbackMime });
+    }
+  }
+  if (typeof candidate === "string" && candidate.startsWith("data:image/")) {
+    return decodeDataUrlToBlob(candidate);
+  }
+  return null;
+}
+
 function extractPreviewBlob(payload) {
-  if (payload instanceof Blob) {
-    return payload;
+  const directBlob = normalizeBinaryCandidate(payload, "image/png");
+  if (directBlob) {
+    return directBlob;
   }
   if (!payload || typeof payload !== "object") {
     return null;
   }
-  if (payload.blob instanceof Blob) {
-    return payload.blob;
-  }
-  if (payload.buffer instanceof ArrayBuffer) {
-    return new Blob([payload.buffer], { type: payload.mime || "image/png" });
-  }
-  if (payload.data instanceof Uint8Array) {
-    return new Blob([payload.data], { type: payload.mime || "image/png" });
+  // IMPORTANT: preview payloads differ by host/frontend bridge; probe nested wrappers before giving up so live preview remains stable across Comfy variants.
+  const queue = [payload];
+  const visited = new Set();
+  const nestedKeys = ["blob", "buffer", "data", "preview", "image", "frame", "payload", "detail", "bytes"];
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+    if (visited.has(candidate)) {
+      continue;
+    }
+    visited.add(candidate);
+    const mimeType =
+      (typeof candidate.mime === "string" && candidate.mime) ||
+      (typeof candidate.mimetype === "string" && candidate.mimetype) ||
+      (typeof candidate.content_type === "string" && candidate.content_type) ||
+      "image/png";
+    for (const key of nestedKeys) {
+      const value = candidate[key];
+      const normalized = normalizeBinaryCandidate(value, mimeType);
+      if (normalized) {
+        return normalized;
+      }
+      if (value && typeof value === "object") {
+        queue.push(value);
+      }
+    }
   }
   return null;
 }

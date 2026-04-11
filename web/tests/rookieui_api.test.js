@@ -95,7 +95,7 @@ describe("fetchRookieUICapabilities", () => {
   test("inspects pnginfo payloads through the backend", async () => {
     const calls = [];
     const result = await inspectRookieUIPngInfo(
-      { infotext: "masterpiece\nNegative prompt: blurry\nSteps: 20, Sampler: Euler a, CFG scale: 7, Seed: 1, Size: 512x512" },
+      { image_data: "data:image/png;base64,ZmFrZQ==" },
       async (url, options) => {
         calls.push([url, options]);
         return {
@@ -116,7 +116,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.ok).toBe(true);
     expect(result.data.target_form).toBe("txt2img");
     expect(calls[0][0]).toBe("/rookieui/pnginfo/inspect");
-    expect(JSON.parse(calls[0][1].body).infotext).toContain("Steps: 20");
+    expect(JSON.parse(calls[0][1].body).image_data).toContain("data:image/png;base64,");
   });
 
   test("submits extras payloads to the backend", async () => {

@@ -32,15 +32,20 @@ class PNGInfoParsingTests(unittest.TestCase):
         encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
         return f"data:image/png;base64,{encoded}"
 
+    def _build_a1111_parameters_image_data(self, parameters: str) -> str:
+        return self._build_image_data_url({"parameters": parameters})
+
     def test_parse_pnginfo_payload_maps_txt2img_fields(self) -> None:
         result = parse_pnginfo_payload(
             {
-                "infotext": (
+                "image_data": self._build_a1111_parameters_image_data(
+                    (
                     "masterpiece, city skyline\n"
                     "Negative prompt: blurry\n"
                     "Steps: 24, Sampler: Euler a, CFG scale: 6.5, Seed: 1234, Size: 768x768, "
                     "Model: dreamshaperXL.safetensors, Clip skip: 2"
-                )
+                    )
+                ),
             }
         ).to_payload()
 
@@ -54,31 +59,31 @@ class PNGInfoParsingTests(unittest.TestCase):
     def test_parse_pnginfo_payload_maps_inpaint_markers(self) -> None:
         result = parse_pnginfo_payload(
             {
-                "metadata": {
-                    "parameters": (
+                "image_data": self._build_a1111_parameters_image_data(
+                    (
                         "portrait cleanup\n"
                         "Negative prompt: bad hands\n"
                         "Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7, Seed: 42, "
                         "Denoising strength: 0.42, Mask mode: Inpaint masked, Masked content: original, "
                         "Inpaint area: Whole picture, Masked area padding: 16, Model: ponyDiffusion.safetensors"
                     )
-                }
+                ),
             }
         ).to_payload()
 
-        self.assertEqual(result["source"], "metadata.parameters")
+        self.assertEqual(result["source"], "image.parameters")
         self.assertEqual(result["target_form"], "inpaint")
         self.assertEqual(result["payload"]["mode"], "inpaint")
         self.assertEqual(result["payload"]["profile"], "pony")
         self.assertEqual(result["payload"]["scheduler_name"], "karras")
-        self.assertIn("image_asset", result["missing_inputs"])
+        self.assertNotIn("image_asset", result["missing_inputs"])
         self.assertIn("mask_asset", result["missing_inputs"])
 
     def test_parse_pnginfo_payload_accepts_underscore_inpaint_aliases(self) -> None:
         result = parse_pnginfo_payload(
             {
-                "metadata": {
-                    "parameters": (
+                "image_data": self._build_a1111_parameters_image_data(
+                    (
                         "portrait cleanup\n"
                         "Negative prompt: bad hands\n"
                         "Steps: 30, Sampler: DPM++ 2M Karras, CFG scale: 7, Seed: 42, "
@@ -86,7 +91,7 @@ class PNGInfoParsingTests(unittest.TestCase):
                         "Masked content: latent_noise, Inpaint area: only_masked, Masked area padding: 16, "
                         "Model: ponyDiffusion.safetensors"
                     )
-                }
+                ),
             }
         ).to_payload()
 
@@ -136,12 +141,14 @@ class PNGInfoParsingTests(unittest.TestCase):
     def test_parse_pnginfo_payload_reports_unsupported_fields(self) -> None:
         result = parse_pnginfo_payload(
             {
-                "infotext": (
+                "image_data": self._build_a1111_parameters_image_data(
+                    (
                     "cat portrait\n"
                     "Negative prompt: blurry\n"
                     "Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 5, Size: 512x512, "
                     "Version: 1.10.0, ENSD: 31337"
-                )
+                    )
+                ),
             }
         ).to_payload()
 
@@ -153,10 +160,12 @@ class PNGInfoParsingTests(unittest.TestCase):
             routes.pnginfo_parse(
                 _FakeJsonRequest(
                     {
-                        "infotext": (
+                        "image_data": self._build_a1111_parameters_image_data(
+                            (
                             "masterpiece, harbor\n"
                             "Negative prompt: blurry\n"
                             "Steps: 28, Sampler: Euler a, CFG scale: 7, Seed: 9, Size: 512x512"
+                            )
                         )
                     }
                 )
@@ -172,10 +181,12 @@ class PNGInfoParsingTests(unittest.TestCase):
             routes.pnginfo_inspect(
                 _FakeJsonRequest(
                     {
-                        "infotext": (
+                        "image_data": self._build_a1111_parameters_image_data(
+                            (
                             "masterpiece, harbor\n"
                             "Negative prompt: blurry\n"
                             "Steps: 28, Sampler: Euler a, CFG scale: 7, Seed: 9, Size: 512x512"
+                            )
                         )
                     }
                 )
@@ -186,13 +197,13 @@ class PNGInfoParsingTests(unittest.TestCase):
         self.assertEqual(response["payload"]["status"], "ok")
         self.assertEqual(response["payload"]["source_type"], "a1111")
 
-    def test_pnginfo_route_rejects_missing_text(self) -> None:
+    def test_pnginfo_route_rejects_missing_image_data(self) -> None:
         response = asyncio.run(routes.pnginfo_parse(_FakeJsonRequest({"metadata": {}})))
 
         self.assertEqual(response["status"], 400)
         self.assertEqual(response["payload"]["status"], "invalid-request")
 
-    def test_pnginfo_route_rejects_oversized_infotext(self) -> None:
+    def test_pnginfo_route_rejects_text_only_payload(self) -> None:
         response = asyncio.run(
             routes.pnginfo_parse(
                 _FakeJsonRequest({"infotext": "x" * (MAX_INFOTEXT_LENGTH + 1)})
