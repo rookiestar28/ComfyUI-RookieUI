@@ -16,10 +16,10 @@ import {
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260410-r30-live-preview-runtime";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260411-f63-style-modules";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260410-r30-live-preview-runtime";
+const ROOKIEUI_ASSET_REVISION = "20260411-f63-style-modules";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {

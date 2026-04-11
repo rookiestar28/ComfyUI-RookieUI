@@ -1,0 +1,531 @@
+﻿.rookieui-shell {
+  --rookieui-prompt-primary-height: 108px;
+  --rookieui-generate-height-scale: 0.7225;
+  --rookieui-bg-root: #eff2f7;
+  --rookieui-bg-panel: #f8fafc;
+  --rookieui-bg-panel-soft: #eef3f9;
+  --rookieui-bg-input: #f4f7fb;
+  --rookieui-bg-elevated: #ffffff;
+  --rookieui-bg-preview-top: rgba(224, 232, 243, 0.95);
+  --rookieui-bg-preview-bottom: rgba(210, 221, 235, 0.95);
+  --rookieui-border: rgba(42, 57, 82, 0.18);
+  --rookieui-border-strong: rgba(232, 120, 21, 0.55);
+  --rookieui-text-primary: #17202e;
+  --rookieui-text-secondary: #4f6077;
+  --rookieui-text-muted: #697a92;
+  --rookieui-text-inverse: #fff8f1;
+  --rookieui-accent: #ff8a1c;
+  --rookieui-accent-soft: rgba(255, 138, 28, 0.12);
+  --rookieui-accent-strong: #ff6a00;
+  --rookieui-tone-queue: #3a78d4;
+  --rookieui-tone-danger: #c15a47;
+  --rookieui-tone-metadata: #b17f2f;
+  --rookieui-tone-transfer: #2a8a6f;
+  --rookieui-tone-extras: #3b8d43;
+  --rookieui-tone-neutral: #6a7890;
+  --rookieui-sidebar-min-width: 980px;
+  --rookieui-generate-button-width: 272px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  min-width: var(--rookieui-sidebar-min-width);
+  padding: 0;
+  background: var(--rookieui-bg-root);
+  color: var(--rookieui-text-primary);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.rookieui-shell[data-theme="dark"] {
+  --rookieui-bg-root: #0f141d;
+  --rookieui-bg-panel: #11161f;
+  --rookieui-bg-panel-soft: #171d28;
+  --rookieui-bg-input: #1c2431;
+  --rookieui-bg-elevated: #0f1622;
+  --rookieui-bg-preview-top: rgba(34, 42, 54, 0.95);
+  --rookieui-bg-preview-bottom: rgba(24, 30, 38, 0.95);
+  --rookieui-border: rgba(255, 255, 255, 0.12);
+  --rookieui-border-strong: rgba(255, 148, 45, 0.58);
+  --rookieui-text-primary: #eef2f6;
+  --rookieui-text-secondary: #c5cfdd;
+  --rookieui-text-muted: #9aa8ba;
+  --rookieui-text-inverse: #fffaf2;
+  --rookieui-accent: #ff9a32;
+  --rookieui-accent-soft: rgba(255, 154, 50, 0.14);
+  --rookieui-accent-strong: #ff6d00;
+  --rookieui-tone-queue: #76a8ff;
+  --rookieui-tone-danger: #ff9f8e;
+  --rookieui-tone-metadata: #e2b266;
+  --rookieui-tone-transfer: #64ceaf;
+  --rookieui-tone-extras: #7cd487;
+  --rookieui-tone-neutral: #b8c3d4;
+}
+
+.side-bar-panel:has(.rookieui-shell),
+.p-splitterpanel:has(.rookieui-shell),
+.sidebar-content-container:has(.rookieui-shell) {
+  min-width: 980px !important;
+}
+
+.rookieui-shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rookieui-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rookieui-accent) 12%, transparent), transparent);
+}
+
+.rookieui-shell__identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rookieui-shell__status-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #2a2;
+  box-shadow: 0 0 10px color-mix(in srgb, #2a2 35%, transparent);
+}
+
+.rookieui-shell__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__version {
+  color: var(--rookieui-text-muted);
+  font-size: 12px;
+}
+
+.rookieui-shell__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* IMPORTANT: keep an explicit rail divider so enlarged tabs still separate cleanly from workspace controls. */
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid var(--rookieui-border);
+}
+
+.rookieui-shell__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 7px;
+  padding: 7px 14px;
+  min-height: 34px;
+  background: var(--rookieui-bg-panel-soft);
+  color: var(--rookieui-text-secondary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.rookieui-shell__tab:hover {
+  border-color: color-mix(in srgb, var(--rookieui-accent) 40%, transparent);
+  background: var(--rookieui-accent-soft);
+}
+
+.rookieui-shell__tab.is-active {
+  border-color: var(--rookieui-border-strong);
+  background: color-mix(in srgb, var(--rookieui-accent) 18%, transparent);
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 16px 18px;
+}
+
+.rookieui-shell__pane {
+  /* CRITICAL: inactive panes must stay display:none; otherwise tab clicks only restyle buttons. */
+  display: none;
+}
+
+.rookieui-shell__pane[hidden] {
+  display: none !important;
+}
+
+.rookieui-shell__pane.is-active {
+  display: block !important;
+}
+
+.rookieui-shell__section {
+  border: 1px solid var(--rookieui-border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--rookieui-bg-panel);
+}
+
+.rookieui-shell__pane > .rookieui-shell__section + .rookieui-shell__section {
+  margin-top: 14px;
+}
+
+.rookieui-shell__section-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__subsection-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--rookieui-accent) 72%, var(--rookieui-text-secondary));
+}
+
+.rookieui-shell__form {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__grid {
+  display: grid;
+  gap: 10px 12px;
+}
+
+.rookieui-shell__grid--two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rookieui-shell__field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.rookieui-shell__inline-checkbox-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.rookieui-shell__field-label {
+  color: var(--rookieui-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.rookieui-shell__checkbox-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.rookieui-shell__input,
+.rookieui-shell__textarea,
+.rookieui-shell__select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: var(--rookieui-bg-input);
+  color: var(--rookieui-text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.rookieui-shell__textarea {
+  resize: vertical;
+}
+
+.rookieui-shell__textarea--prompt {
+  min-height: var(--rookieui-prompt-primary-height);
+}
+
+.rookieui-shell__textarea--negative {
+  min-height: 84px;
+}
+
+.rookieui-shell__select {
+  text-overflow: ellipsis;
+}
+
+.rookieui-shell__checkbox {
+  /* IMPORTANT: do not reuse the full-width input class; it turns the checkbox into a fake text field. */
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--rookieui-accent);
+}
+
+.rookieui-shell__input:focus,
+.rookieui-shell__textarea:focus,
+.rookieui-shell__select:focus,
+.rookieui-shell__checkbox:focus {
+  outline: 1px solid color-mix(in srgb, var(--rookieui-accent) 75%, transparent);
+  border-color: color-mix(in srgb, var(--rookieui-accent) 72%, transparent);
+}
+
+.rookieui-shell__actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__inventory-group + .rookieui-shell__inventory-group {
+  margin-top: 14px;
+}
+
+.rookieui-shell__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--rookieui-accent) 72%, transparent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: var(--rookieui-accent-soft);
+  color: var(--rookieui-text-primary);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rookieui-shell__button--secondary {
+  background: var(--rookieui-bg-panel-soft);
+  color: var(--rookieui-text-primary);
+  border: 1px solid var(--rookieui-border);
+}
+
+.rookieui-shell__status {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--rookieui-text-secondary);
+}
+
+.rookieui-shell__list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rookieui-shell__list-item {
+  margin-bottom: 8px;
+  color: var(--rookieui-text-secondary);
+  font-size: 13px;
+}
+
+.rookieui-shell__repo-link {
+  white-space: nowrap;
+}
+
+.rookieui-shell__forge-pane {
+  min-width: 0;
+}
+
+.rookieui-shell__forge-form {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__quicksettings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rookieui-shell__quicksetting {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rookieui-shell__quicksetting-label {
+  color: var(--rookieui-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.rookieui-shell__quicksetting-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rookieui-shell__quicksetting .rookieui-shell__select,
+.rookieui-shell__quicksetting .rookieui-shell__input {
+  /* IMPORTANT: quicksetting labels and control boxes use separate tokens; do not shrink the label font when reducing the selector chrome. */
+  min-height: 28px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.rookieui-shell__prompt-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1.95fr) minmax(208px, 0.72fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.rookieui-shell__prompt-stack {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rookieui-shell__action-rail {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  justify-items: end;
+}
+
+.rookieui-shell__button--hero {
+  width: min(100%, var(--rookieui-generate-button-width));
+  /* IMPORTANT: keep hero top-edge alignment while reducing height; host CSS must not re-expand Generate buttons. */
+  height: calc(var(--rookieui-prompt-primary-height) * var(--rookieui-generate-height-scale));
+  min-height: calc(var(--rookieui-prompt-primary-height) * var(--rookieui-generate-height-scale));
+  max-height: calc(var(--rookieui-prompt-primary-height) * var(--rookieui-generate-height-scale));
+  border-color: color-mix(in srgb, var(--rookieui-accent-strong) 92%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rookieui-accent) 92%, white 6%), var(--rookieui-accent-strong));
+  color: var(--rookieui-text-inverse);
+  /* IMPORTANT: keep hero label soft and non-bold to match A1111 visual density; do not restore oversized bold typography. */
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.rookieui-shell__mini-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: min(100%, var(--rookieui-generate-button-width));
+  justify-content: flex-start;
+}
+
+.rookieui-shell__action-target-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  width: min(100%, var(--rookieui-generate-button-width));
+}
+
+.rookieui-shell__action-target {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.rookieui-shell__mini-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 6px;
+  padding: 5px 9px;
+  background: var(--rookieui-bg-panel-soft);
+  color: var(--rookieui-text-primary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rookieui-shell__mini-action--icon {
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+}
+
+.rookieui-shell__mini-action--tone-queue {
+  border-color: color-mix(in srgb, var(--rookieui-tone-queue) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-queue) 16%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-queue);
+}
+
+.rookieui-shell__mini-action--tone-danger {
+  border-color: color-mix(in srgb, var(--rookieui-tone-danger) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-danger) 14%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-danger);
+}
+
+.rookieui-shell__mini-action--tone-metadata {
+  border-color: color-mix(in srgb, var(--rookieui-tone-metadata) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-metadata) 16%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-metadata);
+}
+
+.rookieui-shell__mini-action--tone-transfer {
+  border-color: color-mix(in srgb, var(--rookieui-tone-transfer) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-transfer) 14%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-transfer);
+}
+
+.rookieui-shell__mini-action--tone-extras {
+  border-color: color-mix(in srgb, var(--rookieui-tone-extras) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-extras) 14%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-extras);
+}
+
+.rookieui-shell__mini-action--tone-neutral {
+  border-color: color-mix(in srgb, var(--rookieui-tone-neutral) 70%, var(--rookieui-border));
+  background: color-mix(in srgb, var(--rookieui-tone-neutral) 14%, var(--rookieui-bg-panel-soft));
+  color: var(--rookieui-tone-neutral);
+}
+
+.rookieui-shell__mini-action-icon {
+  font-size: 16px;
+  line-height: 1;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+  font-style: normal;
+}
+
+.rookieui-shell__mini-action:hover,
+.rookieui-shell__mini-action:focus-visible {
+  border-color: var(--rookieui-border-strong);
+  background: var(--rookieui-accent-soft);
+}
+
+.rookieui-shell__status--inline {
+  margin: 0;
+  min-height: 18px;
+}
+
