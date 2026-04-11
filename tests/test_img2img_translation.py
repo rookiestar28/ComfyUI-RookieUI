@@ -163,6 +163,19 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.mode, "inpaint_upload")
         self.assertEqual(normalized.execution_mode, "inpaint")
 
+    def test_normalize_img2img_request_exposes_prompt_semantics_and_warning_codes(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait BREAK [soft:sharp:0.5]",
+                "image_asset": "portrait-input",
+            }
+        )
+
+        self.assertIn("PROMPT_BREAK_DETECTED", normalized.prompt_warning_codes)
+        self.assertTrue(normalized.prompt_semantics["features"]["break_chunks"])
+        self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
+        self.assertEqual(len(normalized.prompt_semantics["branches"]), 1)
+
     def test_normalize_img2img_request_accepts_human_readable_inpaint_aliases(self) -> None:
         normalized = normalize_img2img_request(
             {

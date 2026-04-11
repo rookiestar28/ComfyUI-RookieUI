@@ -125,6 +125,9 @@ class NormalizedTxt2ImgRequest:
     hires_upscale_method: str
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
+    prompt_warning_codes: list[str] = field(default_factory=list)
+    prompt_semantics: dict[str, Any] = field(default_factory=dict)
+    negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:
@@ -183,6 +186,9 @@ class NormalizedImg2ImgRequest:
     hires_upscale_method: str
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
+    prompt_warning_codes: list[str] = field(default_factory=list)
+    prompt_semantics: dict[str, Any] = field(default_factory=dict)
+    negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:

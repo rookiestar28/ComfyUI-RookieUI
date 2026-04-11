@@ -320,5 +320,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         hires_upscale_method=hires_upscale_method,
         lora_activations=lora_activations,
         prompt_warnings=prompt_preprocess.prompt_warnings,
+        prompt_warning_codes=prompt_preprocess.warning_codes,
+        prompt_semantics=prompt_preprocess.prompt_semantics.to_payload(),
+        negative_prompt_semantics=prompt_preprocess.negative_prompt_semantics.to_payload(),
         applied_defaults=applied_defaults,
     )

@@ -83,6 +83,19 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.lora_activations[0].strength_model, 0.8)
         self.assertEqual(normalized.lora_activations[0].strength_clip, 0.8)
 
+    def test_normalize_txt2img_request_exposes_prompt_semantics_and_warning_codes(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "hero AND villain BREAK [calm:chaos:0.4]",
+            }
+        )
+
+        self.assertIn("PROMPT_AND_DETECTED", normalized.prompt_warning_codes)
+        self.assertTrue(normalized.prompt_semantics["features"]["and_composition"])
+        self.assertTrue(normalized.prompt_semantics["features"]["break_chunks"])
+        self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
+        self.assertEqual(len(normalized.prompt_semantics["branches"]), 2)
+
     def test_normalize_txt2img_request_clears_text_encoder_for_sd15(self) -> None:
         normalized = normalize_txt2img_request(
             {
