@@ -1,3 +1,5 @@
+import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
+
 const DEFAULT_CAPABILITIES = Object.freeze({
   service: "rookieui",
   visibility: "internal",
@@ -94,8 +96,19 @@ export function createDefaultCapabilities() {
   return JSON.parse(JSON.stringify(DEFAULT_CAPABILITIES));
 }
 
+function toErrorDetail(error) {
+  if (!error) {
+    return "";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 export async function fetchRookieUICapabilities(fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.capabilities", "Using fallback capabilities because fetch() is unavailable.");
     return {
       ok: false,
       source: "fallback",
@@ -118,6 +131,9 @@ export async function fetchRookieUICapabilities(fetchImpl = globalThis.fetch) {
       data: await response.json(),
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.capabilities", "Capability request failed; returning fallback payload.", {
+      error: toErrorDetail(_error),
+    });
     return {
       ok: false,
       source: "fallback",
@@ -128,6 +144,7 @@ export async function fetchRookieUICapabilities(fetchImpl = globalThis.fetch) {
 
 async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.resource", "Using fallback resource because fetch() is unavailable.", { path });
     return { ok: false, source: "fallback", data: fallbackData };
   }
 
@@ -144,6 +161,10 @@ async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.
       data: await response.json(),
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.resource", "Resource request failed; returning fallback payload.", {
+      path,
+      error: toErrorDetail(_error),
+    });
     return { ok: false, source: "fallback", data: fallbackData };
   }
 }
@@ -415,6 +436,7 @@ export async function fetchRookieUIHistoryPrompt(promptId, fetchImpl = globalThi
 
 export async function submitRookieUITxt2Img(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.submit_txt2img", "Submission skipped because fetch() is unavailable.");
     return {
       ok: false,
       status: 0,
@@ -442,6 +464,9 @@ export async function submitRookieUITxt2Img(payload, fetchImpl = globalThis.fetc
       data,
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.submit_txt2img", "Submission failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
     return {
       ok: false,
       status: 0,
@@ -455,6 +480,7 @@ export async function submitRookieUITxt2Img(payload, fetchImpl = globalThis.fetc
 
 export async function submitRookieUIImg2Img(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.submit_img2img", "Submission skipped because fetch() is unavailable.");
     return {
       ok: false,
       status: 0,
@@ -482,6 +508,9 @@ export async function submitRookieUIImg2Img(payload, fetchImpl = globalThis.fetc
       data,
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.submit_img2img", "Submission failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
     return {
       ok: false,
       status: 0,
@@ -495,6 +524,7 @@ export async function submitRookieUIImg2Img(payload, fetchImpl = globalThis.fetc
 
 export async function inspectRookieUIPngInfo(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.inspect_pnginfo", "Inspection skipped because fetch() is unavailable.");
     return {
       ok: false,
       status: 0,
@@ -522,6 +552,9 @@ export async function inspectRookieUIPngInfo(payload, fetchImpl = globalThis.fet
       data,
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.inspect_pnginfo", "Inspection request failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
     return {
       ok: false,
       status: 0,
@@ -535,6 +568,7 @@ export async function inspectRookieUIPngInfo(payload, fetchImpl = globalThis.fet
 
 export async function submitRookieUIExtras(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.submit_extras", "Submission skipped because fetch() is unavailable.");
     return {
       ok: false,
       status: 0,
@@ -562,6 +596,9 @@ export async function submitRookieUIExtras(payload, fetchImpl = globalThis.fetch
       data,
     };
   } catch (_error) {
+    rookieUIDebugWarn("api.submit_extras", "Submission failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
     return {
       ok: false,
       status: 0,

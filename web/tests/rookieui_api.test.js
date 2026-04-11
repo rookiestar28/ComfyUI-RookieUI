@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import {
   fetchRookieUICapabilities,
@@ -209,5 +209,26 @@ describe("fetchRookieUICapabilities", () => {
     });
     expect(history.ok).toBe(true);
     expect(historyCalls[0]).toBe("/history/prompt-123");
+  });
+
+  test("emits guarded debug warnings only when ROOKIEUI_DEBUG is enabled", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const originalFlag = globalThis.__ROOKIEUI_DEBUG__;
+
+    globalThis.__ROOKIEUI_DEBUG__ = false;
+    await fetchRookieUICapabilities(async () => {
+      throw new Error("offline");
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    globalThis.__ROOKIEUI_DEBUG__ = true;
+    await fetchRookieUICapabilities(async () => {
+      throw new Error("offline");
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    expect(String(warnSpy.mock.calls[0][0])).toContain("[RookieUI:api.capabilities]");
+
+    warnSpy.mockRestore();
+    globalThis.__ROOKIEUI_DEBUG__ = originalFlag;
   });
 });

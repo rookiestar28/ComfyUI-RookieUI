@@ -18,6 +18,7 @@ import {
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
 } from "./rookieui_sidebar_shell_utils.js?v=20260411-r46-utils";
+import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
 import { createTxt2ImgTabDefinition } from "./sidebar_tabs/rookieui_txt2img_tab.js?v=20260411-r47-tabs";
 import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.js?v=20260411-r47-tabs";
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
@@ -25,6 +26,17 @@ import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
+
+function emitFrontendDebugWarning(scope, message, error = null, metadata = null) {
+  const detail = {};
+  if (metadata && typeof metadata === "object") {
+    Object.assign(detail, metadata);
+  }
+  if (error) {
+    detail.error = error instanceof Error ? error.message : String(error);
+  }
+  rookieUIDebugWarn(scope, message, Object.keys(detail).length ? detail : null);
+}
 
 function createSeedControlField(parent, labelText, seedInput, seedExtraInput, id = "") {
   const field = document.createElement("div");
@@ -731,6 +743,7 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
     return;
   }
   if (!formRegistry?.img2img?.applyPayload) {
+    emitFrontendDebugWarning("shell.preview_transfer", "Img2Img applyPayload is unavailable; falling back to tab switch.");
     if (statusNode) {
       statusNode.textContent = "Img2Img form is unavailable.";
     }
@@ -751,6 +764,7 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
       statusNode.textContent = "Sent preview image to Img2Img";
     }
   } catch (_error) {
+    emitFrontendDebugWarning("shell.preview_transfer", "Preview transfer failed; falling back to tab switch only.", _error);
     activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
   }
 }
@@ -996,6 +1010,7 @@ function parseJsonArrayField(rawValue) {
     const parsed = JSON.parse(rawValue);
     return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry === "string" && entry.trim()) : [];
   } catch (_error) {
+    emitFrontendDebugWarning("shell.img2img_batch_parse", "Failed to parse batch image JSON field; returning empty list.", _error);
     return [];
   }
 }
@@ -2733,6 +2748,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
             try {
               await onFile(file);
             } catch (_error) {
+              emitFrontendDebugWarning("shell.img2img_upload", "Image upload handler failed on file input.", _error);
               statusNode.textContent = "Failed to load image upload.";
             }
           });
@@ -2753,6 +2769,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
             try {
               await onFile(file);
             } catch (_error) {
+              emitFrontendDebugWarning("shell.img2img_upload", "Image upload handler failed on drop event.", _error);
               statusNode.textContent = "Failed to load dropped image.";
             }
           });
@@ -2802,6 +2819,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           try {
             await setBatchFiles(batchFileInput.files);
           } catch (_error) {
+            emitFrontendDebugWarning("shell.img2img_batch_upload", "Batch image input handling failed.", _error);
             statusNode.textContent = "Failed to load batch image upload.";
           }
         });
@@ -2818,6 +2836,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           try {
             await setBatchFiles(event.dataTransfer?.files);
           } catch (_error) {
+            emitFrontendDebugWarning("shell.img2img_batch_upload", "Batch image drop handling failed.", _error);
             statusNode.textContent = "Failed to load dropped batch images.";
           }
         });
@@ -3393,6 +3412,7 @@ function buildPngInfoSection(parent, bootstrapState, formRegistry) {
       await syncFileSelection(file);
       await runAutoInspection();
     } catch (_error) {
+      emitFrontendDebugWarning("shell.pnginfo_upload", "PNG Info file input handling failed.", _error);
       statusNode.textContent = "Failed to read the selected image.";
     }
   });
@@ -3414,6 +3434,7 @@ function buildPngInfoSection(parent, bootstrapState, formRegistry) {
       await syncFileSelection(file);
       await runAutoInspection();
     } catch (_error) {
+      emitFrontendDebugWarning("shell.pnginfo_upload", "PNG Info file drop handling failed.", _error);
       statusNode.textContent = "Failed to read the dropped image.";
     }
   });
@@ -3788,6 +3809,7 @@ function buildExtrasSection(parent, bootstrapState, formRegistry) {
     try {
       await setSingleFiles(singleFileInput.files);
     } catch (_error) {
+      emitFrontendDebugWarning("shell.extras_upload", "Extras single-image input handling failed.", _error);
       statusNode.textContent = "Failed to load the selected Extras image.";
     }
   });
@@ -3795,6 +3817,7 @@ function buildExtrasSection(parent, bootstrapState, formRegistry) {
     try {
       await setBatchFiles(batchFileInput.files);
     } catch (_error) {
+      emitFrontendDebugWarning("shell.extras_upload", "Extras batch-image input handling failed.", _error);
       statusNode.textContent = "Failed to load the selected batch images.";
     }
   });
@@ -3814,6 +3837,7 @@ function buildExtrasSection(parent, bootstrapState, formRegistry) {
     try {
       await setSingleFiles(event.dataTransfer?.files);
     } catch (_error) {
+      emitFrontendDebugWarning("shell.extras_upload", "Extras single-image drop handling failed.", _error);
       statusNode.textContent = "Failed to load the dropped Extras image.";
     }
   });
@@ -3823,6 +3847,7 @@ function buildExtrasSection(parent, bootstrapState, formRegistry) {
     try {
       await setBatchFiles(event.dataTransfer?.files);
     } catch (_error) {
+      emitFrontendDebugWarning("shell.extras_upload", "Extras batch-image drop handling failed.", _error);
       statusNode.textContent = "Failed to load the dropped batch images.";
     }
   });
