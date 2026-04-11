@@ -45,6 +45,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.denoise_strength, 0.75)
         self.assertEqual(request.seed, -1)
         self.assertGreaterEqual(request.execution_seed, 0)
+        self.assertEqual(request.primary_model_category, "checkpoints")
         self.assertIn("scheduler_name", request.applied_defaults)
         self.assertEqual(request.dtype_profile, "automatic")
         self.assertEqual(request.lora_name, "")
@@ -321,6 +322,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
+        self.assertEqual(request.primary_model_category, "diffusion_models")
 
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:
         normalized = normalize_img2img_request(

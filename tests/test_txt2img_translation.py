@@ -27,6 +27,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.sampler_name, "euler_ancestral")
         self.assertEqual(request.seed, -1)
         self.assertGreaterEqual(request.execution_seed, 0)
+        self.assertEqual(request.primary_model_category, "checkpoints")
         self.assertIn("width", request.applied_defaults)
         self.assertIn("scheduler_name", request.applied_defaults)
         self.assertEqual(request.dtype_profile, "automatic")
@@ -285,6 +286,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
+        self.assertEqual(request.primary_model_category, "diffusion_models")
 
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:
         request = normalize_txt2img_request(

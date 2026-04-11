@@ -103,6 +103,7 @@ class NormalizedTxt2ImgRequest:
     negative_prompt: str
     profile: str
     base_family: str
+    primary_model_category: str
     prompt_encoder: str
     dtype_profile: str
     lora_name: str
@@ -148,6 +149,7 @@ class NormalizedImg2ImgRequest:
     negative_prompt: str
     profile: str
     base_family: str
+    primary_model_category: str
     prompt_encoder: str
     dtype_profile: str
     lora_name: str

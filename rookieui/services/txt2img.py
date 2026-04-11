@@ -245,7 +245,9 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         strict_model_match=inventory_is_host,
     )
 
-    _, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(profile.id, inventory)
+    primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
+        profile.id, inventory
+    )
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
@@ -304,6 +306,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         negative_prompt=negative_prompt,
         profile=profile.id,
         base_family=profile.base_family,
+        primary_model_category=primary_model_category,
         prompt_encoder=profile.prompt_encoder,
         dtype_profile=dtype_profile,
         lora_name=lora_name,

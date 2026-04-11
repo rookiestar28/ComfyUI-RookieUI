@@ -348,7 +348,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         hires_denoise = _DEFAULT_HIRES_DENOISE
         hires_upscale_method = _DEFAULT_HIRES_UPSCALE_METHOD
 
-    _, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(profile.id, inventory)
+    primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
+        profile.id, inventory
+    )
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
@@ -383,6 +385,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         negative_prompt=negative_prompt,
         profile=profile.id,
         base_family=profile.base_family,
+        primary_model_category=primary_model_category,
         prompt_encoder=profile.prompt_encoder,
         dtype_profile=dtype_profile,
         lora_name=lora_name,
