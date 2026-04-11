@@ -8,6 +8,29 @@ function createInput(value = "") {
   return input;
 }
 
+function getSliderControl(rootId, labelText) {
+  const controls = Array.from(document.querySelectorAll(`#${rootId} .rookieui-shell__mask-editor-control`));
+  const row = controls.find((entry) => {
+    const label = entry.querySelector(".rookieui-shell__field-label");
+    return label?.textContent === labelText;
+  });
+  if (!row) {
+    throw new Error(`Unable to find slider control row for label: ${labelText}`);
+  }
+  return {
+    valueInput: row.querySelector('input[type="number"]'),
+    slider: row.querySelector('input[type="range"]'),
+  };
+}
+
+function computeSliderProgressPercent(slider) {
+  const min = Number(slider.min || 0);
+  const max = Number(slider.max || 100);
+  const value = Number(slider.value || min);
+  const ratio = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  return `${Math.min(100, Math.max(0, ratio))}%`;
+}
+
 describe("createImg2ImgMaskCanvasEditor", () => {
   let originalImage;
   let originalGetContext;
@@ -207,6 +230,61 @@ describe("createImg2ImgMaskCanvasEditor", () => {
     document.getElementById("mask-editor-advanced-clear-selection").click();
     const selectionOverlay = document.querySelector("#mask-editor-advanced .rookieui-shell__mask-editor-selection");
     expect(selectionOverlay.hidden).toBe(true);
+  });
+
+  test("keeps Opacity and Zoom slider position synchronized with numeric defaults at mount", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-slider-defaults",
+      parent,
+      modeInput: createInput("img2img"),
+      imageDataInput: createInput(""),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: (mode) => mode,
+      maskCanvasContract: {
+        stageMaskData: vi.fn(() => true),
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    const opacity = getSliderControl("mask-editor-slider-defaults", "Opacity");
+    const zoom = getSliderControl("mask-editor-slider-defaults", "Zoom");
+
+    expect(opacity.valueInput.value).toBe("1");
+    expect(opacity.slider.value).toBe("1");
+    expect(opacity.slider.style.getPropertyValue("--rookieui-slider-progress")).toBe("100%");
+
+    expect(zoom.valueInput.value).toBe("1");
+    expect(zoom.slider.value).toBe("1");
+    expect(zoom.slider.style.getPropertyValue("--rookieui-slider-progress")).toBe(computeSliderProgressPercent(zoom.slider));
+  });
+
+  test("updates Zoom slider progress after fit-to-viewport recalculation", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-slider-fit",
+      parent,
+      modeInput: createInput("img2img"),
+      imageDataInput: createInput("data:image/png;base64,source"),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: (mode) => mode,
+      maskCanvasContract: {
+        stageMaskData: vi.fn(() => true),
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    await editor.refreshFromInputs();
+    const zoom = getSliderControl("mask-editor-slider-fit", "Zoom");
+    expect(zoom.slider.style.getPropertyValue("--rookieui-slider-progress")).toBe(computeSliderProgressPercent(zoom.slider));
   });
 
   afterEach(() => {

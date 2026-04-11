@@ -53,6 +53,17 @@ function resolveAssetPreviewUrl(assetValue) {
   return `/view?filename=${encodeURIComponent(raw)}&subfolder=&type=output`;
 }
 
+function syncSliderProgressVisual(slider) {
+  if (!slider) {
+    return;
+  }
+  const min = Number(slider.min || 0);
+  const max = Number(slider.max || 100);
+  const value = Number(slider.value || min);
+  const ratio = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  slider.style.setProperty("--rookieui-slider-progress", `${Math.min(100, Math.max(0, ratio))}%`);
+}
+
 export function createImg2ImgMaskCanvasEditor({
   idPrefix = "rookieui-img2img-mask-editor",
   parent,
@@ -121,10 +132,11 @@ export function createImg2ImgMaskCanvasEditor({
     const slider = document.createElement("input");
     slider.type = "range";
     slider.className = "rookieui-shell__slider";
-    slider.value = String(value);
     slider.min = String(min);
     slider.max = String(max);
     slider.step = String(step);
+    slider.value = String(value);
+    syncSliderProgressVisual(slider);
     row.appendChild(slider);
     controls.appendChild(row);
     return { valueInput, slider };
@@ -375,6 +387,7 @@ export function createImg2ImgMaskCanvasEditor({
     state.panY = (viewportHeight - state.sourceHeight * fitZoom) / 2;
     zoomControl.valueInput.value = String(Number(fitZoom.toFixed(2)));
     zoomControl.slider.value = String(Number(fitZoom.toFixed(2)));
+    syncSliderProgressVisual(zoomControl.slider);
     updateTransform();
   };
 
@@ -634,6 +647,7 @@ export function createImg2ImgMaskCanvasEditor({
       const rounded = Number(normalized.toFixed(fractionDigits));
       control.valueInput.value = String(rounded);
       control.slider.value = String(rounded);
+      syncSliderProgressVisual(control.slider);
       if (typeof onChange === "function") {
         onChange(rounded);
       }
@@ -643,12 +657,15 @@ export function createImg2ImgMaskCanvasEditor({
       const rounded = Number(normalized.toFixed(fractionDigits));
       control.valueInput.value = String(rounded);
       control.slider.value = String(rounded);
+      syncSliderProgressVisual(control.slider);
       if (typeof onChange === "function") {
         onChange(rounded);
       }
     };
     control.valueInput.addEventListener("input", syncFromInput);
     control.slider.addEventListener("input", syncFromSlider);
+    // CRITICAL: force a first-pass slider sync at mount; otherwise Opacity/Zoom can render stale position/progress despite valid default numeric values.
+    syncFromInput();
   };
 
   bindNumberWithSlider(brushSizeControl, 1, 256, 0);
@@ -668,6 +685,7 @@ export function createImg2ImgMaskCanvasEditor({
     state.zoom = Number(nextZoom.toFixed(2));
     zoomControl.valueInput.value = String(state.zoom);
     zoomControl.slider.value = String(state.zoom);
+    syncSliderProgressVisual(zoomControl.slider);
     updateTransform();
   });
 
