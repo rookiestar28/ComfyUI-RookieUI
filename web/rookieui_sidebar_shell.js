@@ -24,6 +24,7 @@ import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
+import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -1064,10 +1065,22 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
   }
 }
 
-async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState, previewBox) {
+async function submitImg2Img(
+  bootstrapState,
+  elements,
+  statusNode,
+  runtimeState,
+  previewBox,
+  maskCanvasContract = null,
+) {
   statusNode.textContent = "Submitting img2img request...";
 
   const payload = readImg2ImgPayload(elements);
+  const maskCanvasReadiness = maskCanvasContract?.getSubmissionReadiness?.() ?? { ok: true };
+  if (!maskCanvasReadiness.ok) {
+    statusNode.textContent = maskCanvasReadiness.message ?? "Mask canvas is not ready.";
+    return;
+  }
   const executionMode = resolveImg2ImgExecutionMode(payload.mode);
   const batchImages = Array.isArray(payload.batch_images) ? payload.batch_images : [];
   payload.image_asset = String(payload.image_asset ?? "").trim();
@@ -2405,6 +2418,16 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
   statusNode.textContent = "Idle";
   actionRail.appendChild(statusNode);
 
+  const img2imgMaskCanvasContract = createImg2ImgMaskCanvasContract({
+    modeInput: elements.mode,
+    imageDataInput: elements.imageData,
+    imageAssetInput: elements.imageAsset,
+    maskDataInput: elements.maskData,
+    maskAssetInput: elements.maskAsset,
+    resolveExecutionMode: resolveImg2ImgExecutionMode,
+    syncBoundControls,
+  });
+
   updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup);
   syncFamilyAwareModuleQuicksetting(
     profileLookup,
@@ -2445,6 +2468,10 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       batchFileInput: img2imgModeUi.batchFileInput,
       batchStatusNode: img2imgModeUi.batchStatusNode,
     });
+    const modeGuard = img2imgMaskCanvasContract.onModeChange();
+    if (!modeGuard.ok && modeGuard.message) {
+      statusNode.textContent = modeGuard.message;
+    }
   };
   syncImg2ImgModeSurface();
   elements.preset.addEventListener("change", () => {
@@ -2780,6 +2807,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           const imageData = await readFileAsDataUrl(file);
           elements.imageData.value = imageData;
           elements.imageAsset.value = "";
+          img2imgMaskCanvasContract.refreshSourceBinding();
           setPreviewContent(assetPreview, imageData, runtimeState.previewPlaceholder);
           statusNode.textContent = `Loaded source image: ${file.name}`;
           syncBoundControls([elements.imageData, elements.imageAsset]);
@@ -2788,6 +2816,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           const maskData = await readFileAsDataUrl(file);
           elements.maskData.value = maskData;
           elements.maskAsset.value = "";
+          img2imgMaskCanvasContract.handleExternalMaskMutation();
           statusNode.textContent = `Loaded inpaint mask: ${file.name}`;
           syncBoundControls([elements.maskData, elements.maskAsset]);
         });
@@ -2980,7 +3009,14 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await submitImg2Img(bootstrapState, elements, statusNode, runtimeState, img2imgPreviewBox);
+    await submitImg2Img(
+      bootstrapState,
+      elements,
+      statusNode,
+      runtimeState,
+      img2imgPreviewBox,
+      img2imgMaskCanvasContract,
+    );
   });
 
   const img2imgStateLock = installPaneStateLock(formRegistry, "img2img", elements, () => {
@@ -3062,6 +3098,8 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
         elements.textEncoder,
       );
       syncImg2ImgModeSurface();
+      img2imgMaskCanvasContract.refreshSourceBinding();
+      img2imgMaskCanvasContract.handleExternalMaskMutation();
       const appliedImageData = String(elements.imageData.value ?? "").trim();
       const appliedBatchImages = parseJsonArrayField(elements.batchImagesData.value);
       const previewImageData =
@@ -3075,6 +3113,14 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       }
       syncBoundControls(Object.values(elements));
       img2imgStateLock.capture();
+    },
+    maskCanvas: {
+      stageMaskData: (maskDataUrl, metadata = {}) =>
+        img2imgMaskCanvasContract.stageMaskData(maskDataUrl, metadata),
+      applyStagedMask: () => img2imgMaskCanvasContract.applyStagedMask(),
+      clearStagedMask: () => img2imgMaskCanvasContract.clearStagedMask(),
+      refreshSourceBinding: () => img2imgMaskCanvasContract.refreshSourceBinding(),
+      getStateSnapshot: () => img2imgMaskCanvasContract.getStateSnapshot(),
     },
   };
 
