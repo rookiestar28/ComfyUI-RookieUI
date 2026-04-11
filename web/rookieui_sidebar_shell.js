@@ -26,6 +26,7 @@ import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
 import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
 import { createImg2ImgMaskCanvasEditor } from "./sidebar_tabs/rookieui_img2img_mask_editor.js?v=20260411-f58-mask-editor";
+import { createImg2ImgModeRouter } from "./sidebar_tabs/rookieui_img2img_mode_router.js?v=20260411-r50-mode-router";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -2476,7 +2477,14 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     }
     img2imgModeUi.maskEditor?.setMode(elements.mode.value);
   };
-  syncImg2ImgModeSurface();
+  const img2imgModeRouter = createImg2ImgModeRouter({
+    modeInput: elements.mode,
+    resolveExecutionMode: resolveImg2ImgExecutionMode,
+    onTabChange: () => {
+      syncImg2ImgModeSurface();
+    },
+  });
+  img2imgModeRouter.syncFromModeValue();
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup);
     syncFamilyAwareModuleQuicksetting(
@@ -2488,7 +2496,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     );
   });
   elements.mode.addEventListener("change", () => {
-    syncImg2ImgModeSurface();
+    img2imgModeRouter.syncFromModeValue();
   });
 
   const subtabHost = document.createElement("div");
@@ -3120,7 +3128,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
         modulesQuicksettingLabel,
         elements.textEncoder,
       );
-      syncImg2ImgModeSurface();
+      img2imgModeRouter.syncFromModeValue();
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();
       img2imgModeUi.maskEditor?.refreshFromInputs();
@@ -3145,6 +3153,11 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       clearStagedMask: () => img2imgMaskCanvasContract.clearStagedMask(),
       refreshSourceBinding: () => img2imgMaskCanvasContract.refreshSourceBinding(),
       getStateSnapshot: () => img2imgMaskCanvasContract.getStateSnapshot(),
+    },
+    modeRouter: {
+      activateSubtab: (subtabId, options = {}) => img2imgModeRouter.activateSubtab(subtabId, options),
+      getActiveTabId: () => img2imgModeRouter.getActiveTabId(),
+      syncFromModeValue: () => img2imgModeRouter.syncFromModeValue(),
     },
   };
 
