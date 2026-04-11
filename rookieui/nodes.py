@@ -179,7 +179,8 @@ class RookieUILoadAssetMask:
         return (mask.unsqueeze(0),)
 
     @classmethod
-    def VALIDATE_INPUTS(cls, asset_handle, _channel, _invert=False, _blur_radius=0):
+    def VALIDATE_INPUTS(cls, asset_handle, channel="alpha", invert=False, blur_radius=0):
+        # CRITICAL: ComfyUI may validate inner nodes with partial argument sets; keep mask node validation signature tolerant to missing/non-positional channel inputs.
         try:
             resolve_asset_path(asset_handle)
         except ValueError as exc:
@@ -187,7 +188,7 @@ class RookieUILoadAssetMask:
         return True
 
     @classmethod
-    def IS_CHANGED(cls, asset_handle, _channel, _invert=False, _blur_radius=0):
+    def IS_CHANGED(cls, asset_handle, channel="alpha", invert=False, blur_radius=0):
         return RookieUILoadAssetImage.IS_CHANGED(asset_handle)
 
 
