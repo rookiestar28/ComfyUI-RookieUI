@@ -15,20 +15,35 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/For
 - **img2img and extras postprocessing flows**
 - **PNG metadata round-trip and apply workflow**
 - **queue/progress/result UX that feels close to A1111 usage**
-<br>
+
 <br>
 
 The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. That being said, RookieUI's support extends far beyond just the SD models.
 
-## Table of Contents
-
-- [Last Update](#last-update---click-to-expand)
-- [Architecture Snapshot](#architecture-snapshot)
-- [Feature Overview](#feature-overview)
-- [Installation](#installation)
-- [License](#license)
-
 <details><summary><h2>Last Update - Click to expand</h2></summary>
+
+<details>
+
+<summary><strong>ControlNet A1111-native parity (new functionality)</strong></summary>
+
+- Added A1111-style multi-unit ControlNet editing surface in generation panes (`txt2img` and `img2img`).
+- Added host-native ControlNet graph integration for `txt2img`, `img2img`, and `inpaint`, with deterministic multi-unit apply order.
+- Added dual payload compatibility for RookieUI-native units and A1111-style `alwayson_scripts.controlnet` input.
+- Added canonical `/rookieui/controlnet/*` routes and A1111-compatible `/controlnet/*` alias routes.
+- Added optional preprocessor/detect downgrade behavior with explicit warning diagnostics when optional dependencies are unavailable.
+
+</details>
+
+<details>
+
+<summary><strong>Runtime contract and UX consistency fixes (bugfix/stability)</strong></summary>
+
+- Updated shell version display to use backend capability payload sourced from `pyproject.toml`, removing hardcoded frontend version coupling.
+- Fixed `RookieUILoadAssetMask` validation signature mismatch that could raise missing-argument errors during img2img inpaint validation.
+- Fixed mask-canvas slider consistency issue where `Opacity` / `Zoom` initial displayed values and slider positions could diverge.
+- Expanded targeted regression coverage for the above runtime and UI-state contract paths.
+
+</details>
 
 <details>
 
@@ -84,7 +99,15 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 </details>
 </details>
 
+## Table of Contents
 
+- [Last Update](#last-update---click-to-expand)
+- [Architecture Snapshot](#architecture-snapshot)
+- [Feature Overview](#feature-overview)
+- [Default Model Read Paths](#default-model-read-paths-host-comfyui)
+- [ControlNet Support](#controlnet-support)
+- [Installation](#installation)
+- [License](#license)
 
 ## Architecture Snapshot
 
@@ -111,7 +134,7 @@ ComfyUI process (single runtime)
   <img src="assets/rookiesidebar.png" width="80%" />
 </div>
 <br>
-<br>
+
 - A1111/Forge-like compact tab rail and control panel layout
 - Hero `Generate` rail with compact action icons
 - Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
@@ -144,8 +167,9 @@ ComfyUI process (single runtime)
 - Flux and Qwen-Image expose selectable text encoder controls
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
-### Planned Model Support
+### Model Support
 
+- Stable Diffusion family
 - Flux family (expanded coverage)
 - Qwen-Image family (expanded coverage)
 - Wan family
@@ -153,6 +177,33 @@ ComfyUI process (single runtime)
 - Klein family
 - Lumina family
 - Anima family
+
+## Default Model Read Paths (Host ComfyUI)
+
+RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under standard ComfyUI defaults, paths are:
+
+- Checkpoints: `<ComfyUI>/models/checkpoints`
+- Text Encoders (`text_encoders`): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
+- CLIP (`clip`, legacy alias): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
+- Diffusion Models (`diffusion_models`): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
+- UNet (`unet`, legacy alias): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
+- VAE: `<ComfyUI>/models/vae`
+- LoRA: `<ComfyUI>/models/loras`
+- Embeddings: `<ComfyUI>/models/embeddings`
+- CLIP Vision: `<ComfyUI>/models/clip_vision`
+- Upscale Models: `<ComfyUI>/models/upscale_models`
+- ControlNet: `<ComfyUI>/models/controlnet`, `<ComfyUI>/models/t2i_adapter`
+- Ultralytics: host `folder_paths`-defined location (commonly `<ComfyUI>/models/ultralytics` on hosts that provide this key)
+
+## ControlNet Support
+
+- A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img` generation panes.
+- Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
+- Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
+- API surface provides both canonical RookieUI routes and A1111-compatible aliases:
+  - `/rookieui/controlnet/*`
+  - `/controlnet/*`
+- Optional preprocessor/detect dependency is handled with explicit downgrade diagnostics when unavailable.
 
 ## Installation
 
