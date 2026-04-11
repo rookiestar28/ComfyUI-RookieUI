@@ -70,6 +70,10 @@ class ModelInventoryTests(unittest.TestCase):
             payload["catalog"]["primary_model_category_by_family"]["flux"],
             "diffusion_models",
         )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["wan"],
+            "diffusion_models",
+        )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
 

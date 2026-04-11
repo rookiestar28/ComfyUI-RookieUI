@@ -26,6 +26,16 @@ class CompatibilityCatalogTests(unittest.TestCase):
         self.assertIn("ddim_uniform", scheduler_ids)
         self.assertIn("kl_optimal", scheduler_ids)
 
+    def test_build_compatibility_payload_lists_secondary_newer_families(self) -> None:
+        payload = build_compatibility_payload()
+
+        family_ids = [entry["id"] for entry in payload["newer_family_profiles"]]
+        self.assertIn("klein", family_ids)
+        self.assertIn("lumina", family_ids)
+        self.assertIn("zit", family_ids)
+        self.assertIn("wan", family_ids)
+        self.assertIn("anima", family_ids)
+
     def test_compatibility_route_returns_catalog_payload(self) -> None:
         response = asyncio.run(routes.compatibility(_FakeJsonRequest()))
 

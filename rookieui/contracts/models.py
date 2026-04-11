@@ -68,6 +68,11 @@ class ModelInventorySnapshot:
                 "sdxl": "checkpoints",
                 "flux": "diffusion_models",
                 "qwen_image": "diffusion_models",
+                "klein": "diffusion_models",
+                "lumina": "diffusion_models",
+                "zit": "diffusion_models",
+                "wan": "diffusion_models",
+                "anima": "diffusion_models",
             },
             "categories": {
                 "checkpoints": {

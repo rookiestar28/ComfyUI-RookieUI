@@ -68,6 +68,13 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("sdxl", preset_ids)
         self.assertIn("flux", preset_ids)
         self.assertIn("qwen_image", preset_ids)
+        self.assertIn("klein", preset_ids)
+        self.assertIn("lumina", preset_ids)
+        self.assertIn("zit", preset_ids)
+        self.assertIn("wan", preset_ids)
+        self.assertIn("anima", preset_ids)
         preset_lookup = {preset["id"]: preset for preset in payload["presets"]}
         self.assertEqual(preset_lookup["flux"]["profile"], "flux")
         self.assertEqual(preset_lookup["qwen_image"]["profile"], "qwen_image")
+        self.assertEqual(preset_lookup["klein"]["profile"], "klein")
+        self.assertEqual(preset_lookup["zit"]["profile"], "zit")

@@ -17,7 +17,20 @@ class ParityMatrixTests(unittest.TestCase):
 
         self.assertEqual(
             profile_ids,
-            ["sd15", "sdxl", "pony", "illustrious", "noob", "flux", "qwen_image"],
+            [
+                "sd15",
+                "sdxl",
+                "pony",
+                "illustrious",
+                "noob",
+                "flux",
+                "qwen_image",
+                "klein",
+                "lumina",
+                "zit",
+                "wan",
+                "anima",
+            ],
         )
 
     def test_get_parity_profile_returns_sdxl_family_profile(self) -> None:
@@ -31,6 +44,12 @@ class ParityMatrixTests(unittest.TestCase):
 
         self.assertEqual(profile.base_family, "sdxl")
         self.assertEqual(profile.default_sampler, "euler")
+
+    def test_get_parity_profile_returns_secondary_turbo_lane_profile(self) -> None:
+        profile = get_parity_profile("zit")
+
+        self.assertEqual(profile.base_family, "sdxl")
+        self.assertEqual(profile.default_steps, 8)
 
     def test_normalize_sampler_name_handles_a1111_aliases(self) -> None:
         self.assertEqual(normalize_sampler_name("Euler a"), "euler_ancestral")

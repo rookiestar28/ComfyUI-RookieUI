@@ -215,6 +215,38 @@ def build_compatibility_payload() -> dict[str, object]:
                 experimental=True,
                 aliases=["qwen image"],
             ),
+            CompatibilityOption(
+                id="klein",
+                title="Klein (Flux.2)",
+                summary="Experimental catalog entry for later complexity-gated newer-family support.",
+                experimental=True,
+                aliases=["flux.2"],
+            ),
+            CompatibilityOption(
+                id="lumina",
+                title="Lumina",
+                summary="Experimental catalog entry for later complexity-gated newer-family support.",
+                experimental=True,
+            ),
+            CompatibilityOption(
+                id="zit",
+                title="ZiT (Z-Image-Turbo)",
+                summary="Experimental catalog entry for later complexity-gated newer-family support.",
+                experimental=True,
+                aliases=["z-image-turbo", "zit"],
+            ),
+            CompatibilityOption(
+                id="wan",
+                title="Wan",
+                summary="Experimental catalog entry for later complexity-gated newer-family support.",
+                experimental=True,
+            ),
+            CompatibilityOption(
+                id="anima",
+                title="Anima",
+                summary="Experimental catalog entry for later complexity-gated newer-family support.",
+                experimental=True,
+            ),
         ],
     )
     return snapshot.to_payload()
