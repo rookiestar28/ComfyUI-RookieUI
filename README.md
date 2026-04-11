@@ -20,6 +20,17 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/For
 
 <details>
 
+<summary><strong>Extras Hires recovery and secondary family preset expansion</strong></summary>
+
+- Restored a visible A1111-style `Hires. fix` section in Extras, including collapsible chrome and a functional `Enable Hires` toggle wired to the real upscale execution path.
+- Reorganized Extras upscale controls into the recovered Hires section so the UI surface matches active backend behavior instead of acting as decorative duplicates.
+- Expanded secondary preset/profile lanes with new family entries: `Klein (Flux.2)`, `Lumina`, `ZiT (Z-Image-Turbo)`, `Wan`, and `Anima`.
+- Updated model-family catalog mapping and compatibility listings so the new secondary families resolve consistently in the shared RookieUI payload surfaces.
+
+</details>
+
+<details>
+
 <summary><strong>Img2Img workflow expansion and interaction polish</strong></summary>
 
 - Added an embedded Img2Img in-app mask canvas with core controls: brush/eraser, size/opacity, undo/redo, clear/invert, zoom/pan/fit, and explicit `Apply Mask`.
