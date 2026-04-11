@@ -209,6 +209,49 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in payload["workflow"].values()}
         self.assertNotIn("ControlNetApplyAdvanced", class_types)
 
+    def test_txt2img_controlnet_uses_unet_model_source_on_diffusion_model_path(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=["control_v11p_sd15_canny.safetensors"],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "city skyline",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "text_encoder_name": "clip_l.safetensors",
+                    "vae_name": "flux_vae.safetensors",
+                    "controlnet_units": [
+                        {
+                            "enabled": True,
+                            "module": "canny",
+                            "model": "control_v11p_sd15_canny.safetensors",
+                            "image_asset": "source-image",
+                        }
+                    ],
+                }
+            )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        self.assertIn("UNETLoader", class_types)
+        self.assertNotIn("CheckpointLoaderSimple", class_types)
+        unet_node_id = next(node_id for node_id, node in workflow.items() if node["class_type"] == "UNETLoader")
+        loader_node = next(node for node in workflow.values() if node["class_type"] == "DiffControlNetLoader")
+        self.assertEqual(loader_node["inputs"]["model"], [unet_node_id, 0])
+
 
 class ControlNetRouteTests(unittest.TestCase):
     def test_bootstrap_routes_include_controlnet_surface(self) -> None:

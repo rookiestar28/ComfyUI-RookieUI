@@ -505,6 +505,7 @@ def _resolve_model_sources(
     allocator: NodeIdAllocator,
 ) -> tuple[list[object], list[object], list[object]]:
     primary_model_category = str(request.primary_model_category or "checkpoints").strip().lower()
+    # CRITICAL: loader routing must follow normalized primary_model_category; inferring from base_family/profile reintroduces preset-switch path drift.
     if primary_model_category == "diffusion_models":
         model_source, clip_source, vae_source = _resolve_diffusion_model_sources(
             workflow,

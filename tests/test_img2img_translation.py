@@ -357,6 +357,73 @@ class Img2ImgTranslationTests(unittest.TestCase):
         ):
             translate_img2img_request(normalized)
 
+    def test_translate_img2img_request_requires_explicit_vae_for_diffusion_model_category(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["Automatic"],
+                text_encoders=["clip_l.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="Automatic",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "text_encoder_name": "clip_l.safetensors",
+                    "vae_name": "Automatic",
+                }
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "vae_name must be an explicit host selector when primary_model_category is diffusion_models",
+        ):
+            translate_img2img_request(normalized)
+
+    def test_translate_img2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "text_encoder_name": "clip_l.safetensors",
+                    "vae_name": "flux_vae.safetensors",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("UNETLoader", class_types)
+        self.assertIn("CLIPLoader", class_types)
+        self.assertIn("VAELoader", class_types)
+        self.assertNotIn("CheckpointLoaderSimple", class_types)
+
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {
