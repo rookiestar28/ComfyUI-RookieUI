@@ -25,7 +25,6 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Last Update](#last-update---click-to-expand)
 - [Architecture Snapshot](#architecture-snapshot)
 - [Feature Overview](#feature-overview)
-- [New Feature Notes](#new-feature-notes)
 - [Installation](#installation)
 - [License](#license)
 
@@ -149,19 +148,6 @@ ComfyUI process (single runtime)
 - Klein family
 - Lumina family
 - Anima family
-
-## New Feature Notes
-
-### A1111-style Prompt Semantics
-
-- RookieUI now supports structured prompt semantics for `AND`, `BREAK`, scheduling slices, and attention markers.
-- Parsed semantics are compiled into ComfyUI conditioning composition for both txt2img and img2img translation paths.
-- Prompt-semantics rollout includes stable diagnostics and a reversible legacy fallback switch for safer production operation.
-
-### Img2Img Source and Mask Bridge Integrity
-
-- The source/mask bridge contract in Img2Img has been tightened for send-to-img2img handoff consistency.
-- Mask-canvas placeholder visibility now follows source-binding state correctly, preventing false `No source image` overlays after successful transfer.
 
 ## Installation
 
