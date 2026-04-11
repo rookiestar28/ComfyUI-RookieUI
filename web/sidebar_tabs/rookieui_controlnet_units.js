@@ -23,6 +23,9 @@ const HR_OPTION_OPTIONS = [
   { value: "high_res_only", label: "High-res Only" },
 ];
 
+const FILE_SELECTION_PLACEHOLDER = "No file selected";
+const FILE_PAYLOAD_PLACEHOLDER = "Loaded from payload";
+
 function toObjectArray(rawValue) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
     return [];
@@ -71,6 +74,55 @@ function shouldEmitUnit(unit) {
     Boolean(unit.mask_asset) ||
     Boolean(unit.mask_data)
   );
+}
+
+function createEnglishUploadControl({
+  uploadRow,
+  createInput,
+  idPrefix,
+  index,
+  target,
+  buttonLabel,
+  buttonAriaLabel,
+}) {
+  const controlRow = document.createElement("div");
+  controlRow.className = "rookieui-shell__action-target-row";
+  uploadRow.appendChild(controlRow);
+
+  const fileNameInput = createInput("text", `${idPrefix}-${target}-upload-name-${index}`, FILE_SELECTION_PLACEHOLDER, {
+    className: "rookieui-shell__action-target",
+  });
+  fileNameInput.readOnly = true;
+  fileNameInput.setAttribute("aria-live", "polite");
+  controlRow.appendChild(fileNameInput);
+
+  const chooseButton = document.createElement("button");
+  chooseButton.id = `${idPrefix}-${target}-upload-button-${index}`;
+  chooseButton.type = "button";
+  chooseButton.className = "rookieui-shell__mini-action rookieui-shell__mini-action--tone-neutral";
+  chooseButton.textContent = buttonLabel;
+  chooseButton.setAttribute("aria-label", buttonAriaLabel);
+  controlRow.appendChild(chooseButton);
+
+  const fileInput = createInput("file", `${idPrefix}-${target}-upload-${index}`, "", {
+    className: "rookieui-shell__input",
+  });
+  fileInput.accept = "image/png,image/webp,image/jpeg";
+  fileInput.hidden = true;
+  fileInput.setAttribute("tabindex", "-1");
+  fileInput.setAttribute("aria-hidden", "true");
+  controlRow.appendChild(fileInput);
+
+  // IMPORTANT: keep file chooser chrome custom/English-only; browser-native file inputs localize by OS language.
+  chooseButton.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  return {
+    fileInput,
+    fileNameInput,
+    chooseButton,
+  };
 }
 
 export function createControlNetUnitEditor({
@@ -144,11 +196,17 @@ export function createControlNetUnitEditor({
     });
   };
 
-  const attachUploadHandler = (fileInput, { dataField, assetField, label }) => {
+  const attachUploadHandler = (fileInput, { dataField, assetField, label, fileNameField }) => {
     fileInput.addEventListener("change", async () => {
       const [file] = Array.from(fileInput.files ?? []);
       if (!file) {
+        if (fileNameField) {
+          fileNameField.value = FILE_SELECTION_PLACEHOLDER;
+        }
         return;
+      }
+      if (fileNameField) {
+        fileNameField.value = file.name;
       }
       try {
         dataField.value = await readFileAsDataUrl(file);
@@ -158,6 +216,9 @@ export function createControlNetUnitEditor({
           onStatusMessage(`Loaded ControlNet ${label}: ${file.name}`);
         }
       } catch (_error) {
+        if (fileNameField) {
+          fileNameField.value = FILE_SELECTION_PLACEHOLDER;
+        }
         if (onStatusMessage) {
           onStatusMessage(`Failed to load ControlNet ${label}.`);
         }
@@ -271,21 +332,27 @@ export function createControlNetUnitEditor({
     uploadRow.className = "rookieui-shell__mini-actions";
     card.appendChild(uploadRow);
 
-    // CRITICAL: keep ControlNet upload inputs non-overlay; `.rookieui-shell__file-input`
-    // is absolute-positioned for dropzones and will intercept unrelated clicks here.
-    const imageUpload = createInput("file", `${idPrefix}-image-upload-${index}`, "", {
-      className: "rookieui-shell__input",
+    const imageUploadControl = createEnglishUploadControl({
+      uploadRow,
+      createInput,
+      idPrefix,
+      index,
+      target: "image",
+      buttonLabel: "Choose Image File",
+      buttonAriaLabel: "Choose ControlNet image file",
     });
-    imageUpload.accept = "image/png,image/webp,image/jpeg";
-    imageUpload.setAttribute("aria-label", "Upload Control Image");
-    uploadRow.appendChild(imageUpload);
+    const imageUpload = imageUploadControl.fileInput;
 
-    const maskUpload = createInput("file", `${idPrefix}-mask-upload-${index}`, "", {
-      className: "rookieui-shell__input",
+    const maskUploadControl = createEnglishUploadControl({
+      uploadRow,
+      createInput,
+      idPrefix,
+      index,
+      target: "mask",
+      buttonLabel: "Choose Mask File",
+      buttonAriaLabel: "Choose ControlNet mask file",
     });
-    maskUpload.accept = "image/png,image/webp,image/jpeg";
-    maskUpload.setAttribute("aria-label", "Upload Control Mask");
-    uploadRow.appendChild(maskUpload);
+    const maskUpload = maskUploadControl.fileInput;
 
     const rowElements = {
       enabled,
@@ -307,11 +374,23 @@ export function createControlNetUnitEditor({
       maskData,
       imageUpload,
       maskUpload,
+      imageUploadName: imageUploadControl.fileNameInput,
+      maskUploadName: maskUploadControl.fileNameInput,
     };
     unitRows.push(rowElements);
     bindSyncHandlers(rowElements);
-    attachUploadHandler(imageUpload, { dataField: imageData, assetField: imageAsset, label: "source image" });
-    attachUploadHandler(maskUpload, { dataField: maskData, assetField: maskAsset, label: "mask image" });
+    attachUploadHandler(imageUpload, {
+      dataField: imageData,
+      assetField: imageAsset,
+      label: "source image",
+      fileNameField: imageUploadControl.fileNameInput,
+    });
+    attachUploadHandler(maskUpload, {
+      dataField: maskData,
+      assetField: maskAsset,
+      label: "mask image",
+      fileNameField: maskUploadControl.fileNameInput,
+    });
   }
 
   const setUnits = (units) => {
@@ -338,6 +417,8 @@ export function createControlNetUnitEditor({
       row.imageData.value = unit.image_data;
       row.maskAsset.value = unit.mask_asset;
       row.maskData.value = unit.mask_data;
+      row.imageUploadName.value = unit.image_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
+      row.maskUploadName.value = unit.mask_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
     }
     syncHiddenField();
   };

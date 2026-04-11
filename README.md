@@ -125,6 +125,15 @@ ComfyUI process (single runtime)
    +- workflow submission into host ComfyUI queue
 ```
 
+## Installation
+
+Install as a ComfyUI custom node:
+
+```bash
+git clone https://github.com/rookiestar28/ComfyUI-RookieUI custom_nodes/ComfyUI-RookieUI
+```
+
+Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
 
 ## Feature Overview
 
@@ -204,16 +213,6 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
 - Optional preprocessor/detect dependency is handled with explicit downgrade diagnostics when unavailable.
-
-## Installation
-
-Install as a ComfyUI custom node:
-
-```bash
-git clone https://github.com/rookiestar28/ComfyUI-RookieUI custom_nodes/ComfyUI-RookieUI
-```
-
-Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
 
 
 ## License

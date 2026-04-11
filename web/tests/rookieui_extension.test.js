@@ -577,6 +577,16 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(txt2imgGenerationSection?.contains(txt2imgControlNetSection)).toBe(true);
     expect(txt2imgHiresControls).not.toBeNull();
     expect(txt2imgControlNetSection).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-button-0")?.textContent).toBe(
+      "Choose Image File",
+    );
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-button-0")?.textContent).toBe(
+      "Choose Mask File",
+    );
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-0")?.hidden).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
@@ -675,6 +685,16 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgGenerationSection?.contains(img2imgControlNetSection)).toBe(true);
     expect(img2imgHiresControls).not.toBeNull();
     expect(img2imgControlNetSection).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-button-0")?.textContent).toBe(
+      "Choose Image File",
+    );
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-button-0")?.textContent).toBe(
+      "Choose Mask File",
+    );
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-0")?.hidden).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(document.querySelector("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
