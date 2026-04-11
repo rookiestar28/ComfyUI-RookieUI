@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from rookieui.services.model_inventory import discover_model_inventory
@@ -38,6 +39,7 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/generate/img2img",
     f"{INTERNAL_ROUTE_PREFIX}/extras/run",
 ]
+_LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
 def build_health_payload() -> dict[str, Any]:
@@ -100,6 +102,7 @@ def _get_prompt_server_for_submission() -> Any | None:
     try:
         from rookieui.services.route_bootstrap import _get_prompt_server_instance
     except Exception:
+        _LOGGER.debug("RookieUI route helper import fallback triggered.", exc_info=True)
         return None
     return _get_prompt_server_instance()
 

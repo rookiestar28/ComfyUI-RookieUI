@@ -4,6 +4,7 @@ import base64
 import binascii
 import hashlib
 import io
+import logging
 import re
 import secrets
 from dataclasses import dataclass
@@ -25,6 +26,7 @@ _SUPPORTED_EXTENSIONS = {
     "jpg": ".jpg",
     "webp": ".webp",
 }
+_LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
 @dataclass(frozen=True)
@@ -135,6 +137,7 @@ def save_output_image(
                 if isinstance(key, str) and isinstance(value, str):
                     pnginfo.add_text(key, value)
         except Exception:
+            _LOGGER.debug("RookieUI output PNG metadata embedding fallback triggered.", exc_info=True)
             pnginfo = None
 
     image.save(path, format="PNG", pnginfo=pnginfo)

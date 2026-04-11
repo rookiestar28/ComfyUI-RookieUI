@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import io
+import logging
 import re
 from typing import Any
 
@@ -36,6 +37,7 @@ _PARAM_RE = re.compile(r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
 _IMAGE_SIZE_RE = re.compile(r"^(\d+)x(\d+)$")
 _SCHEDULER_SUFFIXES = (" karras", " exponential", " sgm uniform", " simple")
 _INPAINT_MARKERS = {"Mask mode", "Masked content", "Inpaint area", "Masked area padding"}
+_LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
 def _unquote_text(value: str) -> str:
@@ -45,6 +47,7 @@ def _unquote_text(value: str) -> str:
     try:
         return json.loads(value)
     except Exception:
+        _LOGGER.debug("RookieUI PNGInfo quoted text decode fallback triggered.", exc_info=True)
         return value
 
 

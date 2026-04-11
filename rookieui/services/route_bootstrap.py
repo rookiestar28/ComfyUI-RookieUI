@@ -94,8 +94,10 @@ def _reset_registration_state_for_tests() -> None:
     global _routes_registered, _retry_started
     _routes_registered = False
     _retry_started = False
+    logger = logging.getLogger("ComfyUI-RookieUI")
     try:
         from rookieui.security.route_guard import reset_registered_routes_for_tests
     except Exception:
+        logger.debug("RookieUI route_guard reset helper unavailable in test reset fallback.", exc_info=True)
         return
     reset_registered_routes_for_tests()

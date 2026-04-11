@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from typing import Any
@@ -24,6 +25,7 @@ _INVENTORY_CACHE_TTL_SECONDS = 5.0
 _inventory_cache_lock = threading.Lock()
 _inventory_cache_snapshot: ModelInventorySnapshot | None = None
 _inventory_cache_at: float = 0.0
+_LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
 def _load_folder_paths_module() -> Any:
@@ -45,6 +47,11 @@ def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[
     try:
         values = getter(folder_name)
     except Exception:
+        _LOGGER.debug(
+            "RookieUI inventory fallback for folder '%s' due to host getter exception.",
+            folder_name,
+            exc_info=True,
+        )
         return []
 
     if not isinstance(values, list):
