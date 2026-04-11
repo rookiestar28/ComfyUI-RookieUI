@@ -2036,6 +2036,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     batchFileInput: null,
     batchStatusNode: null,
     maskEditor: null,
+    modeButtons: new Map(),
   };
 
   const elements = {
@@ -2461,6 +2462,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     elements.softInpaintingDifferenceContrast,
     elements.softInpaintingDifferenceContrastSlider,
   ];
+  let img2imgModeRouter = null;
   const syncImg2ImgModeSurface = () => {
     syncMaskField(elements.mode, elements.maskAsset, inpaintModeControls, {
       modeHintNode: img2imgModeUi.modeHintNode,
@@ -2476,8 +2478,16 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       statusNode.textContent = modeGuard.message;
     }
     img2imgModeUi.maskEditor?.setMode(elements.mode.value);
+    const activeModeTabId =
+      img2imgModeRouter?.getActiveTabId?.() ?? String(elements.mode.value ?? "img2img").trim().toLowerCase();
+    img2imgModeUi.modeButtons.forEach((button, tabId) => {
+      const active = tabId === activeModeTabId;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-selected", String(active));
+      button.tabIndex = active ? 0 : -1;
+    });
   };
-  const img2imgModeRouter = createImg2ImgModeRouter({
+  img2imgModeRouter = createImg2ImgModeRouter({
     modeInput: elements.mode,
     resolveExecutionMode: resolveImg2ImgExecutionMode,
     onTabChange: () => {
@@ -2508,6 +2518,32 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       id: "generation",
       label: "Generation",
       render: (pane) => {
+        const generationModeRailSection = document.createElement("section");
+        generationModeRailSection.className = "rookieui-shell__section rookieui-shell__section--soft";
+        generationModeRailSection.id = "rookieui-img2img-generation-mode-rail";
+        pane.appendChild(generationModeRailSection);
+        appendTextElement(generationModeRailSection, "h4", "rookieui-shell__section-title", "Generation Modes");
+        const generationModeTabs = document.createElement("div");
+        generationModeTabs.className = "rookieui-shell__subtabs rookieui-shell__subtabs--mode";
+        generationModeTabs.id = "rookieui-img2img-generation-mode-tabs";
+        generationModeTabs.setAttribute("role", "tablist");
+        generationModeRailSection.appendChild(generationModeTabs);
+        img2imgModeRouter.definitions.forEach((definition) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.id = `rookieui-img2img-generation-mode-${definition.id}`;
+          button.className = "rookieui-shell__subtab";
+          button.textContent = definition.label;
+          button.setAttribute("role", "tab");
+          button.setAttribute("aria-selected", "false");
+          button.tabIndex = -1;
+          button.addEventListener("click", () => {
+            img2imgModeRouter.activateSubtab(definition.id);
+          });
+          generationModeTabs.appendChild(button);
+          img2imgModeUi.modeButtons.set(String(definition.id).toLowerCase(), button);
+        });
+
         const workspace = document.createElement("div");
         workspace.className = "rookieui-shell__workspace-grid";
         pane.appendChild(workspace);
@@ -2692,6 +2728,12 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
         assetGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         assetSection.appendChild(assetGrid);
         createField(assetGrid, "Mode", elements.mode);
+        const hiddenModeField = elements.mode.closest(".rookieui-shell__field");
+        // IMPORTANT: keep legacy mode input in DOM as hidden source-of-truth while user-facing switching is routed through generation subtabs.
+        if (hiddenModeField) {
+          hiddenModeField.hidden = true;
+          hiddenModeField.dataset.modeSource = "subtab-router";
+        }
         createField(assetGrid, "Resize Mode", elements.resizeMode);
         createField(assetGrid, "Image Asset", elements.imageAsset);
         createField(assetGrid, "Mask Asset", elements.maskAsset);
@@ -2948,6 +2990,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           });
           assetPreviewToolbar.appendChild(button);
         });
+        syncImg2ImgModeSurface();
       },
     },
     {

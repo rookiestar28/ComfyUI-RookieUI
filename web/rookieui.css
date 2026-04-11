@@ -545,6 +545,11 @@
   border-bottom: 1px solid var(--rookieui-border);
 }
 
+.rookieui-shell__subtabs--mode {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
 .rookieui-shell__subtab {
   display: inline-flex;
   align-items: center;

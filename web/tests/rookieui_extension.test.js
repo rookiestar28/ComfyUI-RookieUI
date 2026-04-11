@@ -628,6 +628,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-hires-controls")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor-tool-select")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-generation-mode-tabs")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     for (const matrixRow of presetClipSkipMatrix) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
@@ -644,11 +645,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-modules-quicksetting").textContent).not.toContain("VAE / Text Encoder");
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-clip-skip").disabled).toBe(false);
-    document.getElementById("rookieui-img2img-mode").value = "batch";
-    document.getElementById("rookieui-img2img-mode").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-img2img-generation-mode-batch").click();
+    expect(document.getElementById("rookieui-img2img-mode").value).toBe("batch");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(true);
-    document.getElementById("rookieui-img2img-mode").value = "img2img";
-    document.getElementById("rookieui-img2img-mode").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-img2img-generation-mode-img2img").click();
+    expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(false);
     expect(document.getElementById("rookieui-image-asset").value).toBe("");
     document.getElementById("rookieui-img2img-form").dispatchEvent(
@@ -659,8 +660,8 @@ describe("registerRookieUIBootstrapExtension", () => {
       "Image asset or uploaded image is required",
     );
     expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/img2img")).toHaveLength(0);
-    document.getElementById("rookieui-img2img-mode").value = "inpaint";
-    document.getElementById("rookieui-img2img-mode").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-img2img-generation-mode-inpaint").click();
+    expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
     document.getElementById("rookieui-image-asset").value = "source-asset";
     document.getElementById("rookieui-mask-asset").value = "mask-asset";
     document.getElementById("rookieui-img2img-form").dispatchEvent(
