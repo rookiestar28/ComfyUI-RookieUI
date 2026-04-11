@@ -90,8 +90,8 @@
   height: 10px;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: var(--rookieui-accent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--rookieui-accent) 35%, transparent);
+  background: #2a2;
+  box-shadow: 0 0 10px color-mix(in srgb, #2a2 35%, transparent);
 }
 
 .rookieui-shell__title {
