@@ -329,6 +329,19 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("VAEEncode", class_types)
         self.assertNotIn("RookieUILoadAssetMask", class_types)
 
+    def test_translate_img2img_request_compiles_prompt_semantics_conditioning_chain(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait AND cinematic BREAK [soft:sharp:0.5]",
+                "image_asset": "portrait-input",
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("ConditioningCombine", class_types)
+        self.assertIn("ConditioningSetTimestepRange", class_types)
+
     def test_translate_img2img_request_builds_sdxl_img2img_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {

@@ -147,6 +147,31 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(result["workflow"]["92"]["inputs"]["lora_name"], "hero_boost.safetensors")
         self.assertEqual(result["workflow"]["5"]["inputs"]["model"], ["92", 0])
 
+    def test_translate_txt2img_request_compiles_prompt_semantics_for_sd15(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "hero AND villain BREAK [calm:chaos:0.4]",
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("ConditioningCombine", class_types)
+        self.assertIn("ConditioningSetTimestepRange", class_types)
+
+    def test_translate_txt2img_request_compiles_prompt_semantics_for_sdxl(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "[sunny:storm:0.5] fashion editorial",
+                "profile": "pony",
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("CLIPTextEncodeSDXL", class_types)
+        self.assertIn("ConditioningSetTimestepRange", class_types)
+
     def test_translate_txt2img_request_keeps_node_ids_unique_with_hires_and_loras(self) -> None:
         normalized = normalize_txt2img_request(
             {

@@ -42,6 +42,272 @@ def _build_checkpoint_loader_node(checkpoint_name: str) -> dict[str, object]:
     }
 
 
+def _append_conditioning_combine_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    conditioning_1: str,
+    conditioning_2: str,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ConditioningCombine",
+        "inputs": {
+            "conditioning_1": [conditioning_1, 0],
+            "conditioning_2": [conditioning_2, 0],
+        },
+    }
+    return node_id
+
+
+def _combine_conditioning_ids(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    conditioning_ids: list[str],
+) -> str:
+    if not conditioning_ids:
+        raise ValueError("conditioning_ids must contain at least one node id.")
+    merged_id = conditioning_ids[0]
+    for conditioning_id in conditioning_ids[1:]:
+        merged_id = _append_conditioning_combine_node(
+            workflow,
+            allocator=allocator,
+            conditioning_1=merged_id,
+            conditioning_2=conditioning_id,
+        )
+    return merged_id
+
+
+def _coerce_semantic_feature(payload: dict[str, object], feature_name: str) -> bool:
+    features = payload.get("features")
+    if not isinstance(features, dict):
+        return False
+    return bool(features.get(feature_name))
+
+
+def _requires_conditioning_compiler(semantic_payload: dict[str, object]) -> bool:
+    return any(
+        _coerce_semantic_feature(semantic_payload, feature_name)
+        for feature_name in ("and_composition", "break_chunks", "prompt_scheduling")
+    )
+
+
+def _append_prompt_encode_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    clip_source: list[object],
+    text: str,
+    prompt_encoder: str,
+    width: int | None = None,
+    height: int | None = None,
+) -> str:
+    node_id = allocator.next()
+    if prompt_encoder == "sdxl":
+        resolved_width = int(width or 1024)
+        resolved_height = int(height or 1024)
+        workflow[node_id] = {
+            "class_type": "CLIPTextEncodeSDXL",
+            "inputs": {
+                "clip": clip_source,
+                "width": resolved_width,
+                "height": resolved_height,
+                "crop_w": 0,
+                "crop_h": 0,
+                "target_width": resolved_width,
+                "target_height": resolved_height,
+                "text_g": text,
+                "text_l": text,
+            },
+        }
+        return node_id
+
+    workflow[node_id] = {
+        "class_type": "CLIPTextEncode",
+        "inputs": {
+            "text": text,
+            "clip": clip_source,
+        },
+    }
+    return node_id
+
+
+def _append_conditioning_range_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    conditioning_id: str,
+    start: float,
+    end: float,
+) -> str:
+    start_value = round(max(0.0, min(1.0, float(start))), 4)
+    end_value = round(max(0.0, min(1.0, float(end))), 4)
+    if end_value <= start_value:
+        return conditioning_id
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ConditioningSetTimestepRange",
+        "inputs": {
+            "conditioning": [conditioning_id, 0],
+            "start": start_value,
+            "end": end_value,
+        },
+    }
+    return node_id
+
+
+def _append_conditioning_weight_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    conditioning_id: str,
+    weight: float,
+) -> str:
+    normalized_weight = round(float(weight), 3)
+    if abs(normalized_weight - 1.0) < 1e-6:
+        return conditioning_id
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ConditioningSetAreaStrength",
+        "inputs": {
+            "conditioning": [conditioning_id, 0],
+            "strength": max(0.0, min(10.0, normalized_weight)),
+        },
+    }
+    return node_id
+
+
+def _compile_prompt_semantic_conditioning(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    clip_source: list[object],
+    prompt_text: str,
+    semantic_payload: dict[str, object],
+    prompt_encoder: str,
+    width: int | None = None,
+    height: int | None = None,
+) -> str:
+    if not _requires_conditioning_compiler(semantic_payload):
+        return _append_prompt_encode_node(
+            workflow,
+            allocator=allocator,
+            clip_source=clip_source,
+            text=prompt_text,
+            prompt_encoder=prompt_encoder,
+            width=width,
+            height=height,
+        )
+
+    branches = semantic_payload.get("branches")
+    if not isinstance(branches, list) or not branches:
+        return _append_prompt_encode_node(
+            workflow,
+            allocator=allocator,
+            clip_source=clip_source,
+            text=prompt_text,
+            prompt_encoder=prompt_encoder,
+            width=width,
+            height=height,
+        )
+
+    compiled_branch_ids: list[str] = []
+    for raw_branch in branches:
+        if not isinstance(raw_branch, dict):
+            continue
+        branch_text = str(raw_branch.get("text") or prompt_text).strip() or prompt_text
+        raw_chunks = raw_branch.get("chunks")
+        chunks = raw_chunks if isinstance(raw_chunks, list) and raw_chunks else [{"text": branch_text, "slices": []}]
+        compiled_chunk_ids: list[str] = []
+
+        for raw_chunk in chunks:
+            if not isinstance(raw_chunk, dict):
+                continue
+            chunk_text = str(raw_chunk.get("text") or branch_text).strip() or branch_text
+            raw_slices = raw_chunk.get("slices")
+            slices = raw_slices if isinstance(raw_slices, list) and raw_slices else [{"text": chunk_text, "start": 0.0, "end": 1.0}]
+            compiled_slice_ids: list[str] = []
+
+            for raw_slice in slices:
+                if not isinstance(raw_slice, dict):
+                    continue
+                slice_text = str(raw_slice.get("text") or chunk_text).strip() or chunk_text
+                encoded_id = _append_prompt_encode_node(
+                    workflow,
+                    allocator=allocator,
+                    clip_source=clip_source,
+                    text=slice_text,
+                    prompt_encoder=prompt_encoder,
+                    width=width,
+                    height=height,
+                )
+                start = float(raw_slice.get("start", 0.0))
+                end = float(raw_slice.get("end", 1.0))
+                compiled_slice_ids.append(
+                    _append_conditioning_range_node(
+                        workflow,
+                        allocator=allocator,
+                        conditioning_id=encoded_id,
+                        start=start,
+                        end=end,
+                    )
+                )
+
+            if compiled_slice_ids:
+                compiled_chunk_ids.append(
+                    _combine_conditioning_ids(
+                        workflow,
+                        allocator=allocator,
+                        conditioning_ids=compiled_slice_ids,
+                    )
+                )
+
+        if not compiled_chunk_ids:
+            compiled_chunk_ids.append(
+                _append_prompt_encode_node(
+                    workflow,
+                    allocator=allocator,
+                    clip_source=clip_source,
+                    text=branch_text,
+                    prompt_encoder=prompt_encoder,
+                    width=width,
+                    height=height,
+                )
+            )
+
+        branch_id = _combine_conditioning_ids(
+            workflow,
+            allocator=allocator,
+            conditioning_ids=compiled_chunk_ids,
+        )
+        branch_weight = float(raw_branch.get("weight", 1.0))
+        compiled_branch_ids.append(
+            _append_conditioning_weight_node(
+                workflow,
+                allocator=allocator,
+                conditioning_id=branch_id,
+                weight=branch_weight,
+            )
+        )
+
+    if not compiled_branch_ids:
+        return _append_prompt_encode_node(
+            workflow,
+            allocator=allocator,
+            clip_source=clip_source,
+            text=prompt_text,
+            prompt_encoder=prompt_encoder,
+            width=width,
+            height=height,
+        )
+    return _combine_conditioning_ids(
+        workflow,
+        allocator=allocator,
+        conditioning_ids=compiled_branch_ids,
+    )
+
+
 def _build_sd15_conditioning(
     workflow: dict[str, object],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
@@ -59,23 +325,22 @@ def _build_sd15_conditioning(
             },
         }
         clip_source = [clip_node_id, 0]
-    positive_id = allocator.next()
-
-    negative_id = allocator.next()
-    workflow[positive_id] = {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": request.prompt,
-            "clip": clip_source,
-        },
-    }
-    workflow[negative_id] = {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-            "text": request.negative_prompt,
-            "clip": clip_source,
-        },
-    }
+    positive_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=request.prompt,
+        semantic_payload=request.prompt_semantics if isinstance(request.prompt_semantics, dict) else {},
+        prompt_encoder="sd15",
+    )
+    negative_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=request.negative_prompt,
+        semantic_payload=request.negative_prompt_semantics if isinstance(request.negative_prompt_semantics, dict) else {},
+        prompt_encoder="sd15",
+    )
     return positive_id, negative_id
 
 
@@ -88,33 +353,26 @@ def _build_sdxl_conditioning(
     height: int,
     clip_source: list[object],
 ) -> tuple[str, str]:
-    positive_id = allocator.next()
-    negative_id = allocator.next()
-    common_inputs = {
-        "clip": clip_source,
-        "width": width,
-        "height": height,
-        "crop_w": 0,
-        "crop_h": 0,
-        "target_width": width,
-        "target_height": height,
-    }
-    workflow[positive_id] = {
-        "class_type": "CLIPTextEncodeSDXL",
-        "inputs": {
-            **common_inputs,
-            "text_g": request.prompt,
-            "text_l": request.prompt,
-        },
-    }
-    workflow[negative_id] = {
-        "class_type": "CLIPTextEncodeSDXL",
-        "inputs": {
-            **common_inputs,
-            "text_g": request.negative_prompt,
-            "text_l": request.negative_prompt,
-        },
-    }
+    positive_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=request.prompt,
+        semantic_payload=request.prompt_semantics if isinstance(request.prompt_semantics, dict) else {},
+        prompt_encoder="sdxl",
+        width=width,
+        height=height,
+    )
+    negative_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=request.negative_prompt,
+        semantic_payload=request.negative_prompt_semantics if isinstance(request.negative_prompt_semantics, dict) else {},
+        prompt_encoder="sdxl",
+        width=width,
+        height=height,
+    )
     return positive_id, negative_id
 
 
