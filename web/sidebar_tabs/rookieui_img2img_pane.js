@@ -1227,6 +1227,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       });
       if (Array.isArray(payload.batch_images)) {
         elements.batchImagesData.value = JSON.stringify(payload.batch_images);
+      } else if (String(payload.mode ?? "").trim().toLowerCase() !== "batch") {
+        elements.batchImagesData.value = "[]";
       }
       const resolvedPresetId = findPresetIdForProfile(allPresets, elements.profileState.value);
       if (resolvedPresetId) {

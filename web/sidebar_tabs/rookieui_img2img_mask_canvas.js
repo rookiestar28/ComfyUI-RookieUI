@@ -24,6 +24,7 @@ export function createImg2ImgMaskCanvasContract({
   const state = {
     sourceImageData: "",
     sourceImageAsset: "",
+    sourceSignature: "",
     stagedMaskData: "",
     stagedMaskDirty: false,
     stagedRevision: 0,
@@ -34,6 +35,16 @@ export function createImg2ImgMaskCanvasContract({
   const refreshSourceBinding = () => {
     state.sourceImageData = _readTrimmedValue(imageDataInput);
     state.sourceImageAsset = _readTrimmedValue(imageAssetInput);
+    const nextSignature = `${state.sourceImageData}::${state.sourceImageAsset}`;
+    if (nextSignature !== state.sourceSignature) {
+      state.sourceSignature = nextSignature;
+      const hasCommittedMask = Boolean(_readTrimmedValue(maskDataInput) || _readTrimmedValue(maskAssetInput));
+      if (!hasCommittedMask) {
+        // CRITICAL: source-image mutations must invalidate stale staged mask buffers when no payload mask exists, otherwise send-to-img2img can carry phantom dirty state across tabs/modes.
+        state.stagedMaskData = "";
+        state.stagedMaskDirty = false;
+      }
+    }
   };
 
   const stageMaskData = (maskDataUrl, metadata = {}) => {
@@ -77,6 +88,8 @@ export function createImg2ImgMaskCanvasContract({
   const handleExternalMaskMutation = () => {
     const currentMaskData = _readTrimmedValue(maskDataInput);
     if (!currentMaskData) {
+      state.stagedMaskData = "";
+      state.stagedMaskDirty = false;
       return;
     }
     if (currentMaskData !== state.stagedMaskData) {
@@ -117,6 +130,7 @@ export function createImg2ImgMaskCanvasContract({
   const getStateSnapshot = () => ({
     sourceImageData: state.sourceImageData,
     sourceImageAsset: state.sourceImageAsset,
+    sourceSignature: state.sourceSignature,
     stagedMaskData: state.stagedMaskData,
     stagedMaskDirty: state.stagedMaskDirty,
     stagedRevision: state.stagedRevision,

@@ -82,4 +82,53 @@ describe("createImg2ImgMaskCanvasContract", () => {
     expect(snapshot.stagedMaskData).toBe("data:image/png;base64,external-mask");
     expect(snapshot.stagedMaskDirty).toBe(false);
   });
+
+  test("clears staged mask state when external payload clears mask_data", () => {
+    const modeInput = createInput("inpaint");
+    const imageDataInput = createInput("data:image/png;base64,source");
+    const imageAssetInput = createInput("");
+    const maskDataInput = createInput("");
+    const maskAssetInput = createInput("");
+
+    const contract = createImg2ImgMaskCanvasContract({
+      modeInput,
+      imageDataInput,
+      imageAssetInput,
+      maskDataInput,
+      maskAssetInput,
+      resolveExecutionMode: (mode) => mode,
+    });
+    contract.stageMaskData("data:image/png;base64,staged-mask");
+    maskDataInput.value = "";
+    contract.handleExternalMaskMutation();
+
+    const snapshot = contract.getStateSnapshot();
+    expect(snapshot.stagedMaskData).toBe("");
+    expect(snapshot.stagedMaskDirty).toBe(false);
+  });
+
+  test("resets staged dirty state when source signature changes without committed mask payload", () => {
+    const modeInput = createInput("img2img");
+    const imageDataInput = createInput("data:image/png;base64,source-a");
+    const imageAssetInput = createInput("");
+    const maskDataInput = createInput("");
+    const maskAssetInput = createInput("");
+
+    const contract = createImg2ImgMaskCanvasContract({
+      modeInput,
+      imageDataInput,
+      imageAssetInput,
+      maskDataInput,
+      maskAssetInput,
+      resolveExecutionMode: (mode) => mode,
+    });
+    contract.stageMaskData("data:image/png;base64,staged-mask");
+    imageDataInput.value = "data:image/png;base64,source-b";
+    contract.refreshSourceBinding();
+
+    const snapshot = contract.getStateSnapshot();
+    expect(snapshot.sourceSignature).toContain("source-b");
+    expect(snapshot.stagedMaskData).toBe("");
+    expect(snapshot.stagedMaskDirty).toBe(false);
+  });
 });

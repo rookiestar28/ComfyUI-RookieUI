@@ -712,6 +712,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-img2img").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
     document.getElementById("rookieui-tab-txt2img").click();
+    document.getElementById("rookieui-tab-img2img").click();
+    document.getElementById("rookieui-mask-asset").value = "stale-mask-before-transfer";
+    const staleMaskDataField = document.getElementById("rookieui-mask-data");
+    if (staleMaskDataField) {
+      staleMaskDataField.value = "data:image/png;base64,c3RhbGUtbWFzaw==";
+    }
+    const staleBatchImagesField = document.getElementById("rookieui-img2img-batch-images-data");
+    if (staleBatchImagesField) {
+      staleBatchImagesField.value = '["data:image/png;base64,c3RhbGUtYmF0Y2g="]';
+    }
+    document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview").innerHTML =
       '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
     document.getElementById("rookieui-txt2img-preview-img2img").click();
@@ -725,6 +736,13 @@ describe("registerRookieUIBootstrapExtension", () => {
     const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
     expect(transferredPreviewImage).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+    expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+    if (staleMaskDataField) {
+      expect(staleMaskDataField.value).toBe("");
+    }
+    if (staleBatchImagesField) {
+      expect(staleBatchImagesField.value).toBe("[]");
+    }
     document.getElementById("rookieui-tab-pnginfo").click();
     expect(document.getElementById("rookieui-pane-pnginfo").classList.contains("is-active")).toBe(true);
     expect(document.getElementById("rookieui-pane-pnginfo").hidden).toBe(false);

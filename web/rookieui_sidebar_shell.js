@@ -878,6 +878,8 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
       image_asset: "",
       image_data: imageDataUrl,
       mask_asset: "",
+      mask_data: "",
+      batch_images: [],
     });
     if (applied && statusNode) {
       statusNode.textContent = "Sent preview image to Img2Img";
@@ -895,6 +897,8 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
         image_asset: fallbackAsset,
         image_data: "",
         mask_asset: "",
+        mask_data: "",
+        batch_images: [],
       });
       if (applied && statusNode) {
         statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
