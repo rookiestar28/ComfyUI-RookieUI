@@ -27,6 +27,7 @@ import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v
 import {
   assertTopLevelTabDefinitions,
 } from "./sidebar_tabs/rookieui_tab_contract.js?v=20260411-r51-tab-contract";
+import { createShellStateEventContract } from "./sidebar_tabs/rookieui_shell_state_contract.js?v=20260411-r52-shell-state";
 import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
 import { createImg2ImgMaskCanvasEditor } from "./sidebar_tabs/rookieui_img2img_mask_editor.js?v=20260411-f58-mask-editor";
 import { createImg2ImgModeRouter } from "./sidebar_tabs/rookieui_img2img_mode_router.js?v=20260411-r50-mode-router";
@@ -387,8 +388,13 @@ function installPaneStateLock(formRegistry, paneId, elements, afterRestore = nul
   });
 
   if (formRegistry && paneId) {
-    formRegistry.__paneStateLocks ??= {};
-    formRegistry.__paneStateLocks[paneId] = { capture, restore };
+    const shellStateContract = formRegistry.__shellStateContract;
+    if (shellStateContract?.registerPaneStateLock) {
+      shellStateContract.registerPaneStateLock(paneId, { capture, restore });
+    } else {
+      formRegistry.__paneStateLocks ??= {};
+      formRegistry.__paneStateLocks[paneId] = { capture, restore };
+    }
   }
   return { capture, restore };
 }
@@ -764,7 +770,7 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
     activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
     return;
   }
-  if (!formRegistry?.img2img?.applyPayload) {
+  if (!formRegistry?.img2img?.applyPayload && !formRegistry?.__shellStateContract?.applyToForm) {
     emitFrontendDebugWarning("shell.preview_transfer", "Img2Img applyPayload is unavailable; falling back to tab switch.");
     if (statusNode) {
       statusNode.textContent = "Img2Img form is unavailable.";
@@ -777,14 +783,13 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
     if (!imageDataUrl) {
       throw new Error("Preview image is empty.");
     }
-    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
-    formRegistry.img2img.applyPayload({
+    const applied = applyCrossPanePayload(formRegistry, "img2img", {
       mode: "img2img",
       image_asset: "",
       image_data: imageDataUrl,
       mask_asset: "",
     });
-    if (statusNode) {
+    if (applied && statusNode) {
       statusNode.textContent = "Sent preview image to Img2Img";
     }
   } catch (_error) {
@@ -795,14 +800,13 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
     );
     if (fallbackAsset) {
       // IMPORTANT: keep asset fallback for transfer flow so Send-to-Img2Img still works when preview blobs/data-url decoding fails.
-      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
-      formRegistry.img2img.applyPayload({
+      const applied = applyCrossPanePayload(formRegistry, "img2img", {
         mode: "img2img",
         image_asset: fallbackAsset,
         image_data: "",
         mask_asset: "",
       });
-      if (statusNode) {
+      if (applied && statusNode) {
         statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
       }
       return;
@@ -1222,10 +1226,35 @@ function createIconActionButton(id, iconToken, labelText, tone = "neutral") {
 }
 
 function activateShellTab(formRegistry, tabId, statusNode, message = "") {
-  formRegistry.__shellTabs?.activateTabById?.(tabId);
+  const shellStateContract = formRegistry?.__shellStateContract;
+  if (shellStateContract?.activateTopTab) {
+    shellStateContract.activateTopTab(tabId);
+  } else {
+    formRegistry.__shellTabs?.activateTabById?.(tabId);
+  }
   if (statusNode && message) {
     statusNode.textContent = message;
   }
+}
+
+function applyCrossPanePayload(formRegistry, targetKey, payload, options = {}) {
+  const normalizedTarget = String(targetKey ?? "").trim();
+  if (!normalizedTarget) {
+    return false;
+  }
+  const shellStateContract = formRegistry?.__shellStateContract;
+  if (shellStateContract?.applyToForm) {
+    return shellStateContract.applyToForm(normalizedTarget, payload, { activate: options.activate !== false });
+  }
+  const targetForm = formRegistry?.[normalizedTarget];
+  if (!targetForm?.applyPayload) {
+    return false;
+  }
+  if (options.activate !== false) {
+    formRegistry.__shellTabs?.activateTabById?.(normalizedTarget);
+  }
+  targetForm.applyPayload(payload);
+  return true;
 }
 
 function buildQuicksettingCard(parent, labelText, controls, id = "") {
@@ -3333,14 +3362,11 @@ function applyPngInfoResult(formRegistry, targetKey, state, statusNode) {
     return;
   }
 
-  const targetForm = formRegistry[targetKey];
-  if (!targetForm?.applyPayload) {
+  const applied = applyCrossPanePayload(formRegistry, targetKey, inspectionResult.payload ?? {});
+  if (!applied) {
     statusNode.textContent = `Target form unavailable: ${targetKey}`;
     return;
   }
-
-  formRegistry.__shellTabs?.activateTabById?.(targetKey);
-  targetForm.applyPayload(inspectionResult.payload ?? {});
   statusNode.textContent = `Applied ${targetKey} fields`;
 }
 
@@ -3932,13 +3958,12 @@ function buildExtrasSection(parent, bootstrapState, formRegistry) {
       statusNode.textContent = "Run Extras before sending an output to img2img.";
       return;
     }
-    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
-    formRegistry.img2img?.applyPayload({
+    const applied = applyCrossPanePayload(formRegistry, "img2img", {
       image_asset: asset,
       mode: "img2img",
       mask_asset: "",
     });
-    statusNode.textContent = `Applied ${asset} to img2img`;
+    statusNode.textContent = applied ? `Applied ${asset} to img2img` : "Img2Img form is unavailable.";
   });
   previewToolbar.appendChild(sendToImg2Img);
 
@@ -4111,22 +4136,36 @@ function buildQueueSection(parent, bootstrapState, formRegistry) {
 
     const img2imgButton = createActionButton(`rookieui-reuse-img2img-${index}`, "Use as Img2Img");
     img2imgButton.addEventListener("click", () => {
-      formRegistry.img2img?.applyPayload({
-        image_asset: job.reusable_outputs[0],
-        mode: "img2img",
-        mask_asset: "",
-      });
-      statusNode.textContent = `Applied ${job.reusable_outputs[0]} to img2img`;
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        {
+          image_asset: job.reusable_outputs[0],
+          mode: "img2img",
+          mask_asset: "",
+        },
+        { activate: false },
+      );
+      statusNode.textContent = applied
+        ? `Applied ${job.reusable_outputs[0]} to img2img`
+        : "Img2Img form is unavailable.";
     });
     actions.appendChild(img2imgButton);
 
     const inpaintButton = createActionButton(`rookieui-reuse-inpaint-${index}`, "Use as Inpaint");
     inpaintButton.addEventListener("click", () => {
-      formRegistry.img2img?.applyPayload({
-        image_asset: job.reusable_outputs[0],
-        mode: "inpaint",
-      });
-      statusNode.textContent = `Applied ${job.reusable_outputs[0]} to inpaint`;
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        {
+          image_asset: job.reusable_outputs[0],
+          mode: "inpaint",
+        },
+        { activate: false },
+      );
+      statusNode.textContent = applied
+        ? `Applied ${job.reusable_outputs[0]} to inpaint`
+        : "Img2Img form is unavailable.";
     });
     actions.appendChild(inpaintButton);
   });
@@ -4245,7 +4284,7 @@ function resolveForgeNeoTheme(documentRef, windowRef = documentRef?.defaultView)
   return "normal";
 }
 
-function buildTabbedShell(container, definitions, controller = {}) {
+function buildTabbedShell(container, definitions, controller = {}, options = {}) {
   const tabs = document.createElement("div");
   tabs.className = "rookieui-shell__tabs";
   tabs.id = "rookieui-shell-tabs";
@@ -4277,6 +4316,7 @@ function buildTabbedShell(container, definitions, controller = {}) {
       panes[index].hidden = !active;
     });
     lifecycles[nextIndex]?.onActivate?.();
+    options.onActiveTabIdChange?.(definitions[nextIndex]?.id ?? "");
     activeIndex = nextIndex;
   };
 
@@ -4335,8 +4375,10 @@ export function renderRookieUISidebar(container, bootstrapState) {
   container.className = "rookieui-shell";
   container.dataset.theme = resolveForgeNeoTheme(container.ownerDocument);
   const formRegistry = {};
+  const shellStateContract = createShellStateEventContract(formRegistry);
+  formRegistry.__shellStateContract = shellStateContract;
   const shellTabs = {};
-  formRegistry.__shellTabs = shellTabs;
+  shellStateContract.registerTopTabController(shellTabs);
   const tabDefinitions = [
     createTxt2ImgTabDefinition(buildTxt2ImgSection, bootstrapState, formRegistry),
     createImg2ImgTabDefinition(buildImg2ImgSection, bootstrapState, formRegistry),
@@ -4349,6 +4391,8 @@ export function renderRookieUISidebar(container, bootstrapState) {
 
   buildShellHeader(container, bootstrapState);
   // IMPORTANT: keep tab wiring in per-tab modules so pane ownership is explicit and future tab-level refactors do not reopen a single giant definition block.
-  buildTabbedShell(container, tabDefinitions, shellTabs);
+  buildTabbedShell(container, tabDefinitions, shellTabs, {
+    onActiveTabIdChange: (tabId) => shellStateContract.setActiveTopTab(tabId),
+  });
   buildShellFooter(container, bootstrapState);
 }
