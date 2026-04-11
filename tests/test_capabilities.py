@@ -47,3 +47,14 @@ class CapabilitySnapshotTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["host_surfaces"], ["desktop", "standalone-web"])
+
+    def test_capabilities_snapshot_exposes_prompt_semantics_contract(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        prompt_semantics = payload["prompt_semantics"]
+        self.assertEqual(prompt_semantics["contract_version"], "r55-20260411")
+        capability_ids = [entry["id"] for entry in prompt_semantics["capabilities"]]
+        self.assertIn("and_composition", capability_ids)
+        self.assertIn("break_chunks", capability_ids)
+        self.assertIn("prompt_scheduling", capability_ids)
+        self.assertIn("attention_weighting", capability_ids)

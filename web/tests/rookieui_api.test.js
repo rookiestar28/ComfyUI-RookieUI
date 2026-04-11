@@ -46,6 +46,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
+    expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
   });
 
   test("submits txt2img payloads to the backend", async () => {

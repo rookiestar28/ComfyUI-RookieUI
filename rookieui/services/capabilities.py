@@ -4,6 +4,52 @@ from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.security.asset_guard import normalize_metadata_text
 
 
+def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized = {
+        "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
+        "contract_scope": normalize_metadata_text(payload.get("contract_scope", "")),
+        "rollout": {},
+        "compiler_constraints": {},
+        "capabilities": [],
+    }
+    rollout = payload.get("rollout", {})
+    if isinstance(rollout, dict):
+        normalized["rollout"] = {
+            key: normalize_metadata_text(value)
+            for key, value in rollout.items()
+            if isinstance(value, str) and value.strip()
+        }
+    constraints = payload.get("compiler_constraints", {})
+    if isinstance(constraints, dict):
+        normalized["compiler_constraints"] = {
+            "conditioning_nodes": [
+                normalize_metadata_text(value)
+                for value in constraints.get("conditioning_nodes", [])
+                if isinstance(value, str) and value.strip()
+            ],
+            "execution_backend": normalize_metadata_text(constraints.get("execution_backend", "")),
+        }
+    capabilities = payload.get("capabilities", [])
+    if isinstance(capabilities, list):
+        normalized_capabilities = []
+        for capability in capabilities:
+            if not isinstance(capability, dict):
+                continue
+            normalized_capabilities.append(
+                {
+                    "id": normalize_metadata_text(capability.get("id", "")),
+                    "title": normalize_metadata_text(capability.get("title", "")),
+                    "a1111_semantics": normalize_metadata_text(capability.get("a1111_semantics", "")),
+                    "rookieui_contract": normalize_metadata_text(capability.get("rookieui_contract", "")),
+                    "status": normalize_metadata_text(capability.get("status", "")),
+                    "translation": normalize_metadata_text(capability.get("translation", "")),
+                    "reference": normalize_metadata_text(capability.get("reference", "")),
+                }
+            )
+        normalized["capabilities"] = normalized_capabilities
+    return normalized
+
+
 def build_capabilities_payload(
     *,
     routes: list[str],
@@ -76,4 +122,7 @@ def build_capabilities_payload(
                 ],
             },
         }
+    prompt_semantics = payload.get("prompt_semantics", {})
+    if isinstance(prompt_semantics, dict):
+        payload["prompt_semantics"] = _normalize_prompt_semantics_payload(prompt_semantics)
     return payload

@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from rookieui.services.parity_matrix import build_parity_payload
+from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,7 @@ class RookieUICapabilitiesSnapshot:
         ]
     )
     parity: dict[str, object] = field(default_factory=build_parity_payload)
+    prompt_semantics: dict[str, object] = field(default_factory=build_prompt_capability_matrix_payload)
     routes: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:
