@@ -1,7 +1,5 @@
+import { createTopLevelTabDefinition } from "./rookieui_tab_contract.js?v=20260411-r51-tab-contract";
+
 export function createPngInfoTabDefinition(buildSection, bootstrapState, formRegistry) {
-  return {
-    id: "pnginfo",
-    label: "PNG Info",
-    render: (pane) => buildSection(pane, bootstrapState, formRegistry),
-  };
+  return createTopLevelTabDefinition("pnginfo", buildSection, bootstrapState, formRegistry);
 }

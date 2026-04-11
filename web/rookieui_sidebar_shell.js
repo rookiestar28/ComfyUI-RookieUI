@@ -24,6 +24,9 @@ import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
+import {
+  assertTopLevelTabDefinitions,
+} from "./sidebar_tabs/rookieui_tab_contract.js?v=20260411-r51-tab-contract";
 import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
 import { createImg2ImgMaskCanvasEditor } from "./sidebar_tabs/rookieui_img2img_mask_editor.js?v=20260411-f58-mask-editor";
 import { createImg2ImgModeRouter } from "./sidebar_tabs/rookieui_img2img_mode_router.js?v=20260411-r50-mode-router";
@@ -4341,6 +4344,8 @@ export function renderRookieUISidebar(container, bootstrapState) {
     createPngInfoTabDefinition(buildPngInfoSection, bootstrapState, formRegistry),
     createQueueTabDefinition(buildQueueSection, bootstrapState, formRegistry),
   ];
+  // CRITICAL: top-level tab contract validation must run before render to catch missing/duplicate pane ownership during modularization stages.
+  assertTopLevelTabDefinitions(tabDefinitions);
 
   buildShellHeader(container, bootstrapState);
   // IMPORTANT: keep tab wiring in per-tab modules so pane ownership is explicit and future tab-level refactors do not reopen a single giant definition block.
