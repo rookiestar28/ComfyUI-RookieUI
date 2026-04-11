@@ -626,6 +626,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     expect(document.getElementById("rookieui-img2img-hires-controls")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-mask-editor")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     for (const matrixRow of presetClipSkipMatrix) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
@@ -642,6 +643,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-modules-quicksetting").textContent).not.toContain("VAE / Text Encoder");
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-clip-skip").disabled).toBe(false);
+    document.getElementById("rookieui-img2img-mode").value = "batch";
+    document.getElementById("rookieui-img2img-mode").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(true);
+    document.getElementById("rookieui-img2img-mode").value = "img2img";
+    document.getElementById("rookieui-img2img-mode").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(false);
     expect(document.getElementById("rookieui-image-asset").value).toBe("");
     document.getElementById("rookieui-img2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),

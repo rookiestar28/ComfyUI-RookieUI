@@ -1,0 +1,153 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+import { createImg2ImgMaskCanvasEditor } from "../sidebar_tabs/rookieui_img2img_mask_editor.js";
+
+function createInput(value = "") {
+  const input = document.createElement("input");
+  input.value = value;
+  return input;
+}
+
+describe("createImg2ImgMaskCanvasEditor", () => {
+  let originalImage;
+  let originalGetContext;
+  let originalToDataUrl;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    originalImage = global.Image;
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    originalToDataUrl = HTMLCanvasElement.prototype.toDataURL;
+
+    global.Image = class MockImage {
+      constructor() {
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
+      }
+
+      set src(value) {
+        this._src = value;
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+
+      get src() {
+        return this._src;
+      }
+    };
+
+    HTMLCanvasElement.prototype.getContext = function mockGetContext() {
+      const width = this.width || 1;
+      const height = this.height || 1;
+      const data = new Uint8ClampedArray(width * height * 4);
+      return {
+        save: vi.fn(),
+        restore: vi.fn(),
+        fillRect: vi.fn(),
+        beginPath: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(),
+        drawImage: vi.fn(),
+        getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(data), width, height })),
+        putImageData: vi.fn(),
+      };
+    };
+
+    HTMLCanvasElement.prototype.toDataURL = vi.fn(() => "data:image/png;base64,mask");
+  });
+
+  test("stages and applies mask payload through the R49 contract bridge", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const modeInput = createInput("inpaint");
+    const imageDataInput = createInput("data:image/png;base64,source");
+    const imageAssetInput = createInput("");
+    const maskDataInput = createInput("");
+    const maskAssetInput = createInput("");
+    const stageMaskData = vi.fn(() => true);
+    const applyStagedMask = vi.fn(() => ({ ok: true, message: "Applied staged mask to Img2Img request payload." }));
+
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-test",
+      parent,
+      modeInput,
+      imageDataInput,
+      imageAssetInput,
+      maskDataInput,
+      maskAssetInput,
+      resolveExecutionMode: () => "inpaint",
+      maskCanvasContract: {
+        stageMaskData,
+        applyStagedMask,
+      },
+      syncBoundControls: vi.fn(),
+      allowJsdomCanvas: true,
+    });
+
+    await editor.refreshFromInputs();
+    editor.forceStageCurrentMask();
+    document.getElementById("mask-editor-test-apply").click();
+
+    expect(stageMaskData).toHaveBeenCalled();
+    expect(applyStagedMask).toHaveBeenCalledTimes(1);
+  });
+
+  test("hides editor in batch execution mode", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-batch",
+      parent,
+      modeInput: createInput("img2img"),
+      imageDataInput: createInput("data:image/png;base64,source"),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: (mode) => mode,
+      maskCanvasContract: {
+        stageMaskData: vi.fn(() => true),
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    editor.setMode("batch");
+    expect(document.getElementById("mask-editor-batch").hidden).toBe(true);
+  });
+
+  test("clear and invert buttons stage mask updates", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const stageMaskData = vi.fn(() => true);
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-actions",
+      parent,
+      modeInput: createInput("inpaint"),
+      imageDataInput: createInput("data:image/png;base64,source"),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: () => "inpaint",
+      maskCanvasContract: {
+        stageMaskData,
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    await editor.refreshFromInputs();
+    document.getElementById("mask-editor-actions-clear").click();
+    document.getElementById("mask-editor-actions-invert").click();
+
+    expect(stageMaskData).toHaveBeenCalledTimes(2);
+    expect(document.getElementById("mask-editor-actions-undo").disabled).toBe(false);
+  });
+
+  afterEach(() => {
+    global.Image = originalImage;
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    HTMLCanvasElement.prototype.toDataURL = originalToDataUrl;
+  });
+});

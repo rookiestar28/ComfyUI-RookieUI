@@ -25,6 +25,7 @@ import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
 import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
+import { createImg2ImgMaskCanvasEditor } from "./sidebar_tabs/rookieui_img2img_mask_editor.js?v=20260411-f58-mask-editor";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -2033,6 +2034,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     batchPane: null,
     batchFileInput: null,
     batchStatusNode: null,
+    maskEditor: null,
   };
 
   const elements = {
@@ -2472,6 +2474,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
     if (!modeGuard.ok && modeGuard.message) {
       statusNode.textContent = modeGuard.message;
     }
+    img2imgModeUi.maskEditor?.setMode(elements.mode.value);
   };
   syncImg2ImgModeSurface();
   elements.preset.addEventListener("change", () => {
@@ -2754,6 +2757,24 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
         img2imgModeUi.batchPane = batchPane;
         img2imgModeUi.batchFileInput = batchFileInput;
         img2imgModeUi.batchStatusNode = batchStatusNode;
+        const maskEditor = createImg2ImgMaskCanvasEditor({
+          idPrefix: "rookieui-img2img-mask-editor",
+          parent: assetSection,
+          modeInput: elements.mode,
+          imageDataInput: elements.imageData,
+          imageAssetInput: elements.imageAsset,
+          maskDataInput: elements.maskData,
+          maskAssetInput: elements.maskAsset,
+          maskCanvasContract: img2imgMaskCanvasContract,
+          resolveExecutionMode: resolveImg2ImgExecutionMode,
+          onStatusMessage: (message) => {
+            statusNode.textContent = message;
+          },
+          syncBoundControls,
+        });
+        img2imgModeUi.maskEditor = maskEditor;
+        maskEditor.setMode(elements.mode.value);
+        maskEditor.refreshFromInputs();
 
         const assetPreview = document.createElement("div");
         assetPreview.className = "rookieui-shell__preview-box rookieui-shell__preview-box--compact";
@@ -2811,6 +2832,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           setPreviewContent(assetPreview, imageData, runtimeState.previewPlaceholder);
           statusNode.textContent = `Loaded source image: ${file.name}`;
           syncBoundControls([elements.imageData, elements.imageAsset]);
+          await img2imgModeUi.maskEditor?.refreshFromInputs();
         });
         attachDropzoneHandlers(maskDropzone, maskFileInput, async (file) => {
           const maskData = await readFileAsDataUrl(file);
@@ -2819,6 +2841,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           img2imgMaskCanvasContract.handleExternalMaskMutation();
           statusNode.textContent = `Loaded inpaint mask: ${file.name}`;
           syncBoundControls([elements.maskData, elements.maskAsset]);
+          await img2imgModeUi.maskEditor?.handleExternalMaskMutation();
         });
 
         const setBatchFiles = async (files) => {
@@ -3100,6 +3123,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
       syncImg2ImgModeSurface();
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();
+      img2imgModeUi.maskEditor?.refreshFromInputs();
       const appliedImageData = String(elements.imageData.value ?? "").trim();
       const appliedBatchImages = parseJsonArrayField(elements.batchImagesData.value);
       const previewImageData =

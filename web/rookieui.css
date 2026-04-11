@@ -704,6 +704,80 @@
   justify-content: center;
 }
 
+.rookieui-shell__mini-action--compact {
+  min-width: 0;
+  padding-inline: 10px;
+}
+
+.rookieui-shell__mask-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.rookieui-shell__mask-editor-toolbar,
+.rookieui-shell__mask-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rookieui-shell__mask-editor-toolbar .rookieui-shell__mini-action.is-active {
+  border-color: var(--rookieui-border-strong);
+  background: var(--rookieui-accent-soft);
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__mask-editor-controls {
+  display: grid;
+  gap: 8px;
+}
+
+.rookieui-shell__mask-editor-control {
+  display: grid;
+  gap: 4px;
+}
+
+.rookieui-shell__mask-editor-viewport {
+  position: relative;
+  min-height: 280px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--rookieui-bg-preview-top), var(--rookieui-bg-preview-bottom));
+  overflow: hidden;
+}
+
+.rookieui-shell__mask-editor-stage {
+  position: absolute;
+  inset: 0;
+  width: 512px;
+  height: 512px;
+  touch-action: none;
+}
+
+.rookieui-shell__mask-editor-source,
+.rookieui-shell__mask-editor-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.rookieui-shell__mask-editor-canvas {
+  cursor: crosshair;
+  opacity: 0.9;
+}
+
+.rookieui-shell__mask-editor-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--rookieui-text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
 .rookieui-shell__dropzone {
   position: relative;
   display: grid;
