@@ -5,6 +5,7 @@ import unittest
 from rookieui.api.routes import build_capabilities_snapshot
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.services.capabilities import build_capabilities_payload
+from rookieui.services.version import resolve_shell_version
 
 
 class CapabilitySnapshotTests(unittest.TestCase):
@@ -58,3 +59,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertIn("break_chunks", capability_ids)
         self.assertIn("prompt_scheduling", capability_ids)
         self.assertIn("attention_weighting", capability_ids)
+
+    def test_capabilities_snapshot_uses_pyproject_shell_version(self) -> None:
+        payload = build_capabilities_snapshot()
+        self.assertEqual(payload["shell_version"], resolve_shell_version())

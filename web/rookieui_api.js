@@ -3,7 +3,8 @@ import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
 const DEFAULT_CAPABILITIES = Object.freeze({
   service: "rookieui",
   visibility: "internal",
-  shell_version: "0.1.0",
+  // IMPORTANT: shell version must come from backend capabilities (pyproject source of truth).
+  shell_version: "",
   host_surfaces: ["standalone-web", "desktop"],
   features: {
     sidebarShell: true,

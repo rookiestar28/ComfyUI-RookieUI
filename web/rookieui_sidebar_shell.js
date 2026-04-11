@@ -1864,7 +1864,7 @@ function buildShellHeader(container, bootstrapState) {
     actions,
     "span",
     "rookieui-shell__version",
-    `v${bootstrapState.capabilities.shell_version ?? "0.1.0"}`,
+    `v${bootstrapState.capabilities.shell_version || "unknown"}`,
     "rookieui-header-version",
   );
 

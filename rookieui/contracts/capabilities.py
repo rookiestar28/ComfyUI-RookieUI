@@ -5,6 +5,7 @@ from typing import Any
 
 from rookieui.services.parity_matrix import build_parity_payload
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
+from rookieui.services.version import resolve_shell_version
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class RookieUITabSnapshot:
 class RookieUICapabilitiesSnapshot:
     service: str = "rookieui"
     visibility: str = "internal"
-    shell_version: str = "0.1.0"
+    shell_version: str = field(default_factory=resolve_shell_version)
     host_surfaces: list[str] = field(
         default_factory=lambda: ["standalone-web", "desktop"]
     )

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-rookieui"
 version = "0.1.0"
-description = "The ultimate A1111-style sidebar. Bring the classic UX into ComfyUI and make its powerful engine accessible and intuitive for rookies and pros alike."
+description = "The ultimate A1111-style sidebar. Bring the classic UX you know and love into ComfyUI."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
