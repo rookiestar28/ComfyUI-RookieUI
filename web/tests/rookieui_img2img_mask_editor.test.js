@@ -117,6 +117,40 @@ describe("createImg2ImgMaskCanvasEditor", () => {
     expect(document.getElementById("mask-editor-batch").hidden).toBe(true);
   });
 
+  test("toggles source placeholder visibility with source binding state", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const imageDataInput = createInput("data:image/png;base64,source");
+    const imageAssetInput = createInput("");
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-source-placeholder",
+      parent,
+      modeInput: createInput("img2img"),
+      imageDataInput,
+      imageAssetInput,
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: (mode) => mode,
+      maskCanvasContract: {
+        stageMaskData: vi.fn(() => true),
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    await editor.refreshFromInputs();
+    const placeholder = document.querySelector(
+      "#mask-editor-source-placeholder .rookieui-shell__mask-editor-placeholder",
+    );
+    expect(placeholder).not.toBeNull();
+    expect(placeholder.hidden).toBe(true);
+
+    imageDataInput.value = "";
+    imageAssetInput.value = "";
+    await editor.refreshFromInputs();
+    expect(placeholder.hidden).toBe(false);
+  });
+
   test("clear and invert buttons stage mask updates", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);

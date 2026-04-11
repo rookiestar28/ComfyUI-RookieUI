@@ -269,6 +269,11 @@
   pointer-events: none;
 }
 
+.rookieui-shell__mask-editor-placeholder[hidden] {
+  /* CRITICAL: keep explicit hidden override so source-bound mask editor never shows a false "No source image" overlay. */
+  display: none !important;
+}
+
 .rookieui-shell__dropzone {
   position: relative;
   display: grid;

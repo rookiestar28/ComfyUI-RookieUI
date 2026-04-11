@@ -19,7 +19,7 @@ import {
 import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260411-f63-style-modules";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260411-f63-style-modules";
+const ROOKIEUI_ASSET_REVISION = "20260411-r59-mask-placeholder";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
