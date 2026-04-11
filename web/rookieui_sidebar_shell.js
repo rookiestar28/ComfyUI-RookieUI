@@ -727,6 +727,22 @@ async function resolvePreviewUrlAsDataUrl(previewUrl) {
   return readBlobAsDataUrl(blob);
 }
 
+function extractComfyViewFilename(previewUrl) {
+  const raw = String(previewUrl ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  try {
+    const parsed = new URL(raw, globalThis?.window?.location?.origin ?? "http://127.0.0.1");
+    if (parsed.pathname !== "/view") {
+      return "";
+    }
+    return String(parsed.searchParams.get("filename") ?? "").trim();
+  } catch (_error) {
+    return "";
+  }
+}
+
 async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox = null) {
   let previewUrl = runtimeState?.previewUrl ?? "";
   if (!previewUrl && previewBox) {
@@ -752,6 +768,7 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
     }
     return;
   }
+  const fallbackAsset = extractComfyViewFilename(previewUrl);
   try {
     const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
     if (!imageDataUrl) {
@@ -762,12 +779,31 @@ async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, 
       mode: "img2img",
       image_asset: "",
       image_data: imageDataUrl,
+      mask_asset: "",
     });
     if (statusNode) {
       statusNode.textContent = "Sent preview image to Img2Img";
     }
   } catch (_error) {
-    emitFrontendDebugWarning("shell.preview_transfer", "Preview transfer failed; falling back to tab switch only.", _error);
+    emitFrontendDebugWarning(
+      "shell.preview_transfer",
+      "Preview transfer image decode failed; attempting asset-based fallback.",
+      _error,
+    );
+    if (fallbackAsset) {
+      // IMPORTANT: keep asset fallback for transfer flow so Send-to-Img2Img still works when preview blobs/data-url decoding fails.
+      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+      formRegistry.img2img.applyPayload({
+        mode: "img2img",
+        image_asset: fallbackAsset,
+        image_data: "",
+        mask_asset: "",
+      });
+      if (statusNode) {
+        statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
+      }
+      return;
+    }
     activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
   }
 }

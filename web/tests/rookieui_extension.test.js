@@ -761,6 +761,78 @@ describe("registerRookieUIBootstrapExtension", () => {
     ).toBe(true);
   });
 
+  test("falls back to image_asset transfer when preview decode fails", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    let extensionDefinition;
+    const app = {
+      registerExtension(definition) {
+        extensionDefinition = definition;
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-transfer-fallback",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    const fetchImpl = async (url) => {
+      if (typeof url === "string" && url.includes("/view?")) {
+        return {
+          ok: false,
+          status: 404,
+          async blob() {
+            return new Blob();
+          },
+        };
+      }
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        },
+      };
+    };
+
+    await registerRookieUIBootstrapExtension({
+      app,
+      windowRef: window,
+      documentRef: document,
+      fetchImpl,
+    });
+
+    expect(extensionDefinition.name).toBe("ComfyUI-RookieUI");
+    const txt2imgPreview = document.getElementById("rookieui-txt2img-preview");
+    txt2imgPreview.innerHTML =
+      '<img class="rookieui-shell__preview-image" src="/view?filename=fallback-image.png&subfolder=&type=output" alt="preview">';
+
+    document.getElementById("rookieui-txt2img-preview-img2img").click();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (document.getElementById("rookieui-pane-img2img").classList.contains("is-active")) {
+        break;
+      }
+    }
+
+    expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+    expect(document.getElementById("rookieui-image-asset").value).toBe("fallback-image.png");
+    expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("asset fallback");
+  });
+
   test("installs a legacy launcher when sidebar tabs are unavailable", async () => {
     const app = {
       registerExtension(definition) {
