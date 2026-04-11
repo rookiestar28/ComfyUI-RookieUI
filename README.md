@@ -16,6 +16,21 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/For
 - **PNG metadata round-trip and apply workflow**
 - **queue/progress/result UX that feels close to A1111 usage**
 
+<details><summary><h2>Last Update - Click to expand</h2></summary>
+
+<details>
+
+<summary><strong>Img2Img workflow expansion and interaction polish</strong></summary>
+
+- Added an embedded Img2Img in-app mask canvas with core controls: brush/eraser, size/opacity, undo/redo, clear/invert, zoom/pan/fit, and explicit `Apply Mask`.
+- Added advanced mask editing operations for inpaint usability: rectangle selection, selection fill/erase/invert, and bounded selection move controls.
+- Introduced a dedicated Img2Img mode router contract so visible mode switching and backend mode payload stay synchronized through one deterministic path.
+- Upgraded Img2Img mode UX to A1111-style second-level generation subtabs (`img2img`, `Sketch`, `Inpaint`, `Inpaint sketch`, `Inpaint upload`, `Batch`) while preserving existing backend compatibility.
+- Hardened high-risk UI paths with focused regression coverage and reran full backend/frontend validation gates after each stage.
+
+</details>
+</details>
+
 
 
 ## Architecture Snapshot
