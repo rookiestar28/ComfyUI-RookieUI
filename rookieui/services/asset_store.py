@@ -7,6 +7,8 @@ import io
 import logging
 import re
 import secrets
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,12 @@ _SUPPORTED_EXTENSIONS = {
     "webp": ".webp",
 }
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
+_RUNTIME_RETENTION_HOURS = 24
+_RUNTIME_MAX_FILES_PER_DIR = 500
+_RUNTIME_CLEANUP_INTERVAL_SECONDS = 60
+_cleanup_lock = threading.Lock()
+# IMPORTANT: throttle runtime cleanup scans; running on every asset operation causes avoidable I/O spikes.
+_last_cleanup_at = 0.0
 
 
 @dataclass(frozen=True)
@@ -41,6 +49,74 @@ class StoredAsset:
 def _ensure_runtime_dirs() -> None:
     _INPUT_ROOT.mkdir(parents=True, exist_ok=True)
     _OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    _run_runtime_cleanup()
+
+
+def _cleanup_directory(
+    root: Path,
+    *,
+    now_epoch: float,
+    max_age_seconds: float,
+    max_files: int,
+) -> None:
+    files: list[Path] = [entry for entry in root.iterdir() if entry.is_file()]
+    for path in files:
+        try:
+            age_seconds = now_epoch - path.stat().st_mtime
+            if age_seconds > max_age_seconds:
+                path.unlink(missing_ok=True)
+        except Exception:
+            _LOGGER.debug(
+                "RookieUI runtime cleanup skipped stale candidate '%s' due to access error.",
+                path,
+                exc_info=True,
+            )
+
+    remaining = sorted(
+        (entry for entry in root.iterdir() if entry.is_file()),
+        key=lambda entry: entry.stat().st_mtime,
+        reverse=True,
+    )
+    # IMPORTANT: enforce hard cap after age pruning so long-running sessions cannot grow unbounded on disk.
+    for overflow_path in remaining[max_files:]:
+        try:
+            overflow_path.unlink(missing_ok=True)
+        except Exception:
+            _LOGGER.debug(
+                "RookieUI runtime cleanup skipped overflow candidate '%s' due to access error.",
+                overflow_path,
+                exc_info=True,
+            )
+
+
+def _run_runtime_cleanup() -> None:
+    global _last_cleanup_at
+
+    now_epoch = time.time()
+    with _cleanup_lock:
+        if (now_epoch - _last_cleanup_at) < _RUNTIME_CLEANUP_INTERVAL_SECONDS:
+            return
+        _last_cleanup_at = now_epoch
+
+    max_age_seconds = float(_RUNTIME_RETENTION_HOURS) * 3600.0
+    _cleanup_directory(
+        _INPUT_ROOT,
+        now_epoch=now_epoch,
+        max_age_seconds=max_age_seconds,
+        max_files=_RUNTIME_MAX_FILES_PER_DIR,
+    )
+    _cleanup_directory(
+        _OUTPUT_ROOT,
+        now_epoch=now_epoch,
+        max_age_seconds=max_age_seconds,
+        max_files=_RUNTIME_MAX_FILES_PER_DIR,
+    )
+
+
+def _reset_runtime_cleanup_state_for_tests() -> None:
+    global _last_cleanup_at
+    with _cleanup_lock:
+        _last_cleanup_at = 0.0
 
 
 def decode_image_data(raw_value: object) -> tuple[bytes, str]:
