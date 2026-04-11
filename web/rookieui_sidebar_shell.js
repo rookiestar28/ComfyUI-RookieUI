@@ -1742,6 +1742,7 @@ function buildTxt2ImgSection(parent, bootstrapState, formRegistry) {
 
         const samplingSection = document.createElement("section");
         samplingSection.className = "rookieui-shell__section rookieui-shell__section--soft";
+        samplingSection.id = "rookieui-txt2img-generation-section";
         leftColumn.appendChild(samplingSection);
         appendTextElement(samplingSection, "h4", "rookieui-shell__section-title", "Generation");
 
@@ -1760,10 +1761,12 @@ function buildTxt2ImgSection(parent, bootstrapState, formRegistry) {
         createSeedControlField(samplingGrid, "Seed", elements.seed, elements.seedExtra, "rookieui-seed-field");
 
         const advancedGrid = createHiresFixSection(
-          leftColumn,
+          samplingSection,
           "rookieui-advanced-controls",
           elements.hiresEnabled,
         );
+        // IMPORTANT: keep Hires.fix border/checkbox chrome while integrating into Generation section.
+        advancedGrid.parentElement?.classList.add("rookieui-shell__hires--integrated");
         createSliderField(advancedGrid, "Hires Scale", elements.hiresScale, elements.hiresScaleSlider, "rookieui-hires-scale-field");
         createSliderField(advancedGrid, "Hires Steps", elements.hiresSteps, elements.hiresStepsSlider, "rookieui-hires-steps-field");
         createSliderField(advancedGrid, "Hires Denoise", elements.hiresDenoise, elements.hiresDenoiseSlider, "rookieui-hires-denoise-field");
@@ -2590,6 +2593,7 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
 
         const generationSection = document.createElement("section");
         generationSection.className = "rookieui-shell__section rookieui-shell__section--soft";
+        generationSection.id = "rookieui-img2img-generation-section";
         leftColumn.appendChild(generationSection);
         appendTextElement(generationSection, "h4", "rookieui-shell__section-title", "Generation");
 
@@ -2662,6 +2666,37 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           elements.seedExtra,
           "rookieui-img2img-seed-field",
         );
+
+        const hiresGrid = createHiresFixSection(
+          generationSection,
+          "rookieui-img2img-hires-controls",
+          elements.hiresEnabled,
+        );
+        // IMPORTANT: keep Hires.fix border/checkbox chrome while integrating into Generation section.
+        hiresGrid.parentElement?.classList.add("rookieui-shell__hires--integrated");
+        createSliderField(
+          hiresGrid,
+          "Hires Scale",
+          elements.hiresScale,
+          elements.hiresScaleSlider,
+          "rookieui-img2img-hires-scale-field",
+        );
+        createSliderField(
+          hiresGrid,
+          "Hires Steps",
+          elements.hiresSteps,
+          elements.hiresStepsSlider,
+          "rookieui-img2img-hires-steps-field",
+        );
+        createSliderField(
+          hiresGrid,
+          "Hires Denoise",
+          elements.hiresDenoise,
+          elements.hiresDenoiseSlider,
+          "rookieui-img2img-hires-denoise-field",
+        );
+        createField(hiresGrid, "Upscale Method", elements.hiresUpscaleMethod);
+
         createSliderField(
           generationGrid,
           "Mask Blur",
@@ -2722,34 +2757,6 @@ function buildImg2ImgSection(parent, bootstrapState, formRegistry) {
           elements.softInpaintingDifferenceContrastSlider,
           "rookieui-img2img-soft-diff-contrast-field",
         );
-
-        const hiresGrid = createHiresFixSection(
-          leftColumn,
-          "rookieui-img2img-hires-controls",
-          elements.hiresEnabled,
-        );
-        createSliderField(
-          hiresGrid,
-          "Hires Scale",
-          elements.hiresScale,
-          elements.hiresScaleSlider,
-          "rookieui-img2img-hires-scale-field",
-        );
-        createSliderField(
-          hiresGrid,
-          "Hires Steps",
-          elements.hiresSteps,
-          elements.hiresStepsSlider,
-          "rookieui-img2img-hires-steps-field",
-        );
-        createSliderField(
-          hiresGrid,
-          "Hires Denoise",
-          elements.hiresDenoise,
-          elements.hiresDenoiseSlider,
-          "rookieui-img2img-hires-denoise-field",
-        );
-        createField(hiresGrid, "Upscale Method", elements.hiresUpscaleMethod);
 
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";

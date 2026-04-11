@@ -668,6 +668,10 @@
   transform: rotate(90deg);
 }
 
+.rookieui-shell__hires--integrated {
+  margin-top: 12px;
+}
+
 .rookieui-shell__preview-box {
   min-height: 340px;
   border: 1px solid var(--rookieui-border);

@@ -562,9 +562,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-txt2img-preview-img2img").click();
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     document.getElementById("rookieui-tab-txt2img").click();
-    expect(document.getElementById("rookieui-advanced-controls").textContent).toContain("Hires. fix");
+    const txt2imgGenerationSection = document.getElementById("rookieui-txt2img-generation-section");
+    const txt2imgHiresControls = document.getElementById("rookieui-advanced-controls");
+    expect(txt2imgGenerationSection).not.toBeNull();
+    expect(txt2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-advanced-controls");
+    expect(txt2imgGenerationSection?.contains(txt2imgHiresControls)).toBe(true);
+    expect(txt2imgHiresControls).not.toBeNull();
+    expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
+    expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
+    expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
     expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).not.toBeNull();
-    expect(document.getElementById("rookieui-advanced-controls").textContent).not.toContain(
+    expect(txt2imgHiresControls?.textContent).not.toContain(
       "Second latent pass with bounded rookie-safe defaults.",
     );
     expect(document.getElementById("rookieui-txt2img-workspace-tab-textual-inversion")).not.toBeNull();
@@ -625,7 +633,15 @@ describe("registerRookieUIBootstrapExtension", () => {
     // IMPORTANT: regression guard — mask upload must remain clickable in Img2Img mode so users can preload masks before switching to inpaint.
     expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
-    expect(document.getElementById("rookieui-img2img-hires-controls")).not.toBeNull();
+    const img2imgGenerationSection = document.getElementById("rookieui-img2img-generation-section");
+    const img2imgHiresControls = document.getElementById("rookieui-img2img-hires-controls");
+    expect(img2imgGenerationSection).not.toBeNull();
+    expect(img2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-img2img-hires-controls");
+    expect(img2imgGenerationSection?.contains(img2imgHiresControls)).toBe(true);
+    expect(img2imgHiresControls).not.toBeNull();
+    expect(img2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
+    expect(img2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
+    expect(document.querySelector("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor-tool-select")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-generation-mode-tabs")).not.toBeNull();

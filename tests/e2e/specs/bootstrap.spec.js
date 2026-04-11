@@ -201,6 +201,9 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
 
   await page.locator("#rookieui-tab-txt2img").click();
   await page.locator("#rookieui-preset").selectOption("sd15");
+  await expect(page.locator("#rookieui-txt2img-generation-section #rookieui-advanced-controls")).toHaveCount(1);
+  await expect(page.locator("#rookieui-advanced-controls")).toHaveClass(/rookieui-shell__section/);
+  await expect(page.locator("#rookieui-advanced-controls")).toHaveClass(/rookieui-shell__hires--integrated/);
   await expect(page.locator("#rookieui-advanced-controls")).toContainText("Hires. fix");
   await expect(page.locator("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).toBeVisible();
   await expect(page.locator("#rookieui-advanced-controls .rookieui-shell__hires-caret")).toHaveCSS("font-size", "30px");
@@ -264,6 +267,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-img2img-mode").selectOption("inpaint");
   await page.locator("#rookieui-image-asset").fill("e2e-source-image");
   await page.locator("#rookieui-mask-asset").fill("e2e-mask-image");
+  await expect(page.locator("#rookieui-img2img-generation-section #rookieui-img2img-hires-controls")).toHaveCount(1);
+  await expect(page.locator("#rookieui-img2img-hires-controls")).toHaveClass(/rookieui-shell__section/);
+  await expect(page.locator("#rookieui-img2img-hires-controls")).toHaveClass(/rookieui-shell__hires--integrated/);
+  await expect(page.locator("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).toBeVisible();
   await page.locator("#rookieui-img2img-cfg-scale").fill("6.5");
   await page.locator("#rookieui-denoise-strength").fill("0.65");
   await page.locator("#rookieui-img2img-hires-enabled").check();
