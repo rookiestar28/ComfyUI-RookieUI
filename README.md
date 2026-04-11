@@ -15,8 +15,51 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/For
 - **img2img and extras postprocessing flows**
 - **PNG metadata round-trip and apply workflow**
 - **queue/progress/result UX that feels close to A1111 usage**
+<br>
+<br>
+
+The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. That being said, RookieUI's support extends far beyond just the SD models.
+
+## Table of Contents
+
+- [Last Update](#last-update---click-to-expand)
+- [Architecture Snapshot](#architecture-snapshot)
+- [Feature Overview](#feature-overview)
+- [New Feature Notes](#new-feature-notes)
+- [Installation](#installation)
+- [License](#license)
 
 <details><summary><h2>Last Update - Click to expand</h2></summary>
+
+<details>
+
+<summary><strong>Prompt semantics parity (new functionality)</strong></summary>
+
+- Added structured prompt-semantic parsing for `AND`, `BREAK`, scheduling slices, and attention markers.
+- Added conditioning-plan compilation so parsed prompt semantics map into ComfyUI conditioning graph composition for txt2img and img2img flows.
+- Preserved deterministic inline LoRA extraction/merge behavior while expanding prompt semantics support.
+
+</details>
+
+<details>
+
+<summary><strong>Parity guardrails and rollout safety (stability)</strong></summary>
+
+- Added stable warning-code diagnostics for prompt parsing/compilation paths.
+- Added a bounded legacy fallback switch so prompt-semantics rollout can be reverted safely in runtime variance scenarios.
+- Expanded regression checks around parser/compiler integration and fallback behavior.
+
+</details>
+
+<details>
+
+<summary><strong>Img2Img source/mask handoff hardening (bugfix)</strong></summary>
+
+- Fixed a mask-canvas placeholder false-positive where `No source image` could appear after a valid txt2img `Send to Img2Img` handoff.
+- Hardened source-binding visibility contract for mask-canvas preview so source image state and placeholder state remain consistent.
+- Added regression coverage for source-image/mask bridge behavior in send-to-img2img flow.
+
+</details>
 
 <details>
 
@@ -106,6 +149,19 @@ ComfyUI process (single runtime)
 - Klein family
 - Lumina family
 - Anima family
+
+## New Feature Notes
+
+### A1111-style Prompt Semantics
+
+- RookieUI now supports structured prompt semantics for `AND`, `BREAK`, scheduling slices, and attention markers.
+- Parsed semantics are compiled into ComfyUI conditioning composition for both txt2img and img2img translation paths.
+- Prompt-semantics rollout includes stable diagnostics and a reversible legacy fallback switch for safer production operation.
+
+### Img2Img Source and Mask Bridge Integrity
+
+- The source/mask bridge contract in Img2Img has been tightened for send-to-img2img handoff consistency.
+- Mask-canvas placeholder visibility now follows source-binding state correctly, preventing false `No source image` overlays after successful transfer.
 
 ## Installation
 
