@@ -18,6 +18,11 @@ import {
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
 } from "./rookieui_sidebar_shell_utils.js?v=20260411-r46-utils";
+import { createTxt2ImgTabDefinition } from "./sidebar_tabs/rookieui_txt2img_tab.js?v=20260411-r47-tabs";
+import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.js?v=20260411-r47-tabs";
+import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
+import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
+import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -4134,34 +4139,16 @@ export function renderRookieUISidebar(container, bootstrapState) {
   const formRegistry = {};
   const shellTabs = {};
   formRegistry.__shellTabs = shellTabs;
+  const tabDefinitions = [
+    createTxt2ImgTabDefinition(buildTxt2ImgSection, bootstrapState, formRegistry),
+    createImg2ImgTabDefinition(buildImg2ImgSection, bootstrapState, formRegistry),
+    createExtrasTabDefinition(buildExtrasSection, bootstrapState, formRegistry),
+    createPngInfoTabDefinition(buildPngInfoSection, bootstrapState, formRegistry),
+    createQueueTabDefinition(buildQueueSection, bootstrapState, formRegistry),
+  ];
 
   buildShellHeader(container, bootstrapState);
-  buildTabbedShell(container, [
-    {
-      id: "txt2img",
-      label: "Txt2Img",
-      render: (pane) => buildTxt2ImgSection(pane, bootstrapState, formRegistry),
-    },
-    {
-      id: "img2img",
-      label: "Img2Img",
-      render: (pane) => buildImg2ImgSection(pane, bootstrapState, formRegistry),
-    },
-    {
-      id: "extras",
-      label: "Extras",
-      render: (pane) => buildExtrasSection(pane, bootstrapState, formRegistry),
-    },
-    {
-      id: "pnginfo",
-      label: "PNG Info",
-      render: (pane) => buildPngInfoSection(pane, bootstrapState, formRegistry),
-    },
-    {
-      id: "queue",
-      label: "Queue",
-      render: (pane) => buildQueueSection(pane, bootstrapState, formRegistry),
-    },
-  ], shellTabs);
+  // IMPORTANT: keep tab wiring in per-tab modules so pane ownership is explicit and future tab-level refactors do not reopen a single giant definition block.
+  buildTabbedShell(container, tabDefinitions, shellTabs);
   buildShellFooter(container, bootstrapState);
 }
