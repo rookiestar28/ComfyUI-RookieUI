@@ -1027,7 +1027,8 @@ function isImg2ImgBatchMode(modeValue) {
 function syncMaskField(modeInput, maskField, inpaintControls = [], options = {}) {
   const inpaintEnabled = resolveImg2ImgExecutionMode(modeInput.value) === "inpaint";
   const batchMode = isImg2ImgBatchMode(modeInput.value);
-  maskField.disabled = !inpaintEnabled;
+  // IMPORTANT: keep mask asset input/upload interactive in every Img2Img mode; users often preload masks before switching to an inpaint execution mode.
+  maskField.disabled = false;
   maskField.placeholder = inpaintEnabled ? "required for inpaint" : "optional";
   inpaintControls.forEach((control) => {
     if (!control) {
@@ -1036,10 +1037,10 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
     control.disabled = !inpaintEnabled;
   });
   if (options.maskDropzone) {
-    options.maskDropzone.hidden = !inpaintEnabled;
+    options.maskDropzone.hidden = false;
   }
   if (options.maskFileInput) {
-    options.maskFileInput.disabled = !inpaintEnabled;
+    options.maskFileInput.disabled = false;
   }
   if (options.batchPane) {
     options.batchPane.hidden = !batchMode;
@@ -1059,7 +1060,7 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
       options.modeHintNode.textContent = "Inpaint family mode: source image plus mask are required.";
       return;
     }
-    options.modeHintNode.textContent = "Img2Img/Sketch mode: source image required; mask optional.";
+    options.modeHintNode.textContent = "Img2Img/Sketch mode: source image required; mask optional (used when switching to inpaint).";
   }
 }
 

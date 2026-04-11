@@ -622,6 +622,9 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     expect(document.getElementById("rookieui-pane-txt2img").hidden).toBe(true);
     expect(document.getElementById("rookieui-pane-img2img").hidden).toBe(false);
+    // IMPORTANT: regression guard — mask upload must remain clickable in Img2Img mode so users can preload masks before switching to inpaint.
+    expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(false);
+    expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     expect(document.getElementById("rookieui-img2img-hires-controls")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     for (const matrixRow of presetClipSkipMatrix) {
