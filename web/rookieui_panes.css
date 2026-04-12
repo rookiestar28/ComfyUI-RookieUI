@@ -229,6 +229,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
   padding: 5px;
   border: 1px solid var(--rookieui-border);
   border-radius: 4px;
@@ -633,6 +635,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
   padding: 5px;
   border: 1px solid var(--rookieui-border);
   border-radius: 4px;
@@ -673,18 +677,54 @@
 
 .rookieui-shell__canvas-brush-layer {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
   z-index: 2;
-  width: 100%;
-  height: 100%;
   touch-action: none;
+}
+
+.rookieui-shell__canvas-brush-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  border: 1px solid color-mix(in srgb, var(--rookieui-accent) 72%, #ffffff);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rookieui-accent) 18%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--rookieui-bg-shell) 84%, transparent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.rookieui-shell__canvas-brush-indicator-cross {
+  position: absolute;
+  background: color-mix(in srgb, var(--rookieui-text-inverse) 84%, transparent);
+  opacity: 0.85;
+}
+
+.rookieui-shell__canvas-brush-indicator-cross--horizontal {
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  transform: translate(-50%, -50%);
+}
+
+.rookieui-shell__canvas-brush-indicator-cross--vertical {
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 10px;
+  transform: translate(-50%, -50%);
 }
 
 .rookieui-shell__canvas-brush-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(128px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  width: min(560px, calc(100vw - 88px));
+  width: min(100%, 560px);
+  max-width: 100%;
+  min-width: 0;
   flex: 1 1 100%;
 }
 

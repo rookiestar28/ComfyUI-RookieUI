@@ -154,6 +154,7 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-width")?.value).toBe("25");
     expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-opacity")?.value).toBe("100");
     expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-softness")?.value).toBe("0");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-indicator")).not.toBeNull();
     expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-width")?.disabled).toBe(true);
 
     const weightField = host.querySelector("#rookieui-txt2img-controlnet-weight-field-0");

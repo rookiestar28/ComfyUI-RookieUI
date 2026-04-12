@@ -1,6 +1,7 @@
 const DEFAULT_BRUSH_WIDTH = 25;
 const DEFAULT_BRUSH_OPACITY = 100;
 const DEFAULT_BRUSH_SOFTNESS = 0;
+const MIN_INDICATOR_PIXELS = 8;
 
 function clamp(value, min, max) {
   const numeric = Number(value);
@@ -45,29 +46,46 @@ function createBrushControl({ host, id, labelText, min, max, step, defaultValue 
   };
 }
 
-function mapPointerToCanvas(event, stage, canvas) {
+function resolveCanvasRenderBox(stage, canvas) {
   const stageRect = stage.getBoundingClientRect();
   const canvasWidth = Number(canvas.width || 0);
   const canvasHeight = Number(canvas.height || 0);
   if (!stageRect.width || !stageRect.height || !canvasWidth || !canvasHeight) {
     return null;
   }
-
   const renderScale = Math.min(stageRect.width / canvasWidth, stageRect.height / canvasHeight);
   const renderWidth = canvasWidth * renderScale;
   const renderHeight = canvasHeight * renderScale;
   const offsetX = (stageRect.width - renderWidth) / 2;
   const offsetY = (stageRect.height - renderHeight) / 2;
+  return {
+    stageRect,
+    renderScale,
+    renderWidth,
+    renderHeight,
+    offsetX,
+    offsetY,
+  };
+}
 
-  const localX = event.clientX - stageRect.left;
-  const localY = event.clientY - stageRect.top;
-  if (localX < offsetX || localX > offsetX + renderWidth || localY < offsetY || localY > offsetY + renderHeight) {
+function mapPointerToCanvas(event, stage, canvas) {
+  const renderBox = resolveCanvasRenderBox(stage, canvas);
+  if (!renderBox) {
     return null;
   }
-
+  const localX = event.clientX - renderBox.stageRect.left;
+  const localY = event.clientY - renderBox.stageRect.top;
+  if (
+    localX < renderBox.offsetX ||
+    localX > renderBox.offsetX + renderBox.renderWidth ||
+    localY < renderBox.offsetY ||
+    localY > renderBox.offsetY + renderBox.renderHeight
+  ) {
+    return null;
+  }
   return {
-    x: (localX - offsetX) / renderScale,
-    y: (localY - offsetY) / renderScale,
+    x: (localX - renderBox.offsetX) / renderBox.renderScale,
+    y: (localY - renderBox.offsetY) / renderBox.renderScale,
   };
 }
 
@@ -123,6 +141,18 @@ export function createSourceCanvasBrushController({
   stage.appendChild(canvas);
   const context = getCanvas2dContext(canvas);
 
+  const brushIndicator = document.createElement("div");
+  brushIndicator.className = "rookieui-shell__canvas-brush-indicator";
+  brushIndicator.id = `${idPrefix}-brush-indicator`;
+  brushIndicator.hidden = true;
+  const indicatorCrossHorizontal = document.createElement("span");
+  indicatorCrossHorizontal.className = "rookieui-shell__canvas-brush-indicator-cross rookieui-shell__canvas-brush-indicator-cross--horizontal";
+  brushIndicator.appendChild(indicatorCrossHorizontal);
+  const indicatorCrossVertical = document.createElement("span");
+  indicatorCrossVertical.className = "rookieui-shell__canvas-brush-indicator-cross rookieui-shell__canvas-brush-indicator-cross--vertical";
+  brushIndicator.appendChild(indicatorCrossVertical);
+  stage.appendChild(brushIndicator);
+
   const brushToggleButton = document.createElement("button");
   brushToggleButton.type = "button";
   brushToggleButton.id = `${idPrefix}-brush-toggle`;
@@ -177,15 +207,82 @@ export function createSourceCanvasBrushController({
     lastPoint: null,
     dirty: false,
     sourceToken: 0,
+    lastPointerClientX: null,
+    lastPointerClientY: null,
+  };
+
+  const hideBrushIndicator = () => {
+    brushIndicator.hidden = true;
+  };
+
+  const syncCanvasViewport = () => {
+    const renderBox = resolveCanvasRenderBox(stage, canvas);
+    if (!renderBox) {
+      canvas.style.left = "0px";
+      canvas.style.top = "0px";
+      canvas.style.width = "0px";
+      canvas.style.height = "0px";
+      hideBrushIndicator();
+      return null;
+    }
+    // IMPORTANT: keep brush-layer viewport anchored to the same contain-fitted geometry as the preview image to avoid aspect-ratio stretching and pointer drift.
+    canvas.style.left = `${renderBox.offsetX}px`;
+    canvas.style.top = `${renderBox.offsetY}px`;
+    canvas.style.width = `${renderBox.renderWidth}px`;
+    canvas.style.height = `${renderBox.renderHeight}px`;
+    return renderBox;
+  };
+
+  const syncBrushIndicatorAtClientPoint = (clientX, clientY) => {
+    if (!state.enabled || !state.hasSource) {
+      hideBrushIndicator();
+      return;
+    }
+    const renderBox = resolveCanvasRenderBox(stage, canvas);
+    if (!renderBox) {
+      hideBrushIndicator();
+      return;
+    }
+    const localX = clientX - renderBox.stageRect.left;
+    const localY = clientY - renderBox.stageRect.top;
+    const withinBounds =
+      localX >= renderBox.offsetX &&
+      localX <= renderBox.offsetX + renderBox.renderWidth &&
+      localY >= renderBox.offsetY &&
+      localY <= renderBox.offsetY + renderBox.renderHeight;
+    if (!withinBounds) {
+      hideBrushIndicator();
+      return;
+    }
+
+    const brushDiameter = Math.max(MIN_INDICATOR_PIXELS, clamp(widthControl.slider.value, 1, 128) * renderBox.renderScale);
+    brushIndicator.style.left = `${localX}px`;
+    brushIndicator.style.top = `${localY}px`;
+    brushIndicator.style.width = `${brushDiameter}px`;
+    brushIndicator.style.height = `${brushDiameter}px`;
+    brushIndicator.hidden = false;
+  };
+
+  const syncBrushIndicatorFromStoredPointer = () => {
+    if (!Number.isFinite(state.lastPointerClientX) || !Number.isFinite(state.lastPointerClientY)) {
+      return;
+    }
+    syncBrushIndicatorAtClientPoint(state.lastPointerClientX, state.lastPointerClientY);
   };
 
   const syncEnabledVisual = () => {
     brushToggleButton.dataset.active = state.enabled ? "true" : "false";
     brushToggleButton.classList.toggle("is-active", state.enabled);
     canvas.style.pointerEvents = state.enabled ? "auto" : "none";
+    canvas.style.cursor = state.enabled ? "none" : "default";
     widthControl.setDisabled(!state.hasSource);
     opacityControl.setDisabled(!state.hasSource);
     softnessControl.setDisabled(!state.hasSource);
+    if (!state.enabled || !state.hasSource) {
+      hideBrushIndicator();
+      return;
+    }
+    syncBrushIndicatorFromStoredPointer();
   };
 
   const setEnabled = (nextEnabled) => {
@@ -253,6 +350,9 @@ export function createSourceCanvasBrushController({
     if (!point) {
       return;
     }
+    state.lastPointerClientX = event.clientX;
+    state.lastPointerClientY = event.clientY;
+    syncBrushIndicatorAtClientPoint(event.clientX, event.clientY);
     state.drawing = true;
     state.dirty = false;
     state.lastPoint = point;
@@ -261,6 +361,9 @@ export function createSourceCanvasBrushController({
   });
 
   canvas.addEventListener("pointermove", (event) => {
+    state.lastPointerClientX = event.clientX;
+    state.lastPointerClientY = event.clientY;
+    syncBrushIndicatorAtClientPoint(event.clientX, event.clientY);
     if (!state.drawing || !state.enabled || !state.lastPoint) {
       return;
     }
@@ -274,13 +377,31 @@ export function createSourceCanvasBrushController({
     event.preventDefault();
   });
 
+  canvas.addEventListener("pointerenter", (event) => {
+    state.lastPointerClientX = event.clientX;
+    state.lastPointerClientY = event.clientY;
+    syncBrushIndicatorAtClientPoint(event.clientX, event.clientY);
+  });
+
+  canvas.addEventListener("pointerleave", async (event) => {
+    hideBrushIndicator();
+    await stopDrawing(event);
+  });
   canvas.addEventListener("pointerup", stopDrawing);
   canvas.addEventListener("pointercancel", stopDrawing);
-  canvas.addEventListener("pointerleave", stopDrawing);
 
   brushToggleButton.addEventListener("click", () => {
     setEnabled(!state.enabled);
   });
+  widthControl.slider.addEventListener("input", syncBrushIndicatorFromStoredPointer);
+
+  if (typeof globalThis.ResizeObserver === "function") {
+    const resizeObserver = new globalThis.ResizeObserver(() => {
+      syncCanvasViewport();
+      syncBrushIndicatorFromStoredPointer();
+    });
+    resizeObserver.observe(stage);
+  }
 
   syncEnabledVisual();
 
@@ -293,7 +414,10 @@ export function createSourceCanvasBrushController({
       state.hasSource = false;
       state.drawing = false;
       state.lastPoint = null;
+      state.lastPointerClientX = null;
+      state.lastPointerClientY = null;
       canvas.hidden = true;
+      hideBrushIndicator();
       if (context) {
         context.clearRect(0, 0, canvas.width, canvas.height);
       }
@@ -312,11 +436,14 @@ export function createSourceCanvasBrushController({
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       canvas.hidden = false;
       state.hasSource = true;
+      syncCanvasViewport();
       // IMPORTANT: source-present surfaces must default to brush-ready interaction mode instead of upload-click mode.
       setEnabled(true);
+      syncBrushIndicatorFromStoredPointer();
     } catch (_error) {
       state.hasSource = false;
       canvas.hidden = true;
+      hideBrushIndicator();
       setEnabled(false);
       if (typeof onStatusMessage === "function") {
         onStatusMessage("Unable to initialize source brush canvas.");
