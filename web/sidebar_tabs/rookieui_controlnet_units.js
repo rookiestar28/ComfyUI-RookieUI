@@ -54,6 +54,8 @@ const RESIZE_MODE_OPTIONS = [
 
 const FILE_SELECTION_PLACEHOLDER = "No file selected";
 const FILE_PAYLOAD_PLACEHOLDER = "Loaded from payload";
+const PREVIEW_UPLOAD_ICON = "⤴";
+const RUN_PREPROCESSOR_ICON = "💥";
 
 function toObjectArray(rawValue) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
@@ -237,7 +239,7 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement }) {
   placeholder.className = "rookieui-shell__controlnet-preview-placeholder";
   const icon = document.createElement("span");
   icon.className = "rookieui-shell__controlnet-preview-placeholder-icon";
-  icon.textContent = "⤴";
+  icon.textContent = PREVIEW_UPLOAD_ICON;
   placeholder.appendChild(icon);
   const text = appendTextElement(
     placeholder,
@@ -274,6 +276,21 @@ function setControlNetPreview(previewState, { imageData = "", imageAsset = "", f
   } else {
     previewState.placeholderText.textContent = fallbackText;
   }
+}
+
+function hasIndependentControlImageData(row) {
+  return Boolean(String(row?.imageData?.value ?? "").trim());
+}
+
+function syncRunPreprocessorVisibility(row, isImg2ImgEditor) {
+  if (!row?.runPreprocessorButton) {
+    return;
+  }
+  const shouldShow = !isImg2ImgEditor || hasIndependentControlImageData(row);
+  row.runPreprocessorButton.hidden = !shouldShow;
+  row.runPreprocessorButton.style.display = shouldShow ? "" : "none";
+  // CRITICAL: img2img must hide Run Preprocessor until an independent control image is present.
+  row.runPreprocessorButton.disabled = !shouldShow;
 }
 
 function buildFallbackControlTypeCatalog(controlTypeOptions) {
@@ -568,6 +585,7 @@ export function createControlNetUnitEditor({
   unitCount = DEFAULT_UNIT_COUNT,
   controlTypeOrder = DEFAULT_CONTROL_TYPE_OPTIONS,
 }) {
+  const isImg2ImgEditor = String(idPrefix ?? "").startsWith("rookieui-img2img-controlnet");
   const integratedDetails = document.createElement("details");
   integratedDetails.className =
     "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires rookieui-shell__controlnet-integrated";
@@ -830,6 +848,7 @@ export function createControlNetUnitEditor({
       row.imageAsset.value = "";
       row.imageUploadName.value = FILE_PAYLOAD_PLACEHOLDER;
       setControlNetPreview(row.preview, { imageData: outputImage });
+      syncRunPreprocessorVisibility(row, isImg2ImgEditor);
       syncHiddenField();
 
       const warningText = Array.isArray(data?.warnings) && data.warnings.length > 0 ? ` (${data.warnings[0]})` : "";
@@ -841,7 +860,7 @@ export function createControlNetUnitEditor({
         onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor request failed.`);
       }
     } finally {
-      row.runPreprocessorButton.disabled = false;
+      syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }
   };
 
@@ -948,7 +967,7 @@ export function createControlNetUnitEditor({
     runPreprocessorButton.setAttribute("aria-label", "Run Preprocessor");
     const runIcon = document.createElement("span");
     runIcon.className = "rookieui-shell__mini-action-icon";
-    runIcon.textContent = "⤴";
+    runIcon.textContent = RUN_PREPROCESSOR_ICON;
     runPreprocessorButton.appendChild(runIcon);
     runPreprocessorRow.appendChild(runPreprocessorButton);
 
@@ -1202,6 +1221,7 @@ export function createControlNetUnitEditor({
       fileNameField: imageUploadControl.fileNameInput,
       onFileLoaded: (imageDataUrl) => {
         setControlNetPreview(preview, { imageData: imageDataUrl, imageAsset: "" });
+        syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
       },
     });
 
@@ -1214,17 +1234,22 @@ export function createControlNetUnitEditor({
 
     imageAsset.addEventListener("input", () => {
       if (imageData.value.trim()) {
+        syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
         return;
       }
       setControlNetPreview(preview, { imageData: "", imageAsset: imageAsset.value });
+      syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
     });
     imageData.addEventListener("input", () => {
       setControlNetPreview(preview, { imageData: imageData.value, imageAsset: imageAsset.value });
+      syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
     });
 
     runPreprocessorButton.addEventListener("click", () => {
       runPreprocessorForRow(rowElements, index);
     });
+
+    syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
 
     tab.addEventListener("click", () => {
       activateTab(index);
@@ -1271,6 +1296,7 @@ export function createControlNetUnitEditor({
       row.imageUploadName.value = unit.image_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
       row.maskUploadName.value = unit.mask_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
       setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
+      syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }
     syncHiddenField();
   };

@@ -271,6 +271,13 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-lora-strength-model").fill("0.9");
   await page.locator("#rookieui-lora-strength-clip").fill("0.7");
   await page.locator("#rookieui-txt2img-workspace-tab-generation").click();
+  await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toBeVisible();
+  await expect(
+    page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
+  ).toHaveText("💥");
+  await expect(
+    page.locator("#rookieui-txt2img-controlnet-preview-stage-0 .rookieui-shell__controlnet-preview-placeholder-icon"),
+  ).toHaveText("⤴");
   await page.locator("#rookieui-cfg-scale").fill("7.25");
   await page.locator("#rookieui-hires-enabled").check();
   await page.locator("#rookieui-hires-scale").fill("1.8");
@@ -303,6 +310,21 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-img2img-workspace-tab-lora").click();
   await page.locator("#rookieui-img2img-lora-item-0").click();
   await page.locator("#rookieui-img2img-workspace-tab-generation").click();
+  const img2imgRunPreprocessorButton = page.locator("#rookieui-img2img-controlnet-run-preprocessor-0");
+  await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await expect(
+    page.locator("#rookieui-img2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
+  ).toHaveText("💥");
+  await page.locator("#rookieui-img2img-controlnet-image-data-0").evaluate((input) => {
+    input.value = "data:image/png;base64,aW1hZ2UtY29udHJvbA==";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(img2imgRunPreprocessorButton).toBeVisible();
+  await page.locator("#rookieui-img2img-controlnet-image-data-0").evaluate((input) => {
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(img2imgRunPreprocessorButton).toBeHidden();
   const img2imgModes = await page.locator("#rookieui-img2img-mode option").evaluateAll((options) =>
     options.map((option) => option.value),
   );

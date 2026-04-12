@@ -901,7 +901,15 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-controlnet-guidance-start-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-guidance-end-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-timestep-range-field-0")).not.toBeNull();
-    expect(document.getElementById("rookieui-txt2img-controlnet-run-preprocessor-0")).not.toBeNull();
+    const txt2imgRunPreprocessorButton = document.getElementById("rookieui-txt2img-controlnet-run-preprocessor-0");
+    expect(txt2imgRunPreprocessorButton).not.toBeNull();
+    expect(txt2imgRunPreprocessorButton?.hidden).toBe(false);
+    expect(txt2imgRunPreprocessorButton?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("💥");
+    expect(
+      document
+        .querySelector("#rookieui-txt2img-controlnet-preview-stage-0 .rookieui-shell__controlnet-preview-placeholder-icon")
+        ?.textContent,
+    ).toBe("⤴");
     expect(document.getElementById("rookieui-txt2img-controlnet-control-mode-segmented-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-resize-mode-segmented-0")).not.toBeNull();
     expect(
@@ -1051,7 +1059,10 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-start-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-end-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-timestep-range-field-0")).not.toBeNull();
-    expect(document.getElementById("rookieui-img2img-controlnet-run-preprocessor-0")).not.toBeNull();
+    const img2imgRunPreprocessorButton = document.getElementById("rookieui-img2img-controlnet-run-preprocessor-0");
+    expect(img2imgRunPreprocessorButton).not.toBeNull();
+    expect(img2imgRunPreprocessorButton?.hidden).toBe(true);
+    expect(img2imgRunPreprocessorButton?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("💥");
     expect(document.getElementById("rookieui-img2img-controlnet-control-mode-segmented-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-resize-mode-segmented-0")).not.toBeNull();
     expect(
@@ -1065,6 +1076,13 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-mask-editor")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mask-editor-tool-select")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-generation-mode-tabs")).not.toBeNull();
+    const img2imgControlImageData = document.getElementById("rookieui-img2img-controlnet-image-data-0");
+    img2imgControlImageData.value = "data:image/png;base64,aW1hZ2UtbWF0cml4";
+    img2imgControlImageData.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(img2imgRunPreprocessorButton?.hidden).toBe(false);
+    img2imgControlImageData.value = "";
+    img2imgControlImageData.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(img2imgRunPreprocessorButton?.hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-text-encoder").hidden).toBe(true);
     for (const matrixRow of presetClipSkipMatrix) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
