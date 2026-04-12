@@ -133,6 +133,7 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     const runButton = host.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0");
     expect(runButton).not.toBeNull();
     expect(runButton?.hidden).toBe(false);
+    expect(runButton?.getAttribute("title")).toBe("Run Preprocessor");
     expect(runButton?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("💥");
 
     const placeholderIcon = host.querySelector(
@@ -225,14 +226,17 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
     const allowPreview = host.querySelector("#rookieui-img2img-controlnet-allow-preview-0");
     const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    const dualPane = host.querySelector("#rookieui-img2img-controlnet-preview-dual-pane-0");
     const generatedLane = host.querySelector("#rookieui-img2img-controlnet-preview-generated-lane-0");
     const generatedImage = host.querySelector("#rookieui-img2img-controlnet-preview-generated-image-0");
     expect(imageData).not.toBeNull();
     expect(moduleSelect).not.toBeNull();
     expect(allowPreview).not.toBeNull();
     expect(runButton).not.toBeNull();
+    expect(dualPane).not.toBeNull();
     expect(generatedLane).not.toBeNull();
     expect(generatedImage).not.toBeNull();
+    expect(dualPane?.dataset.generatedVisible).toBe("false");
 
     const originalFetch = globalThis.fetch;
     try {
@@ -258,11 +262,13 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       allowPreview.checked = true;
       allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
       expect(generatedLane.hidden).toBe(false);
+      expect(dualPane?.dataset.generatedVisible).toBe("true");
       expect(generatedImage.src).toContain("data:image/png;base64,cHJldmlldy1pbWFnZQ==");
 
       allowPreview.checked = false;
       allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
       expect(generatedLane.hidden).toBe(true);
+      expect(dualPane?.dataset.generatedVisible).toBe("false");
     } finally {
       globalThis.fetch = originalFetch;
     }

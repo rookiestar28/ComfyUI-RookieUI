@@ -358,8 +358,16 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement, crea
   );
   generatedLane.appendChild(generatedPlaceholder);
 
+  const dualPane = document.createElement("div");
+  dualPane.className = "rookieui-shell__controlnet-preview-dual-pane";
+  dualPane.id = `${idPrefix}-preview-dual-pane-${index}`;
+  dualPane.dataset.generatedVisible = "false";
+  dualPane.appendChild(stage);
+  dualPane.appendChild(generatedLane);
+
   return {
     unitIndex: index,
+    dualPane,
     stage,
     generatedLane,
     generatedImage,
@@ -421,6 +429,9 @@ function setControlNetGeneratedPreview(previewState, { imageData = "", visible =
   const normalizedImage = String(imageData ?? "").trim();
   const hasGeneratedImage = normalizedImage.startsWith("data:image/");
   const shouldShow = Boolean(visible) && hasGeneratedImage;
+  if (previewState.dualPane) {
+    previewState.dualPane.dataset.generatedVisible = shouldShow ? "true" : "false";
+  }
   previewState.generatedLane.hidden = !shouldShow;
   if (shouldShow) {
     previewState.generatedImage.src = normalizedImage;
@@ -1073,8 +1084,7 @@ export function createControlNetUnitEditor({
     unitPanels.push(panel);
 
     const preview = createControlNetPreviewStage({ idPrefix, index, appendTextElement, createInput });
-    panel.appendChild(preview.stage);
-    panel.appendChild(preview.generatedLane);
+    panel.appendChild(preview.dualPane);
 
     const primaryGrid = document.createElement("div");
     primaryGrid.className = "rookieui-shell__controlnet-toggle-grid";
@@ -1127,6 +1137,7 @@ export function createControlNetUnitEditor({
     runPreprocessorButton.className =
       "rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-neutral rookieui-shell__controlnet-run-preprocessor";
     runPreprocessorButton.setAttribute("aria-label", "Run Preprocessor");
+    runPreprocessorButton.title = "Run Preprocessor";
     const runIcon = document.createElement("span");
     runIcon.className = "rookieui-shell__mini-action-icon";
     runIcon.textContent = RUN_PREPROCESSOR_ICON;

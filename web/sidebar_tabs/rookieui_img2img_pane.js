@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-r83-preview-contract";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f86-dual-preview";
 import {
   CANVAS_ACTIONS,
   canCanvasStageOpenUpload,
