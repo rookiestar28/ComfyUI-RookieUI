@@ -1,5 +1,9 @@
 import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-controlnet-ui-parity-pass2";
-import { hasCanvasSourceImage } from "./rookieui_canvas_surface_contract.js";
+import {
+  CANVAS_ACTIONS,
+  hasCanvasSourceImage,
+  requestCanvasFullscreen,
+} from "./rookieui_canvas_surface_contract.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -119,6 +123,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     maskEditor: null,
     modeButtons: new Map(),
   };
+  let refreshSourceCanvasSurface = null;
   let img2imgControlNetEditor = null;
 
   const elements = {
@@ -858,17 +863,100 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         uploadGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         assetSection.appendChild(uploadGrid);
 
-        const imageDropzone = document.createElement("label");
-        imageDropzone.className = "rookieui-shell__dropzone";
-        imageDropzone.id = "rookieui-img2img-image-dropzone";
-        uploadGrid.appendChild(imageDropzone);
-        appendTextElement(imageDropzone, "span", "rookieui-shell__dropzone-icon", "⇪");
-        appendTextElement(imageDropzone, "span", "rookieui-shell__dropzone-text", "Upload Img2Img source image");
+        const imageCanvasSurface = document.createElement("section");
+        imageCanvasSurface.className = "rookieui-shell__canvas-upload-surface";
+        imageCanvasSurface.id = "rookieui-img2img-image-dropzone";
+        uploadGrid.appendChild(imageCanvasSurface);
+
+        const imageCanvasToolbar = document.createElement("div");
+        imageCanvasToolbar.className = "rookieui-shell__canvas-upload-toolbar";
+        imageCanvasSurface.appendChild(imageCanvasToolbar);
+
+        const createCanvasActionButton = (id, action, icon, label) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.id = id;
+          button.className =
+            "rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-neutral";
+          button.dataset.canvasAction = action;
+          button.title = label;
+          button.setAttribute("aria-label", label);
+          const iconNode = document.createElement("span");
+          iconNode.className = "rookieui-shell__mini-action-icon";
+          iconNode.textContent = icon;
+          button.appendChild(iconNode);
+          imageCanvasToolbar.appendChild(button);
+          return button;
+        };
+
+        const sourceFullscreenButton = createCanvasActionButton(
+          "rookieui-img2img-source-fullscreen",
+          CANVAS_ACTIONS.fullscreen,
+          "⛶",
+          "Fullscreen source canvas",
+        );
+        const sourceUploadButton = createCanvasActionButton(
+          "rookieui-img2img-source-upload",
+          CANVAS_ACTIONS.upload,
+          "📁",
+          "Upload source image",
+        );
+        const sourceRemoveButton = createCanvasActionButton(
+          "rookieui-img2img-source-remove",
+          CANVAS_ACTIONS.remove,
+          "🗑",
+          "Remove source image",
+        );
+        const sourceResetButton = createCanvasActionButton(
+          "rookieui-img2img-source-reset",
+          CANVAS_ACTIONS.reset,
+          "↺",
+          "Reset source canvas",
+        );
+        const sourceUndoButton = createCanvasActionButton(
+          "rookieui-img2img-source-undo",
+          CANVAS_ACTIONS.undo,
+          "↶",
+          "Undo source change",
+        );
+        const sourceRedoButton = createCanvasActionButton(
+          "rookieui-img2img-source-redo",
+          CANVAS_ACTIONS.redo,
+          "↷",
+          "Redo source change",
+        );
+
+        const imageCanvasStage = document.createElement("div");
+        imageCanvasStage.className = "rookieui-shell__canvas-upload-stage";
+        imageCanvasStage.id = "rookieui-img2img-source-canvas-stage";
+        imageCanvasStage.setAttribute("role", "button");
+        imageCanvasStage.setAttribute("tabindex", "0");
+        imageCanvasStage.setAttribute("aria-label", "Upload source image");
+        imageCanvasSurface.appendChild(imageCanvasStage);
+
+        const imageCanvasPreview = document.createElement("img");
+        imageCanvasPreview.className = "rookieui-shell__canvas-upload-preview";
+        imageCanvasPreview.id = "rookieui-img2img-source-canvas-preview";
+        imageCanvasPreview.alt = "Img2Img source canvas preview";
+        imageCanvasPreview.hidden = true;
+        imageCanvasStage.appendChild(imageCanvasPreview);
+
+        const imageCanvasPlaceholder = document.createElement("div");
+        imageCanvasPlaceholder.className = "rookieui-shell__canvas-upload-placeholder";
+        appendTextElement(imageCanvasPlaceholder, "span", "rookieui-shell__canvas-upload-placeholder-icon", "⇪");
+        const imageCanvasPlaceholderText = appendTextElement(
+          imageCanvasPlaceholder,
+          "span",
+          "rookieui-shell__canvas-upload-placeholder-text",
+          "Upload Img2Img source image",
+        );
+        imageCanvasStage.appendChild(imageCanvasPlaceholder);
+
         const imageFileInput = createInput("file", "rookieui-img2img-image-file", "", {
           className: "rookieui-shell__file-input",
         });
         imageFileInput.accept = "image/png,image/webp,image/jpeg";
-        imageDropzone.appendChild(imageFileInput);
+        imageCanvasSurface.appendChild(imageFileInput);
 
         const maskDropzone = document.createElement("label");
         maskDropzone.className = "rookieui-shell__dropzone";
@@ -916,6 +1004,169 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         img2imgModeUi.batchPane = batchPane;
         img2imgModeUi.batchFileInput = batchFileInput;
         img2imgModeUi.batchStatusNode = batchStatusNode;
+
+        const sourceHistoryState = {
+          undo: [],
+          redo: [],
+          limit: 24,
+        };
+
+        const readSourceSnapshot = () => ({
+          imageData: String(elements.imageData.value ?? "").trim(),
+          imageAsset: String(elements.imageAsset.value ?? "").trim(),
+        });
+
+        const areSourceSnapshotsEqual = (left, right) =>
+          String(left?.imageData ?? "") === String(right?.imageData ?? "") &&
+          String(left?.imageAsset ?? "") === String(right?.imageAsset ?? "");
+
+        const syncSourceHistoryButtons = () => {
+          sourceUndoButton.disabled = sourceHistoryState.undo.length === 0;
+          sourceRedoButton.disabled = sourceHistoryState.redo.length === 0;
+        };
+
+        const renderSourceCanvasSurface = () => {
+          const sourceData = String(elements.imageData.value ?? "").trim();
+          const sourceAsset = String(elements.imageAsset.value ?? "").trim();
+          if (sourceData.startsWith("data:image/")) {
+            imageCanvasPreview.src = sourceData;
+            imageCanvasPreview.hidden = false;
+            imageCanvasPlaceholder.hidden = true;
+          } else {
+            imageCanvasPreview.hidden = true;
+            imageCanvasPreview.removeAttribute("src");
+            imageCanvasPlaceholder.hidden = false;
+            imageCanvasPlaceholderText.textContent = sourceAsset ? `Asset: ${sourceAsset}` : "Upload Img2Img source image";
+          }
+          const hasSource = hasCanvasSourceImage(sourceData, sourceAsset);
+          sourceRemoveButton.disabled = !hasSource;
+          sourceResetButton.disabled = !hasSource;
+        };
+        refreshSourceCanvasSurface = renderSourceCanvasSurface;
+
+        const pushSourceUndoSnapshot = () => {
+          const snapshot = readSourceSnapshot();
+          const previous = sourceHistoryState.undo[sourceHistoryState.undo.length - 1];
+          if (areSourceSnapshotsEqual(snapshot, previous)) {
+            return;
+          }
+          sourceHistoryState.undo.push(snapshot);
+          if (sourceHistoryState.undo.length > sourceHistoryState.limit) {
+            sourceHistoryState.undo.shift();
+          }
+        };
+
+        const applySourceSnapshot = async (snapshot, options = {}) => {
+          const nextSnapshot = {
+            imageData: String(snapshot?.imageData ?? "").trim(),
+            imageAsset: String(snapshot?.imageAsset ?? "").trim(),
+          };
+          if (options.recordHistory) {
+            pushSourceUndoSnapshot();
+            sourceHistoryState.redo = [];
+          }
+          elements.imageData.value = nextSnapshot.imageData;
+          elements.imageAsset.value = nextSnapshot.imageAsset;
+          img2imgMaskCanvasContract.refreshSourceBinding();
+          renderSourceCanvasSurface();
+          syncSourceHistoryButtons();
+          const previewValue = nextSnapshot.imageData;
+          if (img2imgPreviewBox) {
+            setPreviewContent(img2imgPreviewBox, previewValue, runtimeState.previewPlaceholder);
+          }
+          syncBoundControls([elements.imageData, elements.imageAsset]);
+          await img2imgModeUi.maskEditor?.refreshFromInputs();
+          if (options.statusMessage) {
+            statusNode.textContent = options.statusMessage;
+          }
+        };
+
+        const openSourceFilePicker = () => {
+          imageFileInput.click();
+        };
+
+        const loadSourceFile = async (file, options = {}) => {
+          const sourceImageData = await readFileAsDataUrl(file);
+          await applySourceSnapshot(
+            {
+              imageData: sourceImageData,
+              imageAsset: "",
+            },
+            {
+              recordHistory: options.recordHistory !== false,
+              statusMessage: `Loaded source image: ${file.name}`,
+            },
+          );
+        };
+
+        sourceUploadButton.addEventListener("click", () => {
+          openSourceFilePicker();
+        });
+        imageCanvasStage.addEventListener("click", () => {
+          openSourceFilePicker();
+        });
+        imageCanvasStage.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openSourceFilePicker();
+          }
+        });
+
+        sourceRemoveButton.addEventListener("click", async () => {
+          // IMPORTANT: removing source image must clear both source fields together so mode guards do not observe split state.
+          await applySourceSnapshot(
+            {
+              imageData: "",
+              imageAsset: "",
+            },
+            {
+              recordHistory: true,
+              statusMessage: "Cleared source image.",
+            },
+          );
+        });
+
+        sourceResetButton.addEventListener("click", async () => {
+          const sourceSnapshot = readSourceSnapshot();
+          if (!hasCanvasSourceImage(sourceSnapshot.imageData, sourceSnapshot.imageAsset)) {
+            statusNode.textContent = "No source image to reset.";
+            return;
+          }
+          await img2imgModeUi.maskEditor?.refreshFromInputs();
+          statusNode.textContent = "Reset source canvas view.";
+        });
+
+        sourceFullscreenButton.addEventListener("click", async () => {
+          const opened = await requestCanvasFullscreen(imageCanvasSurface);
+          statusNode.textContent = opened ? "Source canvas entered fullscreen mode." : "Fullscreen is unavailable.";
+        });
+
+        sourceUndoButton.addEventListener("click", async () => {
+          if (!sourceHistoryState.undo.length) {
+            return;
+          }
+          const currentSnapshot = readSourceSnapshot();
+          const previousSnapshot = sourceHistoryState.undo.pop();
+          sourceHistoryState.redo.push(currentSnapshot);
+          await applySourceSnapshot(previousSnapshot, {
+            recordHistory: false,
+            statusMessage: "Restored previous source image.",
+          });
+        });
+
+        sourceRedoButton.addEventListener("click", async () => {
+          if (!sourceHistoryState.redo.length) {
+            return;
+          }
+          const currentSnapshot = readSourceSnapshot();
+          const nextSnapshot = sourceHistoryState.redo.pop();
+          sourceHistoryState.undo.push(currentSnapshot);
+          await applySourceSnapshot(nextSnapshot, {
+            recordHistory: false,
+            statusMessage: "Reapplied source image.",
+          });
+        });
+
         const maskEditor = createImg2ImgMaskEditor({
           idPrefix: "rookieui-img2img-mask-editor",
           parent: assetSection,
@@ -934,6 +1185,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         img2imgModeUi.maskEditor = maskEditor;
         maskEditor.setMode(elements.mode.value);
         maskEditor.refreshFromInputs();
+        renderSourceCanvasSurface();
+        syncSourceHistoryButtons();
 
         const assetPreview = document.createElement("div");
         assetPreview.className = "rookieui-shell__preview-box rookieui-shell__preview-box--compact";
@@ -983,16 +1236,41 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           });
         };
 
-        attachDropzoneHandlers(imageDropzone, imageFileInput, async (file) => {
-          const imageData = await readFileAsDataUrl(file);
-          elements.imageData.value = imageData;
-          elements.imageAsset.value = "";
-          img2imgMaskCanvasContract.refreshSourceBinding();
-          setPreviewContent(assetPreview, imageData, runtimeState.previewPlaceholder);
-          statusNode.textContent = `Loaded source image: ${file.name}`;
-          syncBoundControls([elements.imageData, elements.imageAsset]);
-          await img2imgModeUi.maskEditor?.refreshFromInputs();
+        imageFileInput.addEventListener("change", async () => {
+          const [file] = Array.from(imageFileInput.files ?? []);
+          if (!file) {
+            return;
+          }
+          try {
+            await loadSourceFile(file, { recordHistory: true });
+          } catch (_error) {
+            emitFrontendDebugWarning("shell.img2img_canvas_source", "Source canvas upload failed on file input.", _error);
+            statusNode.textContent = "Failed to load source image.";
+          }
         });
+
+        imageCanvasSurface.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          imageCanvasSurface.dataset.dragging = "true";
+        });
+        imageCanvasSurface.addEventListener("dragleave", () => {
+          imageCanvasSurface.dataset.dragging = "false";
+        });
+        imageCanvasSurface.addEventListener("drop", async (event) => {
+          event.preventDefault();
+          imageCanvasSurface.dataset.dragging = "false";
+          const [file] = Array.from(event.dataTransfer?.files ?? []);
+          if (!file) {
+            return;
+          }
+          try {
+            await loadSourceFile(file, { recordHistory: true });
+          } catch (_error) {
+            emitFrontendDebugWarning("shell.img2img_canvas_source", "Source canvas upload failed on drop event.", _error);
+            statusNode.textContent = "Failed to load dropped source image.";
+          }
+        });
+
         attachDropzoneHandlers(maskDropzone, maskFileInput, async (file) => {
           const maskData = await readFileAsDataUrl(file);
           elements.maskData.value = maskData;
@@ -1001,6 +1279,15 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           statusNode.textContent = `Loaded inpaint mask: ${file.name}`;
           syncBoundControls([elements.maskData, elements.maskAsset]);
           await img2imgModeUi.maskEditor?.handleExternalMaskMutation();
+        });
+
+        elements.imageData.addEventListener("input", () => {
+          renderSourceCanvasSurface();
+          syncSourceHistoryButtons();
+        });
+        elements.imageAsset.addEventListener("input", () => {
+          renderSourceCanvasSurface();
+          syncSourceHistoryButtons();
         });
 
         const setBatchFiles = async (files) => {
@@ -1290,6 +1577,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();
       img2imgModeUi.maskEditor?.refreshFromInputs();
+      refreshSourceCanvasSurface?.();
       const appliedImageData = String(elements.imageData.value ?? "").trim();
       const hasAppliedSourceImage = hasCanvasSourceImage(appliedImageData, elements.imageAsset.value);
       const appliedBatchImages = parseJsonArrayField(elements.batchImagesData.value);

@@ -335,6 +335,15 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-pane-txt2img")).toBeHidden();
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
   await expect(page.locator("#rookieui-pane-txt2img")).toHaveAttribute("hidden", "");
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toBeVisible();
+  await expect(
+    page.locator("#rookieui-img2img-image-dropzone .rookieui-shell__canvas-upload-placeholder-text"),
+  ).toHaveText("Upload Img2Img source image");
+  await expect(page.locator("#rookieui-img2img-source-upload .rookieui-shell__mini-action-icon")).toHaveText("📁");
+  await expect(page.locator("#rookieui-img2img-source-remove .rookieui-shell__mini-action-icon")).toHaveText("🗑");
+  await expect(page.locator("#rookieui-img2img-source-reset .rookieui-shell__mini-action-icon")).toHaveText("↺");
+  await expect(page.locator("#rookieui-img2img-source-undo")).toBeDisabled();
+  await expect(page.locator("#rookieui-img2img-source-redo")).toBeDisabled();
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");
   await page.locator("#rookieui-img2img-workspace-tab-lora").click();
   await page.locator("#rookieui-img2img-lora-item-0").click();
