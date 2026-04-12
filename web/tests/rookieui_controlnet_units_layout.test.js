@@ -371,6 +371,46 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     }
   });
 
+  test("reports backend detail when run-preprocessor returns a non-OK response", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(runButton).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: false,
+        status: 503,
+        async json() {
+          return { detail: "detect route unavailable" };
+        },
+      }));
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "depth";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(statusMessages.some((entry) => entry.includes("detect route unavailable"))).toBe(true);
+      expect(runButton?.dataset.running).toBe("false");
+      expect(runButton?.title).toBe("Run Preprocessor");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("keeps canvas source history rollback deterministic for remove/undo/redo", async () => {
     const { host } = buildEditor("rookieui-img2img-controlnet");
 
