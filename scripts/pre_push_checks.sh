@@ -65,11 +65,13 @@ bootstrap_venv() {
   fi
 
   if [ -e "$venv_py" ]; then
-    echo "[pre-push] WARN: invalid venv detected; recreating $VENV_DIR"
+    echo "[pre-push] WARN: invalid venv detected; recreating $VENV_DIR" >&2
     rm -rf "$VENV_DIR"
   fi
 
-  echo "[pre-push] INFO: creating project venv at $VENV_DIR"
+  # CRITICAL: this function is consumed via command substitution to resolve VENV_PY;
+  # keep log lines on stderr so stdout returns only the python executable path.
+  echo "[pre-push] INFO: creating project venv at $VENV_DIR" >&2
   case "$UNAME_S" in
     MINGW*|MSYS*|CYGWIN*)
       # IMPORTANT: prefer Windows-native launchers; MSYS python can create broken venv.
