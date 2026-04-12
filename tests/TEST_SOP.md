@@ -26,6 +26,10 @@ Required minimum gate:
 3. backend unit tests (`scripts/run_unittests.py`)
 4. frontend tests (`npm test`)
 
+Optional (recommended for newer-family loader/runtime changes):
+
+5. live host smoke lane (`scripts/run_live_smoke_tests.py`)
+
 ### Bugfix/Hotfix Rule (Reproduce -> Pin -> Sweep)
 
 For bugfix/hotfix work, acceptance evidence must include:
@@ -62,6 +66,21 @@ powershell -File scripts/run_full_tests_windows.ps1
 
 ```bash
 bash scripts/run_full_tests_linux.sh
+```
+
+Enable optional live host smoke lane in either wrapper script:
+
+- PowerShell:
+
+```powershell
+$env:ROOKIEUI_RUN_LIVE_SMOKE = "1"
+powershell -File scripts/run_full_tests_windows.ps1
+```
+
+- bash:
+
+```bash
+ROOKIEUI_RUN_LIVE_SMOKE=1 bash scripts/run_full_tests_linux.sh
 ```
 
 ## Optional Automation (Git pre-push hook)
@@ -110,6 +129,24 @@ node -v
 npm install
 npx playwright install chromium
 npm test
+```
+
+5. Optional live host smoke lane (recommended for profile/model-loader changes):
+
+```bash
+python scripts/run_live_smoke_tests.py
+```
+
+Optional execute mode (real txt2img submission + queue polling):
+
+```bash
+ROOKIEUI_LIVE_SMOKE_EXECUTE=1 python scripts/run_live_smoke_tests.py
+```
+
+Optional base URL override:
+
+```bash
+ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_live_smoke_tests.py
 ```
 
 ## Environment Guardrails

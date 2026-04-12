@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from rookieui.contracts.models import PresetDefinition
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    discover_model_inventory,
+    resolve_primary_model_selector_context,
+    resolve_text_encoder_selector_context,
+    resolve_vae_selector_context,
+)
 from rookieui.services.parity_matrix import get_parity_profile
 
 _UI_PRESET_BLUEPRINTS: tuple[dict[str, object], ...] = (
@@ -34,12 +39,13 @@ _UI_PRESET_BLUEPRINTS: tuple[dict[str, object], ...] = (
         "title": "Qwen-Image",
         "profile": "qwen_image",
         "base_family": "qwen_image",
-        "width": 1024,
-        "height": 1024,
-        "steps": 8,
-        "cfg_scale": 1.0,
-        "sampler_name": "dpmpp_2m",
-        "scheduler_name": "normal",
+        # CRITICAL: keep UI preset aligned with non-Lightning baseline because RookieUI does not auto-attach acceleration LoRA.
+        "width": 1328,
+        "height": 1328,
+        "steps": 50,
+        "cfg_scale": 4.0,
+        "sampler_name": "euler",
+        "scheduler_name": "simple",
     },
     {
         "id": "klein",
@@ -74,8 +80,8 @@ _UI_PRESET_BLUEPRINTS: tuple[dict[str, object], ...] = (
         "height": 1024,
         "steps": 8,
         "cfg_scale": 1.0,
-        "sampler_name": "euler",
-        "scheduler_name": "normal",
+        "sampler_name": "res_multistep",
+        "scheduler_name": "simple",
     },
     {
         "id": "wan",
@@ -85,9 +91,9 @@ _UI_PRESET_BLUEPRINTS: tuple[dict[str, object], ...] = (
         "width": 832,
         "height": 1216,
         "steps": 20,
-        "cfg_scale": 2.0,
+        "cfg_scale": 6.0,
         "sampler_name": "euler",
-        "scheduler_name": "beta",
+        "scheduler_name": "simple",
     },
     {
         "id": "anima",
@@ -110,15 +116,18 @@ def build_preset_payload() -> dict[str, object]:
     for blueprint in _UI_PRESET_BLUEPRINTS:
         profile_id = str(blueprint["profile"])
         profile = get_parity_profile(profile_id)
+        _, primary_models, primary_default = resolve_primary_model_selector_context(profile_id, inventory)
+        text_encoder_default = resolve_text_encoder_selector_context(profile_id, inventory)
+        vae_default = resolve_vae_selector_context(profile_id, inventory)
         presets.append(
             PresetDefinition(
                 id=str(blueprint["id"]),
                 title=str(blueprint["title"]),
                 profile=profile_id,
                 base_family=str(blueprint.get("base_family", profile.base_family)),
-                checkpoint_name=inventory.default_checkpoint,
-                vae_name=inventory.default_vae,
-                text_encoder_name=inventory.default_text_encoder,
+                checkpoint_name=primary_default if primary_models else inventory.default_checkpoint,
+                vae_name=vae_default,
+                text_encoder_name=text_encoder_default,
                 width=int(blueprint.get("width", profile.default_width)),
                 height=int(blueprint.get("height", profile.default_height)),
                 steps=int(blueprint.get("steps", profile.default_steps)),

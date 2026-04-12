@@ -45,3 +45,12 @@ class RouteGuardTests(unittest.TestCase):
     def test_rejects_malformed_internal_route_path(self) -> None:
         with self.assertRaises(ValueError):
             validate_internal_route_path("/rookieui/../health")
+
+    def test_allows_explicit_compatibility_prefix_when_requested(self) -> None:
+        router = FakeRouter()
+        registrar = SafeRouteRegistrar(router, allowed_prefixes=("/controlnet",))
+
+        registrar.add_get("/controlnet/model_list", object())
+
+        self.assertEqual(len(router.routes), 1)
+        self.assertEqual(router.routes[0][1], "/controlnet/model_list")

@@ -50,6 +50,26 @@ class ParityMatrixTests(unittest.TestCase):
 
         self.assertEqual(profile.base_family, "sdxl")
         self.assertEqual(profile.default_steps, 8)
+        self.assertEqual(profile.default_sampler, "res_multistep")
+        self.assertEqual(profile.default_scheduler, "simple")
+
+    def test_get_parity_profile_uses_non_lightning_qwen_baseline_defaults(self) -> None:
+        profile = get_parity_profile("qwen_image")
+
+        self.assertEqual(profile.default_width, 1328)
+        self.assertEqual(profile.default_height, 1328)
+        self.assertEqual(profile.default_steps, 50)
+        self.assertEqual(profile.default_cfg_scale, 4.0)
+        self.assertEqual(profile.default_sampler, "euler")
+        self.assertEqual(profile.default_scheduler, "simple")
+
+    def test_get_parity_profile_uses_non_lightning_wan_baseline_defaults(self) -> None:
+        profile = get_parity_profile("wan")
+
+        self.assertEqual(profile.default_steps, 20)
+        self.assertEqual(profile.default_cfg_scale, 6.0)
+        self.assertEqual(profile.default_sampler, "euler")
+        self.assertEqual(profile.default_scheduler, "simple")
 
     def test_normalize_sampler_name_handles_a1111_aliases(self) -> None:
         self.assertEqual(normalize_sampler_name("Euler a"), "euler_ancestral")

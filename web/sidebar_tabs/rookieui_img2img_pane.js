@@ -1,3 +1,5 @@
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f70-controlnet";
+
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
     buildProfileLookup,
@@ -104,6 +106,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     maskEditor: null,
     modeButtons: new Map(),
   };
+  let img2imgControlNetEditor = null;
 
   const elements = {
     prompt: createTextarea("rookieui-img2img-prompt", "", 4, {
@@ -341,7 +344,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       ],
       "bislerp",
     ),
+    controlnetUnits: createInput("hidden", "rookieui-img2img-controlnet-units", "[]"),
   };
+  form.appendChild(elements.controlnetUnits);
   bindSliderPair(elements.width, elements.widthSlider);
   bindSliderPair(elements.height, elements.heightSlider);
   bindSliderPair(elements.steps, elements.stepsSlider);
@@ -498,7 +503,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncBoundControls,
   });
 
-  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup);
+  updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup, bootstrapState.models);
   syncFamilyAwareModuleQuicksetting(
     profileLookup,
     elements.profileState.value,
@@ -562,7 +567,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   });
   img2imgModeRouter.syncFromModeValue();
   elements.preset.addEventListener("change", () => {
-    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup);
+    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
       profileLookup,
       elements.profileState.value,
@@ -723,6 +728,24 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           "rookieui-img2img-hires-denoise-field",
         );
         createField(hiresGrid, "Upscale Method", elements.hiresUpscaleMethod);
+
+        img2imgControlNetEditor = createControlNetUnitEditor({
+          idPrefix: "rookieui-img2img-controlnet",
+          parent: generationSection,
+          hiddenInput: elements.controlnetUnits,
+          modelOptions: (inventory.controlnet ?? []).map((value) => ({ value, label: value })),
+          createInput,
+          createSelect,
+          createCheckbox,
+          createField,
+          createInlineCheckboxField,
+          appendTextElement,
+          readFileAsDataUrl,
+          syncBoundControls,
+          onStatusMessage: (message) => {
+            statusNode.textContent = message;
+          },
+        });
 
         createSliderField(
           generationGrid,
@@ -1229,6 +1252,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         elements.batchImagesData.value = JSON.stringify(payload.batch_images);
       } else if (String(payload.mode ?? "").trim().toLowerCase() !== "batch") {
         elements.batchImagesData.value = "[]";
+      }
+      if (Array.isArray(payload.controlnet_units)) {
+        elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);
+        img2imgControlNetEditor?.setUnits(payload.controlnet_units);
       }
       const resolvedPresetId = findPresetIdForProfile(allPresets, elements.profileState.value);
       if (resolvedPresetId) {

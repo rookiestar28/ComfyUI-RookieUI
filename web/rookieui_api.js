@@ -16,6 +16,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     compatibilityLayer: true,
     txt2img: true,
     img2img: true,
+    controlnet: true,
     pngInfo: true,
     queue: true,
   },
@@ -153,6 +154,10 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     "/rookieui/compatibility",
     "/rookieui/models",
     "/rookieui/presets",
+    "/rookieui/controlnet/model_list",
+    "/rookieui/controlnet/module_list",
+    "/rookieui/controlnet/control_types",
+    "/rookieui/controlnet/detect",
     "/rookieui/queue",
     "/rookieui/queue/{prompt_id}",
     "/rookieui/pnginfo/inspect",
@@ -272,6 +277,11 @@ export async function fetchRookieUIModels(fetchImpl = globalThis.fetch) {
           sdxl: "checkpoints",
           flux: "diffusion_models",
           qwen_image: "diffusion_models",
+          klein: "diffusion_models",
+          lumina: "diffusion_models",
+          zit: "diffusion_models",
+          wan: "diffusion_models",
+          anima: "diffusion_models",
         },
         categories: {
           checkpoints: {
@@ -352,7 +362,7 @@ export async function fetchRookieUIPresets(fetchImpl = globalThis.fetch) {
         {
           id: "flux",
           title: "Flux",
-          profile: "sdxl",
+          profile: "flux",
           base_family: "flux",
           checkpoint_name: "__host_default__",
           vae_name: "Automatic",
@@ -368,7 +378,7 @@ export async function fetchRookieUIPresets(fetchImpl = globalThis.fetch) {
         {
           id: "qwen_image",
           title: "Qwen-Image",
-          profile: "sdxl",
+          profile: "qwen_image",
           base_family: "qwen_image",
           checkpoint_name: "__host_default__",
           vae_name: "Automatic",
@@ -379,6 +389,86 @@ export async function fetchRookieUIPresets(fetchImpl = globalThis.fetch) {
           cfg_scale: 1,
           sampler_name: "dpmpp_2m",
           scheduler_name: "normal",
+          clip_skip: 1,
+        },
+        {
+          id: "klein",
+          title: "Klein",
+          profile: "klein",
+          base_family: "klein",
+          checkpoint_name: "__host_default__",
+          vae_name: "Automatic",
+          text_encoder_name: "Automatic",
+          width: 896,
+          height: 1152,
+          steps: 20,
+          cfg_scale: 1,
+          sampler_name: "euler",
+          scheduler_name: "beta",
+          clip_skip: 1,
+        },
+        {
+          id: "lumina",
+          title: "Lumina",
+          profile: "lumina",
+          base_family: "lumina",
+          checkpoint_name: "__host_default__",
+          vae_name: "Automatic",
+          text_encoder_name: "Automatic",
+          width: 1024,
+          height: 1024,
+          steps: 16,
+          cfg_scale: 2,
+          sampler_name: "dpmpp_2m",
+          scheduler_name: "normal",
+          clip_skip: 1,
+        },
+        {
+          id: "zit",
+          title: "ZiT",
+          profile: "zit",
+          base_family: "zit",
+          checkpoint_name: "__host_default__",
+          vae_name: "Automatic",
+          text_encoder_name: "Automatic",
+          width: 1024,
+          height: 1024,
+          steps: 8,
+          cfg_scale: 1,
+          sampler_name: "euler",
+          scheduler_name: "normal",
+          clip_skip: 1,
+        },
+        {
+          id: "wan",
+          title: "Wan",
+          profile: "wan",
+          base_family: "wan",
+          checkpoint_name: "__host_default__",
+          vae_name: "Automatic",
+          text_encoder_name: "Automatic",
+          width: 832,
+          height: 1216,
+          steps: 20,
+          cfg_scale: 2,
+          sampler_name: "euler",
+          scheduler_name: "beta",
+          clip_skip: 1,
+        },
+        {
+          id: "anima",
+          title: "Anima",
+          profile: "anima",
+          base_family: "anima",
+          checkpoint_name: "__host_default__",
+          vae_name: "Automatic",
+          text_encoder_name: "Automatic",
+          width: 1024,
+          height: 1024,
+          steps: 20,
+          cfg_scale: 2,
+          sampler_name: "dpmpp_2m",
+          scheduler_name: "karras",
           clip_skip: 1,
         },
       ],
@@ -432,10 +522,142 @@ export async function fetchRookieUICompatibility(fetchImpl = globalThis.fetch) {
           experimental: true,
           aliases: [],
         },
+        {
+          id: "qwen_image",
+          title: "Qwen-Image",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "klein",
+          title: "Klein (Flux.2)",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "lumina",
+          title: "Lumina",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "zit",
+          title: "ZiT (Z-Image-Turbo)",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "wan",
+          title: "Wan",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "anima",
+          title: "Anima",
+          summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
       ],
     },
     fetchImpl,
   );
+}
+
+export async function fetchRookieUIControlNetModels(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/model_list",
+    {
+      source: "fallback",
+      model_list: [],
+      default_model: "",
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIControlNetModules(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/module_list",
+    {
+      source: "fallback",
+      module_list: ["none", "canny"],
+      default_module: "none",
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIControlNetTypes(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/controlnet/control_types",
+    {
+      source: "fallback",
+      control_types: {
+        All: {
+          module_list: ["none", "canny"],
+          model_list: [],
+          default_option: "none",
+        },
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function detectRookieUIControlNet(payload, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.controlnet_detect", "Detect request skipped because fetch() is unavailable.");
+    return {
+      ok: false,
+      status: 0,
+      data: {
+        status: "network-unavailable",
+        detail: "RookieUI controlnet detect is unavailable without fetch().",
+      },
+    };
+  }
+
+  try {
+    const response = await fetchImpl("/rookieui/controlnet/detect", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (_error) {
+    rookieUIDebugWarn("api.controlnet_detect", "Detect request failed before reaching backend.", {
+      error: toErrorDetail(_error),
+    });
+    return {
+      ok: false,
+      status: 0,
+      data: {
+        status: "network-unavailable",
+        detail: "RookieUI controlnet detect failed before reaching the backend.",
+      },
+    };
+  }
 }
 
 function buildQueuePath(clientId) {

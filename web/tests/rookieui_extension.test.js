@@ -178,9 +178,25 @@ describe("registerRookieUIBootstrapExtension", () => {
               clip: ["clip-vit-l.safetensors"],
               clip_vision: ["clip-vision.safetensors"],
               controlnet: ["control_v11p_sd15_canny.safetensors"],
-              diffusion_models: ["flux1-dev.safetensors"],
+              diffusion_models: [
+                "flux1-dev.safetensors",
+                "qwen-image.safetensors",
+                "klein-flux2.safetensors",
+                "lumina2.safetensors",
+                "zImageTurboNSFW_21BF16AIO.safetensors",
+                "wan2_2b.safetensors",
+                "animaPencilXL_v500.safetensors",
+              ],
               vae: ["Automatic"],
-              text_encoders: ["Automatic", "clip_g.safetensors"],
+              text_encoders: [
+                "QwenImageTEModel_.safetensors",
+                "FluxT5XXL.safetensors",
+                "KleinT5XXL.safetensors",
+                "LuminaTEModel.safetensors",
+                "WanTextEncoder.safetensors",
+                "AnimaTextEncoder.safetensors",
+                "clip_g.safetensors",
+              ],
               embeddings: ["badhandv4.pt"],
               loras: ["detail_tweaker.safetensors"],
               ultralytics: ["sam2_b.pt"],
@@ -188,7 +204,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               upscale_models: ["4x-ultrasharp.pth"],
               default_checkpoint: "dreamshaper.safetensors",
               default_vae: "Automatic",
-              default_text_encoder: "Automatic",
+              default_text_encoder: "QwenImageTEModel_.safetensors",
               catalog: {
                 surface_groups: [
                   {
@@ -202,6 +218,11 @@ describe("registerRookieUIBootstrapExtension", () => {
                   sdxl: "checkpoints",
                   flux: "diffusion_models",
                   qwen_image: "diffusion_models",
+                  klein: "diffusion_models",
+                  lumina: "diffusion_models",
+                  zit: "diffusion_models",
+                  wan: "diffusion_models",
+                  anima: "diffusion_models",
                 },
                 categories: {
                   checkpoints: {
@@ -209,6 +230,20 @@ describe("registerRookieUIBootstrapExtension", () => {
                     items: ["dreamshaper.safetensors"],
                     default_value: "dreamshaper.safetensors",
                     sidebar_visible: true,
+                  },
+                  diffusion_models: {
+                    title: "Diffusion Models",
+                    items: [
+                      "flux1-dev.safetensors",
+                      "qwen-image.safetensors",
+                      "klein-flux2.safetensors",
+                      "lumina2.safetensors",
+                      "zImageTurboNSFW_21BF16AIO.safetensors",
+                      "wan2_2b.safetensors",
+                      "animaPencilXL_v500.safetensors",
+                    ],
+                    default_value: "flux1-dev.safetensors",
+                    sidebar_visible: false,
                   },
                 },
               },
@@ -256,6 +291,54 @@ describe("registerRookieUIBootstrapExtension", () => {
                 {
                   id: "flux",
                   title: "Flux",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "qwen_image",
+                  title: "Qwen-Image",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "klein",
+                  title: "Klein (Flux.2)",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "lumina",
+                  title: "Lumina",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "zit",
+                  title: "ZiT (Z-Image-Turbo)",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "wan",
+                  title: "Wan",
+                  summary: "Experimental catalog entry for later complexity-gated newer-family support.",
+                  default: false,
+                  experimental: true,
+                  aliases: [],
+                },
+                {
+                  id: "anima",
+                  title: "Anima",
                   summary: "Experimental catalog entry for later complexity-gated newer-family support.",
                   default: false,
                   experimental: true,
@@ -333,9 +416,9 @@ describe("registerRookieUIBootstrapExtension", () => {
                   title: "Flux",
                   profile: "flux",
                   base_family: "flux",
-                  checkpoint_name: "dreamshaper.safetensors",
+                  checkpoint_name: "flux1-dev.safetensors",
                   vae_name: "Automatic",
-                  text_encoder_name: "Automatic",
+                  text_encoder_name: "FluxT5XXL.safetensors",
                   width: 896,
                   height: 1152,
                   steps: 20,
@@ -349,15 +432,95 @@ describe("registerRookieUIBootstrapExtension", () => {
                   title: "Qwen-Image",
                   profile: "qwen_image",
                   base_family: "qwen_image",
-                  checkpoint_name: "dreamshaper.safetensors",
+                  checkpoint_name: "qwen-image.safetensors",
                   vae_name: "Automatic",
-                  text_encoder_name: "Automatic",
+                  text_encoder_name: "QwenImageTEModel_.safetensors",
+                  width: 1328,
+                  height: 1328,
+                  steps: 50,
+                  cfg_scale: 4,
+                  sampler_name: "euler",
+                  scheduler_name: "simple",
+                  clip_skip: 1,
+                },
+                {
+                  id: "klein",
+                  title: "Klein",
+                  profile: "klein",
+                  base_family: "klein",
+                  checkpoint_name: "klein-flux2.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "KleinT5XXL.safetensors",
+                  width: 896,
+                  height: 1152,
+                  steps: 20,
+                  cfg_scale: 1,
+                  sampler_name: "euler",
+                  scheduler_name: "beta",
+                  clip_skip: 1,
+                },
+                {
+                  id: "lumina",
+                  title: "Lumina",
+                  profile: "lumina",
+                  base_family: "lumina",
+                  checkpoint_name: "lumina2.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "LuminaTEModel.safetensors",
+                  width: 1024,
+                  height: 1024,
+                  steps: 16,
+                  cfg_scale: 2,
+                  sampler_name: "dpmpp_2m",
+                  scheduler_name: "normal",
+                  clip_skip: 1,
+                },
+                {
+                  id: "zit",
+                  title: "ZiT",
+                  profile: "zit",
+                  base_family: "zit",
+                  checkpoint_name: "zImageTurboNSFW_21BF16AIO.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "LuminaTEModel.safetensors",
                   width: 1024,
                   height: 1024,
                   steps: 8,
                   cfg_scale: 1,
+                  sampler_name: "res_multistep",
+                  scheduler_name: "simple",
+                  clip_skip: 1,
+                },
+                {
+                  id: "wan",
+                  title: "Wan",
+                  profile: "wan",
+                  base_family: "wan",
+                  checkpoint_name: "wan2_2b.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "WanTextEncoder.safetensors",
+                  width: 832,
+                  height: 1216,
+                  steps: 20,
+                  cfg_scale: 6,
+                  sampler_name: "euler",
+                  scheduler_name: "simple",
+                  clip_skip: 1,
+                },
+                {
+                  id: "anima",
+                  title: "Anima",
+                  profile: "anima",
+                  base_family: "anima",
+                  checkpoint_name: "animaPencilXL_v500.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "AnimaTextEncoder.safetensors",
+                  width: 1024,
+                  height: 1024,
+                  steps: 20,
+                  cfg_scale: 2,
                   sampler_name: "dpmpp_2m",
-                  scheduler_name: "normal",
+                  scheduler_name: "karras",
                   clip_skip: 1,
                 },
               ],
@@ -443,12 +606,87 @@ describe("registerRookieUIBootstrapExtension", () => {
                   title: "Qwen-Image",
                   base_family: "sdxl",
                   prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 1328,
+                  default_height: 1328,
+                  default_steps: 50,
+                  default_cfg_scale: 4,
+                  default_sampler: "euler",
+                  default_scheduler: "simple",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "klein",
+                  title: "Klein (Flux.2)",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 896,
+                  default_height: 1152,
+                  default_steps: 20,
+                  default_cfg_scale: 1,
+                  default_sampler: "euler",
+                  default_scheduler: "beta",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "lumina",
+                  title: "Lumina",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 1024,
+                  default_height: 1024,
+                  default_steps: 16,
+                  default_cfg_scale: 2,
+                  default_sampler: "dpmpp_2m",
+                  default_scheduler: "normal",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "zit",
+                  title: "ZiT (Z-Image-Turbo)",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
                   default_width: 1024,
                   default_height: 1024,
                   default_steps: 8,
                   default_cfg_scale: 1,
+                  default_sampler: "res_multistep",
+                  default_scheduler: "simple",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "wan",
+                  title: "Wan",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 832,
+                  default_height: 1216,
+                  default_steps: 20,
+                  default_cfg_scale: 6,
+                  default_sampler: "euler",
+                  default_scheduler: "simple",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "anima",
+                  title: "Anima",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 1024,
+                  default_height: 1024,
+                  default_steps: 20,
+                  default_cfg_scale: 2,
                   default_sampler: "dpmpp_2m",
-                  default_scheduler: "normal",
+                  default_scheduler: "karras",
                   default_clip_skip: 1,
                   supports_clip_skip: false,
                   notes: [],
@@ -565,10 +803,22 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     const txt2imgGenerationSection = document.getElementById("rookieui-txt2img-generation-section");
     const txt2imgHiresControls = document.getElementById("rookieui-advanced-controls");
+    const txt2imgControlNetSection = document.getElementById("rookieui-txt2img-controlnet-section");
     expect(txt2imgGenerationSection).not.toBeNull();
-    expect(txt2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-advanced-controls");
     expect(txt2imgGenerationSection?.contains(txt2imgHiresControls)).toBe(true);
+    expect(txt2imgGenerationSection?.contains(txt2imgControlNetSection)).toBe(true);
     expect(txt2imgHiresControls).not.toBeNull();
+    expect(txt2imgControlNetSection).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-button-0")?.textContent).toBe(
+      "Choose Image File",
+    );
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-button-0")?.textContent).toBe(
+      "Choose Mask File",
+    );
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-0")?.hidden).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
@@ -583,11 +833,34 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-prompt").dispatchEvent(new Event("input", { bubbles: true }));
     app.api.clientId = "socket-client-2";
     // CRITICAL: regression matrix must keep Clip Skip editable across all preset profiles.
+    const diffusionModelOptions = [
+      "flux1-dev.safetensors",
+      "qwen-image.safetensors",
+      "klein-flux2.safetensors",
+      "lumina2.safetensors",
+      "zImageTurboNSFW_21BF16AIO.safetensors",
+      "wan2_2b.safetensors",
+      "animaPencilXL_v500.safetensors",
+    ];
+    const diffusionProfileDefaults = {
+      flux: "flux1-dev.safetensors",
+      qwen_image: "qwen-image.safetensors",
+      klein: "klein-flux2.safetensors",
+      lumina: "lumina2.safetensors",
+      zit: "zImageTurboNSFW_21BF16AIO.safetensors",
+      wan: "wan2_2b.safetensors",
+      anima: "animaPencilXL_v500.safetensors",
+    };
     const presetClipSkipMatrix = [
       { id: "sd15", textEncoderHidden: true, ignoredHint: false },
       { id: "sdxl", textEncoderHidden: true, ignoredHint: true },
       { id: "flux", textEncoderHidden: false, ignoredHint: true },
       { id: "qwen_image", textEncoderHidden: false, ignoredHint: true },
+      { id: "klein", textEncoderHidden: false, ignoredHint: true },
+      { id: "lumina", textEncoderHidden: false, ignoredHint: true },
+      { id: "zit", textEncoderHidden: false, ignoredHint: true },
+      { id: "wan", textEncoderHidden: false, ignoredHint: true },
+      { id: "anima", textEncoderHidden: false, ignoredHint: true },
     ];
     for (const matrixRow of presetClipSkipMatrix) {
       document.getElementById("rookieui-preset").value = matrixRow.id;
@@ -598,6 +871,15 @@ describe("registerRookieUIBootstrapExtension", () => {
       expect(document.getElementById("rookieui-clip-skip").dataset.executionHint).toBe(
         matrixRow.ignoredHint ? "ignored" : undefined,
       );
+      if (matrixRow.id in diffusionProfileDefaults) {
+        expect(document.getElementById("rookieui-checkpoint").dataset.modelCategory).toBe("diffusion_models");
+        expect(
+          Array.from(document.getElementById("rookieui-checkpoint").options).map((option) => option.value),
+        ).toEqual(diffusionModelOptions);
+        expect(document.getElementById("rookieui-checkpoint").value).toBe(diffusionProfileDefaults[matrixRow.id]);
+      } else {
+        expect(document.getElementById("rookieui-checkpoint").dataset.modelCategory).toBe("checkpoints");
+      }
     }
     document.getElementById("rookieui-preset").value = "sd15";
     document.getElementById("rookieui-preset").dispatchEvent(new Event("change", { bubbles: true }));
@@ -628,6 +910,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-txt2img-workspace-tab-generation").click();
     document.getElementById("rookieui-cfg-scale").value = "7.25";
     document.getElementById("rookieui-cfg-scale").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-controlnet-units").value = JSON.stringify([
+      {
+        enabled: true,
+        module: "canny",
+        model: "control_v11p_sd15_canny.safetensors",
+        image_asset: "txt2img-control-asset",
+      },
+    ]);
     document.getElementById("rookieui-txt2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
     );
@@ -644,10 +934,22 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     const img2imgGenerationSection = document.getElementById("rookieui-img2img-generation-section");
     const img2imgHiresControls = document.getElementById("rookieui-img2img-hires-controls");
+    const img2imgControlNetSection = document.getElementById("rookieui-img2img-controlnet-section");
     expect(img2imgGenerationSection).not.toBeNull();
-    expect(img2imgGenerationSection?.lastElementChild?.id).toBe("rookieui-img2img-hires-controls");
     expect(img2imgGenerationSection?.contains(img2imgHiresControls)).toBe(true);
+    expect(img2imgGenerationSection?.contains(img2imgControlNetSection)).toBe(true);
     expect(img2imgHiresControls).not.toBeNull();
+    expect(img2imgControlNetSection).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-button-0")?.textContent).toBe(
+      "Choose Image File",
+    );
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-button-0")?.textContent).toBe(
+      "Choose Mask File",
+    );
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
+    expect(document.getElementById("rookieui-img2img-controlnet-image-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-0")?.hidden).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(document.querySelector("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
@@ -664,6 +966,15 @@ describe("registerRookieUIBootstrapExtension", () => {
       expect(document.getElementById("rookieui-img2img-clip-skip").dataset.executionHint).toBe(
         matrixRow.ignoredHint ? "ignored" : undefined,
       );
+      if (matrixRow.id in diffusionProfileDefaults) {
+        expect(document.getElementById("rookieui-img2img-checkpoint").dataset.modelCategory).toBe("diffusion_models");
+        expect(
+          Array.from(document.getElementById("rookieui-img2img-checkpoint").options).map((option) => option.value),
+        ).toEqual(diffusionModelOptions);
+        expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe(diffusionProfileDefaults[matrixRow.id]);
+      } else {
+        expect(document.getElementById("rookieui-img2img-checkpoint").dataset.modelCategory).toBe("checkpoints");
+      }
     }
     document.getElementById("rookieui-img2img-preset").value = "sd15";
     document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
@@ -701,6 +1012,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-img2img-hires-denoise").value = "0.4";
     document.getElementById("rookieui-image-asset").value = "source-asset";
     document.getElementById("rookieui-mask-asset").value = "mask-asset";
+    document.getElementById("rookieui-img2img-controlnet-units").value = JSON.stringify([
+      {
+        enabled: true,
+        module: "depth",
+        model: "control_v11p_sd15_canny.safetensors",
+        image_asset: "img2img-control-asset",
+      },
+    ]);
     document.getElementById("rookieui-img2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
     );
@@ -814,6 +1133,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_model).toBe(0.9);
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_clip).toBe(0.7);
     expect(JSON.parse(txt2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(txt2imgCall[1].body).controlnet_units[0].image_asset).toBe("txt2img-control-asset");
     const img2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
     expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).hires_scale).toBe(1.7);
@@ -821,6 +1141,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(img2imgCall[1].body).hires_denoise).toBe(0.4);
     expect(JSON.parse(img2imgCall[1].body).seed_extra).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(img2imgCall[1].body).controlnet_units[0].image_asset).toBe("img2img-control-asset");
     const extrasCall = fetchCalls.find(([url]) => url === "/rookieui/extras/run");
     expect(extrasCall).toBeDefined();
     expect(JSON.parse(extrasCall[1].body).upscale_enabled).toBe(false);

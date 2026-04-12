@@ -157,10 +157,33 @@ describe("fetchRookieUICapabilities", () => {
 
     expect(models.data.default_checkpoint).toBe("__host_default__");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);
     expect(compatibility.data.samplers[0].id).toBe("euler_ancestral");
     expect(compatibility.data.schedulers[0].id).toBe("normal");
+    expect(compatibility.data.newer_family_profiles.map((profile) => profile.id)).toEqual([
+      "flux",
+      "qwen_image",
+      "klein",
+      "lumina",
+      "zit",
+      "wan",
+      "anima",
+    ]);
     expect(presets.data.presets[0].id).toBe("sd15");
+    expect(presets.data.presets.map((preset) => preset.id)).toEqual([
+      "sd15",
+      "sdxl",
+      "flux",
+      "qwen_image",
+      "klein",
+      "lumina",
+      "zit",
+      "wan",
+      "anima",
+    ]);
+    expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(queue.data.queue_remaining).toBe(0);
   });
 

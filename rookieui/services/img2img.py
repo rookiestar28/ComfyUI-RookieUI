@@ -27,13 +27,19 @@ from rookieui.services.coercion import (
     coerce_float as _coerce_float,
     coerce_int as _coerce_int,
 )
-from rookieui.services.model_inventory import discover_model_inventory
+from rookieui.services.model_inventory import (
+    discover_model_inventory,
+    resolve_primary_model_selector_context,
+    resolve_text_encoder_selector_context,
+    resolve_vae_selector_context,
+)
 from rookieui.services.parity_matrix import (
     get_parity_profile,
     normalize_sampler_name,
     normalize_scheduler_name,
 )
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
+from rookieui.services.controlnet import normalize_controlnet_units
 from rookieui.services.txt2img import (
     _coerce_cfg_scale,
     _coerce_dimension,
@@ -65,6 +71,11 @@ _IMG2IMG_MODE_ALIASES = {
     "inpaint_upload": "inpaint",
     "batch": "img2img",
 }
+
+
+def _is_diffusion_global_selector(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {"", "automatic", "__host_default__"}
 
 
 def _normalize_choice(
@@ -185,6 +196,13 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         data_field_name="mask_data",
         upload_prefix="rookieui_inpaint_mask",
         required=execution_mode == "inpaint",
+    )
+    controlnet_units, controlnet_warning_codes, controlnet_warnings = normalize_controlnet_units(
+        payload,
+        inventory_models=inventory.controlnet,
+        strict_model_match=inventory_is_host,
+        fallback_image_asset=image_asset,
+        fallback_image_data=request.image_data or batch_image_seed,
     )
 
     width = _coerce_dimension(
@@ -337,30 +355,53 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         hires_denoise = _DEFAULT_HIRES_DENOISE
         hires_upscale_method = _DEFAULT_HIRES_UPSCALE_METHOD
 
+    primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
+        profile.id, inventory
+    )
+    raw_vae_selector = request.vae_name
+    raw_text_encoder_selector = request.text_encoder_name
+    if primary_model_category == "diffusion_models":
+        if _is_diffusion_global_selector(raw_vae_selector):
+            raw_vae_selector = ""
+        if _is_diffusion_global_selector(raw_text_encoder_selector):
+            raw_text_encoder_selector = ""
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
-        default_value=inventory.default_checkpoint,
-        inventory_selectors=inventory.checkpoints,
+        default_value=primary_model_default,
+        inventory_selectors=primary_model_selectors,
         strict_match=inventory_is_host,
     )
     vae_name = resolve_inventory_selector(
-        request.vae_name,
+        raw_vae_selector,
         "vae_name",
-        default_value=inventory.default_vae,
+        # CRITICAL: decode quality in img2img/inpaint depends on a profile-compatible VAE;
+        # using a global default can yield normal sampler preview but broken final output.
+        default_value=resolve_vae_selector_context(profile.id, inventory),
         inventory_selectors=inventory.vae,
         strict_match=inventory_is_host,
     )
     text_encoder_name = resolve_inventory_selector(
-        request.text_encoder_name,
+        raw_text_encoder_selector,
         "text_encoder_name",
-        default_value=inventory.default_text_encoder,
+        # IMPORTANT: keep diffusion-model profile defaults aligned to a compatible text encoder on normalization fallback.
+        default_value=resolve_text_encoder_selector_context(profile.id, inventory),
         inventory_selectors=inventory.text_encoders,
         strict_match=inventory_is_host,
     )
     if profile.id in _TEXT_ENCODER_LOCKED_PROFILES:
         # IMPORTANT: SD1.5 and SDXL img2img/inpaint should not depend on a separate text-encoder selector in the RookieUI surface.
         text_encoder_name = ""
+    if primary_model_category == "diffusion_models":
+        # CRITICAL: diffusion families do not support global text encoder/VAE defaults; unresolved/Automatic selectors must fail fast instead of producing mismatched decode artifacts.
+        if _is_diffusion_global_selector(text_encoder_name):
+            raise ValueError(
+                f"text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
+            )
+        if _is_diffusion_global_selector(vae_name):
+            raise ValueError(
+                f"vae_name requires a family-specific host selector for profile '{profile.id}'."
+            )
 
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)
@@ -371,6 +412,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         negative_prompt=negative_prompt,
         profile=profile.id,
         base_family=profile.base_family,
+        primary_model_category=primary_model_category,
         prompt_encoder=profile.prompt_encoder,
         dtype_profile=dtype_profile,
         lora_name=lora_name,
@@ -418,6 +460,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         lora_activations=lora_activations,
         prompt_warnings=prompt_preprocess.prompt_warnings,
         prompt_warning_codes=prompt_preprocess.warning_codes,
+        controlnet_units=controlnet_units,
+        controlnet_warnings=controlnet_warnings,
+        controlnet_warning_codes=controlnet_warning_codes,
         prompt_semantics=prompt_preprocess.prompt_semantics.to_payload(),
         negative_prompt_semantics=prompt_preprocess.negative_prompt_semantics.to_payload(),
         applied_defaults=applied_defaults,

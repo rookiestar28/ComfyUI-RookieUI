@@ -19,6 +19,12 @@ from rookieui.services.workflow_translation import (
 from rookieui.services.coercion import coerce_bool
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.compatibility import build_compatibility_payload
+from rookieui.services.controlnet import (
+    build_controlnet_control_types_payload,
+    build_controlnet_detect_payload,
+    build_controlnet_model_list_payload,
+    build_controlnet_module_list_payload,
+)
 from rookieui.security.asset_guard import normalize_metadata_text
 from rookieui.security.request_guard import normalize_client_id, normalize_option_label
 from rookieui.security.route_guard import INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
@@ -35,6 +41,10 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
+    f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list",
+    f"{INTERNAL_ROUTE_PREFIX}/controlnet/module_list",
+    f"{INTERNAL_ROUTE_PREFIX}/controlnet/control_types",
+    f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect",
     f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img",
     f"{INTERNAL_ROUTE_PREFIX}/generate/img2img",
     f"{INTERNAL_ROUTE_PREFIX}/extras/run",
@@ -143,6 +153,47 @@ async def models(request: Any) -> Any:
 
 async def presets(request: Any) -> Any:
     return _json_response(build_presets_snapshot(), request=request)
+
+
+async def controlnet_model_list(request: Any) -> Any:
+    payload = build_controlnet_model_list_payload()
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    return _json_response(payload, request=request)
+
+
+async def controlnet_module_list(request: Any) -> Any:
+    payload = build_controlnet_module_list_payload()
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    return _json_response(payload, request=request)
+
+
+async def controlnet_control_types(request: Any) -> Any:
+    payload = build_controlnet_control_types_payload()
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    return _json_response(payload, request=request)
+
+
+async def controlnet_detect(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = build_controlnet_detect_payload(payload)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    result["service"] = normalize_metadata_text("rookieui")
+    result["status"] = normalize_metadata_text("ok")
+    return _json_response(result, request=request)
 
 
 async def queue(request: Any) -> Any:
@@ -395,6 +446,18 @@ async def extras_run(request: Any) -> Any:
     return _json_response(response_payload, request=request)
 
 
+def _register_controlnet_alias_routes(prompt_server: Any) -> None:
+    # CRITICAL: keep A1111 compatibility aliases scoped to explicit /controlnet/* paths only; do not broaden global route exposure.
+    alias_registrar = SafeRouteRegistrar(
+        prompt_server.app.router,
+        allowed_prefixes=("/controlnet",),
+    )
+    alias_registrar.add_get("/controlnet/model_list", controlnet_model_list)
+    alias_registrar.add_get("/controlnet/module_list", controlnet_module_list)
+    alias_registrar.add_get("/controlnet/control_types", controlnet_control_types)
+    alias_registrar.add_post("/controlnet/detect", controlnet_detect)
+
+
 def register_routes(prompt_server: Any) -> None:
     registrar = SafeRouteRegistrar(prompt_server.app.router)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/health", health)
@@ -404,10 +467,15 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/compatibility", compatibility)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/models", models)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/presets", presets)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list", controlnet_model_list)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/module_list", controlnet_module_list)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/control_types", controlnet_control_types)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue", queue)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}", queue_prompt)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img", txt2img)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/img2img", img2img)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/extras/run", extras_run)
+    _register_controlnet_alias_routes(prompt_server)

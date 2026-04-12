@@ -27,6 +27,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.sampler_name, "euler_ancestral")
         self.assertEqual(request.seed, -1)
         self.assertGreaterEqual(request.execution_seed, 0)
+        self.assertEqual(request.primary_model_category, "checkpoints")
         self.assertIn("width", request.applied_defaults)
         self.assertIn("scheduler_name", request.applied_defaults)
         self.assertEqual(request.dtype_profile, "automatic")
@@ -128,6 +129,102 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         )
 
         self.assertEqual(normalized.text_encoder_name, "clip_g.safetensors")
+
+    def test_normalize_txt2img_request_uses_profile_aware_text_encoder_default_for_zit(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["lumina2.safetensors", "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors"],
+                vae=["qwen_image_vae.safetensors", "lumina_vae.safetensors"],
+                text_encoders=["QwenImageTEModel_.safetensors", "LuminaTEModel.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="qwen_image_vae.safetensors",
+                default_text_encoder="QwenImageTEModel_.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "zit",
+                    "checkpoint_name": "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
+                    "text_encoder_name": "",
+                    "vae_name": "",
+                }
+            )
+
+        self.assertEqual(normalized.text_encoder_name, "LuminaTEModel.safetensors")
+        self.assertEqual(normalized.vae_name, "lumina_vae.safetensors")
+
+    def test_normalize_txt2img_request_profile_matrix_avoids_qwen_fallback_for_all_non_qwen_diffusion_profiles(self) -> None:
+        mocked_inventory = mock.Mock(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=[
+                "flux\\flux1-dev.safetensors",
+                "qwen\\qwen-image.safetensors",
+                "klein\\flux2_klein.safetensors",
+                "lumina\\lumina2.safetensors",
+                "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
+                "wan\\wan2_2b.safetensors",
+                "anima\\animaPencilXL_v500.safetensors",
+            ],
+            vae=[
+                "qwen_image_vae.safetensors",
+                "flux_vae.safetensors",
+                "klein_vae.safetensors",
+                "lumina_vae.safetensors",
+                "wan_vae.safetensors",
+                "anima_vae.safetensors",
+            ],
+            text_encoders=[
+                "QwenImageTEModel_.safetensors",
+                "FluxT5XXL.safetensors",
+                "KleinT5XXL.safetensors",
+                "LuminaTEModel.safetensors",
+                "WanTextEncoder.safetensors",
+                "AnimaTextEncoder.safetensors",
+            ],
+            loras=[],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="QwenImageTEModel_.safetensors",
+            controlnet=[],
+        )
+        profiles = ["flux", "qwen_image", "klein", "lumina", "zit", "wan", "anima"]
+        checkpoint_by_profile = {
+            "flux": "flux\\flux1-dev.safetensors",
+            "qwen_image": "qwen\\qwen-image.safetensors",
+            "klein": "klein\\flux2_klein.safetensors",
+            "lumina": "lumina\\lumina2.safetensors",
+            "zit": "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
+            "wan": "wan\\wan2_2b.safetensors",
+            "anima": "anima\\animaPencilXL_v500.safetensors",
+        }
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mocked_inventory,
+        ):
+            for profile_id in profiles:
+                with self.subTest(profile_id=profile_id):
+                    normalized = normalize_txt2img_request(
+                        {
+                            "prompt": "matrix smoke",
+                            "profile": profile_id,
+                            "checkpoint_name": checkpoint_by_profile[profile_id],
+                            "text_encoder_name": "",
+                            "vae_name": "",
+                        }
+                    )
+                    if profile_id == "qwen_image":
+                        self.assertIn("qwen", normalized.text_encoder_name.lower())
+                        self.assertIn("qwen", normalized.vae_name.lower())
+                    else:
+                        self.assertNotIn("qwen", normalized.text_encoder_name.lower())
+                        self.assertNotIn("qwen", normalized.vae_name.lower())
 
     def test_translate_txt2img_request_chains_inline_and_selected_loras(self) -> None:
         normalized = normalize_txt2img_request(
@@ -259,6 +356,70 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(request.checkpoint_name, "SD15\\beautifulRealistic_v40.safetensors")
+
+    def test_normalize_txt2img_request_resolves_profile_mapped_diffusion_model_selector(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["flux_text_encoder.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="flux_text_encoder.safetensors",
+                controlnet=[],
+            ),
+        ):
+            request = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                }
+            )
+
+        self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
+        self.assertEqual(request.primary_model_category, "diffusion_models")
+        self.assertEqual(request.vae_name, "flux_vae.safetensors")
+        self.assertEqual(request.text_encoder_name, "flux_text_encoder.safetensors")
+
+    def test_translate_txt2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors"],
+                loras=[],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "text_encoder_name": "clip_l.safetensors",
+                    "vae_name": "flux_vae.safetensors",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("UNETLoader", class_types)
+        self.assertIn("CLIPLoader", class_types)
+        self.assertIn("VAELoader", class_types)
+        self.assertIn("CLIPTextEncode", class_types)
+        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
+        self.assertNotIn("CheckpointLoaderSimple", class_types)
 
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:
         request = normalize_txt2img_request(

@@ -17,6 +17,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertTrue(payload["features"]["capabilityBootstrap"])
         self.assertTrue(payload["features"]["compatibilityLayer"])
         self.assertTrue(payload["features"]["img2img"])
+        self.assertTrue(payload["features"]["controlnet"])
         self.assertTrue(payload["features"]["pngInfo"])
         self.assertTrue(payload["features"]["queue"])
         self.assertIn("/rookieui/capabilities", payload["routes"])
