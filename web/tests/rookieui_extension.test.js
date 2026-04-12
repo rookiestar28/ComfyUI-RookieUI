@@ -1052,6 +1052,36 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     expect(document.getElementById("rookieui-pane-txt2img").hidden).toBe(true);
     expect(document.getElementById("rookieui-pane-img2img").hidden).toBe(false);
+    const img2imgSourceStage = document.getElementById("rookieui-img2img-source-canvas-stage");
+    expect(img2imgSourceStage).not.toBeNull();
+    expect(img2imgSourceStage?.dataset.interactionMode).toBe("upload");
+    expect(document.getElementById("rookieui-img2img-source-brush-width")?.value).toBe("25");
+    expect(document.getElementById("rookieui-img2img-source-brush-opacity")?.value).toBe("100");
+    expect(document.getElementById("rookieui-img2img-source-brush-softness")?.value).toBe("0");
+    expect(document.getElementById("rookieui-img2img-source-remove")?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("🗑");
+    expect(document.getElementById("rookieui-img2img-source-undo")?.disabled).toBe(true);
+    expect(document.getElementById("rookieui-img2img-source-redo")?.disabled).toBe(true);
+    const img2imgSourceValueInput =
+      document.getElementById("rookieui-image-data") ?? document.getElementById("rookieui-image-asset");
+    expect(img2imgSourceValueInput).not.toBeNull();
+    img2imgSourceValueInput.value =
+      img2imgSourceValueInput?.id === "rookieui-image-data" ? "data:image/png;base64,c291cmNl" : "img2img-stage-source";
+    img2imgSourceValueInput.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(img2imgSourceStage?.dataset.interactionMode).toBe("edit");
+    document.getElementById("rookieui-img2img-source-remove").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(img2imgSourceValueInput.value).toBe("");
+    expect(img2imgSourceStage?.dataset.interactionMode).toBe("upload");
+    expect(document.getElementById("rookieui-img2img-source-undo")?.disabled).toBe(false);
+    document.getElementById("rookieui-img2img-source-undo").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(img2imgSourceValueInput.value).not.toBe("");
+    expect(img2imgSourceStage?.dataset.interactionMode).toBe("edit");
+    expect(document.getElementById("rookieui-img2img-source-redo")?.disabled).toBe(false);
+    document.getElementById("rookieui-img2img-source-redo").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(img2imgSourceValueInput.value).toBe("");
+    expect(img2imgSourceStage?.dataset.interactionMode).toBe("upload");
     // IMPORTANT: regression guard — mask upload must remain clickable in Img2Img mode so users can preload masks before switching to inpaint.
     expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);

@@ -387,6 +387,14 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-img2img-source-brush-softness")).toHaveValue("0");
   await expect(page.locator("#rookieui-img2img-source-undo")).toBeDisabled();
   await expect(page.locator("#rookieui-img2img-source-redo")).toBeDisabled();
+  await page.locator("#rookieui-img2img-source-remove").click();
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
+  await expect(page.locator("#rookieui-img2img-source-undo")).toBeEnabled();
+  await page.locator("#rookieui-img2img-source-undo").click();
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "edit");
+  await expect(page.locator("#rookieui-img2img-source-redo")).toBeEnabled();
+  await page.locator("#rookieui-img2img-source-redo").click();
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");
   await page.locator("#rookieui-img2img-workspace-tab-lora").click();
   await page.locator("#rookieui-img2img-lora-item-0").click();
