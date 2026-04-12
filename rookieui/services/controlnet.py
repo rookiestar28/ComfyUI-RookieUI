@@ -5,6 +5,10 @@ import io
 import os
 from typing import Any
 
+from rookieui.contracts.controlnet_integrated import (
+    CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER,
+    build_controlnet_integrated_contract_meta,
+)
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.security.request_guard import normalize_option_label, resolve_inventory_selector
 from rookieui.services.asset_store import decode_image_data, resolve_asset_path, store_uploaded_image
@@ -394,6 +398,7 @@ def build_controlnet_module_list_payload() -> dict[str, object]:
     modules = list(_CONTROLNET_MODULES)
     return {
         "source": "internal",
+        "contract": build_controlnet_integrated_contract_meta(),
         "module_list": modules,
         "default_module": _DEFAULT_MODULE,
     }
@@ -403,6 +408,7 @@ def build_controlnet_model_list_payload() -> dict[str, object]:
     inventory = discover_model_inventory()
     return {
         "source": inventory.source,
+        "contract": build_controlnet_integrated_contract_meta(),
         "model_list": list(inventory.controlnet),
         "default_model": "",
     }
@@ -412,6 +418,9 @@ def build_controlnet_control_types_payload() -> dict[str, object]:
     model_list = build_controlnet_model_list_payload()["model_list"]
     return {
         "source": "internal",
+        "contract": build_controlnet_integrated_contract_meta(),
+        "control_type_order": list(CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER),
+        "default_type": "All",
         "control_types": {
             "All": {
                 "module_list": list(_CONTROLNET_MODULES),
@@ -474,6 +483,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
     if module == "none":
         return {
             "source": "rookieui",
+            "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
             "images": input_images,
             "warning_codes": warning_codes,
@@ -484,6 +494,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
         warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_DISABLED)
         return {
             "source": "rookieui",
+            "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
             "images": input_images,
             "warning_codes": warning_codes,
@@ -494,6 +505,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
         warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE)
         return {
             "source": "rookieui",
+            "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
             "images": input_images,
             "warning_codes": warning_codes,
@@ -504,6 +516,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
         warning_codes.append(CONTROLNET_WARNING_UNSUPPORTED_MODULE)
         return {
             "source": "rookieui",
+            "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
             "images": input_images,
             "warning_codes": warning_codes,
@@ -521,6 +534,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
 
     return {
         "source": "rookieui",
+        "contract": build_controlnet_integrated_contract_meta(),
         "module": module,
         "images": output_images,
         "warning_codes": warning_codes,

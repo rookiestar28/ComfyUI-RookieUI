@@ -6,6 +6,10 @@ from pathlib import Path
 from unittest import mock
 
 from rookieui.api import routes
+from rookieui.contracts.controlnet_integrated import (
+    CONTROLNET_INTEGRATED_CONTRACT_VERSION,
+    CONTROLNET_INTEGRATED_UI_VARIANT,
+)
 from rookieui.services.controlnet import (
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
@@ -277,6 +281,15 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertIn("module_list", module_list["payload"])
         self.assertIn("control_types", control_types["payload"])
         self.assertIn("images", detect["payload"])
+        self.assertEqual(model_list["payload"]["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
+        self.assertEqual(module_list["payload"]["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
+        self.assertEqual(control_types["payload"]["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
+        self.assertEqual(detect["payload"]["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
+        self.assertEqual(
+            control_types["payload"]["contract"]["ui_variant"],
+            CONTROLNET_INTEGRATED_UI_VARIANT,
+        )
+        self.assertEqual(control_types["payload"]["default_type"], "All")
 
     def test_detect_payload_supports_passthrough_none_module(self) -> None:
         payload = build_controlnet_detect_payload(
@@ -287,3 +300,4 @@ class ControlNetRouteTests(unittest.TestCase):
         )
         self.assertEqual(payload["module"], "none")
         self.assertEqual(len(payload["images"]), 1)
+        self.assertEqual(payload["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)

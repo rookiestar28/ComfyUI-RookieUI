@@ -581,6 +581,11 @@ export async function fetchRookieUIControlNetModels(fetchImpl = globalThis.fetch
     "/rookieui/controlnet/model_list",
     {
       source: "fallback",
+      contract: {
+        version: "r72-20260412",
+        ui_variant: "forge_neo_integrated",
+        unit_count: 3,
+      },
       model_list: [],
       default_model: "",
     },
@@ -593,6 +598,11 @@ export async function fetchRookieUIControlNetModules(fetchImpl = globalThis.fetc
     "/rookieui/controlnet/module_list",
     {
       source: "fallback",
+      contract: {
+        version: "r72-20260412",
+        ui_variant: "forge_neo_integrated",
+        unit_count: 3,
+      },
       module_list: ["none", "canny"],
       default_module: "none",
     },
@@ -605,6 +615,33 @@ export async function fetchRookieUIControlNetTypes(fetchImpl = globalThis.fetch)
     "/rookieui/controlnet/control_types",
     {
       source: "fallback",
+      contract: {
+        version: "r72-20260412",
+        ui_variant: "forge_neo_integrated",
+        unit_count: 3,
+      },
+      control_type_order: [
+        "All",
+        "Blur",
+        "Canny",
+        "Depth",
+        "IP-Adapter",
+        "Inpaint",
+        "Instant-ID",
+        "Lineart",
+        "MLSD",
+        "NormalMap",
+        "OpenPose",
+        "Reference",
+        "Scribble",
+        "Segmentation",
+        "Shuffle",
+        "Sketch",
+        "SoftEdge",
+        "T2I-Adapter",
+        "Tile",
+      ],
+      default_type: "All",
       control_types: {
         All: {
           module_list: ["none", "canny"],
