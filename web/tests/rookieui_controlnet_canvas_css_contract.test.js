@@ -61,6 +61,12 @@ describe("ControlNet source canvas CSS contract", () => {
       /\.rookieui-shell__canvas-upload-surface:fullscreen[\s\S]*width:\s*100vw;[\s\S]*height:\s*100vh;[\s\S]*\}/,
     );
     expect(css).toMatch(
+      /\.rookieui-shell__controlnet-preview-image\s*\{[\s\S]*left:\s*0;[\s\S]*top:\s*0;[\s\S]*max-width:\s*none;[\s\S]*max-height:\s*none;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__canvas-upload-preview\s*\{[\s\S]*left:\s*0;[\s\S]*top:\s*0;[\s\S]*max-width:\s*none;[\s\S]*max-height:\s*none;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
       /\.rookieui-shell__canvas-fullscreen-zoom\s*\{[\s\S]*position:\s*absolute;[\s\S]*bottom:\s*14px;[\s\S]*min-width:\s*232px;[\s\S]*\}/,
     );
     expect(css).toMatch(

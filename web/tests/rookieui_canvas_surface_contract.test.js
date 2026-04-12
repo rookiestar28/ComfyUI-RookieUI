@@ -1,13 +1,16 @@
 ﻿import { describe, expect, test } from "vitest";
 
 import {
+  CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
   CANVAS_INTERACTION_MODES,
   canCanvasStageOpenUpload,
   hasCanvasSourceImage,
+  isCanvasElementFullscreen,
   normalizeCanvasSourceValue,
   resolveCanvasInteractionMode,
   requestCanvasFullscreen,
+  toggleCanvasFullscreen,
 } from "../sidebar_tabs/rookieui_canvas_surface_contract.js";
 
 describe("canvas surface contract helpers", () => {
@@ -43,5 +46,52 @@ describe("canvas surface contract helpers", () => {
       },
     };
     await expect(requestCanvasFullscreen(failingElement)).resolves.toBe(false);
+  });
+
+  test("toggles fullscreen state between enter and exit actions", async () => {
+    let fullscreenElement = null;
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, "fullscreenElement");
+    const originalExitDescriptor = Object.getOwnPropertyDescriptor(document, "exitFullscreen");
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get() {
+        return fullscreenElement;
+      },
+    });
+
+    const element = {
+      async requestFullscreen() {
+        fullscreenElement = element;
+      },
+      contains(target) {
+        return target === element;
+      },
+    };
+
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: async () => {
+        fullscreenElement = null;
+      },
+    });
+
+    try {
+      expect(isCanvasElementFullscreen(element)).toBe(false);
+      await expect(toggleCanvasFullscreen(element)).resolves.toBe(CANVAS_FULLSCREEN_ACTIONS.entered);
+      expect(isCanvasElementFullscreen(element)).toBe(true);
+      await expect(toggleCanvasFullscreen(element)).resolves.toBe(CANVAS_FULLSCREEN_ACTIONS.exited);
+      expect(isCanvasElementFullscreen(element)).toBe(false);
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, "fullscreenElement", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "fullscreenElement");
+      }
+      if (originalExitDescriptor) {
+        Object.defineProperty(document, "exitFullscreen", originalExitDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "exitFullscreen");
+      }
+    }
   });
 });

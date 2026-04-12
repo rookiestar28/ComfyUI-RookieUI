@@ -301,9 +301,13 @@
 
 .rookieui-shell__controlnet-preview-image {
   position: absolute;
-  inset: 0;
+  /* CRITICAL: do not switch back to `inset: 0`; it pins right/bottom and blocks JS-driven zoom width/height updates. */
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   background: color-mix(in srgb, var(--rookieui-bg-shell) 68%, transparent);
 }
@@ -894,9 +898,13 @@
 
 .rookieui-shell__canvas-upload-preview {
   position: absolute;
-  inset: 0;
+  /* CRITICAL: keep left/top anchoring only; fullscreen zoom relies on runtime width/height and breaks when inset/right/bottom are forced. */
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   object-position: center center;
   background: color-mix(in srgb, var(--rookieui-bg-shell) 72%, transparent);

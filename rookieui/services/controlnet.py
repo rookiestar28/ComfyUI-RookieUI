@@ -69,12 +69,9 @@ _DEFAULT_MODULE = "none"
 _DEFAULT_RESIZE_MODE = "crop_and_resize"
 _DEFAULT_CONTROL_MODE = "balanced"
 _DEFAULT_HR_OPTION = "both"
-_DEFAULT_DETECT_PROVIDER = "auto"
-_DEFAULT_DETECT_ENDPOINT = "http://127.0.0.1:7860/controlnet/detect"
-_DEFAULT_DETECT_ENDPOINTS = (
-    "http://127.0.0.1:7860/controlnet/detect",
-    "http://127.0.0.1:7860/sdapi/v1/controlnet/detect",
-)
+_DEFAULT_DETECT_PROVIDER = "internal"
+_DEFAULT_DETECT_ENDPOINT = ""
+_DEFAULT_DETECT_ENDPOINTS: tuple[str, ...] = ()
 
 _CONTROLNET_BASE_MODULES = (
     "none",
@@ -233,14 +230,20 @@ def is_controlnet_preprocessor_enabled() -> bool:
 
 def _resolve_detect_provider() -> str:
     normalized = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_PROVIDER_ENV, _DEFAULT_DETECT_PROVIDER)).strip().lower()
-    if normalized in {"internal", "a1111", "auto"}:
-        return normalized
+    if normalized == "a1111":
+        return "a1111"
+    if normalized == "auto":
+        # IMPORTANT: legacy `auto` previously tried external A1111/Forge first; keep runtime self-contained by coercing it to internal.
+        return "internal"
+    if normalized == "internal":
+        return "internal"
+    # IMPORTANT: default to internal detect to keep RookieUI runtime self-contained; external A1111/Forge detect must be explicit opt-in via env.
     return _DEFAULT_DETECT_PROVIDER
 
 
 def _resolve_external_detect_endpoint() -> str:
     endpoint = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_ENDPOINT_ENV, _DEFAULT_DETECT_ENDPOINT)).strip()
-    return endpoint or _DEFAULT_DETECT_ENDPOINT
+    return endpoint
 
 
 def _resolve_external_detect_endpoints() -> list[str]:
@@ -259,9 +262,8 @@ def _resolve_external_detect_endpoints() -> list[str]:
         for candidate in re.split(r"[,\n;]+", raw_endpoints):
             _push(candidate)
     else:
+        # IMPORTANT: do not assume any external detect host; external A1111/Forge route must be explicit opt-in.
         _push(_resolve_external_detect_endpoint())
-        for default_endpoint in _DEFAULT_DETECT_ENDPOINTS:
-            _push(default_endpoint)
 
     if not resolved:
         for default_endpoint in _DEFAULT_DETECT_ENDPOINTS:
@@ -315,6 +317,11 @@ def _run_external_detect_request(
     low_vram: bool,
 ) -> list[str]:
     endpoints = _resolve_external_detect_endpoints()
+    if not endpoints:
+        raise RuntimeError(
+            "external detect endpoint is not configured; set "
+            f"{ROOKIEUI_CONTROLNET_DETECT_ENDPOINT_ENV} or {ROOKIEUI_CONTROLNET_DETECT_ENDPOINTS_ENV}."
+        )
     timeout_seconds = _resolve_external_detect_timeout_seconds()
     request_payload = {
         "controlnet_module": module,

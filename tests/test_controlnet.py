@@ -537,6 +537,50 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
         self.assertEqual(len(payload["images"]), 1)
 
+    def test_detect_payload_defaults_to_internal_provider_when_env_is_not_explicit(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "",
+            },
+            clear=False,
+        ):
+            payload = build_controlnet_detect_payload(
+                {
+                    "controlnet_module": "depth",
+                    "controlnet_input_images": [
+                        "data:image/png;base64,"
+                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
+                    ],
+                }
+            )
+
+        self.assertEqual(payload["source"], "rookieui")
+        self.assertTrue(str(payload["detect_backend"]).startswith("rookieui_internal"))
+        self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
+
+    def test_detect_payload_coerces_legacy_auto_provider_to_internal(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "auto",
+            },
+            clear=False,
+        ):
+            payload = build_controlnet_detect_payload(
+                {
+                    "controlnet_module": "depth",
+                    "controlnet_input_images": [
+                        "data:image/png;base64,"
+                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
+                    ],
+                }
+            )
+
+        self.assertEqual(payload["source"], "rookieui")
+        self.assertTrue(str(payload["detect_backend"]).startswith("rookieui_internal"))
+        self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
+
     def test_detect_payload_uses_a1111_proxy_provider_when_configured(self) -> None:
         captured_request = {}
 
@@ -567,7 +611,7 @@ class ControlNetRouteTests(unittest.TestCase):
             "os.environ",
             {
                 "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "a1111",
-                "ROOKIEUI_CONTROLNET_DETECT_ENDPOINT": "http://127.0.0.1:7860/controlnet/detect",
+                "ROOKIEUI_CONTROLNET_DETECT_ENDPOINT": "http://127.0.0.1:18080/controlnet/detect",
             },
             clear=False,
         ):
@@ -589,7 +633,7 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(payload["module"], "depth")
         self.assertEqual(payload["images"], ["data:image/png;base64,cHJveHk="])
         self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
-        self.assertEqual(captured_request["url"], "http://127.0.0.1:7860/controlnet/detect")
+        self.assertEqual(captured_request["url"], "http://127.0.0.1:18080/controlnet/detect")
         self.assertEqual(captured_request["body"]["controlnet_module"], "depth")
         self.assertEqual(captured_request["body"]["controlnet_masks"], ["data:image/png;base64,bWFzaw=="])
         self.assertTrue(captured_request["body"]["low_vram"])
