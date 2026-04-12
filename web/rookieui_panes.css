@@ -141,6 +141,82 @@
   margin-top: 12px;
 }
 
+.rookieui-shell__controlnet-integrated {
+  margin-top: 12px;
+}
+
+.rookieui-shell__controlnet-body {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__controlnet-note {
+  margin-top: 0;
+}
+
+.rookieui-shell__controlnet-tabs {
+  margin-bottom: 0;
+}
+
+.rookieui-shell__controlnet-panel-host {
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, transparent);
+}
+
+.rookieui-shell__controlnet-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__controlnet-panel[hidden] {
+  display: none !important;
+}
+
+.rookieui-shell__controlnet-panel.is-active {
+  display: grid;
+}
+
+.rookieui-shell__field--full {
+  grid-column: 1 / -1;
+}
+
+.rookieui-shell__controlnet-radio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__controlnet-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 999px;
+  background: var(--rookieui-bg-input);
+}
+
+.rookieui-shell__controlnet-radio-option[data-active="true"] {
+  border-color: var(--rookieui-border-strong);
+  background: color-mix(in srgb, var(--rookieui-accent) 16%, var(--rookieui-bg-input));
+}
+
+.rookieui-shell__controlnet-radio-option .rookieui-shell__checkbox {
+  width: 14px;
+  height: 14px;
+}
+
+.rookieui-shell__controlnet-upload-row {
+  width: 100%;
+}
+
+.rookieui-shell__controlnet-upload-row .rookieui-shell__action-target-row {
+  width: 100%;
+}
+
 .rookieui-shell__preview-box {
   min-height: 340px;
   border: 1px solid var(--rookieui-border);

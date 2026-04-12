@@ -723,7 +723,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260411-r59-mask-placeholder");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260412-f74-controlnet-integrated");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -809,6 +809,13 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(txt2imgGenerationSection?.contains(txt2imgControlNetSection)).toBe(true);
     expect(txt2imgHiresControls).not.toBeNull();
     expect(txt2imgControlNetSection).not.toBeNull();
+    expect(txt2imgControlNetSection?.classList.contains("rookieui-shell__controlnet-integrated")).toBe(true);
+    expect(txt2imgControlNetSection?.textContent).toContain("ControlNet Integrated");
+    expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")?.textContent).toContain("ControlNet Unit 1");
+    expect(document.getElementById("rookieui-txt2img-controlnet-allow-preview-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-use-mask-0")).not.toBeNull();
+    expect(txt2imgControlNetSection?.textContent).toContain("Instant-ID");
     expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-button-0")?.textContent).toBe(
       "Choose Image File",
     );
@@ -940,6 +947,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgGenerationSection?.contains(img2imgControlNetSection)).toBe(true);
     expect(img2imgHiresControls).not.toBeNull();
     expect(img2imgControlNetSection).not.toBeNull();
+    expect(img2imgControlNetSection?.classList.contains("rookieui-shell__controlnet-integrated")).toBe(true);
+    expect(img2imgControlNetSection?.textContent).toContain("ControlNet Integrated");
+    expect(document.getElementById("rookieui-img2img-controlnet-tab-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-allow-preview-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-use-mask-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-image-upload-button-0")?.textContent).toBe(
       "Choose Image File",
     );
