@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f85-source-brush";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-r83-preview-contract";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {

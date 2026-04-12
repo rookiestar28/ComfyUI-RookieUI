@@ -336,9 +336,34 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement, crea
   sourceUploadInput.setAttribute("aria-hidden", "true");
   stage.appendChild(sourceUploadInput);
 
+  const generatedLane = document.createElement("div");
+  generatedLane.className = "rookieui-shell__controlnet-generated-preview";
+  generatedLane.id = `${idPrefix}-preview-generated-lane-${index}`;
+  generatedLane.hidden = true;
+
+  const generatedImage = document.createElement("img");
+  generatedImage.className = "rookieui-shell__controlnet-generated-preview-image";
+  generatedImage.id = `${idPrefix}-preview-generated-image-${index}`;
+  generatedImage.alt = `ControlNet generated preview ${index + 1}`;
+  generatedImage.hidden = true;
+  generatedLane.appendChild(generatedImage);
+
+  const generatedPlaceholder = document.createElement("div");
+  generatedPlaceholder.className = "rookieui-shell__controlnet-generated-preview-placeholder";
+  appendTextElement(
+    generatedPlaceholder,
+    "span",
+    "rookieui-shell__controlnet-generated-preview-placeholder-text",
+    "Run Preprocessor output preview",
+  );
+  generatedLane.appendChild(generatedPlaceholder);
+
   return {
     unitIndex: index,
     stage,
+    generatedLane,
+    generatedImage,
+    generatedPlaceholder,
     toolbar,
     previewImage,
     placeholder,
@@ -390,6 +415,22 @@ function setControlNetPreview(previewState, { imageData = "", imageAsset = "", f
   previewState.resetButton.disabled = !hasSource;
   previewState.undoButton.disabled = previewState.history.undo.length === 0;
   previewState.redoButton.disabled = previewState.history.redo.length === 0;
+}
+
+function setControlNetGeneratedPreview(previewState, { imageData = "", visible = false } = {}) {
+  const normalizedImage = String(imageData ?? "").trim();
+  const hasGeneratedImage = normalizedImage.startsWith("data:image/");
+  const shouldShow = Boolean(visible) && hasGeneratedImage;
+  previewState.generatedLane.hidden = !shouldShow;
+  if (shouldShow) {
+    previewState.generatedImage.src = normalizedImage;
+    previewState.generatedImage.hidden = false;
+    previewState.generatedPlaceholder.hidden = true;
+    return;
+  }
+  previewState.generatedImage.hidden = true;
+  previewState.generatedImage.removeAttribute("src");
+  previewState.generatedPlaceholder.hidden = false;
 }
 
 function hasIndependentControlImageData(row) {
@@ -958,13 +999,12 @@ export function createControlNetUnitEditor({
         }
         return;
       }
-
-      row.imageData.value = outputImage;
-      row.imageAsset.value = "";
-      row.imageUploadName.value = FILE_PAYLOAD_PLACEHOLDER;
-      setControlNetPreview(row.preview, { imageData: outputImage });
-      syncRunPreprocessorVisibility(row, isImg2ImgEditor);
-      syncHiddenField();
+      // CRITICAL: run-preprocessor output is generated preview state only; source image fields must remain immutable to preserve user-selected source/rollback semantics.
+      row.generatedPreviewData = outputImage;
+      setControlNetGeneratedPreview(row.preview, {
+        imageData: row.generatedPreviewData,
+        visible: row.allowPreview.checked,
+      });
 
       const warningText = Array.isArray(data?.warnings) && data.warnings.length > 0 ? ` (${data.warnings[0]})` : "";
       if (onStatusMessage) {
@@ -1034,6 +1074,7 @@ export function createControlNetUnitEditor({
 
     const preview = createControlNetPreviewStage({ idPrefix, index, appendTextElement, createInput });
     panel.appendChild(preview.stage);
+    panel.appendChild(preview.generatedLane);
 
     const primaryGrid = document.createElement("div");
     primaryGrid.className = "rookieui-shell__controlnet-toggle-grid";
@@ -1328,6 +1369,7 @@ export function createControlNetUnitEditor({
       maskUploadName: maskUploadControl.fileNameInput,
       runPreprocessorButton,
       sourceBrush: null,
+      generatedPreviewData: "",
     };
 
     imageUploadControl.controlRow.classList.add("rookieui-shell__controlnet-upload-row--legacy-source");
@@ -1382,6 +1424,11 @@ export function createControlNetUnitEditor({
       setControlNetPreview(rowElements.preview, {
         imageData: normalizedSnapshot.imageData,
         imageAsset: normalizedSnapshot.imageAsset,
+      });
+      rowElements.generatedPreviewData = "";
+      setControlNetGeneratedPreview(rowElements.preview, {
+        imageData: rowElements.generatedPreviewData,
+        visible: rowElements.allowPreview.checked,
       });
       const brushSyncPromise = rowElements.sourceBrush?.syncSourceData(normalizedSnapshot.imageData);
       if (brushSyncPromise && typeof brushSyncPromise.catch === "function") {
@@ -1455,6 +1502,7 @@ export function createControlNetUnitEditor({
     applyCatalogToRow(rowElements, false);
     bindSyncHandlers(rowElements);
     setControlNetPreview(preview, { imageData: "", imageAsset: "" });
+    setControlNetGeneratedPreview(preview, { imageData: "", visible: false });
     rowElements.sourceBrush.syncSourceData("");
 
     moduleSelect.addEventListener("change", syncHiddenField);
@@ -1468,6 +1516,11 @@ export function createControlNetUnitEditor({
     });
 
     imageAsset.addEventListener("input", () => {
+      rowElements.generatedPreviewData = "";
+      setControlNetGeneratedPreview(preview, {
+        imageData: rowElements.generatedPreviewData,
+        visible: rowElements.allowPreview.checked,
+      });
       if (imageData.value.trim()) {
         syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
         return;
@@ -1477,8 +1530,19 @@ export function createControlNetUnitEditor({
     });
     imageData.addEventListener("input", () => {
       setControlNetPreview(preview, { imageData: imageData.value, imageAsset: imageAsset.value });
+      rowElements.generatedPreviewData = "";
+      setControlNetGeneratedPreview(preview, {
+        imageData: rowElements.generatedPreviewData,
+        visible: rowElements.allowPreview.checked,
+      });
       rowElements.sourceBrush?.syncSourceData(imageData.value);
       syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
+    });
+    allowPreview.addEventListener("change", () => {
+      setControlNetGeneratedPreview(preview, {
+        imageData: rowElements.generatedPreviewData,
+        visible: allowPreview.checked,
+      });
     });
 
     preview.uploadButton.addEventListener("click", () => {
@@ -1662,6 +1726,8 @@ export function createControlNetUnitEditor({
       row.preview.history.redo = [];
       setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
       row.sourceBrush?.syncSourceData(unit.image_data);
+      row.generatedPreviewData = "";
+      setControlNetGeneratedPreview(row.preview, { imageData: row.generatedPreviewData, visible: row.allowPreview.checked });
       syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }
     syncHiddenField();

@@ -218,6 +218,56 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(uploadClickSpy).toHaveBeenCalledTimes(1);
   });
 
+  test("keeps source immutable when run-preprocessor updates generated preview state", async () => {
+    const { host } = buildEditor("rookieui-img2img-controlnet");
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const allowPreview = host.querySelector("#rookieui-img2img-controlnet-allow-preview-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    const generatedLane = host.querySelector("#rookieui-img2img-controlnet-preview-generated-lane-0");
+    const generatedImage = host.querySelector("#rookieui-img2img-controlnet-preview-generated-image-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(allowPreview).not.toBeNull();
+    expect(runButton).not.toBeNull();
+    expect(generatedLane).not.toBeNull();
+    expect(generatedImage).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        async json() {
+          return { images: ["data:image/png;base64,cHJldmlldy1pbWFnZQ=="] };
+        },
+      }));
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "depth";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(runButton?.hidden).toBe(false);
+
+      const sourceBeforeRun = imageData.value;
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(imageData.value).toBe(sourceBeforeRun);
+      expect(generatedLane.hidden).toBe(true);
+
+      allowPreview.checked = true;
+      allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(generatedLane.hidden).toBe(false);
+      expect(generatedImage.src).toContain("data:image/png;base64,cHJldmlldy1pbWFnZQ==");
+
+      allowPreview.checked = false;
+      allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(generatedLane.hidden).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("keeps canvas source history rollback deterministic for remove/undo/redo", async () => {
     const { host } = buildEditor("rookieui-img2img-controlnet");
 

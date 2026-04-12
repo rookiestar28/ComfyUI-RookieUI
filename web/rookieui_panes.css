@@ -266,6 +266,38 @@
   line-height: 1.4;
 }
 
+.rookieui-shell__controlnet-generated-preview {
+  position: relative;
+  min-height: 180px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 90%, transparent);
+}
+
+.rookieui-shell__controlnet-generated-preview[hidden] {
+  display: none !important;
+}
+
+.rookieui-shell__controlnet-generated-preview-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 72%, transparent);
+}
+
+.rookieui-shell__controlnet-generated-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--rookieui-text-muted);
+  font-size: 12px;
+}
+
 .rookieui-shell__controlnet-toggle-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -19,7 +19,7 @@ import {
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260412-f85-source-brush";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260412-r83-preview-contract";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
 const ROOKIEUI_ASSET_REVISION = "20260412-controlnet-ui-parity-pass2";
