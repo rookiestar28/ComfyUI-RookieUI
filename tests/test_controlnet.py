@@ -520,3 +520,20 @@ class ControlNetRouteTests(unittest.TestCase):
             return
         self.assertNotIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
         self.assertEqual(len(payload["images"]), 1)
+
+    def test_detect_payload_returns_warning_for_unsupported_runtime_processor_module(self) -> None:
+        payload = build_controlnet_detect_payload(
+            {
+                "controlnet_module": "openpose",
+                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+            }
+        )
+        self.assertEqual(payload["module"], "openpose")
+        self.assertIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
+        self.assertEqual(len(payload["images"]), 1)
+
+    def test_controlnet_detect_route_returns_invalid_request_for_missing_image(self) -> None:
+        response = asyncio.run(routes.controlnet_detect(_FakeJsonRequest({"controlnet_module": "depth"})))
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(response["payload"]["status"], "invalid-request")
+        self.assertIn("controlnet_input_images or image is required", response["payload"]["detail"])
