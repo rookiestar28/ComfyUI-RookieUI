@@ -382,6 +382,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   expect(sourceStageRouting.clickCount).toBe(1);
   expect(sourceStageRouting.interactionModeAfterBind).toBe("edit");
   expect(sourceStageRouting.ariaLabelAfterBind).toBe("Img2Img source canvas editing surface");
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
   await expect(page.locator("#rookieui-img2img-source-upload .rookieui-shell__mini-action-icon")).toHaveText("📁");
   await expect(page.locator("#rookieui-img2img-source-remove .rookieui-shell__mini-action-icon")).toHaveText("🗑");
   await expect(page.locator("#rookieui-img2img-source-reset .rookieui-shell__mini-action-icon")).toHaveText("↺");
@@ -391,12 +392,15 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-img2img-source-brush-softness")).toHaveValue("0");
   await expect(page.locator("#rookieui-img2img-source-undo")).toBeDisabled();
   await expect(page.locator("#rookieui-img2img-source-redo")).toBeDisabled();
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
   await page.locator("#rookieui-img2img-source-remove").click();
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
   await expect(page.locator("#rookieui-img2img-source-undo")).toBeEnabled();
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
   await page.locator("#rookieui-img2img-source-undo").click();
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "edit");
   await expect(page.locator("#rookieui-img2img-source-redo")).toBeEnabled();
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
   await page.locator("#rookieui-img2img-source-redo").click();
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");
@@ -405,6 +409,8 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-img2img-workspace-tab-generation").click();
   const img2imgRunPreprocessorButton = page.locator("#rookieui-img2img-controlnet-run-preprocessor-0");
   await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-upload-action-0")).toBeHidden();
+  await page.locator("#rookieui-img2img-controlnet-preview-stage-0").hover();
   await expect(page.locator("#rookieui-img2img-controlnet-preview-upload-action-0")).toBeVisible();
   await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-toggle")).toBeVisible();
   await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-width")).toHaveValue("25");
@@ -493,10 +499,13 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     window.fetch = window.__ROOKIEUI_ORIGINAL_FETCH__;
     delete window.__ROOKIEUI_ORIGINAL_FETCH__;
   });
+  await page.locator("#rookieui-img2img-controlnet-preview-stage-0").hover();
   await page.locator("#rookieui-img2img-controlnet-preview-remove-action-0").click();
   await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await page.locator("#rookieui-img2img-controlnet-preview-stage-0").hover();
   await page.locator("#rookieui-img2img-controlnet-preview-undo-action-0").click();
   await expect(img2imgRunPreprocessorButton).toBeVisible();
+  await page.locator("#rookieui-img2img-controlnet-preview-stage-0").hover();
   await page.locator("#rookieui-img2img-controlnet-preview-redo-action-0").click();
   await expect(img2imgRunPreprocessorButton).toBeHidden();
   await page.locator("#rookieui-tab-txt2img").click();

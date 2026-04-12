@@ -997,6 +997,7 @@ export function createControlNetUnitEditor({
     if (onStatusMessage) {
       onStatusMessage(`ControlNet Unit ${unitIndex + 1}: running preprocessor...`);
     }
+    const maskImage = row.useMask.checked ? String(row.maskData.value ?? "").trim() : "";
 
     const abortController = typeof globalThis.AbortController === "function" ? new globalThis.AbortController() : null;
     let timeoutHandle = null;
@@ -1018,6 +1019,8 @@ export function createControlNetUnitEditor({
           controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
           controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
           controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
+          controlnet_masks: maskImage ? [maskImage] : [],
+          low_vram: false,
         }),
         signal: abortController?.signal,
       });
@@ -1045,12 +1048,25 @@ export function createControlNetUnitEditor({
         visible: row.allowPreview.checked,
       });
 
-      const warningText = Array.isArray(data?.warnings) && data.warnings.length > 0 ? ` (${data.warnings[0]})` : "";
+      const warningMessages = Array.isArray(data?.warnings) ? data.warnings : [];
+      const warningCodes = Array.isArray(data?.warning_codes) ? data.warning_codes.map((entry) => String(entry)) : [];
+      const warningText = warningMessages.length > 0 ? ` (${warningMessages[0]})` : "";
+      const detectBackend = String(data?.detect_backend ?? "").trim().toLowerCase();
+      const sourceLabel = String(data?.source ?? "").trim().toLowerCase();
+      const externalDetectUnavailable = warningCodes.includes("CONTROLNET_EXTENSION_DETECT_REQUIRED");
+      let backendText = " via RookieUI internal preprocessor.";
+      if (sourceLabel === "a1111-proxy" || detectBackend === "a1111_extension") {
+        backendText = " via A1111/Forge ControlNet API.";
+      } else if (externalDetectUnavailable || detectBackend === "a1111_unavailable_passthrough") {
+        backendText = " A1111/Forge ControlNet API is unavailable; showing passthrough output.";
+      } else if (detectBackend.startsWith("rookieui_internal")) {
+        backendText = " via RookieUI internal fallback preprocessor (approximate output).";
+      }
       const visibilityText = row.allowPreview.checked
         ? " Preview lane updated."
         : " Preview output is ready but hidden because Allow Preview is off.";
       if (onStatusMessage) {
-        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed.${warningText}${visibilityText}`);
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed${warningText}${backendText}${visibilityText}`);
       }
     } catch (error) {
       if (error?.name === "AbortError") {

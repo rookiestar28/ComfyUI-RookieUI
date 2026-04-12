@@ -19,6 +19,19 @@ describe("ControlNet source canvas CSS contract", () => {
     );
   });
 
+  test("hides overlay toolbars by default on pointer-hover surfaces and reveals them on hover/focus", () => {
+    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
+    const css = readFileSync(cssPath, "utf8");
+
+    expect(css).toMatch(/@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)\s*\{[\s\S]*\}/);
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-preview-toolbar,\s*\.rookieui-shell__canvas-upload-toolbar\s*\{[\s\S]*opacity:\s*0;[\s\S]*visibility:\s*hidden;[\s\S]*pointer-events:\s*none;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-preview-stage:hover\s+\.rookieui-shell__controlnet-preview-toolbar[\s\S]*\.rookieui-shell__canvas-upload-surface:focus-within\s+\.rookieui-shell__canvas-upload-toolbar[\s\S]*\{[\s\S]*opacity:\s*1;[\s\S]*visibility:\s*visible;[\s\S]*pointer-events:\s*auto;[\s\S]*\}/,
+    );
+  });
+
   test("defines explicit circular brush indicator layer for edit-mode cursor parity", () => {
     const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
     const css = readFileSync(cssPath, "utf8");

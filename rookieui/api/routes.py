@@ -179,8 +179,16 @@ async def controlnet_control_types(request: Any) -> Any:
 async def controlnet_detect(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
+        requested_module = normalize_metadata_text(str(payload.get("controlnet_module", "")).strip() or "none")
+        requested_image_count = _count_detect_input_images(payload)
+        _LOGGER.info(
+            "RookieUI ControlNet detect request received (module=%s, images=%s).",
+            requested_module,
+            requested_image_count,
+        )
         result = build_controlnet_detect_payload(payload)
     except ValueError as exc:
+        _LOGGER.warning("RookieUI ControlNet detect rejected invalid request: %s", str(exc))
         return _json_response(
             {
                 "service": normalize_metadata_text("rookieui"),
@@ -189,6 +197,31 @@ async def controlnet_detect(request: Any) -> Any:
             },
             status=400,
             request=request,
+        )
+
+    warning_codes = result.get("warning_codes") if isinstance(result, dict) else []
+    output_images = result.get("images") if isinstance(result, dict) else []
+    output_image_count = len(output_images) if isinstance(output_images, list) else 0
+    detect_backend = normalize_metadata_text(str(result.get("detect_backend", "")).strip()) if isinstance(result, dict) else ""
+    source_label = normalize_metadata_text(str(result.get("source", "")).strip()) if isinstance(result, dict) else ""
+    if isinstance(warning_codes, list) and warning_codes:
+        _LOGGER.warning(
+            "RookieUI ControlNet detect completed with warnings (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s, warning_codes=%s).",
+            requested_module,
+            requested_image_count,
+            output_image_count,
+            source_label,
+            detect_backend,
+            ",".join(str(code) for code in warning_codes),
+        )
+    else:
+        _LOGGER.info(
+            "RookieUI ControlNet detect completed (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s).",
+            requested_module,
+            requested_image_count,
+            output_image_count,
+            source_label,
+            detect_backend,
         )
 
     result["service"] = normalize_metadata_text("rookieui")
@@ -300,6 +333,16 @@ def _read_request_query_value(request: Any, key: str) -> object | None:
         return rel_query.get(key)
 
     return None
+
+
+def _count_detect_input_images(payload: dict[str, object]) -> int:
+    raw_images = payload.get("controlnet_input_images")
+    if isinstance(raw_images, list):
+        return len([entry for entry in raw_images if isinstance(entry, str) and entry.strip()])
+    single_image = payload.get("image")
+    if isinstance(single_image, str) and single_image.strip():
+        return 1
+    return 0
 
 
 def _read_request_match_value(request: Any, key: str) -> str:
