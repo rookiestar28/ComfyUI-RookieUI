@@ -1058,6 +1058,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-source-brush-width")?.value).toBe("25");
     expect(document.getElementById("rookieui-img2img-source-brush-opacity")?.value).toBe("100");
     expect(document.getElementById("rookieui-img2img-source-brush-softness")?.value).toBe("0");
+    expect(document.getElementById("rookieui-img2img-source-brush-indicator")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-source-remove")?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("🗑");
     expect(document.getElementById("rookieui-img2img-source-undo")?.disabled).toBe(true);
     expect(document.getElementById("rookieui-img2img-source-redo")?.disabled).toBe(true);
@@ -1110,6 +1111,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-0")?.hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-controlnet-preview-stage-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-preview-image-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-source-0-brush-indicator")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-weight-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-start-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-end-slider-0")).not.toBeNull();
