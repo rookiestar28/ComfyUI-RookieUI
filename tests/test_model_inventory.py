@@ -233,6 +233,52 @@ class ModelInventoryTests(unittest.TestCase):
                 else:
                     self.assertNotIn("qwen", resolved_text_encoder.lower())
 
+    def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": [
+                    "qwen\\Qwen-Image-Lightning-8steps.safetensors",
+                    "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                    "qwen\\qwen_image_2512_2step_distilled.safetensors",
+                ],
+                "vae": ["Automatic"],
+                "text_encoders": ["qwen_3_4b.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        category_id, selectors, default_model = resolve_primary_model_selector_context("qwen_image", snapshot)
+        self.assertEqual(category_id, "diffusion_models")
+        self.assertIn(default_model, selectors)
+        self.assertEqual(default_model, "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors")
+
+        text_encoder = resolve_text_encoder_selector_context("qwen_image", snapshot)
+        self.assertEqual(text_encoder, "qwen_2.5_vl_7b_fp8_scaled.safetensors")
+
+    def test_resolve_primary_model_selector_prefers_non_lightning_wan_default(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": [
+                    "wan\\wan2.2_t2v_lightx2v_4steps.safetensors",
+                    "wan\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+                    "wan\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+                ],
+                "vae": ["Automatic"],
+                "text_encoders": ["wan_text_encoder.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        category_id, selectors, default_model = resolve_primary_model_selector_context("wan", snapshot)
+        self.assertEqual(category_id, "diffusion_models")
+        self.assertIn(default_model, selectors)
+        self.assertEqual(default_model, "wan\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors")
+
+        text_encoder = resolve_text_encoder_selector_context("wan", snapshot)
+        self.assertEqual(text_encoder, "umt5_xxl_fp8_e4m3fn_scaled.safetensors")
+
     def test_discover_model_inventory_uses_ttl_cache_for_host_lookup(self) -> None:
         call_count = 0
 

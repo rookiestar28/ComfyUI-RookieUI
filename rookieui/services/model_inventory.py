@@ -35,6 +35,19 @@ _PROFILE_DIFFUSION_MODEL_HINTS: dict[str, tuple[str, ...]] = {
     "wan": ("wan",),
     "anima": ("anima",),
 }
+_PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "flux": (("flux2", "dev"), ("flux2",), ("flux",)),
+    "qwen_image": (("qwen", "2512", "fp8"), ("qwen", "2512"), ("qwen", "image"), ("qwen",)),
+    "klein": (("klein", "base"), ("flux2", "klein"), ("klein",)),
+    "lumina": (("lumina2",), ("lumina",)),
+    "zit": (("z_image_turbo",), ("z-image-turbo",), ("zimageturbo",), ("zit",), ("z-image",)),
+    "wan": (("wan2.2", "high_noise"), ("wan2.2",), ("wan", "high_noise"), ("wan",)),
+    "anima": (("anima",),),
+}
+_PROFILE_DIFFUSION_MODEL_DENY_HINTS: dict[str, tuple[str, ...]] = {
+    "qwen_image": ("lightning", "lora", "2step", "4step", "8step", "distill", "distilled"),
+    "wan": ("lightning", "lightx2v", "lora", "2step", "4step"),
+}
 _PROFILE_TEXT_ENCODER_HINTS: dict[str, tuple[str, ...]] = {
     "flux": ("flux", "t5"),
     "qwen_image": ("qwen",),
@@ -43,6 +56,15 @@ _PROFILE_TEXT_ENCODER_HINTS: dict[str, tuple[str, ...]] = {
     "zit": ("zit", "z-image", "zimage", "lumina"),
     "wan": ("wan",),
     "anima": ("anima",),
+}
+_PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "flux": (("mistral_3_small_flux2",), ("flux", "t5"), ("flux",), ("t5",)),
+    "qwen_image": (("qwen_2.5_vl",), ("qwenimagete",), ("qwen",)),
+    "klein": (("qwen_3_4b",), ("klein",), ("flux2",), ("t5",)),
+    "lumina": (("lumina",), ("qwen_3_4b",), ("qwen",)),
+    "zit": (("qwen_3_4b",), ("lumina",), ("qwen",)),
+    "wan": (("umt5",), ("wan",), ("t5",)),
+    "anima": (("qwen_3_06b",), ("anima",), ("qwen",)),
 }
 
 
@@ -163,17 +185,65 @@ def _find_selector_by_hints(selectors: list[str], hints: tuple[str, ...]) -> str
     return ""
 
 
+def _find_selector_by_priority(
+    selectors: list[str],
+    priority_hints: tuple[tuple[str, ...], ...],
+) -> str:
+    if not priority_hints:
+        return ""
+    normalized_candidates = [
+        (_normalize_selector_token(selector), selector)
+        for selector in selectors
+    ]
+    for hint_group in priority_hints:
+        if not hint_group:
+            continue
+        normalized_hints = tuple(hint.strip().lower() for hint in hint_group if hint and hint.strip())
+        if not normalized_hints:
+            continue
+        for folded_selector, original_selector in normalized_candidates:
+            if all(hint in folded_selector for hint in normalized_hints):
+                return original_selector
+    return ""
+
+
+def _filter_selectors_by_deny_hints(
+    selectors: list[str],
+    deny_hints: tuple[str, ...],
+) -> list[str]:
+    if not selectors or not deny_hints:
+        return list(selectors)
+    filtered = [
+        selector
+        for selector in selectors
+        if all(deny_hint not in _normalize_selector_token(selector) for deny_hint in deny_hints)
+    ]
+    return filtered or list(selectors)
+
+
 def _resolve_profile_diffusion_model_default(
     profile_id: str,
     selectors: list[str],
 ) -> str:
     if not selectors:
         return ""
+    # CRITICAL: when standard and accelerated variants coexist, defaults must prefer non-acceleration paths;
+    # auto-selecting Lightning/distilled entries can silently force mismatched step/cfg defaults and degrade output quality.
+    candidate_selectors = _filter_selectors_by_deny_hints(
+        selectors,
+        _PROFILE_DIFFUSION_MODEL_DENY_HINTS.get(profile_id, ()),
+    )
+    prioritized = _find_selector_by_priority(
+        candidate_selectors,
+        _PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS.get(profile_id, ()),
+    )
+    if prioritized:
+        return prioritized
     hints = _PROFILE_DIFFUSION_MODEL_HINTS.get(profile_id, ())
-    matched = _find_selector_by_hints(selectors, hints)
+    matched = _find_selector_by_hints(candidate_selectors, hints)
     if matched:
         return matched
-    return selectors[0]
+    return candidate_selectors[0]
 
 
 def resolve_text_encoder_selector_context(
@@ -190,6 +260,12 @@ def resolve_text_encoder_selector_context(
         if inventory.default_text_encoder in selectors
         else selectors[0]
     )
+    matched_by_priority = _find_selector_by_priority(
+        selectors,
+        _PROFILE_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
+    )
+    if matched_by_priority:
+        return matched_by_priority
     profile_hints = _PROFILE_TEXT_ENCODER_HINTS.get(normalized_profile_id, ())
     matched_by_hint = _find_selector_by_hints(selectors, profile_hints)
     if matched_by_hint:
