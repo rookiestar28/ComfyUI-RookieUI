@@ -269,6 +269,7 @@ export function createSliderField(parent, labelText, numberInput, rangeInput, id
   header.appendChild(numberInput);
   field.appendChild(rangeInput);
   parent.appendChild(field);
+  return field;
 }
 
 export function generateDeterministicSeed() {

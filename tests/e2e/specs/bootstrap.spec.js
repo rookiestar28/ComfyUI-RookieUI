@@ -278,6 +278,35 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(
     page.locator("#rookieui-txt2img-controlnet-preview-stage-0 .rookieui-shell__controlnet-preview-placeholder-icon"),
   ).toHaveText("⤴");
+  const txt2imgControlNetRowLayout = await page.evaluate(() => {
+    const moduleSelect = document.querySelector("#rookieui-txt2img-controlnet-module-0");
+    const runButton = document.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0");
+    const modelSelect = document.querySelector("#rookieui-txt2img-controlnet-model-0");
+    const weightField = document.querySelector("#rookieui-txt2img-controlnet-weight-field-0");
+    const timestepField = document.querySelector("#rookieui-txt2img-controlnet-timestep-range-field-0");
+    const moduleRect = moduleSelect?.getBoundingClientRect();
+    const runRect = runButton?.getBoundingClientRect();
+    const modelRect = modelSelect?.getBoundingClientRect();
+    const weightRect = weightField?.getBoundingClientRect();
+    const timestepRect = timestepField?.getBoundingClientRect();
+    return {
+      moduleLeft: moduleRect?.left ?? 0,
+      runLeft: runRect?.left ?? 0,
+      modelLeft: modelRect?.left ?? 0,
+      moduleHeight: moduleRect?.height ?? 0,
+      modelHeight: modelRect?.height ?? 0,
+      weightWidth: weightRect?.width ?? 0,
+      timestepWidth: timestepRect?.width ?? 0,
+    };
+  });
+  expect(txt2imgControlNetRowLayout.moduleLeft).toBeLessThan(txt2imgControlNetRowLayout.runLeft);
+  expect(txt2imgControlNetRowLayout.runLeft).toBeLessThan(txt2imgControlNetRowLayout.modelLeft);
+  expect(Math.abs(txt2imgControlNetRowLayout.moduleHeight - txt2imgControlNetRowLayout.modelHeight)).toBeLessThanOrEqual(
+    2,
+  );
+  expect(Math.abs(txt2imgControlNetRowLayout.weightWidth - txt2imgControlNetRowLayout.timestepWidth)).toBeLessThanOrEqual(
+    2,
+  );
   await page.locator("#rookieui-cfg-scale").fill("7.25");
   await page.locator("#rookieui-hires-enabled").check();
   await page.locator("#rookieui-hires-scale").fill("1.8");

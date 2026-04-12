@@ -901,6 +901,31 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-controlnet-guidance-start-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-guidance-end-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-timestep-range-field-0")).not.toBeNull();
+    const txt2imgSelectorRow = document.getElementById("rookieui-txt2img-controlnet-selector-row-0");
+    expect(txt2imgSelectorRow).not.toBeNull();
+    expect(
+      txt2imgSelectorRow?.children[0]?.querySelector(".rookieui-shell__field-label")?.textContent?.trim(),
+    ).toBe("Preprocessor");
+    expect(txt2imgSelectorRow?.children[1]?.classList.contains("rookieui-shell__controlnet-run-preprocessor-slot")).toBe(
+      true,
+    );
+    expect(
+      txt2imgSelectorRow?.children[2]?.querySelector(".rookieui-shell__field-label")?.textContent?.trim(),
+    ).toBe("Model");
+    expect(
+      document.getElementById("rookieui-txt2img-controlnet-module-0")?.closest(".rookieui-shell__controlnet-selector-field"),
+    ).not.toBeNull();
+    expect(
+      document.getElementById("rookieui-txt2img-controlnet-model-0")?.closest(".rookieui-shell__controlnet-selector-field"),
+    ).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-weight-field-0")?.classList.contains("rookieui-shell__field--full")).toBe(
+      true,
+    );
+    expect(
+      document
+        .getElementById("rookieui-txt2img-controlnet-weight-field-0")
+        ?.classList.contains("rookieui-shell__controlnet-weight-field"),
+    ).toBe(true);
     const txt2imgRunPreprocessorButton = document.getElementById("rookieui-txt2img-controlnet-run-preprocessor-0");
     expect(txt2imgRunPreprocessorButton).not.toBeNull();
     expect(txt2imgRunPreprocessorButton?.hidden).toBe(false);
@@ -1059,6 +1084,9 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-start-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-guidance-end-slider-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-timestep-range-field-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-weight-field-0")?.classList.contains("rookieui-shell__field--full")).toBe(
+      true,
+    );
     const img2imgRunPreprocessorButton = document.getElementById("rookieui-img2img-controlnet-run-preprocessor-0");
     expect(img2imgRunPreprocessorButton).not.toBeNull();
     expect(img2imgRunPreprocessorButton?.hidden).toBe(true);

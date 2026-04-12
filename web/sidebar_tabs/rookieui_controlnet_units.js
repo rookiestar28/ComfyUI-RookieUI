@@ -878,8 +878,8 @@ export function createControlNetUnitEditor({
 
   const appendSliderField = (parentNode, labelText, numberInput, sliderInput, fieldId) => {
     if (typeof createSliderField === "function") {
-      createSliderField(parentNode, labelText, numberInput, sliderInput, fieldId);
-      return;
+      const createdField = createSliderField(parentNode, labelText, numberInput, sliderInput, fieldId);
+      return createdField ?? null;
     }
     const fallbackField = document.createElement("div");
     fallbackField.className = "rookieui-shell__slider-field";
@@ -896,6 +896,7 @@ export function createControlNetUnitEditor({
     fallbackField.appendChild(headerNode);
     fallbackField.appendChild(sliderInput);
     parentNode.appendChild(fallbackField);
+    return fallbackField;
   };
 
   for (let index = 0; index < unitCount; index += 1) {
@@ -951,13 +952,18 @@ export function createControlNetUnitEditor({
     settingsGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
     panel.appendChild(settingsGrid);
 
-    const moduleSelect = createSelect(`${idPrefix}-module-${index}`, MODULE_OPTIONS, "none");
-    const preprocessorField = createField(settingsGrid, "Preprocessor", moduleSelect);
-    preprocessorField.classList.add("rookieui-shell__controlnet-field-with-action");
+    const selectorRow = document.createElement("div");
+    selectorRow.className = "rookieui-shell__field rookieui-shell__field--full rookieui-shell__controlnet-selector-row";
+    selectorRow.id = `${idPrefix}-selector-row-${index}`;
+    settingsGrid.appendChild(selectorRow);
 
-    const runPreprocessorRow = document.createElement("div");
-    runPreprocessorRow.className = "rookieui-shell__controlnet-field-action-row";
-    preprocessorField.appendChild(runPreprocessorRow);
+    const moduleSelect = createSelect(`${idPrefix}-module-${index}`, MODULE_OPTIONS, "none");
+    const preprocessorField = createField(selectorRow, "Preprocessor", moduleSelect);
+    preprocessorField.classList.add("rookieui-shell__controlnet-selector-field");
+
+    const runPreprocessorSlot = document.createElement("div");
+    runPreprocessorSlot.className = "rookieui-shell__controlnet-run-preprocessor-slot";
+    selectorRow.appendChild(runPreprocessorSlot);
 
     const runPreprocessorButton = document.createElement("button");
     runPreprocessorButton.id = `${idPrefix}-run-preprocessor-${index}`;
@@ -969,10 +975,11 @@ export function createControlNetUnitEditor({
     runIcon.className = "rookieui-shell__mini-action-icon";
     runIcon.textContent = RUN_PREPROCESSOR_ICON;
     runPreprocessorButton.appendChild(runIcon);
-    runPreprocessorRow.appendChild(runPreprocessorButton);
+    runPreprocessorSlot.appendChild(runPreprocessorButton);
 
     const modelSelect = createSelect(`${idPrefix}-model-${index}`, currentModelOptions, "");
-    createField(settingsGrid, "Model", modelSelect);
+    const modelField = createField(selectorRow, "Model", modelSelect);
+    modelField.classList.add("rookieui-shell__controlnet-selector-field");
 
     const weightInput = createInput("number", `${idPrefix}-weight-${index}`, "1", {
       min: 0,
@@ -985,13 +992,14 @@ export function createControlNetUnitEditor({
       max: 2,
       step: 0.01,
     });
-    appendSliderField(
+    const weightField = appendSliderField(
       settingsGrid,
       "Control Weight",
       weightInput,
       weightSlider,
       `${idPrefix}-weight-field-${index}`,
     );
+    weightField?.classList.add("rookieui-shell__field--full", "rookieui-shell__controlnet-weight-field");
     bindSliderNumberPair(weightInput, weightSlider);
 
     const guidanceStartInput = createInput("number", `${idPrefix}-guidance-start-${index}`, "0", {

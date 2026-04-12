@@ -270,13 +270,32 @@
   height: 14px;
 }
 
-.rookieui-shell__controlnet-field-with-action {
-  align-content: start;
+.rookieui-shell__controlnet-selector-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: end;
 }
 
-.rookieui-shell__controlnet-field-action-row {
+.rookieui-shell__controlnet-selector-row .rookieui-shell__field {
+  min-width: 0;
+}
+
+.rookieui-shell__controlnet-selector-field {
+  min-width: 0;
+}
+
+.rookieui-shell__controlnet-selector-field .rookieui-shell__input {
+  min-height: 32px;
+  width: 100%;
+}
+
+.rookieui-shell__controlnet-run-preprocessor-slot {
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 34px;
+  padding-bottom: 2px;
 }
 
 .rookieui-shell__controlnet-run-preprocessor {
@@ -284,6 +303,15 @@
   height: 28px;
   min-height: 28px;
   border-radius: 6px;
+}
+
+.rookieui-shell__controlnet-weight-field {
+  display: grid;
+  gap: 5px;
+}
+
+.rookieui-shell__controlnet-weight-field .rookieui-shell__slider {
+  width: 100%;
 }
 
 .rookieui-shell__controlnet-timestep-field {
