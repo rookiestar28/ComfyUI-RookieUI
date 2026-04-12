@@ -656,6 +656,36 @@
   color: var(--rookieui-text-primary);
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .rookieui-shell__controlnet-preview-toolbar,
+  .rookieui-shell__canvas-upload-toolbar {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-2px);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease,
+      visibility 0s linear 120ms;
+  }
+
+  .rookieui-shell__controlnet-preview-stage:hover .rookieui-shell__controlnet-preview-toolbar,
+  .rookieui-shell__controlnet-preview-stage:focus .rookieui-shell__controlnet-preview-toolbar,
+  .rookieui-shell__controlnet-preview-stage:focus-within .rookieui-shell__controlnet-preview-toolbar,
+  .rookieui-shell__controlnet-preview-stage[data-dragging="true"] .rookieui-shell__controlnet-preview-toolbar,
+  .rookieui-shell__controlnet-preview-toolbar:focus-within,
+  .rookieui-shell__canvas-upload-surface:hover .rookieui-shell__canvas-upload-toolbar,
+  .rookieui-shell__canvas-upload-surface:focus-within .rookieui-shell__canvas-upload-toolbar,
+  .rookieui-shell__canvas-upload-surface[data-dragging="true"] .rookieui-shell__canvas-upload-toolbar,
+  .rookieui-shell__canvas-upload-toolbar:focus-within {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+    transition-delay: 0s;
+  }
+}
+
 .rookieui-shell__canvas-upload-stage {
   position: relative;
   min-height: 188px;
