@@ -204,24 +204,32 @@ async def controlnet_detect(request: Any) -> Any:
     output_image_count = len(output_images) if isinstance(output_images, list) else 0
     detect_backend = normalize_metadata_text(str(result.get("detect_backend", "")).strip()) if isinstance(result, dict) else ""
     source_label = normalize_metadata_text(str(result.get("source", "")).strip()) if isinstance(result, dict) else ""
+    processor_label = normalize_metadata_text(str(result.get("processor", "")).strip()) if isinstance(result, dict) else ""
+    control_model_label = (
+        normalize_metadata_text(str(result.get("requested_controlnet_model", "")).strip()) if isinstance(result, dict) else ""
+    )
     if isinstance(warning_codes, list) and warning_codes:
         _LOGGER.warning(
-            "RookieUI ControlNet detect completed with warnings (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s, warning_codes=%s).",
+            "RookieUI ControlNet detect completed with warnings (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s, processor=%s, control_model=%s, warning_codes=%s).",
             requested_module,
             requested_image_count,
             output_image_count,
             source_label,
             detect_backend,
+            processor_label,
+            control_model_label,
             ",".join(str(code) for code in warning_codes),
         )
     else:
         _LOGGER.info(
-            "RookieUI ControlNet detect completed (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s).",
+            "RookieUI ControlNet detect completed (module=%s, images=%s, output_images=%s, source=%s, detect_backend=%s, processor=%s, control_model=%s).",
             requested_module,
             requested_image_count,
             output_image_count,
             source_label,
             detect_backend,
+            processor_label,
+            control_model_label,
         )
 
     result["service"] = normalize_metadata_text("rookieui")

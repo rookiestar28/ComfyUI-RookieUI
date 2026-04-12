@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from rookieui.services import controlnet_runtime as runtime
 
@@ -35,6 +36,20 @@ class _FakeAioSoftEdge:
         }
 
 
+class _FakeDictResultNode:
+    FUNCTION = "execute"
+
+    @staticmethod
+    def INPUT_TYPES() -> dict[str, object]:
+        return {
+            "required": {"image": ("IMAGE",)},
+            "optional": {},
+        }
+
+    def execute(self, image: object) -> dict[str, object]:
+        return {"result": (image,)}
+
+
 class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
     def test_select_aio_preprocessor_name_matches_normalized_explicit_candidates(self) -> None:
         selected = runtime._select_aio_preprocessor_name(_FakeAioDepth, "depth")
@@ -43,3 +58,116 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
     def test_select_aio_preprocessor_name_uses_keyword_ranking_when_explicit_candidates_miss(self) -> None:
         selected = runtime._select_aio_preprocessor_name(_FakeAioSoftEdge, "softedge")
         self.assertEqual(selected, "hed_safe")
+
+    def test_extract_primary_node_output_payload_supports_result_dict(self) -> None:
+        marker = object()
+        payload = runtime._extract_primary_node_output_payload({"result": (marker,)})
+        self.assertIs(payload, marker)
+
+    def test_run_host_node_preprocessor_accepts_result_dict_payload(self) -> None:
+        marker = object()
+        with mock.patch.object(runtime, "_coerce_image_tensor", side_effect=lambda value: value):
+            output = runtime._run_host_node_preprocessor(
+                node_name="DepthAnythingV2Preprocessor",
+                node_cls=_FakeDictResultNode,
+                image_tensor=marker,
+                mask_tensor=None,
+                module_key="depth",
+                processor_res=512,
+                threshold_a=64.0,
+                threshold_b=64.0,
+                aio_preprocessor_name=None,
+            )
+        self.assertIs(output, marker)
+
+    def test_discover_dynamic_host_preprocessors_skips_heavy_depth_candidates(self) -> None:
+        discovered = runtime._discover_dynamic_host_preprocessors(
+            "depth",
+            {
+                "DepthAnythingV2Preprocessor": object(),
+                "Metric3D-DepthMapPreprocessor": object(),
+                "MeshGraphormer-DepthMapPreprocessor": object(),
+            },
+        )
+        self.assertIn("DepthAnythingV2Preprocessor", discovered)
+        self.assertNotIn("Metric3D-DepthMapPreprocessor", discovered)
+        self.assertNotIn("MeshGraphormer-DepthMapPreprocessor", discovered)
+
+    def test_resolve_host_preprocessor_candidates_prioritizes_depthanything_first(self) -> None:
+        resolved = runtime._resolve_host_preprocessor_candidates(
+            "depth",
+            {
+                "MiDaS-DepthMapPreprocessor": object(),
+                "DepthAnythingV2Preprocessor": object(),
+                "LeReS-DepthMapPreprocessor": object(),
+            },
+        )
+        self.assertGreaterEqual(len(resolved), 2)
+        self.assertEqual(resolved[0], "DepthAnythingV2Preprocessor")
+
+    def test_preprocess_controlnet_depth_stops_after_probe_limit(self) -> None:
+        marker = object()
+        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                with mock.patch.object(
+                    runtime,
+                    "_resolve_host_node_class_mappings",
+                    return_value={
+                        "DepthAnythingV2Preprocessor": object(),
+                        "MiDaS-DepthMapPreprocessor": object(),
+                    },
+                ):
+                    with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
+                        with mock.patch.object(
+                            runtime,
+                            "_run_host_node_preprocessor",
+                            side_effect=RuntimeError("DepthAnythingV2Preprocessor failed"),
+                        ) as run_mock:
+                            result = runtime.preprocess_controlnet_tensor(
+                                image_tensor=marker,
+                                module="depth",
+                                processor_res=512,
+                                threshold_a=64.0,
+                                threshold_b=64.0,
+                                mask_tensor=None,
+                            )
+
+        self.assertTrue(result.used_fallback)
+        self.assertEqual(result.backend, "rookieui_internal_fallback")
+        self.assertEqual(run_mock.call_count, 1)
+        self.assertTrue(any("host_probe_limit_reached:1" in entry for entry in result.diagnostics))
+
+    def test_preprocess_controlnet_depth_skips_aio_fallback_when_host_nodes_unavailable(self) -> None:
+        marker = object()
+        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                with mock.patch.object(runtime, "_resolve_host_node_class_mappings", return_value={"AIO_Preprocessor": object()}):
+                    with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
+                        with mock.patch.object(runtime, "_run_host_node_preprocessor") as run_mock:
+                            result = runtime.preprocess_controlnet_tensor(
+                                image_tensor=marker,
+                                module="depth",
+                                processor_res=512,
+                                threshold_a=64.0,
+                                threshold_b=64.0,
+                                mask_tensor=None,
+                            )
+
+        self.assertEqual(result.backend, "rookieui_internal_fallback")
+        self.assertTrue(result.used_fallback)
+        run_mock.assert_not_called()
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_coerce_image_tensor_min_max_normalizes_signed_ranges(self) -> None:
+        tensor = runtime.torch.tensor(
+            [
+                [
+                    [[-1.0, 0.0, 1.0], [0.5, 0.0, -0.5]],
+                    [[1.0, -1.0, 0.25], [0.0, 0.0, 0.0]],
+                ]
+            ],
+            dtype=runtime.torch.float32,
+        )
+        normalized = runtime._coerce_image_tensor(tensor)
+        self.assertGreaterEqual(float(normalized.min().item()), 0.0)
+        self.assertLessEqual(float(normalized.max().item()), 1.0)

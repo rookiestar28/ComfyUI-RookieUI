@@ -131,10 +131,11 @@
   font-size: 30px;
   line-height: 1;
   transition: transform 120ms ease;
+  transform: scaleX(-1);
 }
 
 .rookieui-shell__hires[open] .rookieui-shell__hires-caret {
-  transform: rotate(90deg);
+  transform: scaleX(-1) rotate(90deg);
 }
 
 .rookieui-shell__controlnet-summary .rookieui-shell__hires-header {
