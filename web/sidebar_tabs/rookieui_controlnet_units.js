@@ -12,7 +12,7 @@ const MODULE_OPTIONS = [
   { value: "inpaint", label: "Inpaint" },
 ];
 
-const CONTROL_TYPE_OPTIONS = [
+const DEFAULT_CONTROL_TYPE_OPTIONS = [
   "All",
   "Blur",
   "Canny",
@@ -72,6 +72,22 @@ function normalizeNumber(value, fallbackValue) {
   return Number.isFinite(numeric) ? numeric : fallbackValue;
 }
 
+function normalizeControlTypeOrder(rawControlTypeOrder = []) {
+  const normalized = Array.isArray(rawControlTypeOrder)
+    ? rawControlTypeOrder.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+  const ordered = normalized.length > 0 ? normalized : [...DEFAULT_CONTROL_TYPE_OPTIONS];
+  if (!ordered.includes(DEFAULT_CONTROL_TYPE)) {
+    ordered.unshift(DEFAULT_CONTROL_TYPE);
+  }
+  DEFAULT_CONTROL_TYPE_OPTIONS.forEach((typeLabel) => {
+    if (!ordered.includes(typeLabel)) {
+      ordered.push(typeLabel);
+    }
+  });
+  return ordered;
+}
+
 function slugifyLabel(value) {
   return String(value ?? "")
     .trim()
@@ -102,7 +118,7 @@ function createCustomField(parent, labelText, control, extraClass = "") {
   return field;
 }
 
-function buildFallbackControlTypeCatalog() {
+function buildFallbackControlTypeCatalog(controlTypeOptions) {
   const allModules = MODULE_OPTIONS.map((entry) => entry.value);
   const map = {
     All: {
@@ -147,7 +163,7 @@ function buildFallbackControlTypeCatalog() {
     },
   };
 
-  CONTROL_TYPE_OPTIONS.forEach((label) => {
+  controlTypeOptions.forEach((label) => {
     if (!map[label]) {
       map[label] = {
         module_list: allModules,
@@ -159,8 +175,8 @@ function buildFallbackControlTypeCatalog() {
   return map;
 }
 
-function normalizeControlTypeCatalog(rawCatalog, allModelValues) {
-  const fallbackCatalog = buildFallbackControlTypeCatalog();
+function normalizeControlTypeCatalog(rawCatalog, allModelValues, controlTypeOptions) {
+  const fallbackCatalog = buildFallbackControlTypeCatalog(controlTypeOptions);
   if (!rawCatalog || typeof rawCatalog !== "object") {
     return fallbackCatalog;
   }
@@ -190,7 +206,7 @@ function normalizeControlTypeCatalog(rawCatalog, allModelValues) {
     };
   });
 
-  CONTROL_TYPE_OPTIONS.forEach((typeLabel) => {
+  controlTypeOptions.forEach((typeLabel) => {
     if (!normalizedCatalog[typeLabel]) {
       normalizedCatalog[typeLabel] = {
         ...fallbackCatalog[typeLabel],
@@ -310,13 +326,13 @@ function setSelectOptions(select, options, preferredValue = "") {
   }
 }
 
-function createControlTypeSelector({ idPrefix, index, onChange }) {
+function createControlTypeSelector({ idPrefix, index, controlTypeOptions, onChange }) {
   const group = document.createElement("div");
   group.className = "rookieui-shell__controlnet-radio-grid";
   const groupName = `${idPrefix}-control-type-${index}`;
   const radios = [];
 
-  CONTROL_TYPE_OPTIONS.forEach((labelText) => {
+  controlTypeOptions.forEach((labelText) => {
     const optionLabel = document.createElement("label");
     optionLabel.className = "rookieui-shell__controlnet-radio-option";
 
@@ -391,6 +407,7 @@ export function createControlNetUnitEditor({
   syncBoundControls,
   onStatusMessage = null,
   unitCount = DEFAULT_UNIT_COUNT,
+  controlTypeOrder = DEFAULT_CONTROL_TYPE_OPTIONS,
 }) {
   const integratedDetails = document.createElement("details");
   integratedDetails.className =
@@ -443,7 +460,8 @@ export function createControlNetUnitEditor({
 
   let currentModelOptions = [{ value: "", label: "(Select ControlNet Model)" }, ...modelOptions];
   let currentModelValues = modelOptions.map((entry) => String(entry.value ?? "")).filter(Boolean);
-  let controlTypeCatalog = normalizeControlTypeCatalog({}, currentModelValues);
+  const controlTypeOptions = normalizeControlTypeOrder(controlTypeOrder);
+  let controlTypeCatalog = normalizeControlTypeCatalog({}, currentModelValues, controlTypeOptions);
 
   const unitRows = [];
   const tabButtons = [];
@@ -617,6 +635,7 @@ export function createControlNetUnitEditor({
     const controlType = createControlTypeSelector({
       idPrefix,
       index,
+      controlTypeOptions,
       onChange: () => {
         applyCatalogToRow(rowElements, false);
         syncHiddenField();
@@ -828,7 +847,7 @@ export function createControlNetUnitEditor({
   const setModelOptions = (nextModelOptions = []) => {
     currentModelOptions = [{ value: "", label: "(Select ControlNet Model)" }, ...nextModelOptions];
     currentModelValues = nextModelOptions.map((entry) => String(entry.value ?? "")).filter(Boolean);
-    controlTypeCatalog = normalizeControlTypeCatalog(controlTypeCatalog, currentModelValues);
+    controlTypeCatalog = normalizeControlTypeCatalog(controlTypeCatalog, currentModelValues, controlTypeOptions);
     unitRows.forEach((row) => {
       applyCatalogToRow(row, true);
     });
@@ -836,7 +855,7 @@ export function createControlNetUnitEditor({
   };
 
   const setControlTypeCatalog = (rawControlTypes = {}) => {
-    controlTypeCatalog = normalizeControlTypeCatalog(rawControlTypes, currentModelValues);
+    controlTypeCatalog = normalizeControlTypeCatalog(rawControlTypes, currentModelValues, controlTypeOptions);
     unitRows.forEach((row) => {
       applyCatalogToRow(row, false);
     });

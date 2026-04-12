@@ -1,6 +1,9 @@
 import {
   fetchRookieUICapabilities,
   fetchRookieUICompatibility,
+  fetchRookieUIControlNetModels,
+  fetchRookieUIControlNetModules,
+  fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
   fetchRookieUIPresets,
@@ -10,16 +13,16 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
-} from "./rookieui_api.js?v=20260410-f46r27";
+} from "./rookieui_api.js?v=20260412-f75-controlnet-dynamic-api";
 import {
   describeHostSurface,
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260411-f63-style-modules";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260412-f75-controlnet-dynamic-api";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260412-f74-controlnet-integrated";
+const ROOKIEUI_ASSET_REVISION = "20260412-f75-controlnet-dynamic-api";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
@@ -47,6 +50,41 @@ function createRookieUIClientId(windowRef, runtimeApi = null) {
   }
   const suffix = Math.random().toString(36).slice(2, 12);
   return `rookieui-${Date.now().toString(36)}-${suffix}`;
+}
+
+function toStringArray(rawValue) {
+  return Array.isArray(rawValue)
+    ? rawValue.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
+  const modelList = toStringArray(modelResult?.data?.model_list);
+  const moduleList = toStringArray(moduleResult?.data?.module_list);
+  const controlTypeOrder = toStringArray(typeResult?.data?.control_type_order);
+  const controlTypes =
+    typeResult?.data?.control_types && typeof typeResult.data.control_types === "object"
+      ? typeResult.data.control_types
+      : {};
+
+  return {
+    source: String(typeResult?.data?.source ?? modelResult?.data?.source ?? moduleResult?.data?.source ?? "fallback"),
+    contract:
+      typeResult?.data?.contract ??
+      modelResult?.data?.contract ??
+      moduleResult?.data?.contract ?? {
+        version: "r72-20260412",
+        ui_variant: "forge_neo_integrated",
+        unit_count: 3,
+      },
+    model_list: modelList,
+    module_list: moduleList,
+    control_type_order: controlTypeOrder,
+    default_type: String(typeResult?.data?.default_type ?? "All"),
+    default_module: String(moduleResult?.data?.default_module ?? "none"),
+    default_model: String(modelResult?.data?.default_model ?? ""),
+    control_types: controlTypes,
+  };
 }
 
 function enforceSidebarMinWidth(container) {
@@ -141,10 +179,23 @@ export function registerRookieUIBootstrapExtension({
     async setup() {
       const runtimeApi = app?.api ?? windowRef?.app?.api ?? null;
       const hostSurface = detectHostSurface(windowRef);
-      const capabilityResult = await fetchRookieUICapabilities(fetchImpl);
-      const compatibilityResult = await fetchRookieUICompatibility(fetchImpl);
-      const modelResult = await fetchRookieUIModels(fetchImpl);
-      const presetResult = await fetchRookieUIPresets(fetchImpl);
+      const [
+        capabilityResult,
+        compatibilityResult,
+        modelResult,
+        presetResult,
+        controlNetModelResult,
+        controlNetModuleResult,
+        controlNetTypeResult,
+      ] = await Promise.all([
+        fetchRookieUICapabilities(fetchImpl),
+        fetchRookieUICompatibility(fetchImpl),
+        fetchRookieUIModels(fetchImpl),
+        fetchRookieUIPresets(fetchImpl),
+        fetchRookieUIControlNetModels(fetchImpl),
+        fetchRookieUIControlNetModules(fetchImpl),
+        fetchRookieUIControlNetTypes(fetchImpl),
+      ]);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
       if (clientId && windowRef?.sessionStorage?.setItem) {
         try {
@@ -157,6 +208,11 @@ export function registerRookieUIBootstrapExtension({
       const queueResult = await fetchRookieUIQueue(fetchImpl, { clientId });
       ensureCssInjected(documentRef);
       const hostSurfaceSupported = isHostSurfaceSupported(hostSurface, capabilityResult.data);
+      const controlnetCatalog = buildControlNetCatalog(
+        controlNetModelResult,
+        controlNetModuleResult,
+        controlNetTypeResult,
+      );
 
       const bootstrapState = {
         hostSurface,
@@ -168,6 +224,7 @@ export function registerRookieUIBootstrapExtension({
         compatibility: compatibilityResult.data,
         models: modelResult.data,
         presets: presetResult.data,
+        controlnetCatalog,
         queue: queueResult.data,
         clientId,
         runtimeApi,
@@ -180,6 +237,9 @@ export function registerRookieUIBootstrapExtension({
         inspectPngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, fetchImpl),
         parsePngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, fetchImpl),
         submitExtrasRequest: (payload) => submitRookieUIExtras(payload, fetchImpl),
+        fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(fetchImpl),
+        fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(fetchImpl),
+        fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {

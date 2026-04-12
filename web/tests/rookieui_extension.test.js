@@ -350,6 +350,75 @@ describe("registerRookieUIBootstrapExtension", () => {
         };
       }
 
+      if (url === "/rookieui/controlnet/model_list") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "forge_neo_integrated",
+                unit_count: 3,
+              },
+              model_list: ["control_v11p_sd15_canny.safetensors", "control_v11f1p_sd15_depth.safetensors"],
+              default_model: "control_v11p_sd15_canny.safetensors",
+            };
+          },
+        };
+      }
+
+      if (url === "/rookieui/controlnet/module_list") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "internal",
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "forge_neo_integrated",
+                unit_count: 3,
+              },
+              module_list: ["none", "canny", "depth", "openpose"],
+              default_module: "none",
+            };
+          },
+        };
+      }
+
+      if (url === "/rookieui/controlnet/control_types") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "internal",
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "forge_neo_integrated",
+                unit_count: 3,
+              },
+              control_type_order: ["All", "Canny", "Depth", "OpenPose", "SoftEdge", "Tile"],
+              default_type: "All",
+              control_types: {
+                All: {
+                  module_list: ["none", "canny", "depth", "openpose"],
+                  model_list: ["control_v11p_sd15_canny.safetensors", "control_v11f1p_sd15_depth.safetensors"],
+                  default_option: "none",
+                },
+                Canny: {
+                  module_list: ["none", "canny"],
+                  model_list: ["control_v11p_sd15_canny.safetensors"],
+                  default_option: "canny",
+                },
+              },
+            };
+          },
+        };
+      }
+
       if (url.startsWith("/rookieui/queue")) {
         return {
           ok: true,
@@ -723,7 +792,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260412-f74-controlnet-integrated");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260412-f75-controlnet-dynamic-api");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -1135,6 +1204,9 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(fetchCalls.some(([url]) => url === "/rookieui/models")).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/presets")).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/compatibility")).toBe(true);
+    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/model_list")).toBe(true);
+    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/module_list")).toBe(true);
+    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/control_types")).toBe(true);
     const txt2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/txt2img");
     expect(JSON.parse(txt2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(txt2imgCall[1].body).hires_scale).toBe(1.8);

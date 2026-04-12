@@ -3,6 +3,9 @@ import { describe, expect, test, vi } from "vitest";
 import {
   fetchRookieUICapabilities,
   fetchRookieUICompatibility,
+  fetchRookieUIControlNetModels,
+  fetchRookieUIControlNetModules,
+  fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
   fetchRookieUIPresets,
@@ -233,6 +236,83 @@ describe("fetchRookieUICapabilities", () => {
     });
     expect(history.ok).toBe(true);
     expect(historyCalls[0]).toBe("/history/prompt-123");
+  });
+
+  test("loads dynamic controlnet resources and keeps fallback contracts", async () => {
+    const calls = [];
+    const fetchImpl = async (url) => {
+      calls.push(url);
+      if (url === "/rookieui/controlnet/model_list") {
+        return {
+          ok: true,
+          async json() {
+            return {
+              source: "host",
+              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              model_list: ["control_v11p_sd15_canny.safetensors"],
+              default_model: "control_v11p_sd15_canny.safetensors",
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/module_list") {
+        return {
+          ok: true,
+          async json() {
+            return {
+              source: "internal",
+              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              module_list: ["none", "canny", "depth"],
+              default_module: "none",
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/control_types") {
+        return {
+          ok: true,
+          async json() {
+            return {
+              source: "internal",
+              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              control_type_order: ["All", "Canny", "Depth"],
+              default_type: "All",
+              control_types: {
+                All: {
+                  module_list: ["none", "canny", "depth"],
+                  model_list: ["control_v11p_sd15_canny.safetensors"],
+                  default_option: "none",
+                },
+              },
+            };
+          },
+        };
+      }
+      throw new Error(`unexpected url: ${url}`);
+    };
+
+    const models = await fetchRookieUIControlNetModels(fetchImpl);
+    const modules = await fetchRookieUIControlNetModules(fetchImpl);
+    const types = await fetchRookieUIControlNetTypes(fetchImpl);
+
+    expect(models.ok).toBe(true);
+    expect(modules.ok).toBe(true);
+    expect(types.ok).toBe(true);
+    expect(models.data.model_list[0]).toContain("canny");
+    expect(modules.data.module_list).toContain("depth");
+    expect(types.data.control_type_order).toContain("Canny");
+    expect(calls).toEqual([
+      "/rookieui/controlnet/model_list",
+      "/rookieui/controlnet/module_list",
+      "/rookieui/controlnet/control_types",
+    ]);
+
+    const fallbackTypes = await fetchRookieUIControlNetTypes(async () => {
+      throw new Error("offline");
+    });
+    expect(fallbackTypes.ok).toBe(false);
+    expect(fallbackTypes.data.contract.version).toBe("r72-20260412");
+    expect(fallbackTypes.data.default_type).toBe("All");
   });
 
   test("emits guarded debug warnings only when ROOKIEUI_DEBUG is enabled", async () => {

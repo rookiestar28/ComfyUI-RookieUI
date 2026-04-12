@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f74-controlnet-integrated";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f75-controlnet-dynamic-api";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -59,6 +59,18 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     default_vae: "Automatic",
     default_text_encoder: "Automatic",
   };
+  const controlnetCatalog = bootstrapState.controlnetCatalog ?? {};
+  const controlnetModelValues =
+    Array.isArray(controlnetCatalog.model_list) && controlnetCatalog.model_list.length > 0
+      ? controlnetCatalog.model_list
+      : inventory.controlnet ?? [];
+  const controlnetTypeCatalog =
+    controlnetCatalog.control_types && typeof controlnetCatalog.control_types === "object"
+      ? controlnetCatalog.control_types
+      : {};
+  const controlnetTypeOrder = Array.isArray(controlnetCatalog.control_type_order)
+    ? controlnetCatalog.control_type_order
+    : undefined;
   const presetOptions = (bootstrapState.presets?.presets ?? []).map((preset) => ({
     value: preset.id,
     label: preset.title,
@@ -398,7 +410,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           idPrefix: "rookieui-txt2img-controlnet",
           parent: samplingSection,
           hiddenInput: elements.controlnetUnits,
-          modelOptions: (inventory.controlnet ?? []).map((value) => ({ value, label: value })),
+          modelOptions: controlnetModelValues.map((value) => ({ value, label: value })),
+          controlTypeOrder: controlnetTypeOrder,
           createInput,
           createSelect,
           createCheckbox,
@@ -411,6 +424,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
             statusNode.textContent = message;
           },
         });
+        txt2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
 
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";

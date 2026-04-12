@@ -13,7 +13,11 @@ from rookieui.contracts.controlnet_integrated import (
 from rookieui.services.controlnet import (
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
+    CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE,
+    CONTROLNET_WARNING_UNSUPPORTED_MODULE,
+    build_controlnet_control_types_payload,
     build_controlnet_detect_payload,
+    build_controlnet_module_list_payload,
     normalize_controlnet_units,
 )
 from rookieui.services.img2img import normalize_img2img_request
@@ -301,3 +305,67 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(payload["module"], "none")
         self.assertEqual(len(payload["images"]), 1)
         self.assertEqual(payload["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
+
+    def test_module_list_payload_accepts_env_extension_modules(self) -> None:
+        with mock.patch.dict("os.environ", {"ROOKIEUI_CONTROLNET_EXTRA_MODULES": "OpenPose, custom-module,foo_bar"}):
+            payload = build_controlnet_module_list_payload()
+
+        self.assertIn("none", payload["module_list"])
+        self.assertIn("openpose", payload["module_list"])
+        self.assertIn("custom_module", payload["module_list"])
+        self.assertIn("foo_bar", payload["module_list"])
+
+    def test_control_types_payload_builds_full_dynamic_matrix(self) -> None:
+        fake_inventory = mock.Mock(
+            source="host",
+            checkpoints=[],
+            diffusion_models=[],
+            vae=[],
+            text_encoders=[],
+            loras=[],
+            default_checkpoint="",
+            default_vae="",
+            default_text_encoder="",
+            controlnet=[
+                "control_v11p_sd15_canny.safetensors",
+                "control_v11f1p_sd15_depth.safetensors",
+                "control_v11p_sd15_openpose.safetensors",
+            ],
+        )
+        with mock.patch("rookieui.services.controlnet.discover_model_inventory", return_value=fake_inventory):
+            payload = build_controlnet_control_types_payload()
+
+        self.assertEqual(payload["default_type"], "All")
+        self.assertEqual(payload["control_type_order"], payload["contract"]["control_type_order"])
+        self.assertEqual(set(payload["control_type_order"]), set(payload["control_types"].keys()))
+        self.assertIn("canny", payload["control_types"]["Canny"]["module_list"])
+        self.assertEqual(
+            payload["control_types"]["Canny"]["default_option"],
+            "canny",
+        )
+        self.assertTrue(
+            any("canny" in model.lower() for model in payload["control_types"]["Canny"]["model_list"]),
+        )
+        self.assertTrue(
+            any("depth" in model.lower() for model in payload["control_types"]["Depth"]["model_list"]),
+        )
+        self.assertTrue(
+            any("openpose" in model.lower() for model in payload["control_types"]["OpenPose"]["model_list"]),
+        )
+
+    def test_detect_payload_supports_depth_module_dispatch(self) -> None:
+        payload = build_controlnet_detect_payload(
+            {
+                "controlnet_module": "depth",
+                "controlnet_input_images": [
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
+                ],
+            }
+        )
+        self.assertEqual(payload["module"], "depth")
+        if CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE in payload["warning_codes"]:
+            self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE, payload["warning_codes"])
+            return
+        self.assertNotIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
+        self.assertEqual(len(payload["images"]), 1)
