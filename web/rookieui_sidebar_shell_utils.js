@@ -80,6 +80,7 @@ export function createField(parent, labelText, input) {
   field.appendChild(label);
   field.appendChild(input);
   parent.appendChild(field);
+  return field;
 }
 
 export function syncBoundControls(controls) {
@@ -105,6 +106,7 @@ export function createInlineCheckboxField(parent, labelText, input) {
   field.appendChild(label);
   field.appendChild(toggle);
   parent.appendChild(field);
+  return field;
 }
 
 export function preventSummaryToggleOnCheckbox(toggleInput) {

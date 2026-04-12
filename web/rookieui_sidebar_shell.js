@@ -1,4 +1,4 @@
-﻿import {
+import {
   appendTextElement,
   bindSliderPair,
   buildCompatibilityList,
@@ -24,8 +24,8 @@ import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
-import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260412-f75-controlnet-dynamic-api";
-import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260412-f75-controlnet-dynamic-api";
+import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260412-controlnet-ui-parity-pass2";
+import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260412-controlnet-ui-parity-pass2";
 import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
 import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
 import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";

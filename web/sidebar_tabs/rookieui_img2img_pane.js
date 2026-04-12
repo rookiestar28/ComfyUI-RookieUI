@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f75-controlnet-dynamic-api";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-controlnet-ui-parity-pass2";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -748,10 +748,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           modelOptions: controlnetModelValues.map((value) => ({ value, label: value })),
           controlTypeOrder: controlnetTypeOrder,
           createInput,
+          createRangeInput,
           createSelect,
           createCheckbox,
           createField,
-          createInlineCheckboxField,
+          createSliderField,
           appendTextElement,
           readFileAsDataUrl,
           syncBoundControls,

@@ -167,7 +167,7 @@
 
 .rookieui-shell__controlnet-panel {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .rookieui-shell__controlnet-panel[hidden] {
@@ -180,6 +180,67 @@
 
 .rookieui-shell__field--full {
   grid-column: 1 / -1;
+}
+
+.rookieui-shell__controlnet-preview-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--rookieui-bg-panel) 90%, transparent);
+  background-image:
+    linear-gradient(45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%);
+  background-size: 28px 28px;
+  background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+}
+
+.rookieui-shell__controlnet-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 68%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-placeholder {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  color: var(--rookieui-text-secondary);
+  padding: 12px;
+}
+
+.rookieui-shell__controlnet-preview-placeholder-icon {
+  font-size: 48px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--rookieui-text-primary) 88%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-placeholder-text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rookieui-shell__controlnet-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.rookieui-shell__inline-checkbox-field.rookieui-shell__controlnet-toggle-field {
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.rookieui-shell__controlnet-toggle-field .rookieui-shell__field-label {
+  line-height: 1.2;
 }
 
 .rookieui-shell__controlnet-radio-grid {
@@ -209,7 +270,86 @@
   height: 14px;
 }
 
+.rookieui-shell__controlnet-field-with-action {
+  align-content: start;
+}
+
+.rookieui-shell__controlnet-field-action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rookieui-shell__controlnet-run-preprocessor {
+  width: 34px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+.rookieui-shell__controlnet-timestep-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-timestep-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 88px));
+  justify-content: end;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-timestep-values .rookieui-shell__input {
+  padding-block: 5px;
+}
+
+.rookieui-shell__controlnet-timestep-sliders {
+  display: grid;
+  gap: 4px;
+}
+
+.rookieui-shell__controlnet-slider-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--rookieui-text-muted);
+  font-size: 10px;
+}
+
+.rookieui-shell__controlnet-segmented-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-segmented-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: var(--rookieui-bg-input);
+  color: var(--rookieui-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.rookieui-shell__controlnet-segmented-option[data-active="true"] {
+  border-color: var(--rookieui-border-strong);
+  background: color-mix(in srgb, var(--rookieui-accent) 18%, var(--rookieui-bg-input));
+  color: var(--rookieui-text-primary);
+}
+
 .rookieui-shell__controlnet-upload-row {
+  display: grid;
+  gap: 8px;
   width: 100%;
 }
 
@@ -778,6 +918,14 @@
 }
 
 @media (max-width: 1180px) {
+  .rookieui-shell__controlnet-toggle-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rookieui-shell__controlnet-preview-stage {
+    min-height: 240px;
+  }
+
   .rookieui-shell__workspace-grid--pnginfo {
     grid-template-columns: minmax(0, 1fr);
   }

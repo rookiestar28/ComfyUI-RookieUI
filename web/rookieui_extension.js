@@ -13,16 +13,16 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
-} from "./rookieui_api.js?v=20260412-f75-controlnet-dynamic-api";
+} from "./rookieui_api.js?v=20260412-controlnet-ui-parity-pass2";
 import {
   describeHostSurface,
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260412-f75-controlnet-dynamic-api";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260412-controlnet-ui-parity-pass2";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260412-f75-controlnet-dynamic-api";
+const ROOKIEUI_ASSET_REVISION = "20260412-controlnet-ui-parity-pass2";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {

@@ -36,8 +36,8 @@ const DEFAULT_CONTROL_TYPE_OPTIONS = [
 
 const CONTROL_MODE_OPTIONS = [
   { value: "balanced", label: "Balanced" },
-  { value: "prompt", label: "Prompt Priority" },
-  { value: "control", label: "Control Priority" },
+  { value: "prompt", label: "My prompt is more important" },
+  { value: "control", label: "ControlNet is more important" },
 ];
 
 const HR_OPTION_OPTIONS = [
@@ -107,7 +107,11 @@ function createCustomField(parent, labelText, control, extraClass = "") {
   const field = document.createElement("label");
   field.className = "rookieui-shell__field";
   if (extraClass) {
-    field.classList.add(extraClass);
+    String(extraClass)
+      .split(/\s+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .forEach((className) => field.classList.add(className));
   }
   const label = document.createElement("span");
   label.className = "rookieui-shell__field-label";
@@ -116,6 +120,160 @@ function createCustomField(parent, labelText, control, extraClass = "") {
   field.appendChild(control);
   parent.appendChild(field);
   return field;
+}
+
+function createCompactCheckboxField(parent, labelText, input, fieldId = "") {
+  const field = document.createElement("label");
+  field.className = "rookieui-shell__inline-checkbox-field rookieui-shell__controlnet-toggle-field";
+  if (fieldId) {
+    field.id = fieldId;
+  }
+
+  const toggle = document.createElement("span");
+  toggle.className = "rookieui-shell__checkbox-toggle";
+  toggle.appendChild(input);
+
+  const label = document.createElement("span");
+  label.className = "rookieui-shell__field-label";
+  label.textContent = labelText;
+
+  field.appendChild(toggle);
+  field.appendChild(label);
+  parent.appendChild(field);
+  return field;
+}
+
+function createSegmentedSelectBridge({ idPrefix, index, name, select, options }) {
+  const group = document.createElement("div");
+  group.className = "rookieui-shell__controlnet-segmented";
+  group.id = `${idPrefix}-${name}-segmented-${index}`;
+  const buttons = [];
+
+  const updateActiveStyles = () => {
+    buttons.forEach((button) => {
+      const isActive = button.dataset.value === select.value;
+      button.dataset.active = isActive ? "true" : "false";
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  };
+
+  options.forEach((entry) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rookieui-shell__controlnet-segmented-option";
+    button.id = `${idPrefix}-${name}-option-${entry.value}-${index}`;
+    button.dataset.value = String(entry.value ?? "");
+    button.textContent = String(entry.label ?? entry.value ?? "");
+    button.addEventListener("click", () => {
+      const nextValue = String(entry.value ?? "");
+      if (select.value === nextValue) {
+        return;
+      }
+      select.value = nextValue;
+      updateActiveStyles();
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    group.appendChild(button);
+    buttons.push(button);
+  });
+
+  select.addEventListener("change", updateActiveStyles);
+  updateActiveStyles();
+
+  return {
+    group,
+    setValue(nextValue) {
+      const normalized = String(nextValue ?? "");
+      if (options.some((entry) => String(entry.value ?? "") === normalized)) {
+        select.value = normalized;
+      } else if (options.length > 0) {
+        select.value = String(options[0].value ?? "");
+      }
+      updateActiveStyles();
+    },
+  };
+}
+
+function bindSliderNumberPair(numberInput, sliderInput) {
+  const syncFromNumber = () => {
+    if (numberInput.value !== "") {
+      sliderInput.value = numberInput.value;
+    }
+    sliderInput.disabled = numberInput.disabled;
+    sliderInput.__syncSliderVisual?.();
+  };
+  const syncFromSlider = () => {
+    numberInput.value = sliderInput.value;
+    sliderInput.__syncSliderVisual?.();
+  };
+
+  numberInput.addEventListener("input", syncFromNumber);
+  numberInput.addEventListener("change", syncFromNumber);
+  sliderInput.addEventListener("input", () => {
+    syncFromSlider();
+    syncFromNumber();
+  });
+  sliderInput.addEventListener("change", () => {
+    syncFromSlider();
+    syncFromNumber();
+  });
+  syncFromNumber();
+}
+
+function createControlNetPreviewStage({ idPrefix, index, appendTextElement }) {
+  const stage = document.createElement("div");
+  stage.className = "rookieui-shell__controlnet-preview-stage";
+  stage.id = `${idPrefix}-preview-stage-${index}`;
+
+  const previewImage = document.createElement("img");
+  previewImage.className = "rookieui-shell__controlnet-preview-image";
+  previewImage.id = `${idPrefix}-preview-image-${index}`;
+  previewImage.alt = `ControlNet source preview ${index + 1}`;
+  previewImage.hidden = true;
+  stage.appendChild(previewImage);
+
+  const placeholder = document.createElement("div");
+  placeholder.className = "rookieui-shell__controlnet-preview-placeholder";
+  const icon = document.createElement("span");
+  icon.className = "rookieui-shell__controlnet-preview-placeholder-icon";
+  icon.textContent = "⤴";
+  placeholder.appendChild(icon);
+  const text = appendTextElement(
+    placeholder,
+    "span",
+    "rookieui-shell__controlnet-preview-placeholder-text",
+    "Upload control image",
+  );
+  stage.appendChild(placeholder);
+
+  return {
+    stage,
+    previewImage,
+    placeholder,
+    placeholderText: text,
+  };
+}
+
+function setControlNetPreview(previewState, { imageData = "", imageAsset = "", fallbackText = "Upload control image" } = {}) {
+  const normalizedImage = String(imageData ?? "").trim();
+  const normalizedAsset = String(imageAsset ?? "").trim();
+  if (normalizedImage.startsWith("data:image/")) {
+    previewState.previewImage.src = normalizedImage;
+    previewState.previewImage.hidden = false;
+    previewState.placeholder.hidden = true;
+    return;
+  }
+
+  previewState.previewImage.hidden = true;
+  previewState.previewImage.removeAttribute("src");
+  previewState.placeholder.hidden = false;
+  if (normalizedAsset) {
+    // IMPORTANT: asset handles are server-side identifiers; keep text fallback instead of forcing /view fetches that may fail on non-image handles.
+    previewState.placeholderText.textContent = `Asset: ${normalizedAsset}`;
+  } else {
+    previewState.placeholderText.textContent = fallbackText;
+  }
 }
 
 function buildFallbackControlTypeCatalog(controlTypeOptions) {
@@ -398,10 +556,11 @@ export function createControlNetUnitEditor({
   hiddenInput,
   modelOptions = [],
   createInput,
+  createRangeInput,
   createSelect,
   createCheckbox,
   createField,
-  createInlineCheckboxField,
+  createSliderField,
   appendTextElement,
   readFileAsDataUrl,
   syncBoundControls,
@@ -566,7 +725,16 @@ export function createControlNetUnitEditor({
     });
   };
 
-  const attachUploadHandler = (fileInput, { dataField, assetField, label, fileNameField }) => {
+  const attachUploadHandler = (
+    fileInput,
+    {
+      dataField,
+      assetField,
+      label,
+      fileNameField,
+      onFileLoaded = null,
+    },
+  ) => {
     fileInput.addEventListener("change", async () => {
       const [file] = Array.from(fileInput.files ?? []);
       if (!file) {
@@ -583,6 +751,9 @@ export function createControlNetUnitEditor({
       try {
         dataField.value = await readFileAsDataUrl(file);
         assetField.value = "";
+        if (typeof onFileLoaded === "function") {
+          onFileLoaded(dataField.value, file.name);
+        }
         syncHiddenField();
         if (onStatusMessage) {
           onStatusMessage(`Loaded ControlNet ${label}: ${file.name}`);
@@ -596,6 +767,116 @@ export function createControlNetUnitEditor({
         }
       }
     });
+  };
+
+  const runPreprocessorForRow = async (row, unitIndex) => {
+    const sourceImage = row.imageData.value.trim();
+    if (!sourceImage) {
+      if (onStatusMessage) {
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: upload a source image before running preprocessor.`);
+      }
+      return;
+    }
+
+    const moduleName = String(row.module.value ?? "none").trim() || "none";
+    if (moduleName === "none") {
+      if (onStatusMessage) {
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor module is set to None.`);
+      }
+      return;
+    }
+
+    if (typeof globalThis.fetch !== "function") {
+      if (onStatusMessage) {
+        onStatusMessage("ControlNet preprocessor is unavailable because fetch() is not available.");
+      }
+      return;
+    }
+
+    row.runPreprocessorButton.disabled = true;
+    try {
+      const response = await globalThis.fetch("/rookieui/controlnet/detect", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          controlnet_module: moduleName,
+          controlnet_input_images: [sourceImage],
+          controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
+          controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
+          controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = String(data?.detail ?? "").trim();
+        if (onStatusMessage) {
+          onStatusMessage(detail || `ControlNet Unit ${unitIndex + 1}: run preprocessor failed.`);
+        }
+        return;
+      }
+
+      const outputImage = Array.isArray(data?.images) ? String(data.images[0] ?? "").trim() : "";
+      if (!outputImage) {
+        if (onStatusMessage) {
+          onStatusMessage(`ControlNet Unit ${unitIndex + 1}: no preprocessor output image was returned.`);
+        }
+        return;
+      }
+
+      row.imageData.value = outputImage;
+      row.imageAsset.value = "";
+      row.imageUploadName.value = FILE_PAYLOAD_PLACEHOLDER;
+      setControlNetPreview(row.preview, { imageData: outputImage });
+      syncHiddenField();
+
+      const warningText = Array.isArray(data?.warnings) && data.warnings.length > 0 ? ` (${data.warnings[0]})` : "";
+      if (onStatusMessage) {
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed.${warningText}`);
+      }
+    } catch (_error) {
+      if (onStatusMessage) {
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor request failed.`);
+      }
+    } finally {
+      row.runPreprocessorButton.disabled = false;
+    }
+  };
+
+  const buildRangeInput = (id, value, options) => {
+    if (typeof createRangeInput === "function") {
+      return createRangeInput(id, value, options);
+    }
+    return createInput("range", id, value, {
+      className: "rookieui-shell__slider",
+      min: options?.min,
+      max: options?.max,
+      step: options?.step,
+    });
+  };
+
+  const appendSliderField = (parentNode, labelText, numberInput, sliderInput, fieldId) => {
+    if (typeof createSliderField === "function") {
+      createSliderField(parentNode, labelText, numberInput, sliderInput, fieldId);
+      return;
+    }
+    const fallbackField = document.createElement("div");
+    fallbackField.className = "rookieui-shell__slider-field";
+    if (fieldId) {
+      fallbackField.id = fieldId;
+    }
+    const headerNode = document.createElement("div");
+    headerNode.className = "rookieui-shell__slider-field-header";
+    const labelNode = document.createElement("span");
+    labelNode.className = "rookieui-shell__field-label";
+    labelNode.textContent = labelText;
+    headerNode.appendChild(labelNode);
+    headerNode.appendChild(numberInput);
+    fallbackField.appendChild(headerNode);
+    fallbackField.appendChild(sliderInput);
+    parentNode.appendChild(fallbackField);
   };
 
   for (let index = 0; index < unitCount; index += 1) {
@@ -616,22 +897,26 @@ export function createControlNetUnitEditor({
     panelHost.appendChild(panel);
     unitPanels.push(panel);
 
+    const preview = createControlNetPreviewStage({ idPrefix, index, appendTextElement });
+    panel.appendChild(preview.stage);
+
     const primaryGrid = document.createElement("div");
-    primaryGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
+    primaryGrid.className = "rookieui-shell__controlnet-toggle-grid";
     panel.appendChild(primaryGrid);
 
     const enabled = createCheckbox(`${idPrefix}-enabled-${index}`, false);
-    createInlineCheckboxField(primaryGrid, "Enable", enabled, `${idPrefix}-enabled-field-${index}`);
+    createCompactCheckboxField(primaryGrid, "Enable", enabled, `${idPrefix}-enabled-field-${index}`);
 
     const pixelPerfect = createCheckbox(`${idPrefix}-pixel-perfect-${index}`, false);
-    createInlineCheckboxField(primaryGrid, "Pixel Perfect", pixelPerfect, `${idPrefix}-pixel-perfect-field-${index}`);
+    createCompactCheckboxField(primaryGrid, "Pixel Perfect", pixelPerfect, `${idPrefix}-pixel-perfect-field-${index}`);
 
     const allowPreview = createCheckbox(`${idPrefix}-allow-preview-${index}`, false);
-    createInlineCheckboxField(primaryGrid, "Allow Preview", allowPreview, `${idPrefix}-allow-preview-field-${index}`);
+    createCompactCheckboxField(primaryGrid, "Allow Preview", allowPreview, `${idPrefix}-allow-preview-field-${index}`);
 
     const useMask = createCheckbox(`${idPrefix}-use-mask-${index}`, false);
-    createInlineCheckboxField(primaryGrid, "Use Mask", useMask, `${idPrefix}-use-mask-field-${index}`);
+    createCompactCheckboxField(primaryGrid, "Use Mask", useMask, `${idPrefix}-use-mask-field-${index}`);
 
+    let rowElements = null;
     const controlType = createControlTypeSelector({
       idPrefix,
       index,
@@ -641,14 +926,31 @@ export function createControlNetUnitEditor({
         syncHiddenField();
       },
     });
-    createCustomField(primaryGrid, "Control Type", controlType.group, "rookieui-shell__field--full");
+    createCustomField(panel, "Control Type", controlType.group, "rookieui-shell__field--full");
 
     const settingsGrid = document.createElement("div");
     settingsGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
     panel.appendChild(settingsGrid);
 
     const moduleSelect = createSelect(`${idPrefix}-module-${index}`, MODULE_OPTIONS, "none");
-    createField(settingsGrid, "Preprocessor", moduleSelect);
+    const preprocessorField = createField(settingsGrid, "Preprocessor", moduleSelect);
+    preprocessorField.classList.add("rookieui-shell__controlnet-field-with-action");
+
+    const runPreprocessorRow = document.createElement("div");
+    runPreprocessorRow.className = "rookieui-shell__controlnet-field-action-row";
+    preprocessorField.appendChild(runPreprocessorRow);
+
+    const runPreprocessorButton = document.createElement("button");
+    runPreprocessorButton.id = `${idPrefix}-run-preprocessor-${index}`;
+    runPreprocessorButton.type = "button";
+    runPreprocessorButton.className =
+      "rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-neutral rookieui-shell__controlnet-run-preprocessor";
+    runPreprocessorButton.setAttribute("aria-label", "Run Preprocessor");
+    const runIcon = document.createElement("span");
+    runIcon.className = "rookieui-shell__mini-action-icon";
+    runIcon.textContent = "⤴";
+    runPreprocessorButton.appendChild(runIcon);
+    runPreprocessorRow.appendChild(runPreprocessorButton);
 
     const modelSelect = createSelect(`${idPrefix}-model-${index}`, currentModelOptions, "");
     createField(settingsGrid, "Model", modelSelect);
@@ -659,7 +961,19 @@ export function createControlNetUnitEditor({
       step: 0.01,
       inputMode: "decimal",
     });
-    createField(settingsGrid, "Control Weight", weightInput);
+    const weightSlider = buildRangeInput(`${idPrefix}-weight-slider-${index}`, "1", {
+      min: 0,
+      max: 2,
+      step: 0.01,
+    });
+    appendSliderField(
+      settingsGrid,
+      "Control Weight",
+      weightInput,
+      weightSlider,
+      `${idPrefix}-weight-field-${index}`,
+    );
+    bindSliderNumberPair(weightInput, weightSlider);
 
     const guidanceStartInput = createInput("number", `${idPrefix}-guidance-start-${index}`, "0", {
       min: 0,
@@ -667,21 +981,72 @@ export function createControlNetUnitEditor({
       step: 0.01,
       inputMode: "decimal",
     });
-    createField(settingsGrid, "Guidance Start", guidanceStartInput);
-
     const guidanceEndInput = createInput("number", `${idPrefix}-guidance-end-${index}`, "1", {
       min: 0,
       max: 1,
       step: 0.01,
       inputMode: "decimal",
     });
-    createField(settingsGrid, "Guidance End", guidanceEndInput);
+    const guidanceStartSlider = buildRangeInput(`${idPrefix}-guidance-start-slider-${index}`, "0", {
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    const guidanceEndSlider = buildRangeInput(`${idPrefix}-guidance-end-slider-${index}`, "1", {
+      min: 0,
+      max: 1,
+      step: 0.01,
+    });
+    bindSliderNumberPair(guidanceStartInput, guidanceStartSlider);
+    bindSliderNumberPair(guidanceEndInput, guidanceEndSlider);
 
-    const resizeModeInput = createSelect(`${idPrefix}-resize-mode-${index}`, RESIZE_MODE_OPTIONS, "crop_and_resize");
-    createField(settingsGrid, "Resize Mode", resizeModeInput);
+    const timestepField = document.createElement("div");
+    timestepField.className = "rookieui-shell__field rookieui-shell__field--full rookieui-shell__controlnet-timestep-field";
+    timestepField.id = `${idPrefix}-timestep-range-field-${index}`;
+    const timestepLabel = document.createElement("span");
+    timestepLabel.className = "rookieui-shell__field-label";
+    timestepLabel.textContent = "Timestep Range";
+    timestepField.appendChild(timestepLabel);
+    const timestepValues = document.createElement("div");
+    timestepValues.className = "rookieui-shell__controlnet-timestep-values";
+    timestepValues.appendChild(guidanceStartInput);
+    timestepValues.appendChild(guidanceEndInput);
+    timestepField.appendChild(timestepValues);
+    const timestepSliders = document.createElement("div");
+    timestepSliders.className = "rookieui-shell__controlnet-timestep-sliders";
+    timestepSliders.appendChild(guidanceStartSlider);
+    timestepSliders.appendChild(guidanceEndSlider);
+    timestepField.appendChild(timestepSliders);
+    const timestepScale = document.createElement("div");
+    timestepScale.className = "rookieui-shell__controlnet-slider-scale";
+    appendTextElement(timestepScale, "span", "rookieui-shell__controlnet-slider-scale-label", "0");
+    appendTextElement(timestepScale, "span", "rookieui-shell__controlnet-slider-scale-label", "1");
+    timestepField.appendChild(timestepScale);
+    settingsGrid.appendChild(timestepField);
 
-    const controlModeInput = createSelect(`${idPrefix}-control-mode-${index}`, CONTROL_MODE_OPTIONS, "balanced");
-    createField(settingsGrid, "Control Mode", controlModeInput);
+    const ensureGuidanceBounds = (source) => {
+      let start = normalizeNumber(guidanceStartInput.value, 0);
+      let end = normalizeNumber(guidanceEndInput.value, 1);
+      if (start > end) {
+        // IMPORTANT: keep timestep bounds ordered; reversed ranges produce ambiguous backend semantics and user-visible mismatches.
+        if (source === "start") {
+          end = start;
+        } else {
+          start = end;
+        }
+      }
+      guidanceStartInput.value = String(start);
+      guidanceEndInput.value = String(end);
+      guidanceStartSlider.value = String(start);
+      guidanceEndSlider.value = String(end);
+      guidanceStartSlider.__syncSliderVisual?.();
+      guidanceEndSlider.__syncSliderVisual?.();
+    };
+    guidanceStartInput.addEventListener("input", () => ensureGuidanceBounds("start"));
+    guidanceEndInput.addEventListener("input", () => ensureGuidanceBounds("end"));
+    guidanceStartSlider.addEventListener("input", () => ensureGuidanceBounds("start"));
+    guidanceEndSlider.addEventListener("input", () => ensureGuidanceBounds("end"));
+    ensureGuidanceBounds("start");
 
     const processorResInput = createInput("number", `${idPrefix}-processor-res-${index}`, "512", {
       min: 64,
@@ -707,6 +1072,44 @@ export function createControlNetUnitEditor({
     });
     createField(settingsGrid, "Threshold B", thresholdBInput);
 
+    const controlModeInput = createSelect(`${idPrefix}-control-mode-${index}`, CONTROL_MODE_OPTIONS, "balanced");
+    controlModeInput.hidden = true;
+    controlModeInput.tabIndex = -1;
+    controlModeInput.setAttribute("aria-hidden", "true");
+    const controlModeBridge = createSegmentedSelectBridge({
+      idPrefix,
+      index,
+      name: "control-mode",
+      select: controlModeInput,
+      options: CONTROL_MODE_OPTIONS,
+    });
+    const controlModeField = createCustomField(
+      settingsGrid,
+      "Control Mode",
+      controlModeBridge.group,
+      "rookieui-shell__field--full rookieui-shell__controlnet-segmented-field",
+    );
+    controlModeField.appendChild(controlModeInput);
+
+    const resizeModeInput = createSelect(`${idPrefix}-resize-mode-${index}`, RESIZE_MODE_OPTIONS, "crop_and_resize");
+    resizeModeInput.hidden = true;
+    resizeModeInput.tabIndex = -1;
+    resizeModeInput.setAttribute("aria-hidden", "true");
+    const resizeModeBridge = createSegmentedSelectBridge({
+      idPrefix,
+      index,
+      name: "resize-mode",
+      select: resizeModeInput,
+      options: RESIZE_MODE_OPTIONS,
+    });
+    const resizeModeField = createCustomField(
+      settingsGrid,
+      "Resize Mode",
+      resizeModeBridge.group,
+      "rookieui-shell__field--full rookieui-shell__controlnet-segmented-field",
+    );
+    resizeModeField.appendChild(resizeModeInput);
+
     const hrOption = createSelect(`${idPrefix}-hr-option-${index}`, HR_OPTION_OPTIONS, "both");
     createField(settingsGrid, "Hires Option", hrOption);
 
@@ -725,7 +1128,7 @@ export function createControlNetUnitEditor({
     panel.appendChild(maskData);
 
     const uploadRow = document.createElement("div");
-    uploadRow.className = "rookieui-shell__mini-actions rookieui-shell__controlnet-upload-row";
+    uploadRow.className = "rookieui-shell__controlnet-upload-row";
     panel.appendChild(uploadRow);
 
     const imageUploadControl = createEnglishUploadControl({
@@ -748,23 +1151,30 @@ export function createControlNetUnitEditor({
       buttonAriaLabel: "Choose ControlNet mask file",
     });
 
-    const rowElements = {
+    rowElements = {
       enabled,
       pixelPerfect,
       allowPreview,
       useMask,
+      preview,
       controlType,
       controlTypeRadios: controlType.radios,
       module: moduleSelect,
       model: modelSelect,
       weight: weightInput,
+      weightSlider,
       guidanceStart: guidanceStartInput,
+      guidanceStartSlider,
       guidanceEnd: guidanceEndInput,
+      guidanceEndSlider,
       resizeMode: resizeModeInput,
+      resizeModeBridge,
       controlMode: controlModeInput,
+      controlModeBridge,
       processorRes: processorResInput,
       thresholdA: thresholdAInput,
       thresholdB: thresholdBInput,
+      ensureGuidanceBounds,
       hrOption,
       imageAsset,
       imageData,
@@ -774,11 +1184,13 @@ export function createControlNetUnitEditor({
       maskUpload: maskUploadControl.fileInput,
       imageUploadName: imageUploadControl.fileNameInput,
       maskUploadName: maskUploadControl.fileNameInput,
+      runPreprocessorButton,
     };
 
     unitRows.push(rowElements);
     applyCatalogToRow(rowElements, false);
     bindSyncHandlers(rowElements);
+    setControlNetPreview(preview, { imageData: "", imageAsset: "" });
 
     moduleSelect.addEventListener("change", syncHiddenField);
     modelSelect.addEventListener("change", syncHiddenField);
@@ -788,6 +1200,9 @@ export function createControlNetUnitEditor({
       assetField: imageAsset,
       label: "source image",
       fileNameField: imageUploadControl.fileNameInput,
+      onFileLoaded: (imageDataUrl) => {
+        setControlNetPreview(preview, { imageData: imageDataUrl, imageAsset: "" });
+      },
     });
 
     attachUploadHandler(maskUploadControl.fileInput, {
@@ -795,6 +1210,20 @@ export function createControlNetUnitEditor({
       assetField: maskAsset,
       label: "mask image",
       fileNameField: maskUploadControl.fileNameInput,
+    });
+
+    imageAsset.addEventListener("input", () => {
+      if (imageData.value.trim()) {
+        return;
+      }
+      setControlNetPreview(preview, { imageData: "", imageAsset: imageAsset.value });
+    });
+    imageData.addEventListener("input", () => {
+      setControlNetPreview(preview, { imageData: imageData.value, imageAsset: imageAsset.value });
+    });
+
+    runPreprocessorButton.addEventListener("click", () => {
+      runPreprocessorForRow(rowElements, index);
     });
 
     tab.addEventListener("click", () => {
@@ -820,10 +1249,16 @@ export function createControlNetUnitEditor({
       row.module.value = unit.module;
       row.model.value = unit.model;
       row.weight.value = String(unit.weight);
+      row.weightSlider.value = String(unit.weight);
       row.guidanceStart.value = String(unit.guidance_start);
+      row.guidanceStartSlider.value = String(unit.guidance_start);
       row.guidanceEnd.value = String(unit.guidance_end);
+      row.guidanceEndSlider.value = String(unit.guidance_end);
+      row.ensureGuidanceBounds("start");
       row.resizeMode.value = unit.resize_mode;
+      row.resizeModeBridge.setValue(unit.resize_mode);
       row.controlMode.value = unit.control_mode;
+      row.controlModeBridge.setValue(unit.control_mode);
       row.processorRes.value = String(unit.processor_res);
       row.thresholdA.value = String(unit.threshold_a);
       row.thresholdB.value = String(unit.threshold_b);
@@ -835,6 +1270,7 @@ export function createControlNetUnitEditor({
 
       row.imageUploadName.value = unit.image_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
       row.maskUploadName.value = unit.mask_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
+      setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
     }
     syncHiddenField();
   };

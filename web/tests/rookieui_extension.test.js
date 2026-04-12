@@ -792,7 +792,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260412-f75-controlnet-dynamic-api");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260412-controlnet-ui-parity-pass2");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -895,6 +895,20 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
     expect(document.getElementById("rookieui-txt2img-controlnet-image-upload-0")?.hidden).toBe(true);
     expect(document.getElementById("rookieui-txt2img-controlnet-mask-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-txt2img-controlnet-preview-stage-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-preview-image-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-weight-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-guidance-start-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-guidance-end-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-timestep-range-field-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-run-preprocessor-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-control-mode-segmented-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-controlnet-resize-mode-segmented-0")).not.toBeNull();
+    expect(
+      document.getElementById("rookieui-txt2img-controlnet-allow-preview-field-0")?.classList.contains(
+        "rookieui-shell__controlnet-toggle-field",
+      ),
+    ).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
@@ -1031,6 +1045,20 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-name-0")?.value).toBe("No file selected");
     expect(document.getElementById("rookieui-img2img-controlnet-image-upload-0")?.hidden).toBe(true);
     expect(document.getElementById("rookieui-img2img-controlnet-mask-upload-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-img2img-controlnet-preview-stage-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-preview-image-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-weight-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-guidance-start-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-guidance-end-slider-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-timestep-range-field-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-run-preprocessor-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-control-mode-segmented-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-controlnet-resize-mode-segmented-0")).not.toBeNull();
+    expect(
+      document.getElementById("rookieui-img2img-controlnet-use-mask-field-0")?.classList.contains(
+        "rookieui-shell__controlnet-toggle-field",
+      ),
+    ).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(img2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(document.querySelector("#rookieui-img2img-hires-controls .rookieui-shell__hires-toggle")).not.toBeNull();
