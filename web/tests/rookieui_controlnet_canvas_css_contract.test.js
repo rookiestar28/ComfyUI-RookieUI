@@ -30,6 +30,9 @@ describe("ControlNet source canvas CSS contract", () => {
     expect(css).toMatch(
       /\.rookieui-shell__controlnet-preview-stage:hover\s+\.rookieui-shell__controlnet-preview-toolbar[\s\S]*\.rookieui-shell__canvas-upload-surface:focus-within\s+\.rookieui-shell__canvas-upload-toolbar[\s\S]*\{[\s\S]*opacity:\s*1;[\s\S]*visibility:\s*visible;[\s\S]*pointer-events:\s*auto;[\s\S]*\}/,
     );
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-preview-stage::before,\s*\.rookieui-shell__canvas-upload-surface::before\s*\{[\s\S]*opacity:\s*0;[\s\S]*transition:\s*opacity\s*120ms\s*ease;[\s\S]*\}/,
+    );
   });
 
   test("defines explicit circular brush indicator layer for edit-mode cursor parity", () => {
@@ -44,6 +47,27 @@ describe("ControlNet source canvas CSS contract", () => {
     );
     expect(css).toMatch(
       /\.rookieui-shell__canvas-brush-indicator-cross--vertical\s*\{[\s\S]*width:\s*1px;[\s\S]*height:\s*10px;[\s\S]*\}/,
+    );
+  });
+
+  test("defines fullscreen auto-fit stage rules and fullscreen zoom slider chrome", () => {
+    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
+    const css = readFileSync(cssPath, "utf8");
+
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-preview-stage:fullscreen[\s\S]*width:\s*100vw;[\s\S]*height:\s*100vh;[\s\S]*min-height:\s*100vh;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__canvas-upload-surface:fullscreen[\s\S]*width:\s*100vw;[\s\S]*height:\s*100vh;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__canvas-fullscreen-zoom\s*\{[\s\S]*position:\s*absolute;[\s\S]*bottom:\s*14px;[\s\S]*min-width:\s*232px;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-summary\s+\.rookieui-shell__hires-header\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.rookieui-shell__controlnet-summary\s+\.rookieui-shell__hires-caret\s*\{[\s\S]*transform:\s*scaleX\(-1\);[\s\S]*\}/,
     );
   });
 });

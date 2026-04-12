@@ -1100,6 +1100,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           idPrefix: "rookieui-img2img-source",
           stage: imageCanvasStage,
           toolbar: imageCanvasToolbar,
+          previewImage: imageCanvasPreview,
           onCommitSource: async (editedImageData) => {
             await applySourceSnapshot(
               {
