@@ -34,6 +34,51 @@ class RookieUINodesTests(unittest.TestCase):
         self.assertEqual(changed, "digest")
         mock_changed.assert_called_once_with("mask_asset.png")
 
+    def test_controlnet_preprocess_node_is_registered(self) -> None:
+        self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
+
+    def test_controlnet_preprocess_applies_mask_when_enabled(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
+
+        preprocess = nodes.RookieUIControlNetPreprocess()
+        image = nodes.torch.ones((1, 2, 2, 3), dtype=nodes.torch.float32)
+        mask = nodes.torch.tensor([[[1.0, 0.0], [0.5, 0.0]]], dtype=nodes.torch.float32)
+
+        output, = preprocess.preprocess(
+            image=image,
+            module="none",
+            processor_res=512,
+            threshold_a=64.0,
+            threshold_b=64.0,
+            use_mask=True,
+            mask=mask,
+        )
+
+        self.assertAlmostEqual(float(output[0, 0, 0, 0]), 1.0, places=4)
+        self.assertAlmostEqual(float(output[0, 0, 1, 0]), 0.0, places=4)
+        self.assertAlmostEqual(float(output[0, 1, 1, 0]), 0.0, places=4)
+
+    def test_controlnet_preprocess_unsupported_module_falls_back_to_passthrough(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
+
+        preprocess = nodes.RookieUIControlNetPreprocess()
+        image = nodes.torch.full((1, 2, 2, 3), 0.25, dtype=nodes.torch.float32)
+
+        output, = preprocess.preprocess(
+            image=image,
+            module="not-a-real-module",
+            processor_res=512,
+            threshold_a=64.0,
+            threshold_b=64.0,
+            use_mask=False,
+            mask=None,
+        )
+
+        self.assertAlmostEqual(float(output[0, 0, 0, 0]), 0.25, places=4)
+        self.assertAlmostEqual(float(output[0, 1, 1, 2]), 0.25, places=4)
+
 
 if __name__ == "__main__":
     unittest.main()

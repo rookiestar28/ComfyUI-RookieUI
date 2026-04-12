@@ -22,6 +22,9 @@ class NormalizedControlNetUnit:
     image_asset: str
     mask_asset: str
     source: str
+    control_type: str = "All"
+    use_mask: bool = False
+    allow_preview: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

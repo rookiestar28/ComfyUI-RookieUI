@@ -161,6 +161,68 @@ class ControlNetNormalizationTests(unittest.TestCase):
         self.assertEqual(len(request.controlnet_units), 1)
         self.assertEqual(request.controlnet_units[0].image_asset, "portrait-input")
 
+    def test_controlnet_normalization_enables_legacy_mask_asset_without_use_mask_flag(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "mask-image",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(len(request.controlnet_units), 1)
+        self.assertTrue(request.controlnet_units[0].use_mask)
+
+    def test_controlnet_normalization_respects_explicit_use_mask_false(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "mask-image",
+                        "use_mask": False,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(len(request.controlnet_units), 1)
+        self.assertFalse(request.controlnet_units[0].use_mask)
+
+    def test_controlnet_normalization_maps_control_type_alias_and_fallback(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "control_type": "ipadapter",
+                    },
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image-2",
+                        "control_type": "not-a-real-type",
+                    },
+                ],
+            }
+        )
+
+        self.assertEqual(len(request.controlnet_units), 2)
+        self.assertEqual(request.controlnet_units[0].control_type, "IP-Adapter")
+        self.assertEqual(request.controlnet_units[1].control_type, "All")
+
 
 class ControlNetWorkflowTranslationTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -205,6 +267,67 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(len(controlnet_apply), 1)
         self.assertEqual(controlnet_apply[0]["inputs"]["start_percent"], 0.2)
         self.assertEqual(controlnet_apply[0]["inputs"]["end_percent"], 0.8)
+
+    def test_txt2img_translation_wires_controlnet_preprocess_and_mask(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "depth",
+                        "model": "control_v11f1p_sd15_depth.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "mask-image",
+                        "use_mask": True,
+                        "processor_res": 640,
+                        "threshold_a": 32,
+                        "threshold_b": 16,
+                    }
+                ],
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        preprocess_node_id = next(
+            node_id for node_id, node in workflow.items() if node["class_type"] == "RookieUIControlNetPreprocess"
+        )
+        preprocess_node = workflow[preprocess_node_id]
+        self.assertEqual(preprocess_node["inputs"]["module"], "depth")
+        self.assertEqual(preprocess_node["inputs"]["processor_res"], 640)
+        self.assertTrue(preprocess_node["inputs"]["use_mask"])
+        self.assertIn("mask", preprocess_node["inputs"])
+
+        mask_node = next(node for node in workflow.values() if node["class_type"] == "RookieUILoadAssetMask")
+        self.assertEqual(mask_node["inputs"]["asset_handle"], "mask-image")
+
+        apply_node = next(node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced")
+        self.assertEqual(apply_node["inputs"]["image"], [preprocess_node_id, 0])
+
+    def test_txt2img_translation_does_not_wire_mask_when_use_mask_disabled(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "depth",
+                        "model": "control_v11f1p_sd15_depth.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "mask-image",
+                        "use_mask": False,
+                    }
+                ],
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        preprocess_node = next(node for node in workflow.values() if node["class_type"] == "RookieUIControlNetPreprocess")
+        self.assertFalse(preprocess_node["inputs"]["use_mask"])
+        self.assertNotIn("mask", preprocess_node["inputs"])
+        self.assertFalse(any(node["class_type"] == "RookieUILoadAssetMask" for node in workflow.values()))
 
     def test_img2img_translation_keeps_base_graph_when_no_controlnet_units(self) -> None:
         normalized = normalize_img2img_request(

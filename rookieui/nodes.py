@@ -192,6 +192,164 @@ class RookieUILoadAssetMask:
         return RookieUILoadAssetImage.IS_CHANGED(asset_handle)
 
 
+class RookieUIControlNetPreprocess:
+    _module_choices = (
+        "none",
+        "blur",
+        "canny",
+        "depth",
+        "normalmap",
+        "openpose",
+        "mlsd",
+        "lineart",
+        "scribble",
+        "segmentation",
+        "shuffle",
+        "sketch",
+        "softedge",
+        "reference",
+        "ipadapter",
+        "instantid",
+        "t2iadapter",
+        "tile",
+        "inpaint",
+    )
+    _module_aliases = {
+        "ip-adapter": "ipadapter",
+        "ip_adapter": "ipadapter",
+        "instant-id": "instantid",
+        "instant_id": "instantid",
+        "t2i-adapter": "t2iadapter",
+        "t2i_adapter": "t2iadapter",
+        "normal_map": "normalmap",
+    }
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "module": (list(cls._module_choices),),
+                "processor_res": ("INT", {"default": 512, "min": 64, "max": 2048, "step": 1}),
+                "threshold_a": ("FLOAT", {"default": 64.0, "min": 0.0, "max": 255.0, "step": 0.01}),
+                "threshold_b": ("FLOAT", {"default": 64.0, "min": 0.0, "max": 255.0, "step": 0.01}),
+                "use_mask": ("BOOLEAN", {"default": False}),
+            },
+            "optional": {
+                "mask": ("MASK",),
+            },
+        }
+
+    CATEGORY = "RookieUI/controlnet"
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "preprocess"
+
+    @classmethod
+    def _normalize_module(cls, module_value: object) -> str:
+        normalized = str(module_value or "none").strip().lower().replace(" ", "_")
+        normalized = cls._module_aliases.get(normalized, normalized)
+        if normalized not in cls._module_choices:
+            # IMPORTANT: keep unsupported modules as passthrough instead of hard-failing generation; route-level warnings already capture downgrade semantics.
+            return "none"
+        return normalized
+
+    @staticmethod
+    def _resolve_resize_filters():
+        resample_owner = getattr(Image, "Resampling", Image)
+        return (
+            getattr(resample_owner, "BILINEAR", Image.BILINEAR),
+            getattr(resample_owner, "NEAREST", Image.NEAREST),
+        )
+
+    @classmethod
+    def _resize_for_processor(cls, image_obj: "Image.Image", processor_res: int) -> tuple["Image.Image", tuple[int, int]]:
+        original_size = image_obj.size
+        width, height = original_size
+        if processor_res <= 0 or min(width, height) <= 0:
+            return image_obj, original_size
+        scale = float(processor_res) / float(min(width, height))
+        target_size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
+        if target_size == original_size:
+            return image_obj, original_size
+        bilinear, _nearest = cls._resolve_resize_filters()
+        return image_obj.resize(target_size, bilinear), original_size
+
+    @staticmethod
+    def _apply_module_filter(
+        image_obj: "Image.Image",
+        *,
+        module: str,
+        threshold_a: float,
+        threshold_b: float,
+    ) -> "Image.Image":
+        del threshold_b
+        if module in {"none", "reference", "ipadapter", "instantid", "t2iadapter", "tile", "inpaint", "shuffle"}:
+            return image_obj.convert("RGB")
+        if module in {"depth", "normalmap", "segmentation"}:
+            return image_obj.convert("L").convert("RGB")
+        if module in {"blur"}:
+            radius = max(0.1, min(float(threshold_a), 128.0) / 32.0)
+            return image_obj.filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGB")
+        if module in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch", "openpose"}:
+            return image_obj.convert("L").filter(ImageFilter.FIND_EDGES).convert("RGB")
+        return image_obj.convert("RGB")
+
+    @staticmethod
+    def _normalize_mask(mask_tensor: "torch.Tensor", *, batch_size: int, height: int, width: int) -> "torch.Tensor":
+        if mask_tensor.ndim == 2:
+            mask_tensor = mask_tensor.unsqueeze(0)
+        if mask_tensor.ndim == 4 and mask_tensor.shape[1] == 1:
+            mask_tensor = mask_tensor[:, 0, :, :]
+        if mask_tensor.ndim != 3:
+            raise ValueError("ControlNet mask tensor must be 2D/3D (or 4D single-channel).")
+
+        if mask_tensor.shape[0] == 1 and batch_size > 1:
+            mask_tensor = mask_tensor.repeat(batch_size, 1, 1)
+        elif mask_tensor.shape[0] != batch_size:
+            mask_tensor = mask_tensor[:1].repeat(batch_size, 1, 1)
+
+        resized = torch.nn.functional.interpolate(
+            mask_tensor.unsqueeze(1).to(dtype=torch.float32),
+            size=(height, width),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(1)
+        return torch.clamp(resized, 0.0, 1.0)
+
+    def preprocess(self, image, module="none", processor_res=512, threshold_a=64.0, threshold_b=64.0, use_mask=False, mask=None):
+        _require_runtime_dependencies()
+        module_key = self._normalize_module(module)
+        working = image.detach().cpu()
+        processed_frames = []
+        bilinear, _nearest = self._resolve_resize_filters()
+
+        for frame in working:
+            frame_array = np.clip(frame.numpy() * 255.0, 0.0, 255.0).astype(np.uint8)
+            frame_image = Image.fromarray(frame_array, mode="RGB")
+            frame_image, original_size = self._resize_for_processor(frame_image, int(processor_res))
+            frame_image = self._apply_module_filter(
+                frame_image,
+                module=module_key,
+                threshold_a=float(threshold_a),
+                threshold_b=float(threshold_b),
+            )
+            if frame_image.size != original_size:
+                frame_image = frame_image.resize(original_size, bilinear)
+            processed_frames.append(torch.from_numpy(np.array(frame_image).astype(np.float32) / 255.0))
+
+        output = torch.stack(processed_frames, dim=0).to(dtype=image.dtype, device=image.device)
+        if use_mask and mask is not None:
+            normalized_mask = self._normalize_mask(
+                mask.detach().to(device=output.device),
+                batch_size=output.shape[0],
+                height=output.shape[1],
+                width=output.shape[2],
+            ).to(dtype=output.dtype, device=output.device)
+            output = output * normalized_mask.unsqueeze(-1)
+
+        return (output,)
+
+
 class RookieUIVAEEncodeForInpaint:
     _masked_content_modes = ("fill", "original", "latent_noise", "latent_nothing")
 
@@ -355,11 +513,13 @@ class RookieUIVAEEncodeForInpaint:
 NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
+    "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
+    "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }

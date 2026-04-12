@@ -35,7 +35,6 @@ CONTROLNET_WARNING_FEATURE_DISABLED = "CONTROLNET_FEATURE_DISABLED"
 CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE = "CONTROLNET_ALIAS_NATIVE_OVERRIDE"
 CONTROLNET_WARNING_ALIAS_DISABLED = "CONTROLNET_ALIAS_DISABLED"
 CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED = "CONTROLNET_UNIT_LIMIT_TRUNCATED"
-CONTROLNET_WARNING_MASK_IGNORED = "CONTROLNET_MASK_INPUT_IGNORED"
 CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 CONTROLNET_WARNING_UNSUPPORTED_MODULE = "CONTROLNET_UNSUPPORTED_PREPROCESSOR_MODULE"
@@ -121,6 +120,25 @@ _CONTROL_TYPE_MODULE_HINTS: dict[str, tuple[str, ...]] = {
     "Tile": ("tile",),
 }
 
+
+def _normalize_control_type_alias_key(raw_value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", raw_value.strip().lower())
+
+
+_CONTROL_TYPE_ALIASES: dict[str, str] = {
+    _normalize_control_type_alias_key(name): name for name in CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER
+}
+_CONTROL_TYPE_ALIASES.update(
+    {
+        "normal": "NormalMap",
+        "normalmap": "NormalMap",
+        "openpose": "OpenPose",
+        "ipadapter": "IP-Adapter",
+        "instantid": "Instant-ID",
+        "t2iadapter": "T2I-Adapter",
+    }
+)
+
 _CONTROLNET_MODULE_ALIAS_PATCHES = {
     "ip_adapter": "ipadapter",
     "ip-adapter": "ipadapter",
@@ -162,7 +180,6 @@ _WARNING_MESSAGES = {
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE: "A1111 alias ControlNet payload was ignored because RookieUI-native controlnet_units were provided.",
     CONTROLNET_WARNING_ALIAS_DISABLED: "A1111 alias ControlNet payload was ignored because alias compatibility is disabled by feature flag.",
     CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED: "ControlNet unit count exceeded guardrail; extra units were ignored.",
-    CONTROLNET_WARNING_MASK_IGNORED: "ControlNet unit mask input is accepted but currently ignored by graph translation.",
     CONTROLNET_WARNING_PREPROCESSOR_DISABLED: "ControlNet preprocessors are disabled by feature flag; detect request returned passthrough images.",
     CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE: "ControlNet preprocessors are unavailable because Pillow is not installed.",
     CONTROLNET_WARNING_UNSUPPORTED_MODULE: "Requested ControlNet preprocessor module is unsupported; detect request returned passthrough images.",
@@ -290,6 +307,15 @@ def _normalize_choice(value: object, *, field_name: str, aliases: dict[str, str]
     if normalized is None:
         raise ValueError(f"{field_name} is unsupported.")
     return normalized
+
+
+def _normalize_control_type(value: object, *, field_name: str) -> str:
+    raw = normalize_option_label(value, field_name, max_length=48)
+    if not raw:
+        return "All"
+    alias_key = _normalize_control_type_alias_key(raw)
+    # IMPORTANT: keep unknown/legacy control-type labels rollback-safe by degrading to "All" instead of throwing; this avoids breaking older payload snapshots during phased integrated rollout.
+    return _CONTROL_TYPE_ALIASES.get(alias_key, "All")
 
 
 def _coerce_unit_weight(value: object, field_name: str) -> float:
@@ -467,8 +493,26 @@ def normalize_controlnet_units(
             fallback_data="",
             required=False,
         )
-        if mask_asset:
-            warning_codes.append(CONTROLNET_WARNING_MASK_IGNORED)
+        use_mask_value = _extract_unit_field(raw_unit, "use_mask")
+        use_mask = _coerce_bool(
+            use_mask_value,
+            f"controlnet_units[{index}].use_mask",
+            default=False,
+            strict=False,
+        )
+        if use_mask_value is None and mask_asset:
+            # IMPORTANT: preserve legacy payload compatibility; historical unit payloads may carry mask_asset without an explicit use_mask toggle.
+            use_mask = True
+        control_type = _normalize_control_type(
+            _extract_unit_field(raw_unit, "control_type", "type"),
+            field_name=f"controlnet_units[{index}].control_type",
+        )
+        allow_preview = _coerce_bool(
+            _extract_unit_field(raw_unit, "allow_preview"),
+            f"controlnet_units[{index}].allow_preview",
+            default=False,
+            strict=False,
+        )
 
         weight = _coerce_unit_weight(raw_unit.get("weight", 1.0), f"controlnet_units[{index}].weight")
         guidance_start = _coerce_unit_guidance(
@@ -539,6 +583,9 @@ def normalize_controlnet_units(
                 image_asset=image_asset,
                 mask_asset=mask_asset,
                 source=source,
+                control_type=control_type,
+                use_mask=use_mask,
+                allow_preview=allow_preview,
             )
         )
 

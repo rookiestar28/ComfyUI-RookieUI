@@ -662,6 +662,9 @@ def _apply_controlnet_units(
     current_negative = negative_ref
     for unit in units:
         image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
+        mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
+        use_mask = bool(_read_controlnet_unit_value(unit, "use_mask"))
+        module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
         if not image_asset or not model_name:
             continue
@@ -672,6 +675,37 @@ def _apply_controlnet_units(
             "inputs": {
                 "asset_handle": image_asset,
             },
+        }
+
+        mask_ref: list[object] | None = None
+        if use_mask and mask_asset:
+            mask_id = allocator.next()
+            workflow[mask_id] = {
+                "class_type": "RookieUILoadAssetMask",
+                "inputs": {
+                    "asset_handle": mask_asset,
+                    "channel": "red",
+                    "invert": False,
+                    "blur_radius": 0,
+                },
+            }
+            mask_ref = [mask_id, 0]
+
+        preprocess_id = allocator.next()
+        preprocess_inputs: dict[str, object] = {
+            "image": [image_id, 0],
+            "module": module_name,
+            "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
+            "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
+            "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
+            "use_mask": bool(mask_ref),
+        }
+        if mask_ref is not None:
+            preprocess_inputs["mask"] = mask_ref
+        # IMPORTANT: keep preprocess node in the runtime path so integrated selector changes (module/threshold/use_mask) are not UI-only and always affect the emitted workflow.
+        workflow[preprocess_id] = {
+            "class_type": "RookieUIControlNetPreprocess",
+            "inputs": preprocess_inputs,
         }
 
         loader_id = allocator.next()
@@ -698,7 +732,7 @@ def _apply_controlnet_units(
                 "positive": _to_node_ref(current_positive),
                 "negative": _to_node_ref(current_negative),
                 "control_net": [loader_id, 0],
-                "image": [image_id, 0],
+                "image": [preprocess_id, 0],
                 "strength": float(_read_controlnet_unit_value(unit, "weight") or 1.0),
                 "start_percent": float(_read_controlnet_unit_value(unit, "guidance_start") or 0.0),
                 "end_percent": float(_read_controlnet_unit_value(unit, "guidance_end") or 1.0),
