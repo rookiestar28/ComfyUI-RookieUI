@@ -185,4 +185,44 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     editor.setUnits([{}]);
     expect(runButton?.hidden).toBe(true);
   });
+
+  test("keeps canvas source history rollback deterministic for remove/undo/redo", async () => {
+    const { host } = buildEditor("rookieui-img2img-controlnet");
+
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const previewRemove = host.querySelector("#rookieui-img2img-controlnet-preview-remove-action-0");
+    const previewUndo = host.querySelector("#rookieui-img2img-controlnet-preview-undo-action-0");
+    const previewRedo = host.querySelector("#rookieui-img2img-controlnet-preview-redo-action-0");
+    const uploadInput = host.querySelector("#rookieui-img2img-controlnet-preview-image-upload-0");
+
+    expect(runButton?.hidden).toBe(true);
+    expect(imageData).not.toBeNull();
+    expect(uploadInput).not.toBeNull();
+
+    const file = new File([Uint8Array.from([137, 80, 78, 71])], "control.png", { type: "image/png" });
+    Object.defineProperty(uploadInput, "files", {
+      configurable: true,
+      value: [file],
+    });
+    uploadInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(String(imageData.value || "")).toContain("data:image/png;base64,dGVzdA==");
+    expect(runButton?.hidden).toBe(false);
+
+    previewRemove.click();
+    expect(imageData.value).toBe("");
+    expect(runButton?.hidden).toBe(true);
+    expect(previewUndo?.disabled).toBe(false);
+
+    previewUndo.click();
+    expect(String(imageData.value || "")).toContain("data:image/png;base64,dGVzdA==");
+    expect(runButton?.hidden).toBe(false);
+    expect(previewRedo?.disabled).toBe(false);
+
+    previewRedo.click();
+    expect(imageData.value).toBe("");
+    expect(runButton?.hidden).toBe(true);
+  });
 });

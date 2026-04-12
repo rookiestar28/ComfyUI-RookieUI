@@ -366,10 +366,11 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await expect(img2imgRunPreprocessorButton).toBeVisible();
-  await page.locator("#rookieui-img2img-controlnet-image-data-0").evaluate((input) => {
-    input.value = "";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await page.locator("#rookieui-img2img-controlnet-preview-remove-action-0").click();
+  await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await page.locator("#rookieui-img2img-controlnet-preview-undo-action-0").click();
+  await expect(img2imgRunPreprocessorButton).toBeVisible();
+  await page.locator("#rookieui-img2img-controlnet-preview-redo-action-0").click();
   await expect(img2imgRunPreprocessorButton).toBeHidden();
   await page.locator("#rookieui-tab-txt2img").click();
   await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toBeVisible();
