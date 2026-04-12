@@ -1,4 +1,4 @@
-﻿import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import { createControlNetUnitEditor } from "../sidebar_tabs/rookieui_controlnet_units.js";
 
@@ -184,6 +184,33 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
 
     editor.setUnits([{}]);
     expect(runButton?.hidden).toBe(true);
+  });
+
+  test("switches preview-stage click behavior from upload mode to edit mode after source bind", () => {
+    const { host } = buildEditor("rookieui-img2img-controlnet");
+
+    const stage = host.querySelector("#rookieui-img2img-controlnet-preview-stage-0");
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const uploadInput = host.querySelector("#rookieui-img2img-controlnet-preview-image-upload-0");
+    expect(stage).not.toBeNull();
+    expect(imageData).not.toBeNull();
+    expect(uploadInput).not.toBeNull();
+
+    const uploadClickSpy = vi.fn();
+    uploadInput.click = uploadClickSpy;
+
+    expect(stage?.dataset.interactionMode).toBe("upload");
+    stage?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(uploadClickSpy).toHaveBeenCalledTimes(1);
+
+    imageData.value = "data:image/png;base64,aW1hZ2UtYmluZA==";
+    imageData.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(stage?.dataset.interactionMode).toBe("edit");
+    stage?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(uploadClickSpy).toHaveBeenCalledTimes(1);
+
+    stage?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(uploadClickSpy).toHaveBeenCalledTimes(1);
   });
 
   test("keeps canvas source history rollback deterministic for remove/undo/redo", async () => {

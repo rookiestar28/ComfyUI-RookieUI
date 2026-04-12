@@ -2,8 +2,11 @@
 
 import {
   CANVAS_ACTIONS,
+  CANVAS_INTERACTION_MODES,
+  canCanvasStageOpenUpload,
   hasCanvasSourceImage,
   normalizeCanvasSourceValue,
+  resolveCanvasInteractionMode,
   requestCanvasFullscreen,
 } from "../sidebar_tabs/rookieui_canvas_surface_contract.js";
 
@@ -14,6 +17,10 @@ describe("canvas surface contract helpers", () => {
     expect(hasCanvasSourceImage("", "")).toBe(false);
     expect(hasCanvasSourceImage("data:image/png;base64,abc", "")).toBe(true);
     expect(hasCanvasSourceImage("", "control-image-asset")).toBe(true);
+    expect(resolveCanvasInteractionMode("", "")).toBe(CANVAS_INTERACTION_MODES.upload);
+    expect(resolveCanvasInteractionMode("data:image/png;base64,abc", "")).toBe(CANVAS_INTERACTION_MODES.edit);
+    expect(canCanvasStageOpenUpload("", "")).toBe(true);
+    expect(canCanvasStageOpenUpload("data:image/png;base64,abc", "")).toBe(false);
   });
 
   test("requests fullscreen only when supported", async () => {

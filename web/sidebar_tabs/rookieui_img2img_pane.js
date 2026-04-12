@@ -1,7 +1,9 @@
 import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-controlnet-ui-parity-pass2";
 import {
   CANVAS_ACTIONS,
+  canCanvasStageOpenUpload,
   hasCanvasSourceImage,
+  resolveCanvasInteractionMode,
   requestCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
 
@@ -1028,6 +1030,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         const renderSourceCanvasSurface = () => {
           const sourceData = String(elements.imageData.value ?? "").trim();
           const sourceAsset = String(elements.imageAsset.value ?? "").trim();
+          const interactionMode = resolveCanvasInteractionMode(sourceData, sourceAsset);
           if (sourceData.startsWith("data:image/")) {
             imageCanvasPreview.src = sourceData;
             imageCanvasPreview.hidden = false;
@@ -1041,6 +1044,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           const hasSource = hasCanvasSourceImage(sourceData, sourceAsset);
           sourceRemoveButton.disabled = !hasSource;
           sourceResetButton.disabled = !hasSource;
+          imageCanvasStage.dataset.interactionMode = interactionMode;
+          imageCanvasStage.setAttribute(
+            "aria-label",
+            interactionMode === "upload" ? "Upload source image" : "Img2Img source canvas editing surface",
+          );
         };
         refreshSourceCanvasSurface = renderSourceCanvasSurface;
 
@@ -1103,11 +1111,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           openSourceFilePicker();
         });
         imageCanvasStage.addEventListener("click", () => {
+          if (!canCanvasStageOpenUpload(elements.imageData.value, elements.imageAsset.value)) {
+            // CRITICAL: once source image exists, stage click must stop forcing file-picker opens; Forge-style parity switches the stage to edit-first behavior.
+            return;
+          }
           openSourceFilePicker();
         });
         imageCanvasStage.addEventListener("keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
+            if (!canCanvasStageOpenUpload(elements.imageData.value, elements.imageAsset.value)) {
+              return;
+            }
             openSourceFilePicker();
           }
         });

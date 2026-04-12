@@ -201,6 +201,10 @@
   cursor: pointer;
 }
 
+.rookieui-shell__controlnet-preview-stage[data-interaction-mode="edit"] {
+  cursor: crosshair;
+}
+
 .rookieui-shell__controlnet-preview-stage[data-dragging="true"] {
   border-color: var(--rookieui-accent);
   background: var(--rookieui-accent-soft);
@@ -603,6 +607,10 @@
   display: grid;
   place-items: center;
   overflow: hidden;
+}
+
+.rookieui-shell__canvas-upload-stage[data-interaction-mode="edit"] {
+  cursor: crosshair;
 }
 
 .rookieui-shell__canvas-upload-stage:focus-visible {

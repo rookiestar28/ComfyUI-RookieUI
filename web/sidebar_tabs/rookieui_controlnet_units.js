@@ -1,6 +1,8 @@
 import {
   CANVAS_ACTIONS,
+  canCanvasStageOpenUpload,
   hasCanvasSourceImage,
+  resolveCanvasInteractionMode,
   requestCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
 
@@ -334,6 +336,7 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement, crea
   stage.appendChild(sourceUploadInput);
 
   return {
+    unitIndex: index,
     stage,
     toolbar,
     previewImage,
@@ -358,7 +361,14 @@ function setControlNetPreview(previewState, { imageData = "", imageAsset = "", f
   const normalizedImage = String(imageData ?? "").trim();
   const normalizedAsset = String(imageAsset ?? "").trim();
   const hasSource = hasCanvasSourceImage(normalizedImage, normalizedAsset);
+  const interactionMode = resolveCanvasInteractionMode(normalizedImage, normalizedAsset);
+  const unitLabel = `ControlNet Unit ${(previewState.unitIndex ?? 0) + 1}`;
   previewState.stage.dataset.hasSource = hasSource ? "true" : "false";
+  previewState.stage.dataset.interactionMode = interactionMode;
+  previewState.stage.setAttribute(
+    "aria-label",
+    interactionMode === "upload" ? `${unitLabel} upload source image` : `${unitLabel} source image editing surface`,
+  );
   if (normalizedImage.startsWith("data:image/")) {
     previewState.previewImage.src = normalizedImage;
     previewState.previewImage.hidden = false;
@@ -1446,17 +1456,23 @@ export function createControlNetUnitEditor({
       if (target && typeof target.closest === "function" && target.closest(".rookieui-shell__controlnet-preview-toolbar")) {
         return;
       }
+      if (!canCanvasStageOpenUpload(imageData.value, imageAsset.value)) {
+        // CRITICAL: when a source image is already bound, stage click must no longer open file picker; this reserves click interactions for edit-first canvas behavior.
+        return;
+      }
       preview.sourceUploadInput.click();
     });
     preview.stage.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
+        if (!canCanvasStageOpenUpload(imageData.value, imageAsset.value)) {
+          return;
+        }
         preview.sourceUploadInput.click();
       }
     });
     preview.stage.setAttribute("tabindex", "0");
     preview.stage.setAttribute("role", "button");
-    preview.stage.setAttribute("aria-label", `ControlNet Unit ${index + 1} source image`);
 
     preview.stage.addEventListener("dragover", (event) => {
       event.preventDefault();

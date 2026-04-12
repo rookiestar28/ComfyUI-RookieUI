@@ -343,9 +343,41 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
   await expect(page.locator("#rookieui-pane-txt2img")).toHaveAttribute("hidden", "");
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
+  await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("aria-label", "Upload source image");
   await expect(
     page.locator("#rookieui-img2img-image-dropzone .rookieui-shell__canvas-upload-placeholder-text"),
   ).toHaveText("Upload Img2Img source image");
+  const sourceStageRouting = await page.evaluate(() => {
+    const stage = document.getElementById("rookieui-img2img-source-canvas-stage");
+    const input = document.getElementById("rookieui-img2img-image-file");
+    const sourceValueInput =
+      document.getElementById("rookieui-image-data") ?? document.getElementById("rookieui-image-asset");
+    let clickCount = 0;
+    const originalClick = input.click.bind(input);
+    input.click = () => {
+      clickCount += 1;
+    };
+    stage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    if (sourceValueInput) {
+      sourceValueInput.value =
+        sourceValueInput.id === "rookieui-image-data" ? "data:image/png;base64,c291cmNl" : "img2img-stage-source";
+      sourceValueInput.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    const interactionModeAfterBind = stage.dataset.interactionMode;
+    const ariaLabelAfterBind = stage.getAttribute("aria-label");
+    stage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    input.click = originalClick;
+    return {
+      clickCount,
+      interactionModeAfterBind,
+      ariaLabelAfterBind,
+    };
+  });
+  expect(sourceStageRouting.clickCount).toBe(1);
+  expect(sourceStageRouting.interactionModeAfterBind).toBe("edit");
+  expect(sourceStageRouting.ariaLabelAfterBind).toBe("Img2Img source canvas editing surface");
   await expect(page.locator("#rookieui-img2img-source-upload .rookieui-shell__mini-action-icon")).toHaveText("📁");
   await expect(page.locator("#rookieui-img2img-source-remove .rookieui-shell__mini-action-icon")).toHaveText("🗑");
   await expect(page.locator("#rookieui-img2img-source-reset .rookieui-shell__mini-action-icon")).toHaveText("↺");
@@ -361,6 +393,40 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(
     page.locator("#rookieui-img2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
   ).toHaveText("💥");
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-stage-0")).toHaveAttribute(
+    "data-interaction-mode",
+    "upload",
+  );
+  const controlNetStageRouting = await page.evaluate(() => {
+    const stage = document.getElementById("rookieui-img2img-controlnet-preview-stage-0");
+    const input = document.getElementById("rookieui-img2img-controlnet-preview-image-upload-0");
+    const imageData =
+      document.getElementById("rookieui-img2img-controlnet-image-data-0") ??
+      document.getElementById("rookieui-img2img-controlnet-image-asset-0");
+    let clickCount = 0;
+    const originalClick = input.click.bind(input);
+    input.click = () => {
+      clickCount += 1;
+    };
+    stage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    if (imageData) {
+      imageData.value =
+        imageData.id === "rookieui-img2img-controlnet-image-data-0"
+          ? "data:image/png;base64,Y250cmwtc291cmNl"
+          : "controlnet-stage-source";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    const interactionModeAfterBind = stage.dataset.interactionMode;
+    stage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    input.click = originalClick;
+    return {
+      clickCount,
+      interactionModeAfterBind,
+    };
+  });
+  expect(controlNetStageRouting.clickCount).toBe(1);
+  expect(controlNetStageRouting.interactionModeAfterBind).toBe("edit");
   await page.locator("#rookieui-img2img-controlnet-image-data-0").evaluate((input) => {
     input.value = "data:image/png;base64,aW1hZ2UtY29udHJvbA==";
     input.dispatchEvent(new Event("input", { bubbles: true }));
