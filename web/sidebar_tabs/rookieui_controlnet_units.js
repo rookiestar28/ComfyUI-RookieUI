@@ -5,6 +5,7 @@ import {
   resolveCanvasInteractionMode,
   requestCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
+import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260412-f85-source-brush";
 
 const DEFAULT_UNIT_COUNT = 3;
 const DEFAULT_CONTROL_TYPE = "All";
@@ -1326,6 +1327,7 @@ export function createControlNetUnitEditor({
       imageUploadName: imageUploadControl.fileNameInput,
       maskUploadName: maskUploadControl.fileNameInput,
       runPreprocessorButton,
+      sourceBrush: null,
     };
 
     imageUploadControl.controlRow.classList.add("rookieui-shell__controlnet-upload-row--legacy-source");
@@ -1381,6 +1383,11 @@ export function createControlNetUnitEditor({
         imageData: normalizedSnapshot.imageData,
         imageAsset: normalizedSnapshot.imageAsset,
       });
+      const brushSyncPromise = rowElements.sourceBrush?.syncSourceData(normalizedSnapshot.imageData);
+      if (brushSyncPromise && typeof brushSyncPromise.catch === "function") {
+        // CRITICAL: brush sync is async decode work; keep source snapshot application deterministic even if a decode attempt fails.
+        brushSyncPromise.catch(() => {});
+      }
       syncPreviewHistoryButtons();
       syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
       syncHiddenField();
@@ -1420,10 +1427,35 @@ export function createControlNetUnitEditor({
     bindSourceUploadInput(imageUploadControl.fileInput);
     bindSourceUploadInput(preview.sourceUploadInput);
 
+    rowElements.sourceBrush = createSourceCanvasBrushController({
+      idPrefix: `${idPrefix}-source-${index}`,
+      stage: preview.stage,
+      toolbar: preview.toolbar,
+      onCommitSource: async (editedImageData) => {
+        applyRowSourceSnapshot(
+          {
+            imageData: editedImageData,
+            imageAsset: "",
+            fileName: FILE_PAYLOAD_PLACEHOLDER,
+          },
+          {
+            recordHistory: true,
+            statusMessage: `ControlNet Unit ${index + 1}: applied source brush edits.`,
+          },
+        );
+      },
+      onStatusMessage: (message) => {
+        if (onStatusMessage) {
+          onStatusMessage(`ControlNet Unit ${index + 1}: ${message}`);
+        }
+      },
+    });
+
     unitRows.push(rowElements);
     applyCatalogToRow(rowElements, false);
     bindSyncHandlers(rowElements);
     setControlNetPreview(preview, { imageData: "", imageAsset: "" });
+    rowElements.sourceBrush.syncSourceData("");
 
     moduleSelect.addEventListener("change", syncHiddenField);
     modelSelect.addEventListener("change", syncHiddenField);
@@ -1445,6 +1477,7 @@ export function createControlNetUnitEditor({
     });
     imageData.addEventListener("input", () => {
       setControlNetPreview(preview, { imageData: imageData.value, imageAsset: imageAsset.value });
+      rowElements.sourceBrush?.syncSourceData(imageData.value);
       syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
     });
 
@@ -1628,6 +1661,7 @@ export function createControlNetUnitEditor({
       row.preview.history.undo = [];
       row.preview.history.redo = [];
       setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
+      row.sourceBrush?.syncSourceData(unit.image_data);
       syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }
     syncHiddenField();

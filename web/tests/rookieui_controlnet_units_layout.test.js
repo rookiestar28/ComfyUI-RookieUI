@@ -149,6 +149,11 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     ).toBe("🗑");
     expect(host.querySelector("#rookieui-txt2img-controlnet-preview-undo-action-0")?.disabled).toBe(true);
     expect(host.querySelector("#rookieui-txt2img-controlnet-preview-redo-action-0")?.disabled).toBe(true);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-toggle")).not.toBeNull();
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-width")?.value).toBe("25");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-opacity")?.value).toBe("100");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-softness")?.value).toBe("0");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-source-0-brush-width")?.disabled).toBe(true);
 
     const weightField = host.querySelector("#rookieui-txt2img-controlnet-weight-field-0");
     expect(weightField?.classList.contains("rookieui-shell__field--full")).toBe(true);

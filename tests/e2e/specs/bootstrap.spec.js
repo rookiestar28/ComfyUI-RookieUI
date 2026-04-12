@@ -381,6 +381,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-img2img-source-upload .rookieui-shell__mini-action-icon")).toHaveText("📁");
   await expect(page.locator("#rookieui-img2img-source-remove .rookieui-shell__mini-action-icon")).toHaveText("🗑");
   await expect(page.locator("#rookieui-img2img-source-reset .rookieui-shell__mini-action-icon")).toHaveText("↺");
+  await expect(page.locator("#rookieui-img2img-source-brush-toggle")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-source-brush-width")).toHaveValue("25");
+  await expect(page.locator("#rookieui-img2img-source-brush-opacity")).toHaveValue("100");
+  await expect(page.locator("#rookieui-img2img-source-brush-softness")).toHaveValue("0");
   await expect(page.locator("#rookieui-img2img-source-undo")).toBeDisabled();
   await expect(page.locator("#rookieui-img2img-source-redo")).toBeDisabled();
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");
@@ -390,6 +394,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const img2imgRunPreprocessorButton = page.locator("#rookieui-img2img-controlnet-run-preprocessor-0");
   await expect(img2imgRunPreprocessorButton).toBeHidden();
   await expect(page.locator("#rookieui-img2img-controlnet-preview-upload-action-0")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-toggle")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-width")).toHaveValue("25");
+  await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-opacity")).toHaveValue("100");
+  await expect(page.locator("#rookieui-img2img-controlnet-source-0-brush-softness")).toHaveValue("0");
   await expect(
     page.locator("#rookieui-img2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
   ).toHaveText("💥");

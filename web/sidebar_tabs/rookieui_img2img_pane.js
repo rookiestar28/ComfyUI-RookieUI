@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-controlnet-ui-parity-pass2";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f85-source-brush";
 import {
   CANVAS_ACTIONS,
   canCanvasStageOpenUpload,
@@ -6,6 +6,7 @@ import {
   resolveCanvasInteractionMode,
   requestCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
+import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260412-f85-source-brush";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -1012,6 +1013,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           redo: [],
           limit: 24,
         };
+        let sourceBrushController = null;
 
         const readSourceSnapshot = () => ({
           imageData: String(elements.imageData.value ?? "").trim(),
@@ -1049,6 +1051,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             "aria-label",
             interactionMode === "upload" ? "Upload source image" : "Img2Img source canvas editing surface",
           );
+          const brushSyncPromise = sourceBrushController?.syncSourceData(sourceData);
+          if (brushSyncPromise && typeof brushSyncPromise.catch === "function") {
+            // CRITICAL: brush sync runs async image decode; swallow local decode errors so stage-mode rendering never regresses into a dead UI state.
+            brushSyncPromise.catch(() => {});
+          }
         };
         refreshSourceCanvasSurface = renderSourceCanvasSurface;
 
@@ -1088,6 +1095,27 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             statusNode.textContent = options.statusMessage;
           }
         };
+
+        sourceBrushController = createSourceCanvasBrushController({
+          idPrefix: "rookieui-img2img-source",
+          stage: imageCanvasStage,
+          toolbar: imageCanvasToolbar,
+          onCommitSource: async (editedImageData) => {
+            await applySourceSnapshot(
+              {
+                imageData: editedImageData,
+                imageAsset: "",
+              },
+              {
+                recordHistory: true,
+                statusMessage: "Applied source brush edits.",
+              },
+            );
+          },
+          onStatusMessage: (message) => {
+            statusNode.textContent = message;
+          },
+        });
 
         const openSourceFilePicker = () => {
           imageFileInput.click();

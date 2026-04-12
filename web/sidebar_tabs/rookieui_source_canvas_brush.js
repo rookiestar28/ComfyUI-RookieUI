@@ -1,0 +1,334 @@
+const DEFAULT_BRUSH_WIDTH = 25;
+const DEFAULT_BRUSH_OPACITY = 100;
+const DEFAULT_BRUSH_SOFTNESS = 0;
+
+function clamp(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function createBrushControl({ host, id, labelText, min, max, step, defaultValue }) {
+  const control = document.createElement("label");
+  control.className = "rookieui-shell__canvas-brush-control";
+  control.id = `${id}-field`;
+
+  const label = document.createElement("span");
+  label.className = "rookieui-shell__canvas-brush-control-label";
+  control.appendChild(label);
+
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "rookieui-shell__slider";
+  slider.id = id;
+  slider.min = String(min);
+  slider.max = String(max);
+  slider.step = String(step);
+  slider.value = String(defaultValue);
+  control.appendChild(slider);
+
+  const updateLabel = () => {
+    label.textContent = `${labelText} (${slider.value})`;
+  };
+  slider.addEventListener("input", updateLabel);
+  updateLabel();
+
+  host.appendChild(control);
+  return {
+    control,
+    slider,
+    setDisabled(disabled) {
+      slider.disabled = disabled;
+    },
+  };
+}
+
+function mapPointerToCanvas(event, stage, canvas) {
+  const stageRect = stage.getBoundingClientRect();
+  const canvasWidth = Number(canvas.width || 0);
+  const canvasHeight = Number(canvas.height || 0);
+  if (!stageRect.width || !stageRect.height || !canvasWidth || !canvasHeight) {
+    return null;
+  }
+
+  const renderScale = Math.min(stageRect.width / canvasWidth, stageRect.height / canvasHeight);
+  const renderWidth = canvasWidth * renderScale;
+  const renderHeight = canvasHeight * renderScale;
+  const offsetX = (stageRect.width - renderWidth) / 2;
+  const offsetY = (stageRect.height - renderHeight) / 2;
+
+  const localX = event.clientX - stageRect.left;
+  const localY = event.clientY - stageRect.top;
+  if (localX < offsetX || localX > offsetX + renderWidth || localY < offsetY || localY > offsetY + renderHeight) {
+    return null;
+  }
+
+  return {
+    x: (localX - offsetX) / renderScale,
+    y: (localY - offsetY) / renderScale,
+  };
+}
+
+function readCanvasImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("failed to decode source image"));
+    image.src = dataUrl;
+  });
+}
+
+function isJSDOMEnvironment() {
+  const userAgent = String(globalThis?.navigator?.userAgent ?? "");
+  return /jsdom/i.test(userAgent);
+}
+
+function getCanvas2dContext(canvas) {
+  if (!canvas || typeof canvas.getContext !== "function") {
+    return null;
+  }
+  if (isJSDOMEnvironment()) {
+    // CRITICAL: jsdom's canvas backend is intentionally unimplemented and emits noisy not-implemented errors; short-circuit to keep CI signal clean.
+    return null;
+  }
+  try {
+    // CRITICAL: some runtime environments expose <canvas> without a 2D backend; guard to keep editor boot resilient instead of throwing during module init.
+    return canvas.getContext("2d");
+  } catch (_error) {
+    return null;
+  }
+}
+
+export function createSourceCanvasBrushController({
+  idPrefix,
+  stage,
+  toolbar,
+  onCommitSource,
+  onStatusMessage = null,
+}) {
+  if (!stage || !toolbar || typeof onCommitSource !== "function") {
+    return {
+      syncSourceData: () => {},
+      setEnabled: () => {},
+      isEnabled: () => false,
+    };
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.className = "rookieui-shell__canvas-brush-layer";
+  canvas.id = `${idPrefix}-brush-canvas`;
+  canvas.hidden = true;
+  stage.appendChild(canvas);
+  const context = getCanvas2dContext(canvas);
+
+  const brushToggleButton = document.createElement("button");
+  brushToggleButton.type = "button";
+  brushToggleButton.id = `${idPrefix}-brush-toggle`;
+  brushToggleButton.className =
+    "rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-neutral";
+  brushToggleButton.dataset.canvasAction = "brush";
+  brushToggleButton.title = "Toggle brush drawing";
+  brushToggleButton.setAttribute("aria-label", "Toggle brush drawing");
+  const brushIcon = document.createElement("span");
+  brushIcon.className = "rookieui-shell__mini-action-icon";
+  brushIcon.textContent = "🖌";
+  brushToggleButton.appendChild(brushIcon);
+  toolbar.appendChild(brushToggleButton);
+
+  const controlsHost = document.createElement("div");
+  controlsHost.className = "rookieui-shell__canvas-brush-controls";
+  controlsHost.id = `${idPrefix}-brush-controls`;
+  toolbar.appendChild(controlsHost);
+
+  const widthControl = createBrushControl({
+    host: controlsHost,
+    id: `${idPrefix}-brush-width`,
+    labelText: "Brush Width",
+    min: 1,
+    max: 128,
+    step: 1,
+    defaultValue: DEFAULT_BRUSH_WIDTH,
+  });
+  const opacityControl = createBrushControl({
+    host: controlsHost,
+    id: `${idPrefix}-brush-opacity`,
+    labelText: "Brush Opacity",
+    min: 1,
+    max: 100,
+    step: 1,
+    defaultValue: DEFAULT_BRUSH_OPACITY,
+  });
+  const softnessControl = createBrushControl({
+    host: controlsHost,
+    id: `${idPrefix}-brush-softness`,
+    labelText: "Brush Softness",
+    min: 0,
+    max: 100,
+    step: 1,
+    defaultValue: DEFAULT_BRUSH_SOFTNESS,
+  });
+
+  const state = {
+    enabled: false,
+    hasSource: false,
+    drawing: false,
+    lastPoint: null,
+    dirty: false,
+    sourceToken: 0,
+  };
+
+  const syncEnabledVisual = () => {
+    brushToggleButton.dataset.active = state.enabled ? "true" : "false";
+    brushToggleButton.classList.toggle("is-active", state.enabled);
+    canvas.style.pointerEvents = state.enabled ? "auto" : "none";
+    widthControl.setDisabled(!state.hasSource);
+    opacityControl.setDisabled(!state.hasSource);
+    softnessControl.setDisabled(!state.hasSource);
+  };
+
+  const setEnabled = (nextEnabled) => {
+    state.enabled = Boolean(nextEnabled) && state.hasSource;
+    syncEnabledVisual();
+  };
+
+  const drawSegment = (from, to) => {
+    if (!context) {
+      return;
+    }
+    const width = clamp(widthControl.slider.value, 1, 128);
+    const opacity = clamp(opacityControl.slider.value, 1, 100) / 100;
+    const softness = clamp(softnessControl.slider.value, 0, 100) / 100;
+
+    context.save();
+    context.globalAlpha = opacity;
+    context.strokeStyle = "rgba(255, 255, 255, 1)";
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.lineWidth = width;
+    context.shadowColor = "rgba(255, 255, 255, 0.9)";
+    context.shadowBlur = width * softness;
+    context.beginPath();
+    context.moveTo(from.x, from.y);
+    context.lineTo(to.x, to.y);
+    context.stroke();
+    context.restore();
+  };
+
+  const commitBrushStroke = async () => {
+    if (!state.dirty || !state.hasSource) {
+      return;
+    }
+    state.dirty = false;
+    try {
+      await onCommitSource(canvas.toDataURL("image/png"));
+      if (typeof onStatusMessage === "function") {
+        onStatusMessage("Applied source brush edits.");
+      }
+    } catch (_error) {
+      if (typeof onStatusMessage === "function") {
+        onStatusMessage("Failed to commit source brush edits.");
+      }
+    }
+  };
+
+  const stopDrawing = async (event) => {
+    if (!state.drawing) {
+      return;
+    }
+    state.drawing = false;
+    state.lastPoint = null;
+    if (typeof event?.pointerId === "number" && canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+    await commitBrushStroke();
+  };
+
+  canvas.addEventListener("pointerdown", (event) => {
+    if (!state.enabled || !state.hasSource || event.button !== 0) {
+      return;
+    }
+    const point = mapPointerToCanvas(event, stage, canvas);
+    if (!point) {
+      return;
+    }
+    state.drawing = true;
+    state.dirty = false;
+    state.lastPoint = point;
+    canvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!state.drawing || !state.enabled || !state.lastPoint) {
+      return;
+    }
+    const point = mapPointerToCanvas(event, stage, canvas);
+    if (!point) {
+      return;
+    }
+    drawSegment(state.lastPoint, point);
+    state.lastPoint = point;
+    state.dirty = true;
+    event.preventDefault();
+  });
+
+  canvas.addEventListener("pointerup", stopDrawing);
+  canvas.addEventListener("pointercancel", stopDrawing);
+  canvas.addEventListener("pointerleave", stopDrawing);
+
+  brushToggleButton.addEventListener("click", () => {
+    setEnabled(!state.enabled);
+  });
+
+  syncEnabledVisual();
+
+  const syncSourceData = async (dataUrl) => {
+    const normalized = String(dataUrl ?? "").trim();
+    const token = state.sourceToken + 1;
+    state.sourceToken = token;
+
+    if (!normalized.startsWith("data:image/")) {
+      state.hasSource = false;
+      state.drawing = false;
+      state.lastPoint = null;
+      canvas.hidden = true;
+      if (context) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      setEnabled(false);
+      return;
+    }
+
+    try {
+      const image = await readCanvasImage(normalized);
+      if (token !== state.sourceToken || !context) {
+        return;
+      }
+      canvas.width = Math.max(1, image.naturalWidth || image.width || 1);
+      canvas.height = Math.max(1, image.naturalHeight || image.height || 1);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.hidden = false;
+      state.hasSource = true;
+      // IMPORTANT: source-present surfaces must default to brush-ready interaction mode instead of upload-click mode.
+      setEnabled(true);
+    } catch (_error) {
+      state.hasSource = false;
+      canvas.hidden = true;
+      setEnabled(false);
+      if (typeof onStatusMessage === "function") {
+        onStatusMessage("Unable to initialize source brush canvas.");
+      }
+    }
+  };
+
+  return {
+    syncSourceData,
+    setEnabled,
+    isEnabled() {
+      return state.enabled;
+    },
+  };
+}
