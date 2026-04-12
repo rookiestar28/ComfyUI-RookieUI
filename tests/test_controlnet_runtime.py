@@ -43,4 +43,3 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
     def test_select_aio_preprocessor_name_uses_keyword_ranking_when_explicit_candidates_miss(self) -> None:
         selected = runtime._select_aio_preprocessor_name(_FakeAioSoftEdge, "softedge")
         self.assertEqual(selected, "hed_safe")
-

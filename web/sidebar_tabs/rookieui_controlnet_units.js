@@ -1740,6 +1740,7 @@ export function createControlNetUnitEditor({
     preview.fullscreenButton.addEventListener("click", async () => {
       const fullscreenAction = await toggleCanvasFullscreen(preview.stage);
       syncPreviewFullscreenButton();
+      rowElements.sourceBrush?.syncFullscreenState?.();
       if (onStatusMessage) {
         const statusMessage =
           fullscreenAction === CANVAS_FULLSCREEN_ACTIONS.entered

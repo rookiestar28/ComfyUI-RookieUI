@@ -860,6 +860,10 @@
   transform: translateX(-50%);
 }
 
+.rookieui-shell__canvas-fullscreen-zoom[hidden] {
+  display: none !important;
+}
+
 .rookieui-shell__canvas-fullscreen-zoom-label {
   font-size: 11px;
   color: var(--rookieui-text-secondary);

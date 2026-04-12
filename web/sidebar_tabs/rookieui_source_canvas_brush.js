@@ -104,6 +104,14 @@ function isJSDOMEnvironment() {
   return /jsdom/i.test(userAgent);
 }
 
+function resolveDocumentFullscreenElement() {
+  const doc = globalThis.document;
+  if (!doc || typeof doc !== "object") {
+    return null;
+  }
+  return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+}
+
 function getCanvas2dContext(canvas) {
   if (!canvas || typeof canvas.getContext !== "function") {
     return null;
@@ -246,7 +254,7 @@ export function createSourceCanvasBrushController({
   };
 
   const isStageWithinFullscreenElement = () => {
-    const fullscreenElement = globalThis.document?.fullscreenElement;
+    const fullscreenElement = resolveDocumentFullscreenElement();
     if (!fullscreenElement || !stage) {
       return false;
     }
@@ -474,6 +482,7 @@ export function createSourceCanvasBrushController({
 
   if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
     globalThis.document.addEventListener("fullscreenchange", syncFullscreenZoomVisibility);
+    globalThis.document.addEventListener("webkitfullscreenchange", syncFullscreenZoomVisibility);
   }
 
   if (typeof globalThis.ResizeObserver === "function") {
@@ -538,6 +547,7 @@ export function createSourceCanvasBrushController({
   return {
     syncSourceData,
     setEnabled,
+    syncFullscreenState: syncFullscreenZoomVisibility,
     isEnabled() {
       return state.enabled;
     },
