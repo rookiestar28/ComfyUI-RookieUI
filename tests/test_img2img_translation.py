@@ -422,6 +422,8 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("UNETLoader", class_types)
         self.assertIn("CLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
+        self.assertIn("CLIPTextEncode", class_types)
+        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:

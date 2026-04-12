@@ -319,6 +319,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("UNETLoader", class_types)
         self.assertIn("CLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
+        self.assertIn("CLIPTextEncode", class_types)
+        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:

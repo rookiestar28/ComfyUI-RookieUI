@@ -421,13 +421,14 @@ def _build_sdxl_conditioning(
     height: int,
     clip_source: list[object],
 ) -> tuple[str, str]:
+    prompt_encoder_mode = _resolve_conditioning_prompt_encoder(request)
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,
         allocator=allocator,
         clip_source=clip_source,
         prompt_text=request.prompt,
         semantic_payload=request.prompt_semantics if isinstance(request.prompt_semantics, dict) else {},
-        prompt_encoder="sdxl",
+        prompt_encoder=prompt_encoder_mode,
         width=width,
         height=height,
     )
@@ -437,11 +438,27 @@ def _build_sdxl_conditioning(
         clip_source=clip_source,
         prompt_text=request.negative_prompt,
         semantic_payload=request.negative_prompt_semantics if isinstance(request.negative_prompt_semantics, dict) else {},
-        prompt_encoder="sdxl",
+        prompt_encoder=prompt_encoder_mode,
         width=width,
         height=height,
     )
     return positive_id, negative_id
+
+
+def _resolve_conditioning_prompt_encoder(
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+) -> str:
+    configured_prompt_encoder = str(request.prompt_encoder or "").strip().lower()
+    if configured_prompt_encoder in {"clip_text_encode", "sd15"}:
+        return "sd15"
+    if configured_prompt_encoder in {"clip_text_encode_sdxl", "sdxl"}:
+        text_encoder_values = _normalize_encoder_selector_values(request.text_encoder_name)
+        if request.primary_model_category == "diffusion_models" and len(text_encoder_values) <= 1:
+            # CRITICAL: CLIPTextEncodeSDXL requires both "l" and "g" token channels;
+            # diffusion-model presets often run single text encoders, so forcing SDXL encoding here causes KeyError('l') at runtime.
+            return "sd15"
+        return "sdxl"
+    return "sdxl"
 
 
 def _build_sampler_node(
