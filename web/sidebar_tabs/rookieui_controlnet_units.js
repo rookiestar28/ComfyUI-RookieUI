@@ -1,4 +1,8 @@
-import { hasCanvasSourceImage } from "./rookieui_canvas_surface_contract.js";
+import {
+  CANVAS_ACTIONS,
+  hasCanvasSourceImage,
+  requestCanvasFullscreen,
+} from "./rookieui_canvas_surface_contract.js";
 
 const DEFAULT_UNIT_COUNT = 3;
 const DEFAULT_CONTROL_TYPE = "All";
@@ -225,10 +229,79 @@ function bindSliderNumberPair(numberInput, sliderInput) {
   syncFromNumber();
 }
 
-function createControlNetPreviewStage({ idPrefix, index, appendTextElement }) {
+function createControlNetPreviewActionButton({ toolbar, idPrefix, index, action, icon, label }) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.id = `${idPrefix}-preview-${action}-action-${index}`;
+  button.className = "rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-neutral";
+  button.dataset.canvasAction = action;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  const iconNode = document.createElement("span");
+  iconNode.className = "rookieui-shell__mini-action-icon";
+  iconNode.textContent = icon;
+  button.appendChild(iconNode);
+  toolbar.appendChild(button);
+  return button;
+}
+
+function createControlNetPreviewStage({ idPrefix, index, appendTextElement, createInput }) {
   const stage = document.createElement("div");
   stage.className = "rookieui-shell__controlnet-preview-stage";
   stage.id = `${idPrefix}-preview-stage-${index}`;
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "rookieui-shell__controlnet-preview-toolbar";
+  stage.appendChild(toolbar);
+
+  const fullscreenButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.fullscreen,
+    icon: "⛶",
+    label: "Fullscreen preview",
+  });
+  const uploadButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.upload,
+    icon: "📁",
+    label: "Upload control image",
+  });
+  const removeButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.remove,
+    icon: "🗑",
+    label: "Remove control image",
+  });
+  const resetButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.reset,
+    icon: "↺",
+    label: "Reset control image view",
+  });
+  const undoButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.undo,
+    icon: "↶",
+    label: "Undo control image change",
+  });
+  const redoButton = createControlNetPreviewActionButton({
+    toolbar,
+    idPrefix,
+    index,
+    action: CANVAS_ACTIONS.redo,
+    icon: "↷",
+    label: "Redo control image change",
+  });
 
   const previewImage = document.createElement("img");
   previewImage.className = "rookieui-shell__controlnet-preview-image";
@@ -251,33 +324,61 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement }) {
   );
   stage.appendChild(placeholder);
 
+  const sourceUploadInput = createInput("file", `${idPrefix}-preview-image-upload-${index}`, "", {
+    className: "rookieui-shell__input",
+  });
+  sourceUploadInput.accept = "image/png,image/webp,image/jpeg";
+  sourceUploadInput.hidden = true;
+  sourceUploadInput.setAttribute("tabindex", "-1");
+  sourceUploadInput.setAttribute("aria-hidden", "true");
+  stage.appendChild(sourceUploadInput);
+
   return {
     stage,
+    toolbar,
     previewImage,
     placeholder,
     placeholderText: text,
+    sourceUploadInput,
+    fullscreenButton,
+    uploadButton,
+    removeButton,
+    resetButton,
+    undoButton,
+    redoButton,
+    history: {
+      undo: [],
+      redo: [],
+      limit: 24,
+    },
   };
 }
 
 function setControlNetPreview(previewState, { imageData = "", imageAsset = "", fallbackText = "Upload control image" } = {}) {
   const normalizedImage = String(imageData ?? "").trim();
   const normalizedAsset = String(imageAsset ?? "").trim();
+  const hasSource = hasCanvasSourceImage(normalizedImage, normalizedAsset);
+  previewState.stage.dataset.hasSource = hasSource ? "true" : "false";
   if (normalizedImage.startsWith("data:image/")) {
     previewState.previewImage.src = normalizedImage;
     previewState.previewImage.hidden = false;
     previewState.placeholder.hidden = true;
-    return;
+  } else {
+    previewState.previewImage.hidden = true;
+    previewState.previewImage.removeAttribute("src");
+    previewState.placeholder.hidden = false;
+    if (normalizedAsset) {
+      // IMPORTANT: asset handles are server-side identifiers; keep text fallback instead of forcing /view fetches that may fail on non-image handles.
+      previewState.placeholderText.textContent = `Asset: ${normalizedAsset}`;
+    } else {
+      previewState.placeholderText.textContent = fallbackText;
+    }
   }
 
-  previewState.previewImage.hidden = true;
-  previewState.previewImage.removeAttribute("src");
-  previewState.placeholder.hidden = false;
-  if (normalizedAsset) {
-    // IMPORTANT: asset handles are server-side identifiers; keep text fallback instead of forcing /view fetches that may fail on non-image handles.
-    previewState.placeholderText.textContent = `Asset: ${normalizedAsset}`;
-  } else {
-    previewState.placeholderText.textContent = fallbackText;
-  }
+  previewState.removeButton.disabled = !hasSource;
+  previewState.resetButton.disabled = !hasSource;
+  previewState.undoButton.disabled = previewState.history.undo.length === 0;
+  previewState.redoButton.disabled = previewState.history.redo.length === 0;
 }
 
 function hasIndependentControlImageData(row) {
@@ -477,6 +578,7 @@ function createEnglishUploadControl({
   });
 
   return {
+    controlRow,
     fileInput,
     fileNameInput,
     chooseButton,
@@ -919,7 +1021,7 @@ export function createControlNetUnitEditor({
     panelHost.appendChild(panel);
     unitPanels.push(panel);
 
-    const preview = createControlNetPreviewStage({ idPrefix, index, appendTextElement });
+    const preview = createControlNetPreviewStage({ idPrefix, index, appendTextElement, createInput });
     panel.appendChild(preview.stage);
 
     const primaryGrid = document.createElement("div");
@@ -1216,6 +1318,98 @@ export function createControlNetUnitEditor({
       runPreprocessorButton,
     };
 
+    imageUploadControl.controlRow.classList.add("rookieui-shell__controlnet-upload-row--legacy-source");
+    imageUploadControl.controlRow.hidden = true;
+
+    const readRowSourceSnapshot = () => ({
+      imageData: String(rowElements.imageData.value ?? "").trim(),
+      imageAsset: String(rowElements.imageAsset.value ?? "").trim(),
+      fileName: String(rowElements.imageUploadName.value ?? FILE_SELECTION_PLACEHOLDER).trim() || FILE_SELECTION_PLACEHOLDER,
+    });
+
+    const areSourceSnapshotsEqual = (left, right) =>
+      String(left?.imageData ?? "") === String(right?.imageData ?? "") &&
+      String(left?.imageAsset ?? "") === String(right?.imageAsset ?? "");
+
+    const syncPreviewHistoryButtons = () => {
+      rowElements.preview.undoButton.disabled = rowElements.preview.history.undo.length === 0;
+      rowElements.preview.redoButton.disabled = rowElements.preview.history.redo.length === 0;
+    };
+
+    const pushPreviewUndoSnapshot = () => {
+      const snapshot = readRowSourceSnapshot();
+      const previous = rowElements.preview.history.undo[rowElements.preview.history.undo.length - 1];
+      if (areSourceSnapshotsEqual(snapshot, previous)) {
+        return;
+      }
+      rowElements.preview.history.undo.push(snapshot);
+      if (rowElements.preview.history.undo.length > rowElements.preview.history.limit) {
+        rowElements.preview.history.undo.shift();
+      }
+    };
+
+    const applyRowSourceSnapshot = (snapshot, options = {}) => {
+      const normalizedSnapshot = {
+        imageData: String(snapshot?.imageData ?? "").trim(),
+        imageAsset: String(snapshot?.imageAsset ?? "").trim(),
+        fileName: String(snapshot?.fileName ?? "").trim(),
+      };
+      if (options.recordHistory) {
+        pushPreviewUndoSnapshot();
+        rowElements.preview.history.redo = [];
+      }
+      rowElements.imageData.value = normalizedSnapshot.imageData;
+      rowElements.imageAsset.value = normalizedSnapshot.imageAsset;
+      if (normalizedSnapshot.fileName) {
+        rowElements.imageUploadName.value = normalizedSnapshot.fileName;
+      } else if (normalizedSnapshot.imageData) {
+        rowElements.imageUploadName.value = FILE_PAYLOAD_PLACEHOLDER;
+      } else {
+        rowElements.imageUploadName.value = FILE_SELECTION_PLACEHOLDER;
+      }
+      setControlNetPreview(rowElements.preview, {
+        imageData: normalizedSnapshot.imageData,
+        imageAsset: normalizedSnapshot.imageAsset,
+      });
+      syncPreviewHistoryButtons();
+      syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
+      syncHiddenField();
+      if (options.statusMessage && onStatusMessage) {
+        onStatusMessage(options.statusMessage);
+      }
+    };
+
+    const bindSourceUploadInput = (fileInput) => {
+      fileInput.addEventListener("change", async () => {
+        const [file] = Array.from(fileInput.files ?? []);
+        if (!file) {
+          return;
+        }
+        try {
+          const imageDataUrl = await readFileAsDataUrl(file);
+          applyRowSourceSnapshot(
+            {
+              imageData: imageDataUrl,
+              imageAsset: "",
+              fileName: file.name,
+            },
+            {
+              recordHistory: true,
+              statusMessage: `Loaded ControlNet source image: ${file.name}`,
+            },
+          );
+        } catch (_error) {
+          rowElements.imageUploadName.value = FILE_SELECTION_PLACEHOLDER;
+          if (onStatusMessage) {
+            onStatusMessage("Failed to load ControlNet source image.");
+          }
+        }
+      });
+    };
+
+    bindSourceUploadInput(imageUploadControl.fileInput);
+    bindSourceUploadInput(preview.sourceUploadInput);
+
     unitRows.push(rowElements);
     applyCatalogToRow(rowElements, false);
     bindSyncHandlers(rowElements);
@@ -1223,17 +1417,6 @@ export function createControlNetUnitEditor({
 
     moduleSelect.addEventListener("change", syncHiddenField);
     modelSelect.addEventListener("change", syncHiddenField);
-
-    attachUploadHandler(imageUploadControl.fileInput, {
-      dataField: imageData,
-      assetField: imageAsset,
-      label: "source image",
-      fileNameField: imageUploadControl.fileNameInput,
-      onFileLoaded: (imageDataUrl) => {
-        setControlNetPreview(preview, { imageData: imageDataUrl, imageAsset: "" });
-        syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
-      },
-    });
 
     attachUploadHandler(maskUploadControl.fileInput, {
       dataField: maskData,
@@ -1255,11 +1438,132 @@ export function createControlNetUnitEditor({
       syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
     });
 
+    preview.uploadButton.addEventListener("click", () => {
+      preview.sourceUploadInput.click();
+    });
+    preview.stage.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target && typeof target.closest === "function" && target.closest(".rookieui-shell__controlnet-preview-toolbar")) {
+        return;
+      }
+      preview.sourceUploadInput.click();
+    });
+    preview.stage.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        preview.sourceUploadInput.click();
+      }
+    });
+    preview.stage.setAttribute("tabindex", "0");
+    preview.stage.setAttribute("role", "button");
+    preview.stage.setAttribute("aria-label", `ControlNet Unit ${index + 1} source image`);
+
+    preview.stage.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      preview.stage.dataset.dragging = "true";
+    });
+    preview.stage.addEventListener("dragleave", () => {
+      preview.stage.dataset.dragging = "false";
+    });
+    preview.stage.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      preview.stage.dataset.dragging = "false";
+      const [file] = Array.from(event.dataTransfer?.files ?? []);
+      if (!file) {
+        return;
+      }
+      try {
+        const imageDataUrl = await readFileAsDataUrl(file);
+        applyRowSourceSnapshot(
+          {
+            imageData: imageDataUrl,
+            imageAsset: "",
+            fileName: file.name,
+          },
+          {
+            recordHistory: true,
+            statusMessage: `Loaded ControlNet source image: ${file.name}`,
+          },
+        );
+      } catch (_error) {
+        if (onStatusMessage) {
+          onStatusMessage("Failed to load dropped ControlNet source image.");
+        }
+      }
+    });
+
+    preview.removeButton.addEventListener("click", () => {
+      // IMPORTANT: clear both fields atomically; split source state causes stale visibility and payload mismatches.
+      applyRowSourceSnapshot(
+        {
+          imageData: "",
+          imageAsset: "",
+          fileName: FILE_SELECTION_PLACEHOLDER,
+        },
+        {
+          recordHistory: true,
+          statusMessage: `ControlNet Unit ${index + 1}: cleared source image.`,
+        },
+      );
+    });
+
+    preview.resetButton.addEventListener("click", () => {
+      const snapshot = readRowSourceSnapshot();
+      if (!hasCanvasSourceImage(snapshot.imageData, snapshot.imageAsset)) {
+        if (onStatusMessage) {
+          onStatusMessage(`ControlNet Unit ${index + 1}: no source image to reset.`);
+        }
+        return;
+      }
+      setControlNetPreview(preview, { imageData: snapshot.imageData, imageAsset: snapshot.imageAsset });
+      if (onStatusMessage) {
+        onStatusMessage(`ControlNet Unit ${index + 1}: source preview reset.`);
+      }
+    });
+
+    preview.fullscreenButton.addEventListener("click", async () => {
+      const opened = await requestCanvasFullscreen(preview.stage);
+      if (onStatusMessage) {
+        onStatusMessage(
+          opened
+            ? `ControlNet Unit ${index + 1}: source preview entered fullscreen mode.`
+            : `ControlNet Unit ${index + 1}: fullscreen is unavailable.`,
+        );
+      }
+    });
+
+    preview.undoButton.addEventListener("click", () => {
+      if (!preview.history.undo.length) {
+        return;
+      }
+      const currentSnapshot = readRowSourceSnapshot();
+      const previousSnapshot = preview.history.undo.pop();
+      preview.history.redo.push(currentSnapshot);
+      applyRowSourceSnapshot(previousSnapshot, {
+        recordHistory: false,
+        statusMessage: `ControlNet Unit ${index + 1}: restored previous source image.`,
+      });
+    });
+
+    preview.redoButton.addEventListener("click", () => {
+      if (!preview.history.redo.length) {
+        return;
+      }
+      const currentSnapshot = readRowSourceSnapshot();
+      const nextSnapshot = preview.history.redo.pop();
+      preview.history.undo.push(currentSnapshot);
+      applyRowSourceSnapshot(nextSnapshot, {
+        recordHistory: false,
+        statusMessage: `ControlNet Unit ${index + 1}: reapplied source image.`,
+      });
+    });
+
     runPreprocessorButton.addEventListener("click", () => {
       runPreprocessorForRow(rowElements, index);
     });
 
     syncRunPreprocessorVisibility(rowElements, isImg2ImgEditor);
+    syncPreviewHistoryButtons();
 
     tab.addEventListener("click", () => {
       activateTab(index);
@@ -1305,6 +1609,8 @@ export function createControlNetUnitEditor({
 
       row.imageUploadName.value = unit.image_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
       row.maskUploadName.value = unit.mask_data ? FILE_PAYLOAD_PLACEHOLDER : FILE_SELECTION_PLACEHOLDER;
+      row.preview.history.undo = [];
+      row.preview.history.redo = [];
       setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
       syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }

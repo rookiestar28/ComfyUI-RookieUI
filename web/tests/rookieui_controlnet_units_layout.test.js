@@ -139,10 +139,21 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       "#rookieui-txt2img-controlnet-preview-stage-0 .rookieui-shell__controlnet-preview-placeholder-icon",
     );
     expect(placeholderIcon?.textContent).toBe("⤴");
+    expect(
+      host.querySelector("#rookieui-txt2img-controlnet-preview-upload-action-0 .rookieui-shell__mini-action-icon")
+        ?.textContent,
+    ).toBe("📁");
+    expect(
+      host.querySelector("#rookieui-txt2img-controlnet-preview-remove-action-0 .rookieui-shell__mini-action-icon")
+        ?.textContent,
+    ).toBe("🗑");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-preview-undo-action-0")?.disabled).toBe(true);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-preview-redo-action-0")?.disabled).toBe(true);
 
     const weightField = host.querySelector("#rookieui-txt2img-controlnet-weight-field-0");
     expect(weightField?.classList.contains("rookieui-shell__field--full")).toBe(true);
     expect(weightField?.classList.contains("rookieui-shell__controlnet-weight-field")).toBe(true);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-image-upload-button-0")?.closest(".rookieui-shell__controlnet-upload-row--legacy-source")).not.toBeNull();
   });
 
   test("keeps img2img run-preprocessor hidden by default and toggles with independent image data", () => {

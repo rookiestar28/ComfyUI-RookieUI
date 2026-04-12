@@ -278,6 +278,13 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(
     page.locator("#rookieui-txt2img-controlnet-preview-stage-0 .rookieui-shell__controlnet-preview-placeholder-icon"),
   ).toHaveText("⤴");
+  await expect(
+    page.locator("#rookieui-txt2img-controlnet-preview-upload-action-0 .rookieui-shell__mini-action-icon"),
+  ).toHaveText("📁");
+  await expect(
+    page.locator("#rookieui-txt2img-controlnet-preview-remove-action-0 .rookieui-shell__mini-action-icon"),
+  ).toHaveText("🗑");
+  await expect(page.locator("#rookieui-txt2img-controlnet-image-upload-button-0")).toBeHidden();
   const txt2imgControlNetRowLayout = await page.evaluate(() => {
     const moduleSelect = document.querySelector("#rookieui-txt2img-controlnet-module-0");
     const runButton = document.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0");
@@ -350,6 +357,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-img2img-workspace-tab-generation").click();
   const img2imgRunPreprocessorButton = page.locator("#rookieui-img2img-controlnet-run-preprocessor-0");
   await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-upload-action-0")).toBeVisible();
   await expect(
     page.locator("#rookieui-img2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
   ).toHaveText("💥");

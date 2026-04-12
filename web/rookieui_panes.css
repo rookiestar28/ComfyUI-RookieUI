@@ -198,9 +198,38 @@
     linear-gradient(-45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%);
   background-size: 28px 28px;
   background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+  cursor: pointer;
+}
+
+.rookieui-shell__controlnet-preview-stage[data-dragging="true"] {
+  border-color: var(--rookieui-accent);
+  background: var(--rookieui-accent-soft);
+}
+
+.rookieui-shell__controlnet-preview-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 84%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-toolbar .rookieui-shell__mini-action {
+  width: 28px;
+  min-width: 28px;
+  min-height: 24px;
+  padding: 0;
 }
 
 .rookieui-shell__controlnet-preview-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -379,6 +408,10 @@
   display: grid;
   gap: 8px;
   width: 100%;
+}
+
+.rookieui-shell__controlnet-upload-row--legacy-source {
+  display: none !important;
 }
 
 .rookieui-shell__controlnet-upload-row .rookieui-shell__action-target-row {
