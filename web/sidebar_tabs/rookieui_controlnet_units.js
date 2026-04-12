@@ -1,9 +1,11 @@
 import {
+  CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
   canCanvasStageOpenUpload,
   hasCanvasSourceImage,
+  isCanvasElementFullscreen,
   resolveCanvasInteractionMode,
-  requestCanvasFullscreen,
+  toggleCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
 import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260412-f85-source-brush";
 
@@ -67,6 +69,8 @@ const PREVIEW_UPLOAD_ICON = "⤴";
 const RUN_PREPROCESSOR_ICON = "💥";
 const RUN_PREPROCESSOR_BUSY_ICON = "⏳";
 const RUN_PREPROCESSOR_TIMEOUT_MS = 30000;
+const FULLSCREEN_ENTER_ICON = "⛶";
+const FULLSCREEN_EXIT_ICON = "🗗";
 
 function toObjectArray(rawValue) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
@@ -264,7 +268,7 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement, crea
     idPrefix,
     index,
     action: CANVAS_ACTIONS.fullscreen,
-    icon: "⛶",
+    icon: FULLSCREEN_ENTER_ICON,
     label: "Fullscreen preview",
   });
   const uploadButton = createControlNetPreviewActionButton({
@@ -1650,6 +1654,25 @@ export function createControlNetUnitEditor({
     preview.stage.setAttribute("tabindex", "0");
     preview.stage.setAttribute("role", "button");
 
+    const syncPreviewFullscreenButton = () => {
+      const fullscreenActive = isCanvasElementFullscreen(preview.stage);
+      // CRITICAL: keep icon/title state derived from real fullscreen element so toolbar stays correct after Esc-based exits.
+      const iconNode = preview.fullscreenButton.querySelector(".rookieui-shell__mini-action-icon");
+      if (iconNode) {
+        iconNode.textContent = fullscreenActive ? FULLSCREEN_EXIT_ICON : FULLSCREEN_ENTER_ICON;
+      }
+      preview.fullscreenButton.title = fullscreenActive ? "Exit fullscreen preview" : "Fullscreen preview";
+      preview.fullscreenButton.setAttribute(
+        "aria-label",
+        fullscreenActive ? "Exit fullscreen preview" : "Fullscreen preview",
+      );
+    };
+    syncPreviewFullscreenButton();
+    if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
+      globalThis.document.addEventListener("fullscreenchange", syncPreviewFullscreenButton);
+      globalThis.document.addEventListener("webkitfullscreenchange", syncPreviewFullscreenButton);
+    }
+
     preview.stage.addEventListener("dragover", (event) => {
       event.preventDefault();
       preview.stage.dataset.dragging = "true";
@@ -1714,13 +1737,16 @@ export function createControlNetUnitEditor({
     });
 
     preview.fullscreenButton.addEventListener("click", async () => {
-      const opened = await requestCanvasFullscreen(preview.stage);
+      const fullscreenAction = await toggleCanvasFullscreen(preview.stage);
+      syncPreviewFullscreenButton();
       if (onStatusMessage) {
-        onStatusMessage(
-          opened
+        const statusMessage =
+          fullscreenAction === CANVAS_FULLSCREEN_ACTIONS.entered
             ? `ControlNet Unit ${index + 1}: source preview entered fullscreen mode.`
-            : `ControlNet Unit ${index + 1}: fullscreen is unavailable.`,
-        );
+            : fullscreenAction === CANVAS_FULLSCREEN_ACTIONS.exited
+              ? `ControlNet Unit ${index + 1}: source preview exited fullscreen mode.`
+              : `ControlNet Unit ${index + 1}: fullscreen is unavailable.`;
+        onStatusMessage(statusMessage);
       }
     });
 

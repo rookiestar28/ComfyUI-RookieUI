@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f86-dual-preview";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f90-fullscreen-toggle";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {

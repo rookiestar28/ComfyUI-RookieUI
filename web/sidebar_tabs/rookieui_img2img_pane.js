@@ -1,10 +1,12 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-f86-dual-preview";
+import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f90-fullscreen-toggle";
 import {
+  CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
   canCanvasStageOpenUpload,
   hasCanvasSourceImage,
+  isCanvasElementFullscreen,
   resolveCanvasInteractionMode,
-  requestCanvasFullscreen,
+  toggleCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
 import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260412-f85-source-brush";
 
@@ -1122,6 +1124,25 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           imageFileInput.click();
         };
 
+        const syncSourceFullscreenButton = () => {
+          const fullscreenActive = isCanvasElementFullscreen(imageCanvasSurface);
+          // CRITICAL: fullscreen can be exited via Esc; always re-read document fullscreen state instead of relying on click toggles.
+          const iconNode = sourceFullscreenButton.querySelector(".rookieui-shell__mini-action-icon");
+          if (iconNode) {
+            iconNode.textContent = fullscreenActive ? "🗗" : "⛶";
+          }
+          sourceFullscreenButton.title = fullscreenActive ? "Exit fullscreen source canvas" : "Fullscreen source canvas";
+          sourceFullscreenButton.setAttribute(
+            "aria-label",
+            fullscreenActive ? "Exit fullscreen source canvas" : "Fullscreen source canvas",
+          );
+        };
+        syncSourceFullscreenButton();
+        if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
+          globalThis.document.addEventListener("fullscreenchange", syncSourceFullscreenButton);
+          globalThis.document.addEventListener("webkitfullscreenchange", syncSourceFullscreenButton);
+        }
+
         const loadSourceFile = async (file, options = {}) => {
           const sourceImageData = await readFileAsDataUrl(file);
           await applySourceSnapshot(
@@ -1181,8 +1202,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
 
         sourceFullscreenButton.addEventListener("click", async () => {
-          const opened = await requestCanvasFullscreen(imageCanvasSurface);
-          statusNode.textContent = opened ? "Source canvas entered fullscreen mode." : "Fullscreen is unavailable.";
+          const fullscreenAction = await toggleCanvasFullscreen(imageCanvasSurface);
+          syncSourceFullscreenButton();
+          statusNode.textContent =
+            fullscreenAction === CANVAS_FULLSCREEN_ACTIONS.entered
+              ? "Source canvas entered fullscreen mode."
+              : fullscreenAction === CANVAS_FULLSCREEN_ACTIONS.exited
+                ? "Source canvas exited fullscreen mode."
+                : "Fullscreen is unavailable.";
         });
 
         sourceUndoButton.addEventListener("click", async () => {

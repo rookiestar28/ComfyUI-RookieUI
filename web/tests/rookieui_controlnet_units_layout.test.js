@@ -450,4 +450,71 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(imageData.value).toBe("");
     expect(runButton?.hidden).toBe(true);
   });
+
+  test("toggles fullscreen action button between enter and exit states", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const stage = host.querySelector("#rookieui-img2img-controlnet-preview-stage-0");
+    const fullscreenButton = host.querySelector("#rookieui-img2img-controlnet-preview-fullscreen-action-0");
+    const fullscreenIcon = fullscreenButton?.querySelector(".rookieui-shell__mini-action-icon");
+    expect(stage).not.toBeNull();
+    expect(fullscreenButton).not.toBeNull();
+    expect(fullscreenIcon?.textContent).toBe("⛶");
+
+    let fullscreenElementRef = null;
+    const originalFullscreenDescriptor = Object.getOwnPropertyDescriptor(document, "fullscreenElement");
+    const originalExitDescriptor = Object.getOwnPropertyDescriptor(document, "exitFullscreen");
+
+    const requestFullscreen = vi.fn(async () => {
+      fullscreenElementRef = stage;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+    stage.requestFullscreen = requestFullscreen;
+
+    const exitFullscreen = vi.fn(async () => {
+      fullscreenElementRef = null;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    });
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get() {
+        return fullscreenElementRef;
+      },
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: exitFullscreen,
+    });
+
+    try {
+      fullscreenButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fullscreenIcon?.textContent).toBe("🗗");
+
+      fullscreenButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fullscreenIcon?.textContent).toBe("⛶");
+      expect(statusMessages.some((entry) => entry.includes("entered fullscreen mode"))).toBe(true);
+      expect(statusMessages.some((entry) => entry.includes("exited fullscreen mode"))).toBe(true);
+    } finally {
+      if (originalFullscreenDescriptor) {
+        Object.defineProperty(document, "fullscreenElement", originalFullscreenDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "fullscreenElement");
+      }
+      if (originalExitDescriptor) {
+        Object.defineProperty(document, "exitFullscreen", originalExitDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "exitFullscreen");
+      }
+    }
+  });
 });
