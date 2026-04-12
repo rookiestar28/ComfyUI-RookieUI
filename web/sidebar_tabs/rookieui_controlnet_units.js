@@ -7,7 +7,7 @@ import {
   resolveCanvasInteractionMode,
   toggleCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
-import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260412-f85-source-brush";
+import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260413-f93-source-brush-sync";
 
 const DEFAULT_UNIT_COUNT = 3;
 const DEFAULT_CONTROL_TYPE = "All";
