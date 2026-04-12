@@ -694,6 +694,11 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
         aliases=module_aliases,
         default_value=_DEFAULT_MODULE,
     )
+    requested_controlnet_model = normalize_option_label(
+        payload.get("controlnet_model"),
+        "controlnet_model",
+        max_length=256,
+    )
     input_images = _normalize_detect_images(payload)
     warning_codes: list[str] = []
 
@@ -703,6 +708,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             "detect_backend": "passthrough_none",
             "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
+            "requested_controlnet_model": requested_controlnet_model,
             "images": input_images,
             "warning_codes": warning_codes,
             "warnings": warning_messages_from_codes(warning_codes),
@@ -723,6 +729,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             "detect_backend": "rookieui_internal_disabled",
             "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
+            "requested_controlnet_model": requested_controlnet_model,
             "images": input_images,
             "warning_codes": warning_codes,
             "warnings": warning_messages_from_codes(warning_codes),
@@ -735,6 +742,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             "detect_backend": "rookieui_internal_unavailable",
             "contract": build_controlnet_integrated_contract_meta(),
             "module": module,
+            "requested_controlnet_model": requested_controlnet_model,
             "images": input_images,
             "warning_codes": warning_codes,
             "warnings": warning_messages_from_codes(warning_codes),
@@ -791,6 +799,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
         "detect_backend": detect_backend,
         "contract": build_controlnet_integrated_contract_meta(),
         "module": module,
+        "requested_controlnet_model": requested_controlnet_model,
         "processor": processor_names[0] if processor_names else module,
         "images": output_images,
         "warning_codes": warning_codes,

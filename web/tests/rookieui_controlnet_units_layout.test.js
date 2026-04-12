@@ -371,6 +371,57 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     }
   });
 
+  test("forwards selected control model in run-preprocessor payload and reports model scope", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const modelSelect = host.querySelector("#rookieui-img2img-controlnet-model-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(modelSelect).not.toBeNull();
+    expect(runButton).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async (_url, options) => {
+        const body = JSON.parse(String(options?.body ?? "{}"));
+        expect(body.controlnet_model).toBe("control_v11p_sd15_canny.safetensors");
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              images: ["data:image/png;base64,cHJldmlldy1pbWFnZQ=="],
+              requested_controlnet_model: body.controlnet_model,
+            };
+          },
+        };
+      });
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "depth";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      modelSelect.value = "control_v11p_sd15_canny.safetensors";
+      modelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(statusMessages.some((entry) => entry.includes("generation model; preprocessor uses host annotator weights"))).toBe(
+        true,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("reports backend detail when run-preprocessor returns a non-OK response", async () => {
     const statusMessages = [];
     const { host } = buildEditor("rookieui-img2img-controlnet", {

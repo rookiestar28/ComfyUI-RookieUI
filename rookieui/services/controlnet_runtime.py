@@ -44,14 +44,11 @@ _MODULE_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
         "DepthAnythingPreprocessor",
         "Zoe-DepthMapPreprocessor",
         "LeReS-DepthMapPreprocessor",
-        "Metric3D-DepthMapPreprocessor",
-        "MeshGraphormer-DepthMapPreprocessor",
     ),
     "normalmap": (
         "MiDaS-NormalMapPreprocessor",
         "BAE-NormalMapPreprocessor",
         "DSINE-NormalMapPreprocessor",
-        "Metric3D-NormalMapPreprocessor",
     ),
     "openpose": ("OpenposePreprocessor", "DWPreprocessor", "AnimalPosePreprocessor", "DensePosePreprocessor"),
     "mlsd": ("M-LSDPreprocessor",),
@@ -90,14 +87,10 @@ _MODULE_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
 _MODULE_AIO_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "blur": ("ImageIntensityDetector",),
     "canny": ("CannyEdgePreprocessor", "PyraCannyPreprocessor"),
-    "depth": (
-        "MiDaS-DepthMapPreprocessor",
-        "DepthAnythingV2Preprocessor",
-        "DepthAnythingPreprocessor",
-        "Zoe-DepthMapPreprocessor",
-        "LeReS-DepthMapPreprocessor",
-    ),
-    "normalmap": ("MiDaS-NormalMapPreprocessor", "BAE-NormalMapPreprocessor", "DSINE-NormalMapPreprocessor"),
+    # IMPORTANT: avoid AIO fallback for depth/normalmap families; broad AIO probing may initialize unrelated annotators
+    # and trigger heavyweight auxiliary model bootstrap/download attempts that do not match user-selected processor intent.
+    "depth": (),
+    "normalmap": (),
     "openpose": ("OpenposePreprocessor", "DWPreprocessor"),
     "mlsd": ("M-LSDPreprocessor",),
     "lineart": ("LineArtPreprocessor", "LineartStandardPreprocessor", "AnimeLineArtPreprocessor"),
@@ -130,7 +123,7 @@ _MODULE_AIO_KEYWORDS: dict[str, tuple[str, ...]] = {
 _MODULE_HOST_NODE_KEYWORDS: dict[str, tuple[str, ...]] = {
     "blur": ("blur", "intensity"),
     "canny": ("canny",),
-    "depth": ("depthanythingv2", "depthanything", "midas", "zoe", "leres", "meshgraphormer", "metric3d", "depth"),
+    "depth": ("depthanythingv2", "depthanything", "midas", "zoe", "leres", "depth"),
     "normalmap": ("normalmap", "normal", "dsine", "bae"),
     "openpose": ("openpose", "dw", "densepose", "animalpose", "pose"),
     "mlsd": ("mlsd", "m_lsd"),
@@ -150,6 +143,35 @@ _HOST_NODE_EXCLUDE_TOKENS = (
     "segs",
     "detectorprovider",
 )
+
+_MODULE_DYNAMIC_NODE_EXCLUDE_TOKENS: dict[str, tuple[str, ...]] = {
+    # IMPORTANT: keep heavyweight depth/normal candidates out of generic dynamic probing; these nodes may trigger
+    # large auxiliary model bootstrap/download flows when merely probed and are not the default Forge-like depth path.
+    "depth": ("metric3d", "meshgraphormer"),
+    "normalmap": ("metric3d",),
+}
+
+_MODULE_HOST_PREPROCESSOR_PRIORITIES: dict[str, tuple[str, ...]] = {
+    # IMPORTANT: prefer deterministic Forge-like host nodes first so depth preview does not oscillate across preprocessor families.
+    "depth": (
+        "DepthAnythingV2Preprocessor",
+        "DepthAnythingPreprocessor",
+        "MiDaS-DepthMapPreprocessor",
+        "Zoe-DepthMapPreprocessor",
+        "LeReS-DepthMapPreprocessor",
+    ),
+    "normalmap": (
+        "MiDaS-NormalMapPreprocessor",
+        "BAE-NormalMapPreprocessor",
+        "DSINE-NormalMapPreprocessor",
+    ),
+}
+
+_MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
+    # IMPORTANT: depth/normal host nodes can be expensive to probe; keep invocation deterministic and avoid multi-node churn.
+    "depth": 1,
+    "normalmap": 1,
+}
 
 
 @dataclass(frozen=True)
@@ -231,9 +253,16 @@ def preprocess_controlnet_tensor(
 
     host_mappings = _resolve_host_node_class_mappings()
 
-    for node_name in _resolve_host_preprocessor_candidates(normalized_module, host_mappings):
+    host_candidates = _resolve_host_preprocessor_candidates(normalized_module, host_mappings)
+    host_probe_limit = max(0, _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(normalized_module, len(host_candidates)))
+    host_probe_attempts = 0
+    for node_name in host_candidates:
         if node_name not in host_mappings:
             continue
+        if host_probe_attempts >= host_probe_limit:
+            diagnostics.append(f"host_probe_limit_reached:{host_probe_limit}")
+            break
+        host_probe_attempts += 1
         try:
             processed = _run_host_node_preprocessor(
                 node_name=node_name,
@@ -282,6 +311,15 @@ def preprocess_controlnet_tensor(
                 )
             except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                 diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
+
+    if diagnostics:
+        # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
+        # before fallback so we can pinpoint over-eager node probing without reproducing full host bootstrap logs.
+        _LOGGER.warning(
+            "RookieUI ControlNet host preprocessor chain exhausted (module=%s): %s",
+            normalized_module,
+            " | ".join(diagnostics[:3]),
+        )
 
     fallback = _apply_fallback_filters(
         source,
@@ -361,9 +399,22 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
     if tensor.shape[-1] == 4:
         tensor = tensor[:, :, :, :3]
 
-    if tensor.max().item() > 1.0 or tensor.min().item() < 0.0:
-        tensor = torch.clamp(tensor, 0.0, 255.0) / 255.0
+    tensor = _normalize_image_value_range(tensor)
     return torch.clamp(tensor, 0.0, 1.0)
+
+
+def _normalize_image_value_range(tensor: "torch.Tensor") -> "torch.Tensor":
+    minimum = float(tensor.min().item())
+    maximum = float(tensor.max().item())
+    if minimum >= 0.0 and maximum <= 1.0:
+        return tensor
+    if minimum >= 0.0 and maximum <= 255.0:
+        return tensor / 255.0
+    # IMPORTANT: host preprocessors may emit signed or non-8bit ranges; normalize by min/max to avoid black-frame previews.
+    span = maximum - minimum
+    if span <= 1e-6:
+        return torch.zeros_like(tensor)
+    return (tensor - minimum) / span
 
 
 def _coerce_mask_tensor(mask_value: Any, *, image_tensor: "torch.Tensor") -> "torch.Tensor":
@@ -558,11 +609,31 @@ def _run_host_node_preprocessor(
 
     # DEBUG HOTSPOT: this invocation is the exact seam where host-runtime preprocessor classes differ by signature.
     result = function(**inputs)
-    if isinstance(result, tuple):
-        primary = result[0]
-    else:
-        primary = result
+    primary = _extract_primary_node_output_payload(result)
     return _coerce_image_tensor(primary)
+
+
+def _extract_primary_node_output_payload(result: object) -> object:
+    payload = result
+    for _ in range(4):
+        if isinstance(payload, dict):
+            if "result" in payload:
+                payload = payload["result"]
+                continue
+            if "image" in payload:
+                payload = payload["image"]
+                continue
+            if "images" in payload:
+                payload = payload["images"]
+                continue
+            raise RuntimeError("Host preprocessor returned a dict without `result`/`image` payload.")
+        if isinstance(payload, (tuple, list)):
+            if not payload:
+                raise RuntimeError("Host preprocessor returned an empty result container.")
+            payload = payload[0]
+            continue
+        return payload
+    raise RuntimeError("Unable to resolve host preprocessor image payload.")
 
 
 def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | None:
@@ -599,6 +670,30 @@ def _resolve_host_preprocessor_candidates(module_key: str, host_mappings: dict[s
         _push(node_name)
     for node_name in _discover_dynamic_host_preprocessors(module_key, host_mappings):
         _push(node_name)
+    return _prioritize_module_candidates(module_key, tuple(ordered))
+
+
+def _prioritize_module_candidates(module_key: str, candidates: tuple[str, ...]) -> tuple[str, ...]:
+    preferred = _MODULE_HOST_PREPROCESSOR_PRIORITIES.get(module_key, ())
+    if not preferred or not candidates:
+        return candidates
+
+    candidate_lookup = {name.lower(): name for name in candidates}
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    for preferred_name in preferred:
+        matched = candidate_lookup.get(preferred_name.lower())
+        if matched is None or matched in seen:
+            continue
+        ordered.append(matched)
+        seen.add(matched)
+
+    for candidate_name in candidates:
+        if candidate_name in seen:
+            continue
+        ordered.append(candidate_name)
+        seen.add(candidate_name)
     return tuple(ordered)
 
 
@@ -606,6 +701,7 @@ def _discover_dynamic_host_preprocessors(module_key: str, host_mappings: dict[st
     keywords = _MODULE_HOST_NODE_KEYWORDS.get(module_key, ())
     if not keywords:
         return ()
+    module_excludes = _MODULE_DYNAMIC_NODE_EXCLUDE_TOKENS.get(module_key, ())
 
     ranked: list[tuple[int, str]] = []
     for node_name in host_mappings.keys():
@@ -614,14 +710,17 @@ def _discover_dynamic_host_preprocessors(module_key: str, host_mappings: dict[st
             continue
         if any(excluded in normalized_node for excluded in _HOST_NODE_EXCLUDE_TOKENS):
             continue
-        score = 0
-        if normalized_node.endswith("preprocessor"):
-            score += 10
+        if any(excluded in normalized_node for excluded in module_excludes):
+            continue
+        keyword_score = 0
         for index, keyword in enumerate(keywords):
             if keyword in normalized_node:
-                score += 100 - index
-        if score <= 0:
+                keyword_score += 100 - index
+        if keyword_score <= 0:
             continue
+        score = keyword_score
+        if normalized_node.endswith("preprocessor"):
+            score += 10
         ranked.append((score, node_name))
 
     ranked.sort(key=lambda item: (-item[0], item[1].lower()))

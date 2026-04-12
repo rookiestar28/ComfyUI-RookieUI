@@ -73,6 +73,9 @@ describe("ControlNet source canvas CSS contract", () => {
       /\.rookieui-shell__canvas-fullscreen-zoom\[hidden\]\s*\{[\s\S]*display:\s*none\s*!important;[\s\S]*\}/,
     );
     expect(css).toMatch(
+      /\.rookieui-shell__hires-caret\s*\{[\s\S]*transform:\s*scaleX\(-1\);[\s\S]*\}/,
+    );
+    expect(css).toMatch(
       /\.rookieui-shell__controlnet-summary\s+\.rookieui-shell__hires-header\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto;[\s\S]*\}/,
     );
     expect(css).toMatch(

@@ -1002,6 +1002,7 @@ export function createControlNetUnitEditor({
       onStatusMessage(`ControlNet Unit ${unitIndex + 1}: running preprocessor...`);
     }
     const maskImage = row.useMask.checked ? String(row.maskData.value ?? "").trim() : "";
+    const selectedControlModel = String(row.model?.value ?? "").trim();
 
     const abortController = typeof globalThis.AbortController === "function" ? new globalThis.AbortController() : null;
     let timeoutHandle = null;
@@ -1019,6 +1020,7 @@ export function createControlNetUnitEditor({
         },
         body: JSON.stringify({
           controlnet_module: moduleName,
+          controlnet_model: selectedControlModel,
           controlnet_input_images: [sourceImage],
           controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
           controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
@@ -1056,6 +1058,8 @@ export function createControlNetUnitEditor({
       const warningCodes = Array.isArray(data?.warning_codes) ? data.warning_codes.map((entry) => String(entry)) : [];
       const warningText = warningMessages.length > 0 ? ` (${warningMessages[0]})` : "";
       const detectBackend = String(data?.detect_backend ?? "").trim().toLowerCase();
+      const processorName = String(data?.processor ?? "").trim();
+      const requestedControlModel = String(data?.requested_controlnet_model ?? selectedControlModel).trim();
       const hostFallback = warningCodes.includes("CONTROLNET_PREPROCESSOR_HOST_FALLBACK");
       let backendText = " via ComfyUI host preprocessor.";
       if (detectBackend === "comfy_host_preprocessor_aio") {
@@ -1070,8 +1074,14 @@ export function createControlNetUnitEditor({
       const visibilityText = row.allowPreview.checked
         ? " Preview lane updated."
         : " Preview output is ready but hidden because Allow Preview is off.";
+      const processorText = processorName ? ` Processor: ${processorName}.` : "";
+      const controlModelText = requestedControlModel
+        ? ` Control model: ${requestedControlModel} (generation model; preprocessor uses host annotator weights).`
+        : "";
       if (onStatusMessage) {
-        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed${warningText}${backendText}${visibilityText}`);
+        onStatusMessage(
+          `ControlNet Unit ${unitIndex + 1}: preprocessor completed${warningText}${backendText}${processorText}${controlModelText}${visibilityText}`,
+        );
       }
     } catch (error) {
       if (error?.name === "AbortError") {

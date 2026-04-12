@@ -458,6 +458,16 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(len(payload["images"]), 1)
         self.assertEqual(payload["contract"]["version"], CONTROLNET_INTEGRATED_CONTRACT_VERSION)
 
+    def test_detect_payload_echoes_requested_controlnet_model(self) -> None:
+        payload = build_controlnet_detect_payload(
+            {
+                "controlnet_module": "none",
+                "controlnet_model": "xinsir-controlnet-depth-sdxl.safetensors",
+                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+            }
+        )
+        self.assertEqual(payload["requested_controlnet_model"], "xinsir-controlnet-depth-sdxl.safetensors")
+
     def test_module_list_payload_accepts_env_extension_modules(self) -> None:
         with mock.patch.dict("os.environ", {"ROOKIEUI_CONTROLNET_EXTRA_MODULES": "OpenPose, custom-module,foo_bar"}):
             payload = build_controlnet_module_list_payload()
