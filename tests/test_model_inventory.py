@@ -226,6 +226,34 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(qwen_selector, "qwen_image_vae.safetensors")
         self.assertEqual(zit_selector, "lumina_vae.safetensors")
 
+    def test_resolve_text_encoder_selector_context_disables_global_default_for_diffusion_profiles(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        zit_selector = resolve_text_encoder_selector_context("zit", snapshot)
+        self.assertEqual(zit_selector, "")
+
+    def test_resolve_vae_selector_context_disables_global_default_for_diffusion_profiles(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "vae": ["Automatic"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        zit_selector = resolve_vae_selector_context("zit", snapshot)
+        self.assertEqual(zit_selector, "")
+
     def test_profile_matrix_uses_family_aligned_defaults_for_all_non_sd_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {

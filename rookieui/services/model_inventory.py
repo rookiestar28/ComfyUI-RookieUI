@@ -255,6 +255,14 @@ def _filter_selectors_by_deny_hints(
     return filtered or list(selectors)
 
 
+def _filter_explicit_diffusion_selectors(selectors: list[str]) -> list[str]:
+    return [
+        selector
+        for selector in selectors
+        if _normalize_selector_token(selector) not in {"automatic", "__host_default__"}
+    ]
+
+
 def _resolve_profile_diffusion_model_default(
     profile_id: str,
     selectors: list[str],
@@ -280,6 +288,31 @@ def _resolve_profile_diffusion_model_default(
     return candidate_selectors[0]
 
 
+def _resolve_profile_text_encoder_default(
+    profile_id: str,
+    selectors: list[str],
+) -> str:
+    if not selectors:
+        return ""
+
+    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    if not candidate_selectors:
+        return ""
+
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    matched_by_priority = _find_selector_by_priority(
+        candidate_selectors,
+        _PROFILE_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
+    )
+    if matched_by_priority:
+        return matched_by_priority
+    profile_hints = _PROFILE_TEXT_ENCODER_HINTS.get(normalized_profile_id, ())
+    matched_by_hint = _find_selector_by_hints(candidate_selectors, profile_hints)
+    if matched_by_hint:
+        return matched_by_hint
+    return ""
+
+
 def resolve_text_encoder_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
@@ -289,32 +322,15 @@ def resolve_text_encoder_selector_context(
         return inventory.default_text_encoder
 
     normalized_profile_id = str(profile_id or "").strip().lower()
+    if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models":
+        # CRITICAL: diffusion families require family-bound text encoder pairing; never fall back to a global/default selector.
+        return _resolve_profile_text_encoder_default(normalized_profile_id, selectors)
+
     fallback_default = (
         inventory.default_text_encoder
         if inventory.default_text_encoder in selectors
         else selectors[0]
     )
-    matched_by_priority = _find_selector_by_priority(
-        selectors,
-        _PROFILE_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
-    )
-    if matched_by_priority:
-        return matched_by_priority
-    profile_hints = _PROFILE_TEXT_ENCODER_HINTS.get(normalized_profile_id, ())
-    matched_by_hint = _find_selector_by_hints(selectors, profile_hints)
-    if matched_by_hint:
-        return matched_by_hint
-
-    if (
-        PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models"
-        and normalized_profile_id != "qwen_image"
-    ):
-        # CRITICAL: non-Qwen diffusion presets must not silently inherit a global Qwen text-encoder default;
-        # that pairing can hard-crash runtime with hidden-size mismatches (for example Lumina/ZiT + QwenImage TE).
-        for selector in selectors:
-            if "qwen" not in _normalize_selector_token(selector):
-                return selector
-
     return fallback_default
 
 
@@ -326,15 +342,9 @@ def _resolve_profile_vae_default(
         return ""
 
     normalized_profile_id = str(profile_id or "").strip().lower()
-    candidate_selectors = list(selectors)
-
-    explicit_selectors = [
-        selector
-        for selector in candidate_selectors
-        if _normalize_selector_token(selector) not in {"automatic", "__host_default__"}
-    ]
-    if explicit_selectors:
-        candidate_selectors = explicit_selectors
+    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    if not candidate_selectors:
+        return ""
 
     candidate_selectors = _filter_selectors_by_deny_hints(
         candidate_selectors,
@@ -352,16 +362,7 @@ def _resolve_profile_vae_default(
     if matched:
         return matched
 
-    if (
-        PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models"
-        and normalized_profile_id != "qwen_image"
-    ):
-        # CRITICAL: diffusion preset decode quality depends on the VAE pair; falling back to a global Qwen VAE can keep sampler previews normal but corrupt final VAEDecode output.
-        for selector in candidate_selectors:
-            if "qwen" not in _normalize_selector_token(selector):
-                return selector
-
-    return candidate_selectors[0]
+    return ""
 
 
 def resolve_vae_selector_context(
@@ -377,8 +378,8 @@ def resolve_vae_selector_context(
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) != "diffusion_models":
         return fallback_default
 
-    resolved = _resolve_profile_vae_default(normalized_profile_id, selectors)
-    return resolved or fallback_default
+    # CRITICAL: diffusion families require family-bound VAE pairing; never fall back to global/default selectors.
+    return _resolve_profile_vae_default(normalized_profile_id, selectors)
 
 
 def resolve_primary_model_selector_context(

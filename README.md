@@ -24,6 +24,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Diffusion-family decode integrity and selector hardening (bugfix/stability)</strong></summary>
+
+- Fixed a diffusion-family decode mismatch path where sampler preview could look normal but final output degraded due to incompatible fallback VAE pairing.
+- Enforced family-specific selector resolution for diffusion-model profiles so `vae_name` and `text_encoder_name` no longer rely on a global default fallback.
+- Added fail-fast normalization checks for unresolved diffusion-family selectors to surface configuration problems before workflow translation/runtime execution.
+- Expanded regression coverage across Flux, Qwen-Image, Klein, Lumina, ZiT, Wan, and Anima selector/normalization matrices.
+
+</details>
+
+<details>
+
 <summary><strong>ControlNet A1111-native parity (new functionality)</strong></summary>
 
 - Added A1111-style multi-unit ControlNet editing surface in generation panes (`txt2img` and `img2img`).
@@ -103,10 +114,11 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - [Last Update](#last-update---click-to-expand)
 - [Architecture Snapshot](#architecture-snapshot)
+- [Installation](#installation)
 - [Feature Overview](#feature-overview)
 - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [ControlNet Support](#controlnet-support)
-- [Installation](#installation)
+- [Support for Other Extensions](#support-for-other-extensions)
 - [License](#license)
 
 ## Architecture Snapshot
@@ -206,6 +218,7 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 
 ## ControlNet Support
 
+- Status: under construction; interface and functionality may change.
 - A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img` generation panes.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
@@ -213,6 +226,10 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
 - Optional preprocessor/detect dependency is handled with explicit downgrade diagnostics when unavailable.
+
+## Support for Other Extensions
+
+- Additional extension features beyond ControlNet will be added incrementally.
 
 
 ## License

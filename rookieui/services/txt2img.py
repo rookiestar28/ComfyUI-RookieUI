@@ -59,6 +59,12 @@ _DTYPE_PROFILE_ALIASES = {
     "float8_e5m2": {"float8_e5m2", "float8-e5m2"},
 }
 
+
+def _is_diffusion_global_selector(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {"", "automatic", "__host_default__"}
+
+
 def _coerce_dimension(
     value: int | None,
     default_value: int,
@@ -250,6 +256,13 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
         profile.id, inventory
     )
+    raw_vae_selector = request.vae_name
+    raw_text_encoder_selector = request.text_encoder_name
+    if primary_model_category == "diffusion_models":
+        if _is_diffusion_global_selector(raw_vae_selector):
+            raw_vae_selector = ""
+        if _is_diffusion_global_selector(raw_text_encoder_selector):
+            raw_text_encoder_selector = ""
     checkpoint_name = resolve_inventory_selector(
         request.checkpoint_name,
         "checkpoint_name",
@@ -258,7 +271,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         strict_match=inventory_is_host,
     )
     vae_name = resolve_inventory_selector(
-        request.vae_name,
+        raw_vae_selector,
         "vae_name",
         # CRITICAL: diffusion-model families need profile-aware VAE fallback;
         # a mismatched global VAE often only surfaces as corrupted final decode output.
@@ -267,7 +280,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         strict_match=inventory_is_host,
     )
     text_encoder_name = resolve_inventory_selector(
-        request.text_encoder_name,
+        raw_text_encoder_selector,
         "text_encoder_name",
         # IMPORTANT: use profile-aware default so diffusion-model presets do not inherit a mismatched global text encoder.
         default_value=resolve_text_encoder_selector_context(profile.id, inventory),
@@ -277,6 +290,16 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     if profile.id in _TEXT_ENCODER_LOCKED_PROFILES:
         # IMPORTANT: SD1.5 and SDXL use model-native text encoders in A1111-style flow; keep standalone selector disabled to prevent decorative mismatches.
         text_encoder_name = ""
+    if primary_model_category == "diffusion_models":
+        # CRITICAL: diffusion families do not support global text encoder/VAE defaults; unresolved/Automatic selectors must fail fast instead of silently degrading final decode quality.
+        if _is_diffusion_global_selector(text_encoder_name):
+            raise ValueError(
+                f"text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
+            )
+        if _is_diffusion_global_selector(vae_name):
+            raise ValueError(
+                f"vae_name requires a family-specific host selector for profile '{profile.id}'."
+            )
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)
     seed_extra = _coerce_bool(request.seed_extra, "seed_extra")

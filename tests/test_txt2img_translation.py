@@ -364,12 +364,12 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 source="host",
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["flux\\flux1-dev.safetensors"],
-                vae=["Automatic"],
-                text_encoders=["Automatic"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["flux_text_encoder.safetensors"],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="Automatic",
-                default_text_encoder="Automatic",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="flux_text_encoder.safetensors",
                 controlnet=[],
             ),
         ):
@@ -383,6 +383,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
         self.assertEqual(request.primary_model_category, "diffusion_models")
+        self.assertEqual(request.vae_name, "flux_vae.safetensors")
+        self.assertEqual(request.text_encoder_name, "flux_text_encoder.safetensors")
 
     def test_translate_txt2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
         with mock.patch(
