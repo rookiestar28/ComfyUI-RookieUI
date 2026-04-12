@@ -7,6 +7,7 @@ This SOP defines the verified Playwright workflow for this repository.
 - Frontend harness E2E only (Playwright)
 - Uses `tests/e2e/test-harness.html` with mocked runtime seams
 - Not a live ComfyUI backend integration lane
+- Live backend checks are handled separately via `scripts/run_live_smoke_tests.py`
 
 ## Requirements
 
@@ -77,3 +78,17 @@ ROOKIEUI_E2E_PORT=4300 npm test
   - run `npx playwright install chromium`
 - Dependency drift:
   - remove `node_modules` and rerun `npm install`
+
+## Optional Live Backend Smoke
+
+Use this only when backend/runtime regressions are suspected (for example, preset-driven loader mismatches).
+
+```bash
+python scripts/run_live_smoke_tests.py
+```
+
+Execute mode (submits/polls real txt2img runs):
+
+```bash
+ROOKIEUI_LIVE_SMOKE_EXECUTE=1 python scripts/run_live_smoke_tests.py
+```

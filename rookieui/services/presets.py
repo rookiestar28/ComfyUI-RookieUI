@@ -4,6 +4,7 @@ from rookieui.contracts.models import PresetDefinition
 from rookieui.services.model_inventory import (
     discover_model_inventory,
     resolve_primary_model_selector_context,
+    resolve_text_encoder_selector_context,
 )
 from rookieui.services.parity_matrix import get_parity_profile
 
@@ -114,6 +115,7 @@ def build_preset_payload() -> dict[str, object]:
         profile_id = str(blueprint["profile"])
         profile = get_parity_profile(profile_id)
         _, primary_models, primary_default = resolve_primary_model_selector_context(profile_id, inventory)
+        text_encoder_default = resolve_text_encoder_selector_context(profile_id, inventory)
         presets.append(
             PresetDefinition(
                 id=str(blueprint["id"]),
@@ -122,7 +124,7 @@ def build_preset_payload() -> dict[str, object]:
                 base_family=str(blueprint.get("base_family", profile.base_family)),
                 checkpoint_name=primary_default if primary_models else inventory.default_checkpoint,
                 vae_name=inventory.default_vae,
-                text_encoder_name=inventory.default_text_encoder,
+                text_encoder_name=text_encoder_default,
                 width=int(blueprint.get("width", profile.default_width)),
                 height=int(blueprint.get("height", profile.default_height)),
                 steps=int(blueprint.get("steps", profile.default_steps)),

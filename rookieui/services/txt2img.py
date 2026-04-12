@@ -15,6 +15,7 @@ from rookieui.security.request_guard import (
 from rookieui.services.model_inventory import (
     discover_model_inventory,
     resolve_primary_model_selector_context,
+    resolve_text_encoder_selector_context,
 )
 from rookieui.services.parity_matrix import (
     get_parity_profile,
@@ -265,7 +266,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     text_encoder_name = resolve_inventory_selector(
         request.text_encoder_name,
         "text_encoder_name",
-        default_value=inventory.default_text_encoder,
+        # IMPORTANT: use profile-aware default so diffusion-model presets do not inherit a mismatched global text encoder.
+        default_value=resolve_text_encoder_selector_context(profile.id, inventory),
         inventory_selectors=inventory.text_encoders,
         strict_match=inventory_is_host,
     )

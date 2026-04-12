@@ -150,11 +150,34 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-tab-txt2img").click();
 
   // CRITICAL: this preset matrix pins the clip-skip regression seam; profile switches must never hard-disable input/slider.
+  const diffusionModelOptions = [
+    "flux1-dev.safetensors",
+    "qwen-image.safetensors",
+    "klein-flux2.safetensors",
+    "lumina2.safetensors",
+    "zImageTurboNSFW_21BF16AIO.safetensors",
+    "wan2_2b.safetensors",
+    "animaPencilXL_v500.safetensors",
+  ];
+  const diffusionProfileDefaults = {
+    flux: "flux1-dev.safetensors",
+    qwen_image: "qwen-image.safetensors",
+    klein: "klein-flux2.safetensors",
+    lumina: "lumina2.safetensors",
+    zit: "zImageTurboNSFW_21BF16AIO.safetensors",
+    wan: "wan2_2b.safetensors",
+    anima: "animaPencilXL_v500.safetensors",
+  };
   const clipSkipPresetMatrix = [
     { id: "sd15", textEncoderVisible: false, ignoredHint: false },
     { id: "sdxl", textEncoderVisible: false, ignoredHint: true },
     { id: "flux", textEncoderVisible: true, ignoredHint: true },
     { id: "qwen_image", textEncoderVisible: true, ignoredHint: true },
+    { id: "klein", textEncoderVisible: true, ignoredHint: true },
+    { id: "lumina", textEncoderVisible: true, ignoredHint: true },
+    { id: "zit", textEncoderVisible: true, ignoredHint: true },
+    { id: "wan", textEncoderVisible: true, ignoredHint: true },
+    { id: "anima", textEncoderVisible: true, ignoredHint: true },
   ];
 
   for (const row of clipSkipPresetMatrix) {
@@ -170,6 +193,16 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
       await expect(page.locator("#rookieui-clip-skip")).toHaveAttribute("data-execution-hint", "ignored");
     } else {
       await expect(page.locator("#rookieui-clip-skip")).not.toHaveAttribute("data-execution-hint", "ignored");
+    }
+    if (row.id in diffusionProfileDefaults) {
+      await expect(page.locator("#rookieui-checkpoint")).toHaveAttribute("data-model-category", "diffusion_models");
+      const checkpointOptions = await page.locator("#rookieui-checkpoint option").evaluateAll((options) =>
+        options.map((option) => option.value),
+      );
+      expect(checkpointOptions).toEqual(diffusionModelOptions);
+      await expect(page.locator("#rookieui-checkpoint")).toHaveValue(diffusionProfileDefaults[row.id]);
+    } else {
+      await expect(page.locator("#rookieui-checkpoint")).toHaveAttribute("data-model-category", "checkpoints");
     }
   }
   await page.locator("#rookieui-tab-queue").click();
@@ -192,6 +225,19 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
       await expect(page.locator("#rookieui-img2img-clip-skip")).toHaveAttribute("data-execution-hint", "ignored");
     } else {
       await expect(page.locator("#rookieui-img2img-clip-skip")).not.toHaveAttribute("data-execution-hint", "ignored");
+    }
+    if (row.id in diffusionProfileDefaults) {
+      await expect(page.locator("#rookieui-img2img-checkpoint")).toHaveAttribute(
+        "data-model-category",
+        "diffusion_models",
+      );
+      const checkpointOptions = await page.locator("#rookieui-img2img-checkpoint option").evaluateAll((options) =>
+        options.map((option) => option.value),
+      );
+      expect(checkpointOptions).toEqual(diffusionModelOptions);
+      await expect(page.locator("#rookieui-img2img-checkpoint")).toHaveValue(diffusionProfileDefaults[row.id]);
+    } else {
+      await expect(page.locator("#rookieui-img2img-checkpoint")).toHaveAttribute("data-model-category", "checkpoints");
     }
   }
   await page.locator("#rookieui-tab-queue").click();

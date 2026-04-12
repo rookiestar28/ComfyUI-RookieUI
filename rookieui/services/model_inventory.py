@@ -26,6 +26,24 @@ _inventory_cache_lock = threading.Lock()
 _inventory_cache_snapshot: ModelInventorySnapshot | None = None
 _inventory_cache_at: float = 0.0
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
+_PROFILE_DIFFUSION_MODEL_HINTS: dict[str, tuple[str, ...]] = {
+    "flux": ("flux",),
+    "qwen_image": ("qwen",),
+    "klein": ("klein", "flux.2", "flux2"),
+    "lumina": ("lumina",),
+    "zit": ("zit", "z-image", "zimage", "turbo"),
+    "wan": ("wan",),
+    "anima": ("anima",),
+}
+_PROFILE_TEXT_ENCODER_HINTS: dict[str, tuple[str, ...]] = {
+    "flux": ("flux", "t5"),
+    "qwen_image": ("qwen",),
+    "klein": ("klein", "flux.2", "flux2"),
+    "lumina": ("lumina",),
+    "zit": ("zit", "z-image", "zimage", "lumina"),
+    "wan": ("wan",),
+    "anima": ("anima",),
+}
 
 
 def _load_folder_paths_module() -> Any:
@@ -131,6 +149,65 @@ def discover_model_inventory(*, folder_paths_module: Any | None = None) -> Model
     return snapshot
 
 
+def _normalize_selector_token(value: str) -> str:
+    return str(value or "").replace("\\", "/").strip().lower()
+
+
+def _find_selector_by_hints(selectors: list[str], hints: tuple[str, ...]) -> str:
+    if not hints:
+        return ""
+    for selector in selectors:
+        folded_selector = _normalize_selector_token(selector)
+        if any(hint in folded_selector for hint in hints):
+            return selector
+    return ""
+
+
+def _resolve_profile_diffusion_model_default(
+    profile_id: str,
+    selectors: list[str],
+) -> str:
+    if not selectors:
+        return ""
+    hints = _PROFILE_DIFFUSION_MODEL_HINTS.get(profile_id, ())
+    matched = _find_selector_by_hints(selectors, hints)
+    if matched:
+        return matched
+    return selectors[0]
+
+
+def resolve_text_encoder_selector_context(
+    profile_id: str,
+    inventory: ModelInventorySnapshot,
+) -> str:
+    selectors = [value for value in (inventory.text_encoders or []) if isinstance(value, str) and value.strip()]
+    if not selectors:
+        return inventory.default_text_encoder
+
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    fallback_default = (
+        inventory.default_text_encoder
+        if inventory.default_text_encoder in selectors
+        else selectors[0]
+    )
+    profile_hints = _PROFILE_TEXT_ENCODER_HINTS.get(normalized_profile_id, ())
+    matched_by_hint = _find_selector_by_hints(selectors, profile_hints)
+    if matched_by_hint:
+        return matched_by_hint
+
+    if (
+        PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models"
+        and normalized_profile_id != "qwen_image"
+    ):
+        # CRITICAL: non-Qwen diffusion presets must not silently inherit a global Qwen text-encoder default;
+        # that pairing can hard-crash runtime with hidden-size mismatches (for example Lumina/ZiT + QwenImage TE).
+        for selector in selectors:
+            if "qwen" not in _normalize_selector_token(selector):
+                return selector
+
+    return fallback_default
+
+
 def resolve_primary_model_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
@@ -148,7 +225,11 @@ def resolve_primary_model_selector_context(
     if not category_values:
         category_values = [inventory.default_checkpoint]
 
-    default_value = category_values[0] if category_values else inventory.default_checkpoint
+    default_value = (
+        _resolve_profile_diffusion_model_default(normalized_profile_id, category_values)
+        if category_id == "diffusion_models"
+        else (category_values[0] if category_values else inventory.default_checkpoint)
+    )
     return category_id, category_values, default_value
 
 
