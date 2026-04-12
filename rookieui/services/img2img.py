@@ -31,6 +31,7 @@ from rookieui.services.model_inventory import (
     discover_model_inventory,
     resolve_primary_model_selector_context,
     resolve_text_encoder_selector_context,
+    resolve_vae_selector_context,
 )
 from rookieui.services.parity_matrix import (
     get_parity_profile,
@@ -362,7 +363,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     vae_name = resolve_inventory_selector(
         request.vae_name,
         "vae_name",
-        default_value=inventory.default_vae,
+        # CRITICAL: decode quality in img2img/inpaint depends on a profile-compatible VAE;
+        # using a global default can yield normal sampler preview but broken final output.
+        default_value=resolve_vae_selector_context(profile.id, inventory),
         inventory_selectors=inventory.vae,
         strict_match=inventory_is_host,
     )

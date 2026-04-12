@@ -9,6 +9,7 @@ from rookieui.services.model_inventory import (
     discover_model_inventory,
     resolve_primary_model_selector_context,
     resolve_text_encoder_selector_context,
+    resolve_vae_selector_context,
 )
 from rookieui.services.presets import build_preset_payload
 
@@ -108,7 +109,10 @@ class ModelInventoryTests(unittest.TestCase):
                     "lumina2.safetensors",
                     "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
                 ],
-                "vae": ["Automatic"],
+                "vae": [
+                    "qwen_image_vae.safetensors",
+                    "lumina_vae.safetensors",
+                ],
                 "text_encoders": [
                     "QwenImageTEModel_.safetensors",
                     "clip_l.safetensors",
@@ -130,6 +134,18 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(
             preset_lookup["zit"]["checkpoint_name"],
             "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["qwen_image"]["vae_name"],
+            "qwen_image_vae.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["lumina"]["vae_name"],
+            "lumina_vae.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["zit"]["vae_name"],
+            "lumina_vae.safetensors",
         )
         self.assertEqual(
             preset_lookup["qwen_image"]["text_encoder_name"],
@@ -193,6 +209,23 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(qwen_selector, "QwenImageTEModel_.safetensors")
         self.assertEqual(zit_selector, "LuminaTEModel.safetensors")
 
+    def test_resolve_vae_selector_context_avoids_qwen_default_for_non_qwen_diffusion_profiles(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "vae": ["qwen_image_vae.safetensors", "lumina_vae.safetensors"],
+                "text_encoders": ["Automatic"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        qwen_selector = resolve_vae_selector_context("qwen_image", snapshot)
+        zit_selector = resolve_vae_selector_context("zit", snapshot)
+
+        self.assertEqual(qwen_selector, "qwen_image_vae.safetensors")
+        self.assertEqual(zit_selector, "lumina_vae.safetensors")
+
     def test_profile_matrix_uses_family_aligned_defaults_for_all_non_sd_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
@@ -206,7 +239,14 @@ class ModelInventoryTests(unittest.TestCase):
                     "wan\\wan2_2b.safetensors",
                     "anima\\animaPencilXL_v500.safetensors",
                 ],
-                "vae": ["Automatic"],
+                "vae": [
+                    "qwen_image_vae.safetensors",
+                    "flux_vae.safetensors",
+                    "klein_vae.safetensors",
+                    "lumina_vae.safetensors",
+                    "wan_vae.safetensors",
+                    "anima_vae.safetensors",
+                ],
                 "text_encoders": [
                     "QwenImageTEModel_.safetensors",
                     "FluxT5XXL.safetensors",
@@ -228,10 +268,14 @@ class ModelInventoryTests(unittest.TestCase):
 
                 resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, snapshot)
                 self.assertIn(resolved_text_encoder, snapshot.text_encoders)
+                resolved_vae = resolve_vae_selector_context(profile_id, snapshot)
+                self.assertIn(resolved_vae, snapshot.vae)
                 if profile_id == "qwen_image":
                     self.assertIn("qwen", resolved_text_encoder.lower())
+                    self.assertIn("qwen", resolved_vae.lower())
                 else:
                     self.assertNotIn("qwen", resolved_text_encoder.lower())
+                    self.assertNotIn("qwen", resolved_vae.lower())
 
     def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
         module = types.SimpleNamespace(

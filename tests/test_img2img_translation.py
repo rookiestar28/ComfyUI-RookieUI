@@ -279,11 +279,11 @@ class Img2ImgTranslationTests(unittest.TestCase):
                 source="host",
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["lumina2.safetensors", "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors"],
-                vae=["Automatic"],
+                vae=["qwen_image_vae.safetensors", "lumina_vae.safetensors"],
                 text_encoders=["QwenImageTEModel_.safetensors", "LuminaTEModel.safetensors"],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="Automatic",
+                default_vae="qwen_image_vae.safetensors",
                 default_text_encoder="QwenImageTEModel_.safetensors",
                 controlnet=[],
             ),
@@ -295,10 +295,12 @@ class Img2ImgTranslationTests(unittest.TestCase):
                     "profile": "zit",
                     "checkpoint_name": "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
                     "text_encoder_name": "",
+                    "vae_name": "",
                 }
             )
 
         self.assertEqual(normalized.text_encoder_name, "LuminaTEModel.safetensors")
+        self.assertEqual(normalized.vae_name, "lumina_vae.safetensors")
 
     def test_normalize_img2img_request_profile_matrix_avoids_qwen_fallback_for_all_non_qwen_diffusion_profiles(
         self,
@@ -315,7 +317,14 @@ class Img2ImgTranslationTests(unittest.TestCase):
                 "wan\\wan2_2b.safetensors",
                 "anima\\animaPencilXL_v500.safetensors",
             ],
-            vae=["Automatic"],
+            vae=[
+                "qwen_image_vae.safetensors",
+                "flux_vae.safetensors",
+                "klein_vae.safetensors",
+                "lumina_vae.safetensors",
+                "wan_vae.safetensors",
+                "anima_vae.safetensors",
+            ],
             text_encoders=[
                 "QwenImageTEModel_.safetensors",
                 "FluxT5XXL.safetensors",
@@ -326,7 +335,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             ],
             loras=[],
             default_checkpoint="SDXL\\realvisxl.safetensors",
-            default_vae="Automatic",
+            default_vae="qwen_image_vae.safetensors",
             default_text_encoder="QwenImageTEModel_.safetensors",
             controlnet=[],
         )
@@ -353,12 +362,15 @@ class Img2ImgTranslationTests(unittest.TestCase):
                             "profile": profile_id,
                             "checkpoint_name": checkpoint_by_profile[profile_id],
                             "text_encoder_name": "",
+                            "vae_name": "",
                         }
                     )
                     if profile_id == "qwen_image":
                         self.assertIn("qwen", normalized.text_encoder_name.lower())
+                        self.assertIn("qwen", normalized.vae_name.lower())
                     else:
                         self.assertNotIn("qwen", normalized.text_encoder_name.lower())
+                        self.assertNotIn("qwen", normalized.vae_name.lower())
 
     def test_normalize_img2img_request_resolves_host_checkpoint_selector(self) -> None:
         with mock.patch(

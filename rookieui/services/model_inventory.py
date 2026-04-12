@@ -66,6 +66,40 @@ _PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "wan": (("umt5",), ("wan",), ("t5",)),
     "anima": (("qwen_3_06b",), ("anima",), ("qwen",)),
 }
+_PROFILE_VAE_HINTS: dict[str, tuple[str, ...]] = {
+    "flux": ("flux", "ae"),
+    "qwen_image": ("qwen", "qwen-image", "qwen_image"),
+    "klein": ("klein", "flux.2", "flux2"),
+    "lumina": ("lumina",),
+    "zit": ("zit", "z-image", "zimage", "turbo", "lumina"),
+    "wan": ("wan",),
+    "anima": ("anima",),
+}
+_PROFILE_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "flux": (("flux", "vae"), ("flux",), ("ae",)),
+    "qwen_image": (("qwen", "vae"), ("qwen", "image"), ("qwen",)),
+    "klein": (("klein", "vae"), ("klein",), ("flux2", "vae"), ("flux2",)),
+    "lumina": (("lumina", "vae"), ("lumina",)),
+    "zit": (
+        ("z_image_turbo", "vae"),
+        ("z-image-turbo", "vae"),
+        ("zit", "vae"),
+        ("lumina", "vae"),
+        ("lumina",),
+        ("zimage",),
+        ("zit",),
+    ),
+    "wan": (("wan2.2", "vae"), ("wan", "vae"), ("wan2.2",), ("wan",)),
+    "anima": (("anima", "vae"), ("anima",)),
+}
+_PROFILE_VAE_DENY_HINTS: dict[str, tuple[str, ...]] = {
+    "flux": ("qwen",),
+    "klein": ("qwen",),
+    "lumina": ("qwen",),
+    "zit": ("qwen",),
+    "wan": ("qwen",),
+    "anima": ("qwen",),
+}
 
 
 def _load_folder_paths_module() -> Any:
@@ -282,6 +316,69 @@ def resolve_text_encoder_selector_context(
                 return selector
 
     return fallback_default
+
+
+def _resolve_profile_vae_default(
+    profile_id: str,
+    selectors: list[str],
+) -> str:
+    if not selectors:
+        return ""
+
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    candidate_selectors = list(selectors)
+
+    explicit_selectors = [
+        selector
+        for selector in candidate_selectors
+        if _normalize_selector_token(selector) not in {"automatic", "__host_default__"}
+    ]
+    if explicit_selectors:
+        candidate_selectors = explicit_selectors
+
+    candidate_selectors = _filter_selectors_by_deny_hints(
+        candidate_selectors,
+        _PROFILE_VAE_DENY_HINTS.get(normalized_profile_id, ()),
+    )
+    prioritized = _find_selector_by_priority(
+        candidate_selectors,
+        _PROFILE_VAE_PRIORITY_HINTS.get(normalized_profile_id, ()),
+    )
+    if prioritized:
+        return prioritized
+
+    hints = _PROFILE_VAE_HINTS.get(normalized_profile_id, ())
+    matched = _find_selector_by_hints(candidate_selectors, hints)
+    if matched:
+        return matched
+
+    if (
+        PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models"
+        and normalized_profile_id != "qwen_image"
+    ):
+        # CRITICAL: diffusion preset decode quality depends on the VAE pair; falling back to a global Qwen VAE can keep sampler previews normal but corrupt final VAEDecode output.
+        for selector in candidate_selectors:
+            if "qwen" not in _normalize_selector_token(selector):
+                return selector
+
+    return candidate_selectors[0]
+
+
+def resolve_vae_selector_context(
+    profile_id: str,
+    inventory: ModelInventorySnapshot,
+) -> str:
+    selectors = [value for value in (inventory.vae or []) if isinstance(value, str) and value.strip()]
+    if not selectors:
+        return inventory.default_vae
+
+    fallback_default = inventory.default_vae if inventory.default_vae in selectors else selectors[0]
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) != "diffusion_models":
+        return fallback_default
+
+    resolved = _resolve_profile_vae_default(normalized_profile_id, selectors)
+    return resolved or fallback_default
 
 
 def resolve_primary_model_selector_context(
