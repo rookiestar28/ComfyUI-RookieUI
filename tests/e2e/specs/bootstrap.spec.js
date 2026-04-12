@@ -354,6 +354,9 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await expect(img2imgRunPreprocessorButton).toBeHidden();
+  await page.locator("#rookieui-tab-txt2img").click();
+  await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toBeVisible();
+  await page.locator("#rookieui-tab-img2img").click();
   const img2imgModes = await page.locator("#rookieui-img2img-mode option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
