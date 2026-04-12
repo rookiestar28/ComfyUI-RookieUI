@@ -272,6 +272,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-lora-strength-clip").fill("0.7");
   await page.locator("#rookieui-txt2img-workspace-tab-generation").click();
   await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toHaveAttribute(
+    "title",
+    "Run Preprocessor",
+  );
   await expect(
     page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0 .rookieui-shell__mini-action-icon"),
   ).toHaveText("💥");
@@ -448,6 +452,47 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await expect(img2imgRunPreprocessorButton).toBeVisible();
+  await expect(img2imgRunPreprocessorButton).toHaveAttribute("title", "Run Preprocessor");
+  // CRITICAL: this mock pins preprocessor output routing to generated-preview lane; source field must remain immutable.
+  await page.evaluate(() => {
+    if (window.__ROOKIEUI_ORIGINAL_FETCH__) {
+      return;
+    }
+    window.__ROOKIEUI_ORIGINAL_FETCH__ = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === "string" ? input : input?.url ?? "";
+      if (url.includes("/rookieui/controlnet/detect")) {
+        return new Response(JSON.stringify({ images: ["data:image/png;base64,cHJldmlldy1pbWFnZQ=="] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return window.__ROOKIEUI_ORIGINAL_FETCH__(input, init);
+    };
+  });
+  await page.locator("#rookieui-img2img-controlnet-module-0").selectOption("depth");
+  await page.locator("#rookieui-img2img-controlnet-allow-preview-0").check();
+  const sourceBeforeRun = await page.locator("#rookieui-img2img-controlnet-image-data-0").inputValue();
+  await img2imgRunPreprocessorButton.click();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-generated-lane-0")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-dual-pane-0")).toHaveAttribute(
+    "data-generated-visible",
+    "true",
+  );
+  await expect(page.locator("#rookieui-img2img-controlnet-image-data-0")).toHaveValue(sourceBeforeRun);
+  await page.locator("#rookieui-img2img-controlnet-allow-preview-0").uncheck();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-generated-lane-0")).toBeHidden();
+  await expect(page.locator("#rookieui-img2img-controlnet-preview-dual-pane-0")).toHaveAttribute(
+    "data-generated-visible",
+    "false",
+  );
+  await page.evaluate(() => {
+    if (!window.__ROOKIEUI_ORIGINAL_FETCH__) {
+      return;
+    }
+    window.fetch = window.__ROOKIEUI_ORIGINAL_FETCH__;
+    delete window.__ROOKIEUI_ORIGINAL_FETCH__;
+  });
   await page.locator("#rookieui-img2img-controlnet-preview-remove-action-0").click();
   await expect(img2imgRunPreprocessorButton).toBeHidden();
   await page.locator("#rookieui-img2img-controlnet-preview-undo-action-0").click();

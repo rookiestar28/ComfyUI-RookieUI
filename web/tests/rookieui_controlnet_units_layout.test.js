@@ -170,6 +170,7 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(runButton).not.toBeNull();
     expect(imageData).not.toBeNull();
     expect(runButton?.hidden).toBe(true);
+    expect(runButton?.getAttribute("title")).toBe("Run Preprocessor");
 
     imageData.value = "data:image/png;base64,aW1hZ2U=";
     imageData.dispatchEvent(new Event("input", { bubbles: true }));
@@ -264,6 +265,11 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       expect(generatedLane.hidden).toBe(false);
       expect(dualPane?.dataset.generatedVisible).toBe("true");
       expect(generatedImage.src).toContain("data:image/png;base64,cHJldmlldy1pbWFnZQ==");
+
+      imageData.value = "data:image/png;base64,bmV3LXNvdXJjZQ==";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(generatedLane.hidden).toBe(true);
+      expect(dualPane?.dataset.generatedVisible).toBe("false");
 
       allowPreview.checked = false;
       allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
