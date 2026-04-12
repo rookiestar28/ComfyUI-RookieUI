@@ -190,6 +190,34 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
   actionRail.className = "rookieui-shell__action-rail rookieui-shell__action-rail--extras";
   rightColumn.appendChild(actionRail);
 
+  let extrasRailAlignRafToken = null;
+  const resolveActiveExtrasPane = () => (state.mode === "batch_process" ? batchPane : singlePane);
+  const syncExtrasActionRailAlignment = () => {
+    const ownerPane = section.closest(".rookieui-shell__pane");
+    if (ownerPane?.hidden) {
+      return;
+    }
+    const activePaneRect = resolveActiveExtrasPane().getBoundingClientRect();
+    const actionRailRect = actionRail.getBoundingClientRect();
+    const currentMarginTop = Number.parseFloat(globalThis.getComputedStyle?.(actionRail)?.marginTop ?? "0") || 0;
+    const marginTop = Math.max(0, Math.round(currentMarginTop + (activePaneRect.top - actionRailRect.top)));
+    // CRITICAL: keep Extras rail alignment dynamic; fixed offsets drift across Linux/Windows font metrics and cause flaky E2E top-delta checks.
+    actionRail.style.marginTop = `${marginTop}px`;
+  };
+  const queueExtrasActionRailAlignment = () => {
+    if (extrasRailAlignRafToken !== null && typeof globalThis.cancelAnimationFrame === "function") {
+      globalThis.cancelAnimationFrame(extrasRailAlignRafToken);
+    }
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      extrasRailAlignRafToken = globalThis.requestAnimationFrame(() => {
+        extrasRailAlignRafToken = null;
+        syncExtrasActionRailAlignment();
+      });
+      return;
+    }
+    syncExtrasActionRailAlignment();
+  };
+
   const submitButton = document.createElement("button");
   submitButton.id = "rookieui-extras-submit";
   submitButton.className = "rookieui-shell__button rookieui-shell__button--hero";
@@ -352,12 +380,28 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
   singleButton.addEventListener("click", () => {
     state.mode = "single_image";
     syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
+    syncExtrasActionRailAlignment();
+    queueExtrasActionRailAlignment();
   });
   batchButton.addEventListener("click", () => {
     state.mode = "batch_process";
     syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
+    syncExtrasActionRailAlignment();
+    queueExtrasActionRailAlignment();
   });
   syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
+  queueExtrasActionRailAlignment();
+
+  if (typeof ResizeObserver === "function") {
+    const extrasAlignObserver = new ResizeObserver(() => {
+      queueExtrasActionRailAlignment();
+    });
+    extrasAlignObserver.observe(modeTabs);
+    extrasAlignObserver.observe(singlePane);
+    extrasAlignObserver.observe(batchPane);
+    section.__extrasAlignObserver = extrasAlignObserver;
+  }
+  globalThis.addEventListener?.("resize", queueExtrasActionRailAlignment);
 
   let extrasModeSnapshot = state.mode;
   const extrasStateLock = installPaneStateLock(formRegistry, "extras", elements, () => {
@@ -380,7 +424,11 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
   });
 
   return {
-    onActivate: restoreExtrasState,
+    onActivate: () => {
+      restoreExtrasState();
+      syncExtrasActionRailAlignment();
+      queueExtrasActionRailAlignment();
+    },
     onDeactivate: captureExtrasState,
   };
 }
