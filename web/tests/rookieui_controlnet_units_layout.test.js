@@ -94,7 +94,7 @@ function appendTextElement(parent, tagName, className, textContent) {
   return node;
 }
 
-function buildEditor(idPrefix) {
+function buildEditor(idPrefix, overrides = {}) {
   const host = document.createElement("div");
   const hiddenInput = createInput("hidden", `${idPrefix}-units`, "[]");
   host.appendChild(hiddenInput);
@@ -111,9 +111,9 @@ function buildEditor(idPrefix) {
     createField,
     createSliderField,
     appendTextElement,
-    readFileAsDataUrl: async () => "data:image/png;base64,dGVzdA==",
+    readFileAsDataUrl: overrides.readFileAsDataUrl ?? (async () => "data:image/png;base64,dGVzdA=="),
     syncBoundControls: () => {},
-    onStatusMessage: () => {},
+    onStatusMessage: overrides.onStatusMessage ?? (() => {}),
   });
 
   return { host, hiddenInput, editor };
@@ -276,6 +276,96 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
       expect(generatedLane.hidden).toBe(true);
       expect(dualPane?.dataset.generatedVisible).toBe("false");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("reports explicit hidden-preview guidance after run-preprocessor success with Allow Preview disabled", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    const generatedLane = host.querySelector("#rookieui-img2img-controlnet-preview-generated-lane-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(runButton).not.toBeNull();
+    expect(generatedLane).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          return { images: ["data:image/png;base64,cHJldmlldy1pbWFnZQ=="] };
+        },
+      }));
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "depth";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(generatedLane.hidden).toBe(true);
+      expect(runButton?.dataset.running).toBe("false");
+      expect(runButton?.title).toBe("Run Preprocessor");
+      expect(runButton?.querySelector(".rookieui-shell__mini-action-icon")?.textContent).toBe("💥");
+      expect(statusMessages.some((entry) => entry.includes("running preprocessor"))).toBe(true);
+      expect(statusMessages.some((entry) => entry.includes("hidden because Allow Preview is off"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("reports explicit preview-lane update status when Allow Preview is enabled", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const allowPreview = host.querySelector("#rookieui-img2img-controlnet-allow-preview-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    const generatedLane = host.querySelector("#rookieui-img2img-controlnet-preview-generated-lane-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(allowPreview).not.toBeNull();
+    expect(runButton).not.toBeNull();
+    expect(generatedLane).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          return { images: ["data:image/png;base64,cHJldmlldy1pbWFnZQ=="] };
+        },
+      }));
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "depth";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      allowPreview.checked = true;
+      allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(generatedLane.hidden).toBe(false);
+      expect(statusMessages.some((entry) => entry.includes("Preview lane updated"))).toBe(true);
     } finally {
       globalThis.fetch = originalFetch;
     }

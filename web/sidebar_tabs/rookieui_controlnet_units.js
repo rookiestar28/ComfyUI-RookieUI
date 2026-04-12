@@ -65,6 +65,8 @@ const FILE_SELECTION_PLACEHOLDER = "No file selected";
 const FILE_PAYLOAD_PLACEHOLDER = "Loaded from payload";
 const PREVIEW_UPLOAD_ICON = "⤴";
 const RUN_PREPROCESSOR_ICON = "💥";
+const RUN_PREPROCESSOR_BUSY_ICON = "⏳";
+const RUN_PREPROCESSOR_TIMEOUT_MS = 30000;
 
 function toObjectArray(rawValue) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
@@ -453,10 +455,19 @@ function syncRunPreprocessorVisibility(row, isImg2ImgEditor) {
     return;
   }
   const shouldShow = !isImg2ImgEditor || hasIndependentControlImageData(row);
+  const isBusy = Boolean(row.preprocessorBusy);
   row.runPreprocessorButton.hidden = !shouldShow;
   row.runPreprocessorButton.style.display = shouldShow ? "" : "none";
+  row.runPreprocessorButton.dataset.running = isBusy ? "true" : "false";
+  row.runPreprocessorButton.setAttribute("aria-busy", isBusy ? "true" : "false");
+  row.runPreprocessorButton.title = isBusy ? "Running Preprocessor..." : "Run Preprocessor";
+  row.runPreprocessorButton.setAttribute("aria-label", row.runPreprocessorButton.title);
+  const runIcon = row.runPreprocessorButton.querySelector(".rookieui-shell__mini-action-icon");
+  if (runIcon) {
+    runIcon.textContent = isBusy ? RUN_PREPROCESSOR_BUSY_ICON : RUN_PREPROCESSOR_ICON;
+  }
   // CRITICAL: img2img must hide Run Preprocessor until an independent control image is present.
-  row.runPreprocessorButton.disabled = !shouldShow;
+  row.runPreprocessorButton.disabled = !shouldShow || isBusy;
 }
 
 function buildFallbackControlTypeCatalog(controlTypeOptions) {
@@ -955,6 +966,9 @@ export function createControlNetUnitEditor({
   };
 
   const runPreprocessorForRow = async (row, unitIndex) => {
+    if (row.preprocessorBusy) {
+      return;
+    }
     const sourceImage = row.imageData.value.trim();
     if (!sourceImage) {
       if (onStatusMessage) {
@@ -978,7 +992,19 @@ export function createControlNetUnitEditor({
       return;
     }
 
-    row.runPreprocessorButton.disabled = true;
+    row.preprocessorBusy = true;
+    syncRunPreprocessorVisibility(row, isImg2ImgEditor);
+    if (onStatusMessage) {
+      onStatusMessage(`ControlNet Unit ${unitIndex + 1}: running preprocessor...`);
+    }
+
+    const abortController = typeof globalThis.AbortController === "function" ? new globalThis.AbortController() : null;
+    let timeoutHandle = null;
+    if (abortController && typeof globalThis.setTimeout === "function") {
+      timeoutHandle = globalThis.setTimeout(() => {
+        abortController.abort();
+      }, RUN_PREPROCESSOR_TIMEOUT_MS);
+    }
     try {
       const response = await globalThis.fetch("/rookieui/controlnet/detect", {
         method: "POST",
@@ -993,12 +1019,14 @@ export function createControlNetUnitEditor({
           controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
           controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
         }),
+        signal: abortController?.signal,
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = String(data?.detail ?? "").trim();
+        const statusDetail = Number.isFinite(Number(response.status)) ? ` (HTTP ${response.status})` : "";
         if (onStatusMessage) {
-          onStatusMessage(detail || `ControlNet Unit ${unitIndex + 1}: run preprocessor failed.`);
+          onStatusMessage(detail || `ControlNet Unit ${unitIndex + 1}: run preprocessor failed${statusDetail}.`);
         }
         return;
       }
@@ -1018,14 +1046,29 @@ export function createControlNetUnitEditor({
       });
 
       const warningText = Array.isArray(data?.warnings) && data.warnings.length > 0 ? ` (${data.warnings[0]})` : "";
+      const visibilityText = row.allowPreview.checked
+        ? " Preview lane updated."
+        : " Preview output is ready but hidden because Allow Preview is off.";
       if (onStatusMessage) {
-        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed.${warningText}`);
+        onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor completed.${warningText}${visibilityText}`);
       }
-    } catch (_error) {
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        if (onStatusMessage) {
+          onStatusMessage(
+            `ControlNet Unit ${unitIndex + 1}: preprocessor request timed out after ${Math.round(RUN_PREPROCESSOR_TIMEOUT_MS / 1000)} seconds.`,
+          );
+        }
+        return;
+      }
       if (onStatusMessage) {
         onStatusMessage(`ControlNet Unit ${unitIndex + 1}: preprocessor request failed.`);
       }
     } finally {
+      if (timeoutHandle !== null && typeof globalThis.clearTimeout === "function") {
+        globalThis.clearTimeout(timeoutHandle);
+      }
+      row.preprocessorBusy = false;
       syncRunPreprocessorVisibility(row, isImg2ImgEditor);
     }
   };
@@ -1381,6 +1424,7 @@ export function createControlNetUnitEditor({
       runPreprocessorButton,
       sourceBrush: null,
       generatedPreviewData: "",
+      preprocessorBusy: false,
     };
 
     imageUploadControl.controlRow.classList.add("rookieui-shell__controlnet-upload-row--legacy-source");
@@ -1554,6 +1598,13 @@ export function createControlNetUnitEditor({
         imageData: rowElements.generatedPreviewData,
         visible: allowPreview.checked,
       });
+      if (rowElements.generatedPreviewData && onStatusMessage) {
+        onStatusMessage(
+          allowPreview.checked
+            ? `ControlNet Unit ${index + 1}: generated preview is now visible.`
+            : `ControlNet Unit ${index + 1}: generated preview hidden (Allow Preview off).`,
+        );
+      }
     });
 
     preview.uploadButton.addEventListener("click", () => {
@@ -1737,6 +1788,7 @@ export function createControlNetUnitEditor({
       row.preview.history.redo = [];
       setControlNetPreview(row.preview, { imageData: unit.image_data, imageAsset: unit.image_asset });
       row.sourceBrush?.syncSourceData(unit.image_data);
+      row.preprocessorBusy = false;
       row.generatedPreviewData = "";
       setControlNetGeneratedPreview(row.preview, { imageData: row.generatedPreviewData, visible: row.allowPreview.checked });
       syncRunPreprocessorVisibility(row, isImg2ImgEditor);
