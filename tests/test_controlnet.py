@@ -102,6 +102,34 @@ class ControlNetNormalizationTests(unittest.TestCase):
         self.assertEqual(request.controlnet_units[0].source, "alwayson_scripts.controlnet")
         self.assertEqual(request.controlnet_units[0].image_asset, "alias-image")
 
+    def test_txt2img_normalization_maps_a1111_alias_input_image_mask_payload(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "alwayson_scripts": {
+                    "ControlNet": {
+                        "args": [
+                            {
+                                "enabled": True,
+                                "module": "canny",
+                                "model": "control_v11p_sd15_canny.safetensors",
+                                "input_image": {
+                                    "image": "alias-image",
+                                    "mask": "alias-mask",
+                                },
+                            }
+                        ]
+                    }
+                },
+            }
+        )
+
+        self.assertEqual(len(request.controlnet_units), 1)
+        self.assertEqual(request.controlnet_units[0].source, "alwayson_scripts.controlnet")
+        self.assertEqual(request.controlnet_units[0].image_asset, "alias-image")
+        self.assertEqual(request.controlnet_units[0].mask_asset, "alias-mask")
+        self.assertTrue(request.controlnet_units[0].use_mask)
+
     def test_controlnet_normalization_prefers_native_units_over_alias_units(self) -> None:
         units, warning_codes, _ = normalize_controlnet_units(
             {
