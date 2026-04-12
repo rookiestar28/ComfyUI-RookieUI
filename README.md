@@ -139,7 +139,10 @@ ComfyUI process (single runtime)
 
 ## Installation
 
-Install as a ComfyUI custom node:
+1. Install via ComfyUI-Manager (recommended)
+   Update ComfyUI-Manager to the latest version first, then search for `ComfyUI-RookieUI` in Manager and install it.
+
+2. Install as a ComfyUI custom node (manual)
 
 ```bash
 git clone https://github.com/rookiestar28/ComfyUI-RookieUI custom_nodes/ComfyUI-RookieUI
