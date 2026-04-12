@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -13,16 +12,15 @@ from rookieui.contracts.controlnet_integrated import (
 )
 from rookieui.services.controlnet import (
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
-    CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED,
-    CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED,
     CONTROLNET_WARNING_FEATURE_DISABLED,
+    CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK,
     CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE,
-    CONTROLNET_WARNING_UNSUPPORTED_MODULE,
     build_controlnet_control_types_payload,
     build_controlnet_detect_payload,
     build_controlnet_module_list_payload,
     normalize_controlnet_units,
 )
+from rookieui.services.controlnet_runtime import ControlNetRuntimeResult
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_img2img_request, translate_txt2img_request
@@ -508,187 +506,103 @@ class ControlNetRouteTests(unittest.TestCase):
         )
 
     def test_detect_payload_supports_depth_module_dispatch(self) -> None:
-        with mock.patch.dict("os.environ", {"ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "internal"}, clear=False):
-            payload = build_controlnet_detect_payload(
-                {
-                    "controlnet_module": "depth",
-                    "controlnet_input_images": [
-                        "data:image/png;base64,"
-                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
-                    ],
-                }
-            )
+        payload = build_controlnet_detect_payload(
+            {
+                "controlnet_module": "depth",
+                "controlnet_input_images": [
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
+                ],
+            }
+        )
         self.assertEqual(payload["module"], "depth")
         if CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE in payload["warning_codes"]:
             self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE, payload["warning_codes"])
             return
-        self.assertNotIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
+        self.assertIn(payload["detect_backend"], {"comfy_host_preprocessor", "comfy_host_preprocessor_aio", "rookieui_internal_fallback"})
         self.assertEqual(len(payload["images"]), 1)
 
-    def test_detect_payload_returns_warning_for_unsupported_runtime_processor_module(self) -> None:
-        with mock.patch.dict("os.environ", {"ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "internal"}, clear=False):
-            payload = build_controlnet_detect_payload(
-                {
-                    "controlnet_module": "openpose",
-                    "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
-                }
-            )
-        self.assertEqual(payload["module"], "openpose")
-        self.assertIn(CONTROLNET_WARNING_UNSUPPORTED_MODULE, payload["warning_codes"])
-        self.assertEqual(len(payload["images"]), 1)
-
-    def test_detect_payload_defaults_to_internal_provider_when_env_is_not_explicit(self) -> None:
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "",
-            },
-            clear=False,
-        ):
-            payload = build_controlnet_detect_payload(
-                {
-                    "controlnet_module": "depth",
-                    "controlnet_input_images": [
-                        "data:image/png;base64,"
-                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
-                    ],
-                }
-            )
+    def test_detect_payload_uses_host_preprocessor_backend_when_runtime_succeeds(self) -> None:
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch(
+                    "rookieui.services.controlnet.preprocess_controlnet_tensor",
+                    return_value=ControlNetRuntimeResult(
+                        image=mock.Mock(),
+                        backend="comfy_host_preprocessor",
+                        processor_name="MiDaS-DepthMapPreprocessor",
+                        used_fallback=False,
+                        diagnostics=(),
+                    ),
+                ):
+                    with mock.patch("rookieui.services.controlnet.image_tensor_to_data_url", return_value="data:image/png;base64,cHJldmlldw=="):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "depth",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
 
         self.assertEqual(payload["source"], "rookieui")
-        self.assertTrue(str(payload["detect_backend"]).startswith("rookieui_internal"))
-        self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
+        self.assertEqual(payload["detect_backend"], "comfy_host_preprocessor")
+        self.assertEqual(payload["processor"], "MiDaS-DepthMapPreprocessor")
+        self.assertNotIn(CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK, payload["warning_codes"])
 
-    def test_detect_payload_coerces_legacy_auto_provider_to_internal(self) -> None:
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "auto",
-            },
-            clear=False,
-        ):
-            payload = build_controlnet_detect_payload(
-                {
-                    "controlnet_module": "depth",
-                    "controlnet_input_images": [
-                        "data:image/png;base64,"
-                        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
-                    ],
-                }
+    def test_detect_payload_passes_mask_tensor_to_runtime_when_mask_is_present(self) -> None:
+        runtime_image = mock.Mock(name="runtime_image_tensor")
+        runtime_mask = mock.Mock(name="runtime_mask_tensor")
+        preprocess_mock = mock.Mock(
+            return_value=ControlNetRuntimeResult(
+                image=runtime_image,
+                backend="comfy_host_preprocessor",
+                processor_name="InpaintPreprocessor",
+                used_fallback=False,
+                diagnostics=(),
             )
+        )
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=runtime_image):
+                with mock.patch("rookieui.services.controlnet.mask_tensor_from_bytes", return_value=runtime_mask):
+                    with mock.patch("rookieui.services.controlnet.preprocess_controlnet_tensor", preprocess_mock):
+                        with mock.patch(
+                            "rookieui.services.controlnet.image_tensor_to_data_url",
+                            return_value="data:image/png;base64,cHJldmlldw==",
+                        ):
+                            payload = build_controlnet_detect_payload(
+                                {
+                                    "controlnet_module": "inpaint",
+                                    "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                    "controlnet_masks": ["data:image/png;base64,bWFzaw=="],
+                                }
+                            )
 
-        self.assertEqual(payload["source"], "rookieui")
-        self.assertTrue(str(payload["detect_backend"]).startswith("rookieui_internal"))
-        self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
+        self.assertEqual(payload["detect_backend"], "comfy_host_preprocessor")
+        preprocess_mock.assert_called_once()
+        self.assertIs(preprocess_mock.call_args.kwargs["mask_tensor"], runtime_mask)
 
-    def test_detect_payload_uses_a1111_proxy_provider_when_configured(self) -> None:
-        captured_request = {}
+    def test_detect_payload_emits_fallback_warning_when_runtime_fallback_is_used(self) -> None:
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch(
+                    "rookieui.services.controlnet.preprocess_controlnet_tensor",
+                    return_value=ControlNetRuntimeResult(
+                        image=mock.Mock(),
+                        backend="rookieui_internal_fallback",
+                        processor_name="depth",
+                        used_fallback=True,
+                        diagnostics=("MiDaS-DepthMapPreprocessor: model missing",),
+                    ),
+                ):
+                    with mock.patch("rookieui.services.controlnet.image_tensor_to_data_url", return_value="data:image/png;base64,cHJldmlldw=="):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "depth",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
 
-        class _FakeUrlopenResponse:
-            def __init__(self, payload: dict[str, object]) -> None:
-                self.status = 200
-                self._payload = payload
-
-            def read(self) -> bytes:
-                return json.dumps(self._payload).encode("utf-8")
-
-            def getcode(self) -> int:
-                return self.status
-
-            def __enter__(self) -> "_FakeUrlopenResponse":
-                return self
-
-            def __exit__(self, exc_type, exc, tb) -> bool:
-                return False
-
-        def _fake_urlopen(request, timeout=0):  # noqa: ANN001
-            captured_request["url"] = request.full_url
-            captured_request["timeout"] = timeout
-            captured_request["body"] = json.loads(request.data.decode("utf-8"))
-            return _FakeUrlopenResponse({"images": ["data:image/png;base64,cHJveHk="], "info": "Success"})
-
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "a1111",
-                "ROOKIEUI_CONTROLNET_DETECT_ENDPOINT": "http://127.0.0.1:18080/controlnet/detect",
-            },
-            clear=False,
-        ):
-            with mock.patch(
-                "rookieui.services.controlnet.urllib_request.urlopen",
-                side_effect=_fake_urlopen,
-            ):
-                payload = build_controlnet_detect_payload(
-                    {
-                        "controlnet_module": "depth",
-                        "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
-                        "controlnet_masks": ["data:image/png;base64,bWFzaw=="],
-                        "low_vram": True,
-                    }
-                )
-
-        self.assertEqual(payload["source"], "a1111-proxy")
-        self.assertEqual(payload["detect_backend"], "a1111_extension")
-        self.assertEqual(payload["module"], "depth")
-        self.assertEqual(payload["images"], ["data:image/png;base64,cHJveHk="])
-        self.assertNotIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
-        self.assertEqual(captured_request["url"], "http://127.0.0.1:18080/controlnet/detect")
-        self.assertEqual(captured_request["body"]["controlnet_module"], "depth")
-        self.assertEqual(captured_request["body"]["controlnet_masks"], ["data:image/png;base64,bWFzaw=="])
-        self.assertTrue(captured_request["body"]["low_vram"])
-
-    def test_detect_payload_returns_extension_required_warning_when_external_provider_unavailable(self) -> None:
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "a1111",
-                "ROOKIEUI_CONTROLNET_DETECT_INTERNAL_FALLBACK": "0",
-            },
-            clear=False,
-        ):
-            with mock.patch(
-                "rookieui.services.controlnet.urllib_request.urlopen",
-                side_effect=RuntimeError("connection refused"),
-            ):
-                payload = build_controlnet_detect_payload(
-                    {
-                        "controlnet_module": "depth",
-                        "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
-                    }
-                )
-
-        self.assertEqual(payload["source"], "rookieui")
-        self.assertEqual(payload["detect_backend"], "a1111_unavailable_passthrough")
-        self.assertIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
-        self.assertIn(CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED, payload["warning_codes"])
-        self.assertEqual(payload["images"], ["data:image/png;base64,ZmFrZQ=="])
-
-    def test_detect_payload_can_use_internal_fallback_when_explicitly_enabled(self) -> None:
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "ROOKIEUI_CONTROLNET_DETECT_PROVIDER": "a1111",
-                "ROOKIEUI_CONTROLNET_DETECT_INTERNAL_FALLBACK": "1",
-            },
-            clear=False,
-        ):
-            with mock.patch(
-                "rookieui.services.controlnet.urllib_request.urlopen",
-                side_effect=RuntimeError("connection refused"),
-            ):
-                payload = build_controlnet_detect_payload(
-                    {
-                        "controlnet_module": "depth",
-                        "controlnet_input_images": [
-                            "data:image/png;base64,"
-                            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7+gW8AAAAASUVORK5CYII="
-                        ],
-                    }
-                )
-
-        self.assertIn(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED, payload["warning_codes"])
-        self.assertNotIn(CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED, payload["warning_codes"])
+        self.assertEqual(payload["detect_backend"], "rookieui_internal_fallback")
+        self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK, payload["warning_codes"])
         self.assertEqual(len(payload["images"]), 1)
 
     def test_controlnet_detect_route_returns_invalid_request_for_missing_image(self) -> None:

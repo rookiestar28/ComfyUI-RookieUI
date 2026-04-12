@@ -1056,15 +1056,16 @@ export function createControlNetUnitEditor({
       const warningCodes = Array.isArray(data?.warning_codes) ? data.warning_codes.map((entry) => String(entry)) : [];
       const warningText = warningMessages.length > 0 ? ` (${warningMessages[0]})` : "";
       const detectBackend = String(data?.detect_backend ?? "").trim().toLowerCase();
-      const sourceLabel = String(data?.source ?? "").trim().toLowerCase();
-      const externalDetectUnavailable = warningCodes.includes("CONTROLNET_EXTENSION_DETECT_REQUIRED");
-      let backendText = " via RookieUI internal preprocessor.";
-      if (sourceLabel === "a1111-proxy" || detectBackend === "a1111_extension") {
-        backendText = " via A1111/Forge ControlNet API.";
-      } else if (externalDetectUnavailable || detectBackend === "a1111_unavailable_passthrough") {
-        backendText = " A1111/Forge ControlNet API is unavailable; showing passthrough output.";
+      const hostFallback = warningCodes.includes("CONTROLNET_PREPROCESSOR_HOST_FALLBACK");
+      let backendText = " via ComfyUI host preprocessor.";
+      if (detectBackend === "comfy_host_preprocessor_aio") {
+        backendText = " via ComfyUI host AIO preprocessor.";
+      } else if (detectBackend === "passthrough_none" || detectBackend === "passthrough_module") {
+        backendText = " (passthrough output).";
+      } else if (hostFallback || detectBackend === "rookieui_internal_fallback") {
+        backendText = " via RookieUI fallback preprocessor (approximate output).";
       } else if (detectBackend.startsWith("rookieui_internal")) {
-        backendText = " via RookieUI internal fallback preprocessor (approximate output).";
+        backendText = " via RookieUI internal preprocessor.";
       }
       const visibilityText = row.allowPreview.checked
         ? " Preview lane updated."
