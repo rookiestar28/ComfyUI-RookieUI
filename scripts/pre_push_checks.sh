@@ -26,9 +26,49 @@ is_wsl() {
   grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null
 }
 
+validate_repo_relative_path() {
+  local raw_value="$1"
+  local field_name="$2"
+  local candidate="$raw_value"
+
+  candidate="${candidate//\\//}"
+  while [[ "$candidate" == ./* ]]; do
+    candidate="${candidate#./}"
+  done
+
+  if [ -z "$candidate" ]; then
+    echo "[pre-push] ERROR: $field_name must be a non-empty repo-relative path." >&2
+    exit 1
+  fi
+
+  # CRITICAL: keep override paths repo-relative only; absolute or malformed values can create garbage directories in workspace and leak outside intended test roots.
+  if [[ "$candidate" == /* ]] || [[ "$candidate" =~ ^[A-Za-z]: ]] || [[ "$candidate" =~ ^// ]]; then
+    echo "[pre-push] ERROR: $field_name must be repo-relative (absolute paths are not allowed): $raw_value" >&2
+    exit 1
+  fi
+
+  if [[ ! "$candidate" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "[pre-push] ERROR: $field_name contains unsupported characters: $raw_value" >&2
+    exit 1
+  fi
+
+  IFS='/' read -r -a segments <<<"$candidate"
+  local segment
+  for segment in "${segments[@]}"; do
+    if [ -z "$segment" ] || [ "$segment" = "." ] || [ "$segment" = ".." ]; then
+      echo "[pre-push] ERROR: $field_name must be a normalized repo-relative path: $raw_value" >&2
+      exit 1
+    fi
+  done
+
+  printf "%s" "$candidate"
+}
+
 select_venv_dir() {
   if [ -n "${ROOKIEUI_TEST_VENV:-}" ]; then
-    echo "$ROOKIEUI_TEST_VENV"
+    local normalized_override
+    normalized_override="$(validate_repo_relative_path "$ROOKIEUI_TEST_VENV" "ROOKIEUI_TEST_VENV")"
+    echo "$ROOT_DIR/$normalized_override"
     return 0
   fi
   case "$UNAME_S" in
