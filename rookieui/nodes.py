@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 
 try:
@@ -22,11 +23,14 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
+from rookieui.services.controlnet_runtime import normalize_module_key, preprocess_controlnet_tensor
 
 try:
     from comfy import model_management
 except Exception:  # pragma: no cover - host-only import path
     model_management = None
+
+_LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
 def _get_intermediate_dtype():
@@ -246,53 +250,12 @@ class RookieUIControlNetPreprocess:
 
     @classmethod
     def _normalize_module(cls, module_value: object) -> str:
-        normalized = str(module_value or "none").strip().lower().replace(" ", "_")
+        normalized = normalize_module_key(module_value)
         normalized = cls._module_aliases.get(normalized, normalized)
         if normalized not in cls._module_choices:
             # IMPORTANT: keep unsupported modules as passthrough instead of hard-failing generation; route-level warnings already capture downgrade semantics.
             return "none"
         return normalized
-
-    @staticmethod
-    def _resolve_resize_filters():
-        resample_owner = getattr(Image, "Resampling", Image)
-        return (
-            getattr(resample_owner, "BILINEAR", Image.BILINEAR),
-            getattr(resample_owner, "NEAREST", Image.NEAREST),
-        )
-
-    @classmethod
-    def _resize_for_processor(cls, image_obj: "Image.Image", processor_res: int) -> tuple["Image.Image", tuple[int, int]]:
-        original_size = image_obj.size
-        width, height = original_size
-        if processor_res <= 0 or min(width, height) <= 0:
-            return image_obj, original_size
-        scale = float(processor_res) / float(min(width, height))
-        target_size = (max(1, int(round(width * scale))), max(1, int(round(height * scale))))
-        if target_size == original_size:
-            return image_obj, original_size
-        bilinear, _nearest = cls._resolve_resize_filters()
-        return image_obj.resize(target_size, bilinear), original_size
-
-    @staticmethod
-    def _apply_module_filter(
-        image_obj: "Image.Image",
-        *,
-        module: str,
-        threshold_a: float,
-        threshold_b: float,
-    ) -> "Image.Image":
-        del threshold_b
-        if module in {"none", "reference", "ipadapter", "instantid", "t2iadapter", "tile", "inpaint", "shuffle"}:
-            return image_obj.convert("RGB")
-        if module in {"depth", "normalmap", "segmentation"}:
-            return image_obj.convert("L").convert("RGB")
-        if module in {"blur"}:
-            radius = max(0.1, min(float(threshold_a), 128.0) / 32.0)
-            return image_obj.filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGB")
-        if module in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch", "openpose"}:
-            return image_obj.convert("L").filter(ImageFilter.FIND_EDGES).convert("RGB")
-        return image_obj.convert("RGB")
 
     @staticmethod
     def _normalize_mask(mask_tensor: "torch.Tensor", *, batch_size: int, height: int, width: int) -> "torch.Tensor":
@@ -319,25 +282,24 @@ class RookieUIControlNetPreprocess:
     def preprocess(self, image, module="none", processor_res=512, threshold_a=64.0, threshold_b=64.0, use_mask=False, mask=None):
         _require_runtime_dependencies()
         module_key = self._normalize_module(module)
-        working = image.detach().cpu()
-        processed_frames = []
-        bilinear, _nearest = self._resolve_resize_filters()
-
-        for frame in working:
-            frame_array = np.clip(frame.numpy() * 255.0, 0.0, 255.0).astype(np.uint8)
-            frame_image = Image.fromarray(frame_array, mode="RGB")
-            frame_image, original_size = self._resize_for_processor(frame_image, int(processor_res))
-            frame_image = self._apply_module_filter(
-                frame_image,
-                module=module_key,
-                threshold_a=float(threshold_a),
-                threshold_b=float(threshold_b),
+        runtime_mask = mask if use_mask and mask is not None else None
+        runtime_result = preprocess_controlnet_tensor(
+            image_tensor=image,
+            module=module_key,
+            processor_res=int(processor_res),
+            threshold_a=float(threshold_a),
+            threshold_b=float(threshold_b),
+            mask_tensor=runtime_mask,
+        )
+        output = runtime_result.image.to(dtype=image.dtype, device=image.device)
+        if runtime_result.used_fallback and runtime_result.diagnostics:
+            # DEBUG HOTSPOT: when users report unexpected preprocessor outputs, inspect this log for failed host-node invocation chain before fallback.
+            _LOGGER.debug(
+                "RookieUIControlNetPreprocess host preprocessor fallback engaged (module=%s, diagnostics=%s).",
+                module_key,
+                " | ".join(runtime_result.diagnostics[:3]),
             )
-            if frame_image.size != original_size:
-                frame_image = frame_image.resize(original_size, bilinear)
-            processed_frames.append(torch.from_numpy(np.array(frame_image).astype(np.float32) / 255.0))
 
-        output = torch.stack(processed_frames, dim=0).to(dtype=image.dtype, device=image.device)
         if use_mask and mask is not None:
             normalized_mask = self._normalize_mask(
                 mask.detach().to(device=output.device),

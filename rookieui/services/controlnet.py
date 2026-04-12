@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-import base64
-import io
-import json
 import logging
 import os
 import re
 from typing import Any
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 
 from rookieui.contracts.controlnet_integrated import (
     CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER,
@@ -22,23 +17,20 @@ from rookieui.services.coercion import (
     coerce_float as _coerce_float,
     coerce_int as _coerce_int,
 )
+from rookieui.services.controlnet_runtime import (
+    image_tensor_from_bytes,
+    image_tensor_to_data_url,
+    mask_tensor_from_bytes,
+    normalize_module_key,
+    preprocess_controlnet_tensor,
+    runtime_dependencies_available,
+)
 from rookieui.services.model_inventory import discover_model_inventory
-
-try:
-    from PIL import Image, ImageFilter
-except Exception:  # pragma: no cover - optional preprocessor dependency
-    Image = None
-    ImageFilter = None
 
 ROOKIEUI_CONTROLNET_ENABLED_ENV = "ROOKIEUI_CONTROLNET_ENABLED"
 ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED_ENV = "ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED"
 ROOKIEUI_CONTROLNET_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_PREPROCESSOR_ENABLED"
 ROOKIEUI_CONTROLNET_EXTRA_MODULES_ENV = "ROOKIEUI_CONTROLNET_EXTRA_MODULES"
-ROOKIEUI_CONTROLNET_DETECT_PROVIDER_ENV = "ROOKIEUI_CONTROLNET_DETECT_PROVIDER"
-ROOKIEUI_CONTROLNET_DETECT_ENDPOINT_ENV = "ROOKIEUI_CONTROLNET_DETECT_ENDPOINT"
-ROOKIEUI_CONTROLNET_DETECT_ENDPOINTS_ENV = "ROOKIEUI_CONTROLNET_DETECT_ENDPOINTS"
-ROOKIEUI_CONTROLNET_DETECT_TIMEOUT_MS_ENV = "ROOKIEUI_CONTROLNET_DETECT_TIMEOUT_MS"
-ROOKIEUI_CONTROLNET_DETECT_INTERNAL_FALLBACK_ENV = "ROOKIEUI_CONTROLNET_DETECT_INTERNAL_FALLBACK"
 
 CONTROLNET_WARNING_FEATURE_DISABLED = "CONTROLNET_FEATURE_DISABLED"
 CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE = "CONTROLNET_ALIAS_NATIVE_OVERRIDE"
@@ -46,9 +38,7 @@ CONTROLNET_WARNING_ALIAS_DISABLED = "CONTROLNET_ALIAS_DISABLED"
 CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED = "CONTROLNET_UNIT_LIMIT_TRUNCATED"
 CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
-CONTROLNET_WARNING_UNSUPPORTED_MODULE = "CONTROLNET_UNSUPPORTED_PREPROCESSOR_MODULE"
-CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED = "CONTROLNET_EXTERNAL_DETECT_FAILED"
-CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED = "CONTROLNET_EXTENSION_DETECT_REQUIRED"
+CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
@@ -61,17 +51,11 @@ _MIN_PROCESSOR_RES = 64
 _MAX_PROCESSOR_RES = 2048
 _MIN_THRESHOLD = 0.0
 _MAX_THRESHOLD = 255.0
-_MIN_DETECT_TIMEOUT_MS = 100
-_MAX_DETECT_TIMEOUT_MS = 5000
-_DEFAULT_DETECT_TIMEOUT_MS = 450
 
 _DEFAULT_MODULE = "none"
 _DEFAULT_RESIZE_MODE = "crop_and_resize"
 _DEFAULT_CONTROL_MODE = "balanced"
 _DEFAULT_HR_OPTION = "both"
-_DEFAULT_DETECT_PROVIDER = "internal"
-_DEFAULT_DETECT_ENDPOINT = ""
-_DEFAULT_DETECT_ENDPOINTS: tuple[str, ...] = ()
 
 _CONTROLNET_BASE_MODULES = (
     "none",
@@ -200,10 +184,12 @@ _WARNING_MESSAGES = {
     CONTROLNET_WARNING_ALIAS_DISABLED: "A1111 alias ControlNet payload was ignored because alias compatibility is disabled by feature flag.",
     CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED: "ControlNet unit count exceeded guardrail; extra units were ignored.",
     CONTROLNET_WARNING_PREPROCESSOR_DISABLED: "ControlNet preprocessors are disabled by feature flag; detect request returned passthrough images.",
-    CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE: "ControlNet preprocessors are unavailable because Pillow is not installed.",
-    CONTROLNET_WARNING_UNSUPPORTED_MODULE: "Requested ControlNet preprocessor module is unsupported; detect request returned passthrough images.",
-    CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED: "ControlNet external detect provider failed.",
-    CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED: "A1111/Forge ControlNet detect API is unavailable; start Forge with --api and ControlNet extension, or enable explicit internal fallback.",
+    CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE: (
+        "ControlNet preprocessors are unavailable because runtime dependencies (numpy/torch/Pillow) are missing."
+    ),
+    CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK: (
+        "ComfyUI host preprocessor node is unavailable for the selected module; using RookieUI fallback output."
+    ),
 }
 
 
@@ -228,63 +214,6 @@ def is_controlnet_preprocessor_enabled() -> bool:
     return _env_flag(ROOKIEUI_CONTROLNET_PREPROCESSOR_ENABLED_ENV, default=True)
 
 
-def _resolve_detect_provider() -> str:
-    normalized = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_PROVIDER_ENV, _DEFAULT_DETECT_PROVIDER)).strip().lower()
-    if normalized == "a1111":
-        return "a1111"
-    if normalized == "auto":
-        # IMPORTANT: legacy `auto` previously tried external A1111/Forge first; keep runtime self-contained by coercing it to internal.
-        return "internal"
-    if normalized == "internal":
-        return "internal"
-    # IMPORTANT: default to internal detect to keep RookieUI runtime self-contained; external A1111/Forge detect must be explicit opt-in via env.
-    return _DEFAULT_DETECT_PROVIDER
-
-
-def _resolve_external_detect_endpoint() -> str:
-    endpoint = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_ENDPOINT_ENV, _DEFAULT_DETECT_ENDPOINT)).strip()
-    return endpoint
-
-
-def _resolve_external_detect_endpoints() -> list[str]:
-    resolved: list[str] = []
-    seen: set[str] = set()
-
-    def _push(candidate: object) -> None:
-        token = str(candidate).strip()
-        if not token or token in seen:
-            return
-        seen.add(token)
-        resolved.append(token)
-
-    raw_endpoints = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_ENDPOINTS_ENV, "")).strip()
-    if raw_endpoints:
-        for candidate in re.split(r"[,\n;]+", raw_endpoints):
-            _push(candidate)
-    else:
-        # IMPORTANT: do not assume any external detect host; external A1111/Forge route must be explicit opt-in.
-        _push(_resolve_external_detect_endpoint())
-
-    if not resolved:
-        for default_endpoint in _DEFAULT_DETECT_ENDPOINTS:
-            _push(default_endpoint)
-    return resolved
-
-
-def _resolve_external_detect_timeout_seconds() -> float:
-    raw_timeout_ms = str(os.getenv(ROOKIEUI_CONTROLNET_DETECT_TIMEOUT_MS_ENV, str(_DEFAULT_DETECT_TIMEOUT_MS))).strip()
-    try:
-        timeout_ms = int(raw_timeout_ms)
-    except ValueError:
-        timeout_ms = _DEFAULT_DETECT_TIMEOUT_MS
-    timeout_ms = max(_MIN_DETECT_TIMEOUT_MS, min(timeout_ms, _MAX_DETECT_TIMEOUT_MS))
-    return timeout_ms / 1000.0
-
-
-def _is_internal_detect_fallback_enabled() -> bool:
-    return _env_flag(ROOKIEUI_CONTROLNET_DETECT_INTERNAL_FALLBACK_ENV, default=False)
-
-
 def warning_messages_from_codes(codes: list[str]) -> list[str]:
     messages: list[str] = []
     for code in codes:
@@ -294,97 +223,13 @@ def warning_messages_from_codes(codes: list[str]) -> list[str]:
     return messages
 
 
-def _extract_external_detect_images(payload: object) -> list[str]:
-    if not isinstance(payload, dict):
-        raise RuntimeError("external detect response must be an object.")
-    raw_images = payload.get("images")
-    if not isinstance(raw_images, list):
-        raise RuntimeError("external detect response did not include images.")
-    images = [str(entry).strip() for entry in raw_images if isinstance(entry, str) and str(entry).strip()]
-    if not images:
-        raise RuntimeError("external detect response returned no usable images.")
-    return images
-
-
-def _run_external_detect_request(
-    *,
-    module: str,
-    input_images: list[str],
-    processor_res: int,
-    threshold_a: float,
-    threshold_b: float,
-    masks: list[str],
-    low_vram: bool,
-) -> list[str]:
-    endpoints = _resolve_external_detect_endpoints()
-    if not endpoints:
-        raise RuntimeError(
-            "external detect endpoint is not configured; set "
-            f"{ROOKIEUI_CONTROLNET_DETECT_ENDPOINT_ENV} or {ROOKIEUI_CONTROLNET_DETECT_ENDPOINTS_ENV}."
-        )
-    timeout_seconds = _resolve_external_detect_timeout_seconds()
-    request_payload = {
-        "controlnet_module": module,
-        "controlnet_input_images": input_images,
-        "controlnet_processor_res": processor_res,
-        "controlnet_threshold_a": threshold_a,
-        "controlnet_threshold_b": threshold_b,
-        "low_vram": bool(low_vram),
-    }
-    if masks:
-        request_payload["controlnet_masks"] = masks
-
-    errors: list[str] = []
-    for endpoint in endpoints:
-        body = json.dumps(request_payload).encode("utf-8")
-        request = urllib_request.Request(
-            endpoint,
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib_request.urlopen(request, timeout=timeout_seconds) as response:
-                status_code = int(getattr(response, "status", response.getcode()))
-                raw_body = response.read().decode("utf-8", errors="replace")
-        except urllib_error.HTTPError as exc:
-            error_detail = ""
-            try:
-                error_detail = exc.read().decode("utf-8", errors="replace")
-            except Exception:
-                error_detail = ""
-            errors.append(f"{endpoint} -> HTTP {exc.code} {error_detail[:140]}".strip())
-            continue
-        except Exception as exc:
-            errors.append(f"{endpoint} -> {exc}")
-            continue
-
-        if status_code < 200 or status_code >= 300:
-            errors.append(f"{endpoint} -> HTTP {status_code}")
-            continue
-
-        try:
-            response_payload = json.loads(raw_body)
-        except Exception:
-            errors.append(f"{endpoint} -> non-JSON response")
-            continue
-
-        try:
-            return _extract_external_detect_images(response_payload)
-        except RuntimeError as exc:
-            errors.append(f"{endpoint} -> {exc}")
-            continue
-
-    condensed = " | ".join(errors[:3]).strip()
-    raise RuntimeError(condensed or "external detect request failed for all endpoints.")
-
-
 def _normalize_module_name(raw_value: object) -> str:
     normalized = normalize_option_label(raw_value, "controlnet_module", max_length=64).strip().lower()
     if not normalized:
         return ""
     token = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
-    return _CONTROLNET_MODULE_ALIAS_PATCHES.get(token, token)
+    token = _CONTROLNET_MODULE_ALIAS_PATCHES.get(token, token)
+    return normalize_module_key(token)
 
 
 def _discover_controlnet_modules() -> list[str]:
@@ -811,48 +656,6 @@ def build_controlnet_control_types_payload() -> dict[str, object]:
     }
 
 
-def _encode_png_data_url(image: "Image.Image") -> str:
-    stream = io.BytesIO()
-    image.save(stream, format="PNG")
-    return f"data:image/png;base64,{base64.b64encode(stream.getvalue()).decode('ascii')}"
-
-
-def _apply_canny_like_filter(image: "Image.Image") -> "Image.Image":
-    grayscale = image.convert("L")
-    # IMPORTANT: keep detect path dependency-light; fallback to PIL FIND_EDGES so ControlNet API remains usable without optional CV stacks.
-    return grayscale.filter(ImageFilter.FIND_EDGES).convert("RGB")
-
-
-def _apply_depth_like_filter(image: "Image.Image") -> "Image.Image":
-    return image.convert("L").convert("RGB")
-
-
-def _apply_blur_filter(image: "Image.Image", threshold_a: float = 64.0) -> "Image.Image":
-    radius = max(0.1, min(float(threshold_a), 128.0) / 32.0)
-    return image.filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGB")
-
-
-def _apply_passthrough_filter(image: "Image.Image") -> "Image.Image":
-    return image.convert("RGB")
-
-
-def _resolve_detect_processor(module: str):
-    dispatch = {
-        "canny": lambda image, _a, _b: _apply_canny_like_filter(image),
-        "lineart": lambda image, _a, _b: _apply_canny_like_filter(image),
-        "scribble": lambda image, _a, _b: _apply_canny_like_filter(image),
-        "softedge": lambda image, _a, _b: _apply_canny_like_filter(image),
-        "mlsd": lambda image, _a, _b: _apply_canny_like_filter(image),
-        "depth": lambda image, _a, _b: _apply_depth_like_filter(image),
-        "normalmap": lambda image, _a, _b: _apply_depth_like_filter(image),
-        "blur": lambda image, a, _b: _apply_blur_filter(image, a),
-        "inpaint": lambda image, _a, _b: _apply_passthrough_filter(image),
-        "tile": lambda image, _a, _b: _apply_passthrough_filter(image),
-        "reference": lambda image, _a, _b: _apply_passthrough_filter(image),
-    }
-    return dispatch.get(module)
-
-
 def _normalize_detect_images(payload: dict[str, object]) -> list[str]:
     raw_images = payload.get("controlnet_input_images")
     if isinstance(raw_images, list) and raw_images:
@@ -908,49 +711,10 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
     processor_res = _coerce_processor_res(payload.get("controlnet_processor_res"), "controlnet_processor_res")
     threshold_a = _coerce_threshold(payload.get("controlnet_threshold_a"), "controlnet_threshold_a", 64.0)
     threshold_b = _coerce_threshold(payload.get("controlnet_threshold_b"), "controlnet_threshold_b", 64.0)
-    masks = _normalize_detect_masks(payload, image_count=len(input_images))
-    low_vram = _coerce_bool(payload.get("low_vram"), "low_vram", default=False, strict=False)
-    detect_provider = _resolve_detect_provider()
-    if detect_provider in {"auto", "a1111"}:
-        try:
-            external_images = _run_external_detect_request(
-                module=module,
-                input_images=input_images,
-                processor_res=processor_res,
-                threshold_a=threshold_a,
-                threshold_b=threshold_b,
-                masks=masks,
-                low_vram=low_vram,
-            )
-            return {
-                "source": "a1111-proxy",
-                "detect_backend": "a1111_extension",
-                "contract": build_controlnet_integrated_contract_meta(),
-                "module": module,
-                "images": external_images,
-                "warning_codes": warning_codes,
-                "warnings": warning_messages_from_codes(warning_codes),
-            }
-        except RuntimeError as exc:
-            warning_codes.append(CONTROLNET_WARNING_EXTERNAL_DETECT_FAILED)
-            _LOGGER.warning(
-                "RookieUI ControlNet detect external provider failed (provider=%s,module=%s): %s",
-                detect_provider,
-                module,
-                str(exc),
-            )
-            # CRITICAL: keep internal detect fallback opt-in; silent fallback produces non-reference pseudo-preprocessor outputs that look valid but are semantically wrong for many ControlNet modules.
-            if not _is_internal_detect_fallback_enabled():
-                warning_codes.append(CONTROLNET_WARNING_EXTENSION_DETECT_REQUIRED)
-                return {
-                    "source": "rookieui",
-                    "detect_backend": "a1111_unavailable_passthrough",
-                    "contract": build_controlnet_integrated_contract_meta(),
-                    "module": module,
-                    "images": input_images,
-                    "warning_codes": warning_codes,
-                    "warnings": warning_messages_from_codes(warning_codes),
-                }
+    input_masks = _normalize_detect_masks(payload, image_count=len(input_images))
+    if len(input_masks) < len(input_images):
+        input_masks.extend([""] * (len(input_images) - len(input_masks)))
+    _ = _coerce_bool(payload.get("low_vram"), "low_vram", default=False, strict=False)
 
     if not is_controlnet_preprocessor_enabled():
         warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_DISABLED)
@@ -964,7 +728,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             "warnings": warning_messages_from_codes(warning_codes),
         }
 
-    if Image is None or ImageFilter is None:
+    if not runtime_dependencies_available():
         warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE)
         return {
             "source": "rookieui",
@@ -976,37 +740,58 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             "warnings": warning_messages_from_codes(warning_codes),
         }
 
-    module_processor = _resolve_detect_processor(module)
-
-    if module_processor is None:
-        warning_codes.append(CONTROLNET_WARNING_UNSUPPORTED_MODULE)
-        return {
-            "source": "rookieui",
-            "detect_backend": "rookieui_internal_unsupported",
-            "contract": build_controlnet_integrated_contract_meta(),
-            "module": module,
-            "images": input_images,
-            "warning_codes": warning_codes,
-            "warnings": warning_messages_from_codes(warning_codes),
-        }
-
     output_images: list[str] = []
+    backend_labels: list[str] = []
+    processor_names: list[str] = []
+    fallback_used = False
+    fallback_diagnostics: list[str] = []
     for index, raw_image in enumerate(input_images):
         try:
             image_bytes, _ = decode_image_data(raw_image)
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            # IMPORTANT: keep module-dispatch centralized so API module/type selectors remain consistent with detect behavior.
-            _ = processor_res  # reserved for future processor-specific sizing behavior
-            processed = module_processor(image, threshold_a, threshold_b)
-            output_images.append(_encode_png_data_url(processed))
+            image_tensor = image_tensor_from_bytes(image_bytes)
+            mask_tensor = None
+            raw_mask = input_masks[index]
+            if raw_mask:
+                mask_bytes, _ = decode_image_data(raw_mask)
+                mask_tensor = mask_tensor_from_bytes(mask_bytes)
+            runtime_result = preprocess_controlnet_tensor(
+                image_tensor=image_tensor,
+                module=module,
+                processor_res=processor_res,
+                threshold_a=threshold_a,
+                threshold_b=threshold_b,
+                mask_tensor=mask_tensor,
+            )
+            backend_labels.append(runtime_result.backend)
+            processor_names.append(runtime_result.processor_name)
+            if runtime_result.used_fallback:
+                fallback_used = True
+                fallback_diagnostics.extend(list(runtime_result.diagnostics))
+            output_images.append(image_tensor_to_data_url(runtime_result.image))
         except Exception as exc:
-            raise ValueError(f"controlnet_input_images[{index}] is not a valid image payload.") from exc
+            raise ValueError(f"controlnet_input_images[{index}] or controlnet_masks[{index}] is not a valid image payload.") from exc
+
+    if fallback_used:
+        warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK)
+        if fallback_diagnostics:
+            # DEBUG HOTSPOT: if detect previews look visually wrong, inspect this diagnostics seam to identify which host preprocessor node failed before fallback.
+            _LOGGER.warning(
+                "RookieUI ControlNet detect host preprocessor fallback engaged (module=%s): %s",
+                module,
+                " | ".join(fallback_diagnostics[:3]),
+            )
+
+    detect_backend = "rookieui_internal"
+    if backend_labels:
+        unique_backends = list(dict.fromkeys(backend_labels))
+        detect_backend = unique_backends[0] if len(unique_backends) == 1 else "rookieui_internal_mixed"
 
     return {
         "source": "rookieui",
-        "detect_backend": "rookieui_internal",
+        "detect_backend": detect_backend,
         "contract": build_controlnet_integrated_contract_meta(),
         "module": module,
+        "processor": processor_names[0] if processor_names else module,
         "images": output_images,
         "warning_codes": warning_codes,
         "warnings": warning_messages_from_codes(warning_codes),
