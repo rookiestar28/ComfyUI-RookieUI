@@ -46,14 +46,15 @@ function createBrushControl({ host, id, labelText, min, max, step, defaultValue 
   };
 }
 
-function resolveCanvasRenderBox(stage, canvas) {
+function resolveCanvasRenderBox(stage, canvas, zoomScale = 1) {
   const stageRect = stage.getBoundingClientRect();
   const canvasWidth = Number(canvas.width || 0);
   const canvasHeight = Number(canvas.height || 0);
   if (!stageRect.width || !stageRect.height || !canvasWidth || !canvasHeight) {
     return null;
   }
-  const renderScale = Math.min(stageRect.width / canvasWidth, stageRect.height / canvasHeight);
+  const normalizedZoom = clamp(zoomScale, 0.1, 4);
+  const renderScale = Math.min(stageRect.width / canvasWidth, stageRect.height / canvasHeight) * normalizedZoom;
   const renderWidth = canvasWidth * renderScale;
   const renderHeight = canvasHeight * renderScale;
   const offsetX = (stageRect.width - renderWidth) / 2;
@@ -68,8 +69,8 @@ function resolveCanvasRenderBox(stage, canvas) {
   };
 }
 
-function mapPointerToCanvas(event, stage, canvas) {
-  const renderBox = resolveCanvasRenderBox(stage, canvas);
+function mapPointerToCanvas(event, stage, canvas, zoomScale = 1) {
+  const renderBox = resolveCanvasRenderBox(stage, canvas, zoomScale);
   if (!renderBox) {
     return null;
   }
@@ -123,6 +124,7 @@ export function createSourceCanvasBrushController({
   idPrefix,
   stage,
   toolbar,
+  previewImage = null,
   onCommitSource,
   onStatusMessage = null,
 }) {
@@ -209,6 +211,49 @@ export function createSourceCanvasBrushController({
     sourceToken: 0,
     lastPointerClientX: null,
     lastPointerClientY: null,
+    zoomPercent: 100,
+    fullscreenActive: false,
+  };
+
+  const fullscreenZoom = document.createElement("div");
+  fullscreenZoom.className = "rookieui-shell__canvas-fullscreen-zoom";
+  fullscreenZoom.id = `${idPrefix}-fullscreen-zoom`;
+  fullscreenZoom.hidden = true;
+  const fullscreenZoomLabel = document.createElement("span");
+  fullscreenZoomLabel.className = "rookieui-shell__canvas-fullscreen-zoom-label";
+  fullscreenZoom.appendChild(fullscreenZoomLabel);
+  const fullscreenZoomSlider = document.createElement("input");
+  fullscreenZoomSlider.type = "range";
+  fullscreenZoomSlider.className = "rookieui-shell__slider";
+  fullscreenZoomSlider.id = `${idPrefix}-fullscreen-zoom-slider`;
+  fullscreenZoomSlider.min = "50";
+  fullscreenZoomSlider.max = "300";
+  fullscreenZoomSlider.step = "5";
+  fullscreenZoomSlider.value = "100";
+  fullscreenZoom.appendChild(fullscreenZoomSlider);
+  stage.appendChild(fullscreenZoom);
+
+  const updateFullscreenZoomLabel = () => {
+    fullscreenZoomLabel.textContent = `Zoom (${state.zoomPercent}%)`;
+  };
+  updateFullscreenZoomLabel();
+
+  const resolveZoomScale = () => {
+    if (!state.fullscreenActive) {
+      return 1;
+    }
+    return clamp(state.zoomPercent, 50, 300) / 100;
+  };
+
+  const isStageWithinFullscreenElement = () => {
+    const fullscreenElement = globalThis.document?.fullscreenElement;
+    if (!fullscreenElement || !stage) {
+      return false;
+    }
+    if (fullscreenElement === stage) {
+      return true;
+    }
+    return typeof fullscreenElement.contains === "function" && fullscreenElement.contains(stage);
   };
 
   const hideBrushIndicator = () => {
@@ -216,12 +261,18 @@ export function createSourceCanvasBrushController({
   };
 
   const syncCanvasViewport = () => {
-    const renderBox = resolveCanvasRenderBox(stage, canvas);
+    const renderBox = resolveCanvasRenderBox(stage, canvas, resolveZoomScale());
     if (!renderBox) {
       canvas.style.left = "0px";
       canvas.style.top = "0px";
       canvas.style.width = "0px";
       canvas.style.height = "0px";
+      if (previewImage) {
+        previewImage.style.left = "0px";
+        previewImage.style.top = "0px";
+        previewImage.style.width = "100%";
+        previewImage.style.height = "100%";
+      }
       hideBrushIndicator();
       return null;
     }
@@ -230,6 +281,12 @@ export function createSourceCanvasBrushController({
     canvas.style.top = `${renderBox.offsetY}px`;
     canvas.style.width = `${renderBox.renderWidth}px`;
     canvas.style.height = `${renderBox.renderHeight}px`;
+    if (previewImage) {
+      previewImage.style.left = `${renderBox.offsetX}px`;
+      previewImage.style.top = `${renderBox.offsetY}px`;
+      previewImage.style.width = `${renderBox.renderWidth}px`;
+      previewImage.style.height = `${renderBox.renderHeight}px`;
+    }
     return renderBox;
   };
 
@@ -238,7 +295,7 @@ export function createSourceCanvasBrushController({
       hideBrushIndicator();
       return;
     }
-    const renderBox = resolveCanvasRenderBox(stage, canvas);
+    const renderBox = resolveCanvasRenderBox(stage, canvas, resolveZoomScale());
     if (!renderBox) {
       hideBrushIndicator();
       return;
@@ -346,7 +403,7 @@ export function createSourceCanvasBrushController({
     if (!state.enabled || !state.hasSource || event.button !== 0) {
       return;
     }
-    const point = mapPointerToCanvas(event, stage, canvas);
+    const point = mapPointerToCanvas(event, stage, canvas, resolveZoomScale());
     if (!point) {
       return;
     }
@@ -367,7 +424,7 @@ export function createSourceCanvasBrushController({
     if (!state.drawing || !state.enabled || !state.lastPoint) {
       return;
     }
-    const point = mapPointerToCanvas(event, stage, canvas);
+    const point = mapPointerToCanvas(event, stage, canvas, resolveZoomScale());
     if (!point) {
       return;
     }
@@ -394,6 +451,30 @@ export function createSourceCanvasBrushController({
     setEnabled(!state.enabled);
   });
   widthControl.slider.addEventListener("input", syncBrushIndicatorFromStoredPointer);
+
+  const syncFullscreenZoomVisibility = () => {
+    state.fullscreenActive = isStageWithinFullscreenElement();
+    if (!state.fullscreenActive) {
+      state.zoomPercent = 100;
+      fullscreenZoomSlider.value = "100";
+      updateFullscreenZoomLabel();
+    }
+    fullscreenZoom.hidden = !(state.fullscreenActive && state.hasSource);
+    syncCanvasViewport();
+    syncBrushIndicatorFromStoredPointer();
+  };
+
+  fullscreenZoomSlider.addEventListener("input", () => {
+    state.zoomPercent = Math.round(clamp(fullscreenZoomSlider.value, 50, 300));
+    fullscreenZoomSlider.value = String(state.zoomPercent);
+    updateFullscreenZoomLabel();
+    syncCanvasViewport();
+    syncBrushIndicatorFromStoredPointer();
+  });
+
+  if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
+    globalThis.document.addEventListener("fullscreenchange", syncFullscreenZoomVisibility);
+  }
 
   if (typeof globalThis.ResizeObserver === "function") {
     const resizeObserver = new globalThis.ResizeObserver(() => {
@@ -422,6 +503,7 @@ export function createSourceCanvasBrushController({
         context.clearRect(0, 0, canvas.width, canvas.height);
       }
       setEnabled(false);
+      syncFullscreenZoomVisibility();
       return;
     }
 
@@ -440,11 +522,13 @@ export function createSourceCanvasBrushController({
       // IMPORTANT: source-present surfaces must default to brush-ready interaction mode instead of upload-click mode.
       setEnabled(true);
       syncBrushIndicatorFromStoredPointer();
+      syncFullscreenZoomVisibility();
     } catch (_error) {
       state.hasSource = false;
       canvas.hidden = true;
       hideBrushIndicator();
       setEnabled(false);
+      syncFullscreenZoomVisibility();
       if (typeof onStatusMessage === "function") {
         onStatusMessage("Unable to initialize source brush canvas.");
       }

@@ -772,7 +772,7 @@ export function createControlNetUnitEditor({
   parent.appendChild(integratedDetails);
 
   const summary = document.createElement("summary");
-  summary.className = "rookieui-shell__hires-summary";
+  summary.className = "rookieui-shell__hires-summary rookieui-shell__controlnet-summary";
   integratedDetails.appendChild(summary);
 
   const header = document.createElement("div");
@@ -781,7 +781,7 @@ export function createControlNetUnitEditor({
 
   const title = document.createElement("span");
   title.className = "rookieui-shell__hires-title";
-  title.textContent = "ControlNet Integrated";
+  title.textContent = "Controlnet";
   header.appendChild(title);
 
   const caret = document.createElement("span");
@@ -1549,6 +1549,7 @@ export function createControlNetUnitEditor({
       idPrefix: `${idPrefix}-source-${index}`,
       stage: preview.stage,
       toolbar: preview.toolbar,
+      previewImage: preview.previewImage,
       onCommitSource: async (editedImageData) => {
         applyRowSourceSnapshot(
           {
