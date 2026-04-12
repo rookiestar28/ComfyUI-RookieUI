@@ -1,4 +1,5 @@
 import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260412-controlnet-ui-parity-pass2";
+import { hasCanvasSourceImage } from "./rookieui_canvas_surface_contract.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -1290,9 +1291,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       img2imgMaskCanvasContract.handleExternalMaskMutation();
       img2imgModeUi.maskEditor?.refreshFromInputs();
       const appliedImageData = String(elements.imageData.value ?? "").trim();
+      const hasAppliedSourceImage = hasCanvasSourceImage(appliedImageData, elements.imageAsset.value);
       const appliedBatchImages = parseJsonArrayField(elements.batchImagesData.value);
       const previewImageData =
-        appliedImageData || (isImg2ImgBatchMode(elements.mode.value) ? String(appliedBatchImages[0] ?? "") : "");
+        (hasAppliedSourceImage ? appliedImageData : "") ||
+        (isImg2ImgBatchMode(elements.mode.value) ? String(appliedBatchImages[0] ?? "") : "");
       if (img2imgPreviewBox) {
         if (previewImageData) {
           setPreviewContent(img2imgPreviewBox, previewImageData, runtimeState.previewPlaceholder);

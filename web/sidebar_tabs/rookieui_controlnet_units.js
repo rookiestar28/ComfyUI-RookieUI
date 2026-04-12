@@ -1,3 +1,5 @@
+import { hasCanvasSourceImage } from "./rookieui_canvas_surface_contract.js";
+
 const DEFAULT_UNIT_COUNT = 3;
 const DEFAULT_CONTROL_TYPE = "All";
 
@@ -279,7 +281,7 @@ function setControlNetPreview(previewState, { imageData = "", imageAsset = "", f
 }
 
 function hasIndependentControlImageData(row) {
-  return Boolean(String(row?.imageData?.value ?? "").trim());
+  return hasCanvasSourceImage(row?.imageData?.value ?? "", "");
 }
 
 function syncRunPreprocessorVisibility(row, isImg2ImgEditor) {
