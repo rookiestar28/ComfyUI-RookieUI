@@ -233,6 +233,11 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 
 ## ControlNet Support
 
+<div align="left">
+  <img src="assets/controlnet.png" width="70%" />
+</div>
+<br>
+
 Simple usage:
 
 1. Open `txt2img` or `img2img`, then enable a `ControlNet Unit`.
