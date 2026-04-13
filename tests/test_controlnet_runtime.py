@@ -171,15 +171,16 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                     ):
                         with mock.patch.object(runtime, "_resolve_host_preprocessor_candidates", return_value=()):
                             with mock.patch.object(runtime, "_select_aio_preprocessor_name", return_value="hed_safe"):
-                                with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker) as run_mock:
-                                    result = runtime.preprocess_controlnet_tensor(
-                                        image_tensor=marker,
-                                        module="softedge",
-                                        processor_res=512,
-                                        threshold_a=64.0,
-                                        threshold_b=64.0,
-                                        mask_tensor=None,
-                                    )
+                                with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=False):
+                                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker) as run_mock:
+                                        result = runtime.preprocess_controlnet_tensor(
+                                            image_tensor=marker,
+                                            module="softedge",
+                                            processor_res=512,
+                                            threshold_a=64.0,
+                                            threshold_b=64.0,
+                                            mask_tensor=None,
+                                        )
 
         self.assertEqual(result.backend, "comfy_host_preprocessor_aio")
         self.assertEqual(result.processor_name, "hed_safe")
@@ -202,10 +203,36 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                     return_value={"DepthAnythingV2Preprocessor": object()},
                 ):
                     with mock.patch.object(runtime, "_resolve_prompt_server_instance", return_value=fake_prompt_server_instance):
-                        with mock.patch.object(runtime, "_run_host_node_preprocessor", side_effect=_host_runner):
+                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=False):
+                            with mock.patch.object(runtime, "_run_host_node_preprocessor", side_effect=_host_runner):
+                                result = runtime.preprocess_controlnet_tensor(
+                                    image_tensor=marker,
+                                    module="depth",
+                                    processor_res=512,
+                                    threshold_a=64.0,
+                                    threshold_b=64.0,
+                                    mask_tensor=None,
+                                )
+
+        self.assertEqual(result.backend, "comfy_host_preprocessor")
+        self.assertEqual(result.processor_name, "DepthAnythingV2Preprocessor")
+        self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
+        self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
+
+    def test_preprocess_controlnet_marks_host_success_with_near_empty_output_diagnostic(self) -> None:
+        marker = object()
+        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                with mock.patch.object(
+                    runtime,
+                    "_resolve_host_node_class_mappings",
+                    return_value={"OpenposePreprocessor": object()},
+                ):
+                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker):
+                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=True):
                             result = runtime.preprocess_controlnet_tensor(
                                 image_tensor=marker,
-                                module="depth",
+                                module="openpose",
                                 processor_res=512,
                                 threshold_a=64.0,
                                 threshold_b=64.0,
@@ -213,9 +240,8 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                             )
 
         self.assertEqual(result.backend, "comfy_host_preprocessor")
-        self.assertEqual(result.processor_name, "DepthAnythingV2Preprocessor")
-        self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
-        self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
+        self.assertEqual(result.processor_name, "OpenposePreprocessor")
+        self.assertIn("OpenposePreprocessor:output_near_empty", result.diagnostics)
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_min_max_normalizes_signed_ranges(self) -> None:
@@ -231,3 +257,11 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         normalized = runtime._coerce_image_tensor(tensor)
         self.assertGreaterEqual(float(normalized.min().item()), 0.0)
         self.assertLessEqual(float(normalized.max().item()), 1.0)
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_coerce_image_tensor_promotes_alpha_only_rgba_to_visible_rgb(self) -> None:
+        tensor = runtime.torch.zeros((1, 2, 2, 4), dtype=runtime.torch.float32)
+        tensor[:, :, :, 3] = 1.0
+        normalized = runtime._coerce_image_tensor(tensor)
+        self.assertGreater(float(normalized.max().item()), 0.0)
+        self.assertEqual(normalized.shape[-1], 3)

@@ -371,6 +371,58 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     }
   });
 
+  test("surfaces backend near-empty warning text when preprocessor returns black/empty-like output", async () => {
+    const statusMessages = [];
+    const { host } = buildEditor("rookieui-img2img-controlnet", {
+      onStatusMessage: (message) => {
+        statusMessages.push(String(message ?? ""));
+      },
+    });
+
+    const imageData = host.querySelector("#rookieui-img2img-controlnet-image-data-0");
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const allowPreview = host.querySelector("#rookieui-img2img-controlnet-allow-preview-0");
+    const runButton = host.querySelector("#rookieui-img2img-controlnet-run-preprocessor-0");
+    expect(imageData).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+    expect(allowPreview).not.toBeNull();
+    expect(runButton).not.toBeNull();
+
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            images: ["data:image/png;base64,YmxhY2stb3ItZW1wdHk="],
+            warning_codes: ["CONTROLNET_PREPROCESSOR_EMPTY_OUTPUT"],
+            warnings: ["ComfyUI host preprocessor completed but output is near-empty for the current image/module settings."],
+            detect_backend: "comfy_host_preprocessor",
+            processor: "OpenposePreprocessor",
+          };
+        },
+      }));
+
+      imageData.value = "data:image/png;base64,c291cmNlLWltYWdl";
+      imageData.dispatchEvent(new Event("input", { bubbles: true }));
+      moduleSelect.value = "openpose";
+      moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      allowPreview.checked = true;
+      allowPreview.dispatchEvent(new Event("change", { bubbles: true }));
+      runButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(
+        statusMessages.some((entry) => entry.includes("near-empty for the current image/module settings")),
+      ).toBe(true);
+      expect(statusMessages.some((entry) => entry.includes("Processor: OpenposePreprocessor"))).toBe(true);
+      expect(statusMessages.some((entry) => entry.includes("Preview lane updated"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("forwards selected control model in run-preprocessor payload and reports model scope", async () => {
     const statusMessages = [];
     const { host } = buildEditor("rookieui-img2img-controlnet", {

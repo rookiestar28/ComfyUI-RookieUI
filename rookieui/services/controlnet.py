@@ -39,6 +39,7 @@ CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED = "CONTROLNET_UNIT_LIMIT_TRUNCATED"
 CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
+CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT = "CONTROLNET_PREPROCESSOR_EMPTY_OUTPUT"
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
@@ -189,6 +190,9 @@ _WARNING_MESSAGES = {
     ),
     CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK: (
         "ComfyUI host preprocessor node is unavailable for the selected module; using RookieUI fallback output."
+    ),
+    CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT: (
+        "ComfyUI host preprocessor completed but output is near-empty for the current image/module settings."
     ),
 }
 
@@ -753,6 +757,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
     processor_names: list[str] = []
     fallback_used = False
     fallback_diagnostics: list[str] = []
+    near_empty_diagnostics: list[str] = []
     for index, raw_image in enumerate(input_images):
         try:
             image_bytes, _ = decode_image_data(raw_image)
@@ -777,6 +782,12 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             if runtime_result.used_fallback:
                 fallback_used = True
                 fallback_diagnostics.extend(list(runtime_result.diagnostics))
+            else:
+                # DEBUG HOTSPOT: successful-host-but-empty-output seam; this isolates black/blank previews
+                # that are not runtime failures and should surface as targeted warnings.
+                near_empty_diagnostics.extend(
+                    [entry for entry in runtime_result.diagnostics if "output_near_empty" in str(entry)]
+                )
             output_images.append(image_tensor_to_data_url(runtime_result.image))
         except Exception as exc:
             raise ValueError(f"controlnet_input_images[{index}] or controlnet_masks[{index}] is not a valid image payload.") from exc
@@ -791,6 +802,14 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
                 module,
                 " | ".join(fallback_diagnostics[:3]),
             )
+    if near_empty_diagnostics:
+        warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT)
+        # DEBUG HOTSPOT: near-empty host output seam (often seen in pose/seg detectors on incompatible crops).
+        _LOGGER.warning(
+            "RookieUI ControlNet detect host preprocessor produced near-empty output (module=%s): %s",
+            module,
+            " | ".join(near_empty_diagnostics[:3]),
+        )
 
     detect_backend = "rookieui_internal"
     if backend_labels:
