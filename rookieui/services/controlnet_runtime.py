@@ -334,10 +334,14 @@ _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
     # IMPORTANT: keep explicit overrides sparse; default behavior is already single-attempt deterministic probing.
     "depth": 1,
     "normalmap": 1,
+    # IMPORTANT: allow one additional host attempt for openpose so near-empty first-pass outputs can retry
+    # on an alternate pose annotator before declaring fallback.
+    "openpose": 2,
 }
 
 _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT = 1
 ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED"
+_RETRY_ON_NEAR_EMPTY_MODULES: set[str] = {"openpose"}
 
 
 @dataclass(frozen=True)
@@ -479,6 +483,10 @@ def preprocess_controlnet_tensor(
                 # Mark this seam explicitly so detect-layer warnings can distinguish "pipeline failure" vs "empty detection result".
                 if _is_visually_empty_image_tensor(processed):
                     diagnostics.append(f"{node_name}:output_near_empty")
+                    # DEBUG HOTSPOT: openpose near-empty previews (solid black lane) are typically unusable to users.
+                    # Retry alternate host candidates before returning, then fallback if all candidates stay near-empty.
+                    if normalized_module in _RETRY_ON_NEAR_EMPTY_MODULES:
+                        continue
                 return ControlNetRuntimeResult(
                     image=processed,
                     backend="comfy_host_preprocessor",
@@ -510,13 +518,22 @@ def preprocess_controlnet_tensor(
                         # DEBUG HOTSPOT: same near-empty visibility check for AIO branch; keep diagnostics symmetric with direct-host branch.
                         if _is_visually_empty_image_tensor(processed):
                             diagnostics.append(f"AIO_Preprocessor({aio_name}):output_near_empty")
-                        return ControlNetRuntimeResult(
-                            image=processed,
-                            backend="comfy_host_preprocessor_aio",
-                            processor_name=aio_name,
-                            used_fallback=False,
-                            diagnostics=tuple(diagnostics),
-                        )
+                            if normalized_module not in _RETRY_ON_NEAR_EMPTY_MODULES:
+                                return ControlNetRuntimeResult(
+                                    image=processed,
+                                    backend="comfy_host_preprocessor_aio",
+                                    processor_name=aio_name,
+                                    used_fallback=False,
+                                    diagnostics=tuple(diagnostics),
+                                )
+                        else:
+                            return ControlNetRuntimeResult(
+                                image=processed,
+                                backend="comfy_host_preprocessor_aio",
+                                processor_name=aio_name,
+                                used_fallback=False,
+                                diagnostics=tuple(diagnostics),
+                            )
                     except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                         diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
         else:
