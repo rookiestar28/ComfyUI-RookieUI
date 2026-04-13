@@ -425,12 +425,6 @@ function createControlNetPreviewStage({ idPrefix, index, appendTextElement, crea
 
   const generatedPlaceholder = document.createElement("div");
   generatedPlaceholder.className = "rookieui-shell__controlnet-generated-preview-placeholder";
-  appendTextElement(
-    generatedPlaceholder,
-    "span",
-    "rookieui-shell__controlnet-generated-preview-placeholder-text",
-    "Run Preprocessor output preview",
-  );
   generatedLane.appendChild(generatedPlaceholder);
 
   const dualPane = document.createElement("div");
