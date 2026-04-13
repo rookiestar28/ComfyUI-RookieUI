@@ -54,12 +54,19 @@ class CapabilitySnapshotTests(unittest.TestCase):
         payload = build_capabilities_snapshot()
 
         prompt_semantics = payload["prompt_semantics"]
-        self.assertEqual(prompt_semantics["contract_version"], "r55-20260411")
+        self.assertEqual(prompt_semantics["contract_version"], "r106-20260413")
         capability_ids = [entry["id"] for entry in prompt_semantics["capabilities"]]
         self.assertIn("and_composition", capability_ids)
         self.assertIn("break_chunks", capability_ids)
         self.assertIn("prompt_scheduling", capability_ids)
         self.assertIn("attention_weighting", capability_ids)
+
+        capability_by_id = {entry["id"]: entry for entry in prompt_semantics["capabilities"]}
+        self.assertEqual(capability_by_id["and_composition"]["status"], "approximate")
+        self.assertEqual(capability_by_id["break_chunks"]["status"], "approximate")
+        self.assertEqual(capability_by_id["prompt_scheduling"]["status"], "approximate")
+        self.assertEqual(capability_by_id["attention_weighting"]["status"], "approximate")
+        self.assertEqual(capability_by_id["extra_network_lora"]["status"], "exact")
 
     def test_capabilities_snapshot_uses_pyproject_shell_version(self) -> None:
         payload = build_capabilities_snapshot()
