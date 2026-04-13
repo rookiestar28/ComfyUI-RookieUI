@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import os
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -168,10 +169,13 @@ _MODULE_HOST_PREPROCESSOR_PRIORITIES: dict[str, tuple[str, ...]] = {
 }
 
 _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
-    # IMPORTANT: depth/normal host nodes can be expensive to probe; keep invocation deterministic and avoid multi-node churn.
+    # IMPORTANT: keep explicit overrides sparse; default behavior is already single-attempt deterministic probing.
     "depth": 1,
     "normalmap": 1,
 }
+
+_DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT = 1
+ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED"
 
 
 @dataclass(frozen=True)
@@ -254,7 +258,13 @@ def preprocess_controlnet_tensor(
     host_mappings = _resolve_host_node_class_mappings()
 
     host_candidates = _resolve_host_preprocessor_candidates(normalized_module, host_mappings)
-    host_probe_limit = max(0, _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(normalized_module, len(host_candidates)))
+    configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
+        normalized_module,
+        _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
+    )
+    # DEBUG HOTSPOT: enforce single-attempt deterministic probing across all modules to avoid cross-family
+    # annotator side effects (unexpected model bootstrap/download) when host preprocessor chains fan out.
+    host_probe_limit = max(0, int(configured_probe_limit))
     host_probe_attempts = 0
     for node_name in host_candidates:
         if node_name not in host_mappings:
@@ -286,31 +296,35 @@ def preprocess_controlnet_tensor(
             diagnostics.append(f"{node_name}: {exc}")
             continue
 
-    aio_cls = host_mappings.get("AIO_Preprocessor")
-    if aio_cls is not None:
-        aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
-        if aio_name:
-            try:
-                processed = _run_host_node_preprocessor(
-                    node_name="AIO_Preprocessor",
-                    node_cls=aio_cls,
-                    image_tensor=source,
-                    mask_tensor=normalized_mask,
-                    module_key=normalized_module,
-                    processor_res=processor_res,
-                    threshold_a=threshold_a,
-                    threshold_b=threshold_b,
-                    aio_preprocessor_name=aio_name,
-                )
-                return ControlNetRuntimeResult(
-                    image=processed,
-                    backend="comfy_host_preprocessor_aio",
-                    processor_name=aio_name,
-                    used_fallback=False,
-                    diagnostics=tuple(diagnostics),
-                )
-            except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
-                diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
+    if _is_aio_preprocessor_enabled():
+        aio_cls = host_mappings.get("AIO_Preprocessor")
+        if aio_cls is not None:
+            aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
+            if aio_name:
+                try:
+                    processed = _run_host_node_preprocessor(
+                        node_name="AIO_Preprocessor",
+                        node_cls=aio_cls,
+                        image_tensor=source,
+                        mask_tensor=normalized_mask,
+                        module_key=normalized_module,
+                        processor_res=processor_res,
+                        threshold_a=threshold_a,
+                        threshold_b=threshold_b,
+                        aio_preprocessor_name=aio_name,
+                    )
+                    return ControlNetRuntimeResult(
+                        image=processed,
+                        backend="comfy_host_preprocessor_aio",
+                        processor_name=aio_name,
+                        used_fallback=False,
+                        diagnostics=tuple(diagnostics),
+                    )
+                except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
+                    diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
+    else:
+        # DEBUG HOTSPOT: keep AIO gating explicit; querying AIO INPUT_TYPES can trigger broad annotator enumeration.
+        diagnostics.append("aio_preprocessor_disabled")
 
     if diagnostics:
         # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
@@ -348,6 +362,19 @@ def _require_runtime_dependencies() -> None:
     if Image is None or ImageFilter is None:
         missing.append("Pillow")
     raise RuntimeError(f"ControlNet runtime preprocessing requires {', '.join(missing)}.")
+
+
+def _env_flag(name: str, *, default: bool) -> bool:
+    raw_value = str(os.getenv(name, "1" if default else "0")).strip().lower()
+    if raw_value in {"1", "true", "yes", "on"}:
+        return True
+    if raw_value in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _is_aio_preprocessor_enabled() -> bool:
+    return _env_flag(ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV, default=False)
 
 
 def _resolve_host_node_class_mappings() -> dict[str, Any]:
