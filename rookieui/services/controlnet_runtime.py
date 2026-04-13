@@ -847,6 +847,7 @@ def _resolve_node_function(instance: Any) -> Any:
 def _build_node_parameter_value(
     parameter_name: str,
     *,
+    schema_entry: object,
     host_parameter_overrides: dict[str, object],
     image_tensor: "torch.Tensor",
     mask_tensor: "torch.Tensor | None",
@@ -857,7 +858,7 @@ def _build_node_parameter_value(
 ) -> object:
     key = str(parameter_name or "").strip()
     if key in host_parameter_overrides:
-        return host_parameter_overrides[key]
+        return _coerce_value_for_schema(host_parameter_overrides[key], schema_entry)
     if key == "image":
         return image_tensor
     if key == "mask":
@@ -891,7 +892,7 @@ def _build_node_parameter_value(
     if key == "intensity_threshold":
         return int(round(max(0.0, min(255.0, threshold_b))))
     if key in {"detect_hand", "detect_body", "detect_face"}:
-        return True
+        return _coerce_value_for_schema(True, schema_entry)
     if key == "safe":
         return True
     if key == "coarse":
@@ -903,6 +904,30 @@ def _build_node_parameter_value(
     if key == "merge_with_lineart":
         return True
     return _MISSING
+
+
+def _coerce_value_for_schema(value: object, schema_entry: object) -> object:
+    choices = _extract_schema_choices(schema_entry)
+    if choices:
+        normalized_choices = {str(choice).strip().lower(): choice for choice in choices}
+        # CRITICAL: Comfy host wrappers such as OpenPose/DWPose expose detect flags as combo strings
+        # (`enable` / `disable`), not Python booleans. Bypassing schema-aware coercion here turns every
+        # truthy/falsey flag into a disabled branch at the host wrapper boundary and yields black previews.
+        if isinstance(value, bool) and {"enable", "disable"}.issubset(normalized_choices):
+            return normalized_choices["enable"] if value else normalized_choices["disable"]
+        if isinstance(value, str):
+            normalized_value = value.strip().lower()
+            if normalized_value in normalized_choices:
+                return normalized_choices[normalized_value]
+    return value
+
+
+def _extract_schema_choices(schema_entry: object) -> list[object]:
+    if isinstance(schema_entry, (list, tuple)) and schema_entry:
+        choices = schema_entry[0]
+        if isinstance(choices, list):
+            return list(choices)
+    return []
 
 
 def _run_host_node_preprocessor(
@@ -925,6 +950,7 @@ def _run_host_node_preprocessor(
     for required_name, required_spec in required_schema.items():
         resolved = _build_node_parameter_value(
             str(required_name),
+            schema_entry=required_spec,
             host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
@@ -944,6 +970,7 @@ def _run_host_node_preprocessor(
     for optional_name in optional_schema.keys():
         resolved = _build_node_parameter_value(
             str(optional_name),
+            schema_entry=optional_schema[optional_name],
             host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
