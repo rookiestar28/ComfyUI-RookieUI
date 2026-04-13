@@ -24,6 +24,39 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>A1111-native prompt parity node delivery (new functionality)</strong></summary>
+
+- Added RookieUI-owned A1111 parity text-encode nodes for SD-family default routes, moving `AND`, `BREAK`, scheduling, and attention handling to the CLIP/tokenizer boundary instead of relying on graph-only approximation.
+- Added SD1.x / SD2.x parity-node execution for standard CLIP paths and SDXL dual-encoder parity-node execution with pooled-output/size metadata preservation.
+- Added hires-pass prompt-conditioning separation for SDXL parity routes so second-pass scheduling and chunk timing no longer collapse back onto the base pass.
+- Preserved rollback-safe legacy graph fallback behavior for environments that still need the older prompt path.
+
+</details>
+
+<details>
+
+<summary><strong>Prompt capability and warning truthfulness realignment (bugfix/stability)</strong></summary>
+
+- Updated backend/frontend capability payloads so default SD-family prompt behavior is reported as exact, while legacy fallback and secondary-family approximate lanes are surfaced explicitly.
+- Added structured warning-code metadata for semantic detection, fallback, guardrails, and unsupported extra-network families.
+- Corrected legacy warning copy so prompt-path downgrades clearly state when RookieUI is running the legacy graph fallback instead of the default parity-node route.
+- Synced offline/frontend fallback capability payloads with the same post-cutover prompt contract to avoid contradictory UI messaging.
+
+</details>
+
+<details>
+
+<summary><strong>ControlNet OpenPose and host-preprocessor execution hardening (bugfix/stability)</strong></summary>
+
+- Fixed OpenPose-family host preprocessing so selected variants execute with exact host-node/flag binding instead of drifting into unrelated preprocessors.
+- Removed the generic visual-empty rejection that incorrectly treated sparse pose outputs as failures, especially for OpenPose-family previews.
+- Corrected fallback preview behavior so host failures no longer echo the source image as if preprocessing succeeded.
+- Expanded schema-aware host parameter coercion and regression coverage for OpenPose-family and other variant-driven preprocessor paths.
+
+</details>
+
+<details>
+
 <summary><strong>ControlNet preprocessor UX and dispatch parity improvements (bugfix/stability)</strong></summary>
 
 - Added Forge-style preprocessor option narrowing by selected Control Type, so each type shows only relevant annotator choices.
@@ -128,6 +161,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Architecture Snapshot](#architecture-snapshot)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
+- [Prompt Semantics and A1111 Parity](#prompt-semantics-and-a1111-parity)
 - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [ControlNet Support](#controlnet-support)
 - [Support for Other Extensions](#support-for-other-extensions)
@@ -183,6 +217,8 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 - `img2img` request normalization with guarded asset-handle path
 - `img2img` mode surface: `img2img`, `sketch`, `inpaint`, `inpaint_sketch`, `inpaint_upload`, `batch`
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
+- SD-family default prompt execution uses RookieUI A1111 parity text-encode nodes instead of graph-only prompt approximation
+- Exact prompt support on default SD-family routes for `AND`, `BREAK`, scheduling, and attention weighting
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
 ### PNG Info
@@ -199,7 +235,7 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 
 ### Model Controls
 
-- SD1.5/SDXL use model-native text-encoder behavior
+- SD1.5/SDXL default routes use RookieUI-owned A1111 parity text-encode nodes at the host CLIP boundary
 - Flux and Qwen-Image expose selectable text encoder controls
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
@@ -213,6 +249,18 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 - Klein family
 - Lumina family
 - Anima family
+
+## Prompt Semantics and A1111 Parity
+
+- Default Stable Diffusion-family routes (`sd15`, `sdxl`, Pony, Illustrious, Noob) execute prompt semantics through RookieUI A1111 parity text-encode nodes.
+- Supported default SD-family prompt features include:
+  - `AND` composition
+  - `BREAK` chunking
+  - prompt scheduling syntax such as `[from:to:at]`
+  - parenthesis/bracket attention weighting and explicit `(text:weight)` emphasis
+  - inline LoRA / LyCORIS extraction into deterministic loader chains
+- Secondary newer-family routes still exist, but they are not described as exact A1111 prompt-parity lanes in RookieUI capability surfaces.
+- If you enable `ROOKIEUI_PROMPT_DSL_LEGACY`, RookieUI falls back to the older graph-based prompt path and reports that downgrade explicitly in warning diagnostics.
 
 ## Default Model Read Paths (Host ComfyUI)
 
@@ -234,7 +282,7 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 ## ControlNet Support
 
 <div align="left">
-  <img src="assets/controlnet.png" width="70%" />
+  <img src="assets/controlnet.png" width="85%" />
 </div>
 <br>
 
@@ -251,6 +299,8 @@ Behavior and compatibility:
 
 - A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img`.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
+- Preprocessor selection is Control Type-aware and preserves explicit variant choice for families such as depth, lineart, and OpenPose.
+- OpenPose-family host preprocessing keeps exact selected variant semantics and avoids misleading source-image echo on fallback failure.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
