@@ -25,6 +25,7 @@ from rookieui.services.controlnet import (
     build_controlnet_model_list_payload,
     build_controlnet_module_list_payload,
 )
+from rookieui.services.adetailer import build_adetailer_catalog_payload
 from rookieui.security.asset_guard import normalize_metadata_text
 from rookieui.security.request_guard import normalize_client_id, normalize_option_label
 from rookieui.security.route_guard import INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
@@ -45,6 +46,7 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/module_list",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/control_types",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect",
+    f"{INTERNAL_ROUTE_PREFIX}/adetailer/catalog",
     f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img",
     f"{INTERNAL_ROUTE_PREFIX}/generate/img2img",
     f"{INTERNAL_ROUTE_PREFIX}/extras/run",
@@ -86,6 +88,10 @@ def build_models_snapshot() -> dict[str, object]:
 
 def build_presets_snapshot() -> dict[str, object]:
     return build_preset_payload()
+
+
+def build_adetailer_snapshot() -> dict[str, object]:
+    return build_adetailer_catalog_payload()
 
 
 def build_queue_snapshot_payload(*, client_id: str | None = None) -> dict[str, object]:
@@ -235,6 +241,13 @@ async def controlnet_detect(request: Any) -> Any:
     result["service"] = normalize_metadata_text("rookieui")
     result["status"] = normalize_metadata_text("ok")
     return _json_response(result, request=request)
+
+
+async def adetailer_catalog(request: Any) -> Any:
+    payload = build_adetailer_snapshot()
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    return _json_response(payload, request=request)
 
 
 async def queue(request: Any) -> Any:
@@ -521,6 +534,7 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list", controlnet_model_list)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/module_list", controlnet_module_list)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/control_types", controlnet_control_types)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/adetailer/catalog", adetailer_catalog)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue", queue)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}", queue_prompt)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)

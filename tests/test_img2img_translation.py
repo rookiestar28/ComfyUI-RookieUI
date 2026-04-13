@@ -177,6 +177,42 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 1)
 
+    def test_normalize_img2img_request_exposes_adetailer_controlnet_custom_block(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "image_asset": "portrait-input",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [
+                        {
+                            "detector": "person_yolov8n-seg.pt",
+                            "use_checkpoint": True,
+                            "checkpoint_name": "__host_default__",
+                            "controlnet": {
+                                "mode": "custom",
+                                "model": "control_v11p_sd15_openpose.safetensors",
+                                "module": "none",
+                                "weight": 0.6,
+                                "guidance_start": 0.1,
+                                "guidance_end": 0.8,
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(normalized.adetailer.enabled)
+        self.assertTrue(normalized.adetailer.skip_img2img)
+        self.assertEqual(normalized.adetailer.units[0].detector, "person_yolov8n-seg.pt")
+        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "Use same checkpoint")
+        self.assertEqual(normalized.adetailer.units[0].controlnet.mode, "custom")
+        self.assertEqual(normalized.adetailer.units[0].controlnet.model, "control_v11p_sd15_openpose.safetensors")
+        self.assertEqual(normalized.adetailer.units[0].controlnet.module, "none")
+        self.assertEqual(normalized.adetailer.units[0].controlnet.weight, 0.6)
+
     def test_normalize_img2img_request_accepts_human_readable_inpaint_aliases(self) -> None:
         normalized = normalize_img2img_request(
             {

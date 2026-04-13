@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 
 import {
   fetchRookieUICapabilities,
+  fetchRookieUIADetailerCatalog,
   fetchRookieUICompatibility,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
@@ -53,6 +54,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.prompt_semantics.rollout.default_mode).toBe("a1111_parity_nodes_exact");
     expect(result.data.prompt_semantics.warning_codes.fallback).toContain("PROMPT_LEGACY_FALLBACK_ENABLED");
     expect(result.data.prompt_semantics.capabilities[0].status).toBe("exact");
+    expect(result.data.features.adetailer).toBe(true);
+    expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
+    expect(result.data.adetailer.routes).toContain("/rookieui/adetailer/catalog");
   });
 
   test("submits txt2img payloads to the backend", async () => {
@@ -316,6 +320,18 @@ describe("fetchRookieUICapabilities", () => {
     expect(fallbackTypes.ok).toBe(false);
     expect(fallbackTypes.data.contract.version).toBe("r72-20260412");
     expect(fallbackTypes.data.default_type).toBe("All");
+  });
+
+  test("loads adetailer catalog fallback contract", async () => {
+    const fallbackCatalog = await fetchRookieUIADetailerCatalog(async () => {
+      throw new Error("offline");
+    });
+
+    expect(fallbackCatalog.ok).toBe(false);
+    expect(fallbackCatalog.data.contract.version).toBe("r74f77-20260414");
+    expect(fallbackCatalog.data.contract.unit_count).toBe(4);
+    expect(fallbackCatalog.data.prompt_tokens).toEqual(["[PROMPT]", "[SEP]", "[SKIP]"]);
+    expect(fallbackCatalog.data.controlnet_modes).toEqual(["none", "passthrough", "custom"]);
   });
 
   test("emits guarded debug warnings only when ROOKIEUI_DEBUG is enabled", async () => {
