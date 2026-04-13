@@ -29,6 +29,167 @@ _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 _MISSING = object()
 
+# Forge-style preprocessor option catalog consumed by both backend payload validation and
+# workflow/runtime dispatch. Keep this list deterministic to preserve UI filter order.
+CONTROLNET_PREPROCESSOR_OPTION_ORDER: tuple[str, ...] = (
+    "none",
+    "blur",
+    "canny",
+    "depth",
+    "depth_anything_v2",
+    "depth_anything",
+    "depth_midas",
+    "depth_zoe",
+    "depth_leres",
+    "normalmap",
+    "normal_midas",
+    "normal_bae",
+    "normal_dsine",
+    "openpose",
+    "openpose_full",
+    "openpose_dw",
+    "openpose_animal",
+    "openpose_densepose",
+    "mlsd",
+    "lineart",
+    "lineart_anime",
+    "lineart_anime_denoise",
+    "lineart_coarse",
+    "lineart_realistic",
+    "lineart_standard",
+    "scribble",
+    "scribble_xdog",
+    "scribble_pidinet",
+    "scribble_fake",
+    "segmentation",
+    "segmentation_oneformer_coco",
+    "segmentation_oneformer_ade20k",
+    "segmentation_uniformer",
+    "segmentation_anime_face",
+    "shuffle",
+    "sketch",
+    "sketch_scribble",
+    "sketch_lineart",
+    "sketch_hed",
+    "softedge",
+    "softedge_hed",
+    "softedge_pidinet",
+    "softedge_teed",
+    "reference",
+    "ipadapter",
+    "instantid",
+    "t2iadapter",
+    "tile",
+    "tile_simple",
+    "tile_gf",
+    "inpaint",
+)
+
+_PREPROCESSOR_OPTION_BASE_MODULE: dict[str, str] = {
+    "none": "none",
+    "blur": "blur",
+    "canny": "canny",
+    "depth": "depth",
+    "depth_anything_v2": "depth",
+    "depth_anything": "depth",
+    "depth_midas": "depth",
+    "depth_zoe": "depth",
+    "depth_leres": "depth",
+    "normalmap": "normalmap",
+    "normal_midas": "normalmap",
+    "normal_bae": "normalmap",
+    "normal_dsine": "normalmap",
+    "openpose": "openpose",
+    "openpose_full": "openpose",
+    "openpose_dw": "openpose",
+    "openpose_animal": "openpose",
+    "openpose_densepose": "openpose",
+    "mlsd": "mlsd",
+    "lineart": "lineart",
+    "lineart_anime": "lineart",
+    "lineart_anime_denoise": "lineart",
+    "lineart_coarse": "lineart",
+    "lineart_realistic": "lineart",
+    "lineart_standard": "lineart",
+    "scribble": "scribble",
+    "scribble_xdog": "scribble",
+    "scribble_pidinet": "scribble",
+    "scribble_fake": "scribble",
+    "segmentation": "segmentation",
+    "segmentation_oneformer_coco": "segmentation",
+    "segmentation_oneformer_ade20k": "segmentation",
+    "segmentation_uniformer": "segmentation",
+    "segmentation_anime_face": "segmentation",
+    "shuffle": "shuffle",
+    "sketch": "sketch",
+    "sketch_scribble": "sketch",
+    "sketch_lineart": "sketch",
+    "sketch_hed": "sketch",
+    "softedge": "softedge",
+    "softedge_hed": "softedge",
+    "softedge_pidinet": "softedge",
+    "softedge_teed": "softedge",
+    "reference": "reference",
+    "ipadapter": "ipadapter",
+    "instantid": "instantid",
+    "t2iadapter": "t2iadapter",
+    "tile": "tile",
+    "tile_simple": "tile",
+    "tile_gf": "tile",
+    "inpaint": "inpaint",
+}
+
+_PREPROCESSOR_OPTION_PREFERRED_HOST_CANDIDATES: dict[str, tuple[str, ...]] = {
+    "depth_anything_v2": ("DepthAnythingV2Preprocessor",),
+    "depth_anything": ("DepthAnythingPreprocessor",),
+    "depth_midas": ("MiDaS-DepthMapPreprocessor",),
+    "depth_zoe": ("Zoe-DepthMapPreprocessor",),
+    "depth_leres": ("LeReS-DepthMapPreprocessor",),
+    "normal_midas": ("MiDaS-NormalMapPreprocessor",),
+    "normal_bae": ("BAE-NormalMapPreprocessor",),
+    "normal_dsine": ("DSINE-NormalMapPreprocessor",),
+    "openpose_full": ("OpenposePreprocessor",),
+    "openpose_dw": ("DWPreprocessor",),
+    "openpose_animal": ("AnimalPosePreprocessor",),
+    "openpose_densepose": ("DensePosePreprocessor",),
+    "lineart_anime": ("AnimeLineArtPreprocessor",),
+    "lineart_anime_denoise": ("AnimeLineArtPreprocessor",),
+    "lineart_coarse": ("AnyLineArtPreprocessor_aux",),
+    "lineart_realistic": ("LineArtPreprocessor",),
+    "lineart_standard": ("LineartStandardPreprocessor",),
+    "scribble_xdog": ("Scribble_XDoG_Preprocessor",),
+    "scribble_pidinet": ("Scribble_PiDiNet_Preprocessor",),
+    "scribble_fake": ("FakeScribblePreprocessor",),
+    "segmentation_oneformer_coco": ("OneFormer-COCO-SemSegPreprocessor",),
+    "segmentation_oneformer_ade20k": ("OneFormer-ADE20K-SemSegPreprocessor",),
+    "segmentation_uniformer": ("UniFormer-SemSegPreprocessor",),
+    "segmentation_anime_face": ("AnimeFace_SemSegPreprocessor",),
+    "sketch_scribble": ("ScribblePreprocessor", "Scribble_XDoG_Preprocessor"),
+    "sketch_lineart": ("LineArtPreprocessor",),
+    "sketch_hed": ("HEDPreprocessor",),
+    "softedge_hed": ("HEDPreprocessor",),
+    "softedge_pidinet": ("PiDiNetPreprocessor",),
+    "softedge_teed": ("TEEDPreprocessor",),
+    "tile_simple": ("TTPlanet_TileSimple_Preprocessor",),
+    "tile_gf": ("TTPlanet_TileGF_Preprocessor",),
+}
+
+_PREPROCESSOR_OPTION_ALIASES: dict[str, str] = {
+    "ip_adapter": "ipadapter",
+    "ip-adapter": "ipadapter",
+    "instant_id": "instantid",
+    "instant-id": "instantid",
+    "t2i_adapter": "t2iadapter",
+    "t2i-adapter": "t2iadapter",
+    "normal_map": "normalmap",
+    "openposefull": "openpose_full",
+    "openpose_dwpose": "openpose_dw",
+    "lineart_anime_denoised": "lineart_anime_denoise",
+    "lineartstandard": "lineart_standard",
+    "lineartrealistic": "lineart_realistic",
+    "soft_edge": "softedge",
+}
+
 _PASSTHROUGH_MODULES = {
     "none",
     "reference",
@@ -192,16 +353,31 @@ def runtime_dependencies_available() -> bool:
     return all(dependency is not None for dependency in (np, torch, Image, ImageFilter))
 
 
+def _normalize_module_token(module_value: object) -> str:
+    token = str(module_value or "none").strip().lower()
+    token = re.sub(r"[^a-z0-9]+", "_", token).strip("_")
+    if not token:
+        return "none"
+    return _PREPROCESSOR_OPTION_ALIASES.get(token, token)
+
+
+def normalize_preprocessor_option_key(module_value: object) -> str:
+    token = _normalize_module_token(module_value)
+    if token in _PREPROCESSOR_OPTION_BASE_MODULE:
+        return token
+    return token or "none"
+
+
 def normalize_module_key(module_value: object) -> str:
-    token = str(module_value or "none").strip().lower().replace(" ", "_")
-    token = token.replace("-", "_")
-    aliases = {
-        "ip_adapter": "ipadapter",
-        "instant_id": "instantid",
-        "t2i_adapter": "t2iadapter",
-        "normal_map": "normalmap",
-    }
-    return aliases.get(token, token or "none")
+    option_key = normalize_preprocessor_option_key(module_value)
+    return _PREPROCESSOR_OPTION_BASE_MODULE.get(option_key, option_key or "none")
+
+
+def _resolve_module_dispatch(module_value: object) -> tuple[str, str, tuple[str, ...]]:
+    option_key = normalize_preprocessor_option_key(module_value)
+    module_key = _PREPROCESSOR_OPTION_BASE_MODULE.get(option_key, option_key or "none")
+    preferred_candidates = _PREPROCESSOR_OPTION_PREFERRED_HOST_CANDIDATES.get(option_key, ())
+    return option_key, module_key, preferred_candidates
 
 
 def image_tensor_from_bytes(image_bytes: bytes) -> "torch.Tensor":
@@ -242,7 +418,7 @@ def preprocess_controlnet_tensor(
     mask_tensor: "torch.Tensor | np.ndarray | Image.Image | None" = None,
 ) -> ControlNetRuntimeResult:
     _require_runtime_dependencies()
-    normalized_module = normalize_module_key(module)
+    selected_preprocessor, normalized_module, preferred_host_candidates = _resolve_module_dispatch(module)
     source = _coerce_image_tensor(image_tensor)
     normalized_mask = _coerce_mask_tensor(mask_tensor, image_tensor=source) if mask_tensor is not None else None
     diagnostics: list[str] = []
@@ -263,7 +439,15 @@ def preprocess_controlnet_tensor(
         diagnostics.append("prompt_server_last_prompt_id_shim_applied")
 
     try:
-        host_candidates = _resolve_host_preprocessor_candidates(normalized_module, host_mappings)
+        host_candidates = _resolve_host_preprocessor_candidates(
+            normalized_module,
+            host_mappings,
+            preferred_candidates=preferred_host_candidates,
+        )
+        # DEBUG HOTSPOT: selected preprocessor option -> host candidate binding seam.
+        # If UI selection appears ignored, inspect `selected_preprocessor` and first host candidate here.
+        if selected_preprocessor != normalized_module:
+            diagnostics.append(f"selected_preprocessor:{selected_preprocessor}")
         configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
             normalized_module,
             _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
@@ -752,7 +936,12 @@ def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | 
     return None
 
 
-def _resolve_host_preprocessor_candidates(module_key: str, host_mappings: dict[str, Any]) -> tuple[str, ...]:
+def _resolve_host_preprocessor_candidates(
+    module_key: str,
+    host_mappings: dict[str, Any],
+    *,
+    preferred_candidates: tuple[str, ...] = (),
+) -> tuple[str, ...]:
     ordered: list[str] = []
     seen: set[str] = set()
 
@@ -762,6 +951,8 @@ def _resolve_host_preprocessor_candidates(module_key: str, host_mappings: dict[s
         seen.add(node_name)
         ordered.append(node_name)
 
+    for node_name in preferred_candidates:
+        _push(node_name)
     for node_name in _MODULE_HOST_PREPROCESSOR_CANDIDATES.get(module_key, ()):
         _push(node_name)
     for node_name in _discover_dynamic_host_preprocessors(module_key, host_mappings):

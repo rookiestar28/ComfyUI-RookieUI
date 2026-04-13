@@ -19,7 +19,7 @@ import {
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260413-f93-zoom-sync";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260413-f96-preprocessor-variants";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
 const ROOKIEUI_ASSET_REVISION = "20260413-controlnet-zoom-sync";

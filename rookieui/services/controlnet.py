@@ -18,10 +18,11 @@ from rookieui.services.coercion import (
     coerce_int as _coerce_int,
 )
 from rookieui.services.controlnet_runtime import (
+    CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     image_tensor_from_bytes,
     image_tensor_to_data_url,
     mask_tensor_from_bytes,
-    normalize_module_key,
+    normalize_preprocessor_option_key,
     preprocess_controlnet_tensor,
     runtime_dependencies_available,
 )
@@ -58,27 +59,7 @@ _DEFAULT_RESIZE_MODE = "crop_and_resize"
 _DEFAULT_CONTROL_MODE = "balanced"
 _DEFAULT_HR_OPTION = "both"
 
-_CONTROLNET_BASE_MODULES = (
-    "none",
-    "blur",
-    "canny",
-    "depth",
-    "normalmap",
-    "openpose",
-    "mlsd",
-    "lineart",
-    "scribble",
-    "segmentation",
-    "shuffle",
-    "sketch",
-    "softedge",
-    "reference",
-    "ipadapter",
-    "instantid",
-    "t2iadapter",
-    "tile",
-    "inpaint",
-)
+_CONTROLNET_BASE_MODULES = CONTROLNET_PREPROCESSOR_OPTION_ORDER
 
 _CONTROL_TYPE_MODEL_KEYWORDS: dict[str, tuple[str, ...]] = {
     "All": (),
@@ -235,7 +216,9 @@ def _normalize_module_name(raw_value: object) -> str:
         return ""
     token = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
     token = _CONTROLNET_MODULE_ALIAS_PATCHES.get(token, token)
-    return normalize_module_key(token)
+    # DEBUG HOTSPOT: module token normalization seam for Control-Type-filtered preprocessor variants.
+    # Keep option keys intact here (for UI filtering) and defer base-module collapsing to runtime dispatch.
+    return normalize_preprocessor_option_key(token)
 
 
 def _discover_controlnet_modules() -> list[str]:
