@@ -253,6 +253,37 @@ _MODULE_BOUNDED_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "openpose": ("OpenposePreprocessor", "DWPreprocessor"),
 }
 
+_OPENPOSE_FAMILY_PREPROCESSORS: set[str] = {
+    "openpose",
+    "openpose_full",
+    "openpose_dw",
+    "openpose_animal",
+    "openpose_densepose",
+}
+
+_PREPROCESSOR_OPTION_SKIP_VISUAL_EMPTY_GATE: set[str] = set(_OPENPOSE_FAMILY_PREPROCESSORS)
+
+_PREPROCESSOR_OPTION_HOST_PARAMETER_OVERRIDES: dict[str, dict[str, object]] = {
+    # CRITICAL: Forge/Forge-Neo treat OpenPose-family selections as exact runtime choices.
+    # Keep detect flags aligned with the selected variant instead of letting generic schema defaults
+    # silently collapse all OpenPose-family variants into "full pose" execution.
+    "openpose": {
+        "detect_body": True,
+        "detect_hand": False,
+        "detect_face": False,
+    },
+    "openpose_full": {
+        "detect_body": True,
+        "detect_hand": True,
+        "detect_face": True,
+    },
+    "openpose_dw": {
+        "detect_body": True,
+        "detect_hand": True,
+        "detect_face": True,
+    },
+}
+
 _MODULE_AIO_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "blur": ("ImageIntensityDetector",),
     "canny": ("CannyEdgePreprocessor", "PyraCannyPreprocessor"),
@@ -340,14 +371,13 @@ _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
     # IMPORTANT: keep explicit overrides sparse; default behavior is already single-attempt deterministic probing.
     "depth": 1,
     "normalmap": 1,
-    # IMPORTANT: openpose frequently returns near-empty maps on specific annotator variants.
-    # Probe the full openpose candidate lane before fallback to avoid premature downgrade.
-    "openpose": 4,
+    # IMPORTANT: generic OpenPose keeps a bounded same-family fallback lane for runtime/node-availability failures only.
+    "openpose": 2,
 }
 
 _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT = 1
 ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED"
-_RETRY_ON_NEAR_EMPTY_MODULES: set[str] = {"openpose"}
+_RETRY_ON_NEAR_EMPTY_MODULES: set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -388,6 +418,16 @@ def _resolve_module_dispatch(module_value: object) -> tuple[str, str, tuple[str,
     module_key = _PREPROCESSOR_OPTION_BASE_MODULE.get(option_key, option_key or "none")
     preferred_candidates = _PREPROCESSOR_OPTION_PREFERRED_HOST_CANDIDATES.get(option_key, ())
     return option_key, module_key, preferred_candidates
+
+
+def _resolve_host_parameter_overrides(selected_preprocessor: str) -> dict[str, object]:
+    overrides = _PREPROCESSOR_OPTION_HOST_PARAMETER_OVERRIDES.get(selected_preprocessor, {})
+    return dict(overrides)
+
+
+def _should_skip_visual_empty_gate(selected_preprocessor: str, module_key: str) -> bool:
+    del module_key
+    return selected_preprocessor in _PREPROCESSOR_OPTION_SKIP_VISUAL_EMPTY_GATE
 
 
 def image_tensor_from_bytes(image_bytes: bytes) -> "torch.Tensor":
@@ -457,16 +497,13 @@ def preprocess_controlnet_tensor(
             host_mappings,
             preferred_candidates=preferred_host_candidates,
         )
-        # DEBUG HOTSPOT: selected preprocessor option -> host candidate binding seam.
-        # If UI selection appears ignored, inspect `selected_preprocessor` and first host candidate here.
+        skip_visual_empty_gate = _should_skip_visual_empty_gate(selected_preprocessor, normalized_module)
         if selected_preprocessor != normalized_module:
             diagnostics.append(f"selected_preprocessor:{selected_preprocessor}")
         configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
             normalized_module,
             _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
         )
-        # DEBUG HOTSPOT: enforce single-attempt deterministic probing across all modules to avoid cross-family
-        # annotator side effects (unexpected model bootstrap/download) when host preprocessor chains fan out.
         host_probe_limit = max(0, int(configured_probe_limit))
         host_probe_attempts = 0
         for node_name in host_candidates:
@@ -480,6 +517,7 @@ def preprocess_controlnet_tensor(
                 processed = _run_host_node_preprocessor(
                     node_name=node_name,
                     node_cls=host_mappings[node_name],
+                    selected_preprocessor=selected_preprocessor,
                     image_tensor=source,
                     mask_tensor=normalized_mask,
                     module_key=normalized_module,
@@ -488,12 +526,10 @@ def preprocess_controlnet_tensor(
                     threshold_b=threshold_b,
                     aio_preprocessor_name=None,
                 )
-                # DEBUG HOTSPOT: host execution succeeded but visual result may still be effectively blank.
-                # Mark this seam explicitly so detect-layer warnings can distinguish "pipeline failure" vs "empty detection result".
-                if _is_visually_empty_image_tensor(processed):
+                # IMPORTANT: exact OpenPose-family execution follows Forge-style success semantics.
+                # Sparse pose maps are valid outputs and must not be rejected by a generic pixel-density heuristic.
+                if not skip_visual_empty_gate and _is_visually_empty_image_tensor(processed):
                     diagnostics.append(f"{node_name}:output_near_empty")
-                    # DEBUG HOTSPOT: openpose near-empty previews (solid black lane) are typically unusable to users.
-                    # Retry alternate host candidates before returning, then fallback if all candidates stay near-empty.
                     if normalized_module in _RETRY_ON_NEAR_EMPTY_MODULES:
                         continue
                 return ControlNetRuntimeResult(
@@ -520,6 +556,7 @@ def preprocess_controlnet_tensor(
                         processed = _run_host_node_preprocessor(
                             node_name="AIO_Preprocessor",
                             node_cls=aio_cls,
+                            selected_preprocessor=selected_preprocessor,
                             image_tensor=source,
                             mask_tensor=normalized_mask,
                             module_key=normalized_module,
@@ -528,8 +565,7 @@ def preprocess_controlnet_tensor(
                             threshold_b=threshold_b,
                             aio_preprocessor_name=aio_name,
                         )
-                        # DEBUG HOTSPOT: same near-empty visibility check for AIO branch; keep diagnostics symmetric with direct-host branch.
-                        if _is_visually_empty_image_tensor(processed):
+                        if not skip_visual_empty_gate and _is_visually_empty_image_tensor(processed):
                             diagnostics.append(f"AIO_Preprocessor({aio_name}):output_near_empty")
                             if normalized_module not in _RETRY_ON_NEAR_EMPTY_MODULES:
                                 return ControlNetRuntimeResult(
@@ -550,12 +586,10 @@ def preprocess_controlnet_tensor(
                     except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                         diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
         else:
-            # DEBUG HOTSPOT: keep AIO gating explicit; querying AIO INPUT_TYPES can trigger broad annotator enumeration.
+            # IMPORTANT: keep AIO gating explicit; probing AIO schemas may enumerate unrelated annotators.
             diagnostics.append("aio_preprocessor_disabled")
 
         if diagnostics:
-            # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
-            # before fallback so we can pinpoint over-eager node probing without reproducing full host bootstrap logs.
             _LOGGER.warning(
                 "RookieUI ControlNet host preprocessor chain exhausted (module=%s): %s",
                 normalized_module,
@@ -572,8 +606,8 @@ def preprocess_controlnet_tensor(
         return ControlNetRuntimeResult(
             image=fallback,
             backend="rookieui_internal_fallback",
-            # DEBUG HOTSPOT: preserve user-selected variant token for fallback diagnostics/UX messaging.
-            # Collapsing to base module (e.g. openpose) hides the requested variant (e.g. openpose_animal).
+            # IMPORTANT: preserve the selected variant token in fallback results.
+            # Collapsing to the base module hides which explicit annotator the user asked for.
             processor_name=selected_preprocessor,
             used_fallback=True,
             diagnostics=tuple(diagnostics),
@@ -623,8 +657,8 @@ def _ensure_prompt_server_last_prompt_id(server_instance: Any) -> tuple[bool, st
     if server_instance is None or hasattr(server_instance, "last_prompt_id"):
         return False, ""
     synthetic_prompt_id = f"rookieui-controlnet-detect-{int(time.time() * 1000)}"
-    # DEBUG HOTSPOT: some host preprocessors read PromptServer.instance.last_prompt_id even outside queued prompt
-    # execution. Provide a scoped compatibility shim to keep detect routes host-compatible.
+    # IMPORTANT: some host preprocessors read PromptServer.instance.last_prompt_id outside queued execution.
+    # Keep this shim scoped so detect routes stay host-compatible without leaking synthetic prompt ids.
     try:
         setattr(server_instance, "last_prompt_id", synthetic_prompt_id)
     except Exception:
@@ -693,8 +727,8 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
     if tensor.shape[-1] == 4:
         rgb = tensor[:, :, :, :3]
         alpha = tensor[:, :, :, 3:4]
-        # DEBUG HOTSPOT: some host preprocessors emit annotation strokes via alpha-only RGBA payloads.
-        # Preserve visual content by promoting alpha matte to RGB when color channels are effectively empty.
+        # IMPORTANT: some host preprocessors emit alpha-only annotation strokes.
+        # Promote the matte to RGB so valid previews are not discarded as empty color payloads.
         if float(rgb.abs().max().item()) <= 1e-6 and float(alpha.abs().max().item()) > 1e-6:
             tensor = alpha.repeat(1, 1, 1, 3)
         else:
@@ -705,8 +739,8 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
 
 
 def _is_visually_empty_image_tensor(image_tensor: "torch.Tensor", *, pixel_threshold: float = 0.01, ratio_threshold: float = 0.0005) -> bool:
-    # DEBUG HOTSPOT: visual-emptiness heuristic seam for preprocess outputs.
-    # Tune thresholds here when users report "completed but black preview" cases with host preprocessors.
+    # IMPORTANT: this heuristic is only safe for dense-map preprocessors.
+    # OpenPose-family outputs bypass it because sparse skeleton maps are valid non-empty results.
     normalized = _coerce_image_tensor(image_tensor)
     if normalized.shape[0] == 0:
         return True
@@ -813,6 +847,7 @@ def _resolve_node_function(instance: Any) -> Any:
 def _build_node_parameter_value(
     parameter_name: str,
     *,
+    host_parameter_overrides: dict[str, object],
     image_tensor: "torch.Tensor",
     mask_tensor: "torch.Tensor | None",
     processor_res: int,
@@ -821,6 +856,8 @@ def _build_node_parameter_value(
     aio_preprocessor_name: str | None,
 ) -> object:
     key = str(parameter_name or "").strip()
+    if key in host_parameter_overrides:
+        return host_parameter_overrides[key]
     if key == "image":
         return image_tensor
     if key == "mask":
@@ -872,6 +909,7 @@ def _run_host_node_preprocessor(
     *,
     node_name: str,
     node_cls: type[Any],
+    selected_preprocessor: str,
     image_tensor: "torch.Tensor",
     mask_tensor: "torch.Tensor | None",
     module_key: str,
@@ -882,10 +920,12 @@ def _run_host_node_preprocessor(
 ) -> "torch.Tensor":
     required_schema, optional_schema = _extract_node_input_schema(node_cls)
     inputs: dict[str, object] = {}
+    host_parameter_overrides = _resolve_host_parameter_overrides(selected_preprocessor)
 
     for required_name, required_spec in required_schema.items():
         resolved = _build_node_parameter_value(
             str(required_name),
+            host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
             processor_res=processor_res,
@@ -904,6 +944,7 @@ def _run_host_node_preprocessor(
     for optional_name in optional_schema.keys():
         resolved = _build_node_parameter_value(
             str(optional_name),
+            host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
             processor_res=processor_res,
@@ -919,7 +960,6 @@ def _run_host_node_preprocessor(
     if function is None:
         raise RuntimeError(f"{node_name} does not expose an invokable function.")
 
-    # DEBUG HOTSPOT: this invocation is the exact seam where host-runtime preprocessor classes differ by signature.
     result = function(**inputs)
     primary = _extract_primary_node_output_payload(result)
     return _coerce_image_tensor(primary)
@@ -975,7 +1015,6 @@ def _select_aio_preprocessor_name(
 
     ranked = _rank_preprocessor_choices_by_keywords(choices, _MODULE_AIO_KEYWORDS.get(module_key, ()))
     if ranked:
-        # DEBUG HOTSPOT: if AIO choice differs from expected Forge-like defaults, inspect keyword ranking behavior at this seam.
         return ranked[0]
     return None
 
@@ -1151,9 +1190,9 @@ def _apply_fallback_module_filter(
     if module_key in _PASSTHROUGH_MODULES or module_key in {"tile", "inpaint", "shuffle"}:
         return image_obj.convert("RGB")
     if module_key in {"openpose"}:
-        # DEBUG HOTSPOT: do not approximate openpose fallback with edge maps.
-        # Edge fallback is visually similar to lineart and misleads users about pose-detect success.
-        return image_obj.convert("RGB")
+        # IMPORTANT: OpenPose-family host failure must not masquerade as a successful source-image preview.
+        # Return a blank control map instead of echoing the input image.
+        return Image.new("RGB", image_obj.size, color=(0, 0, 0))
     if module_key in {"depth", "normalmap", "segmentation"}:
         return image_obj.convert("L").convert("RGB")
     if module_key in {"blur"}:
