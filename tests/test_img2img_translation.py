@@ -589,6 +589,38 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("CLIPTextEncode", class_types)
         self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
 
+    def test_translate_img2img_request_uses_a1111_text_encode_node_for_sdxl(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "fashion editorial [sunny:storm:0.5]",
+                "profile": "pony",
+                "image_asset": "pony-input",
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertIn("RookieUIA1111TextEncodeSDXL", class_types)
+        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
+        self.assertNotIn("ConditioningSetTimestepRange", class_types)
+
+    def test_translate_img2img_request_uses_legacy_roll_back_switch_for_sdxl(self) -> None:
+        with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "fashion editorial [sunny:storm:0.5]",
+                    "profile": "pony",
+                    "image_asset": "pony-input",
+                }
+            )
+            result = translate_img2img_request(normalized).to_payload()
+
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertNotIn("RookieUIA1111TextEncodeSDXL", class_types)
+        self.assertIn("CLIPTextEncodeSDXL", class_types)
+        self.assertNotIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
+
     def test_translate_img2img_request_builds_sdxl_img2img_workflow(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -601,7 +633,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         result = translate_img2img_request(normalized).to_payload()
 
         self.assertEqual(result["workflow_kind"], "img2img-sdxl")
-        self.assertEqual(result["workflow"]["2"]["class_type"], "CLIPTextEncodeSDXL")
+        self.assertEqual(result["workflow"]["2"]["class_type"], "RookieUIA1111TextEncodeSDXL")
         self.assertEqual(result["workflow"]["4"]["class_type"], "RookieUILoadAssetImage")
         sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
         self.assertEqual(len(sampler_nodes), 1)
@@ -624,12 +656,17 @@ class Img2ImgTranslationTests(unittest.TestCase):
         result = translate_img2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
         sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
+        prompt_nodes = [
+            node for node in result["workflow"].values() if node["class_type"] == "RookieUIA1111TextEncodeSDXL"
+        ]
 
         self.assertEqual(result["workflow_kind"], "img2img-sdxl-hires")
-        self.assertIn("CLIPTextEncodeSDXL", class_types)
+        self.assertIn("RookieUIA1111TextEncodeSDXL", class_types)
         self.assertIn("LatentUpscaleBy", class_types)
         self.assertEqual(len(sampler_nodes), 2)
-        self.assertNotIn("RookieUIA1111TextEncode", class_types)
+        self.assertEqual(len(prompt_nodes), 4)
+        self.assertEqual(sorted(node["inputs"]["steps"] for node in prompt_nodes), [12, 12, 28, 28])
+        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
 
     def test_translate_img2img_request_applies_resize_mode_nodes(self) -> None:
         normalized = normalize_img2img_request(

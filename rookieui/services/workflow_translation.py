@@ -221,6 +221,37 @@ def _append_rookieui_a1111_text_encode_node(
     return node_id
 
 
+def _append_rookieui_a1111_text_encode_sdxl_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    clip_source: list[object],
+    text: str,
+    width: int,
+    height: int,
+    steps: int,
+) -> str:
+    resolved_width = int(width or 1024)
+    resolved_height = int(height or 1024)
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "RookieUIA1111TextEncodeSDXL",
+        "inputs": {
+            "clip": clip_source,
+            "width": resolved_width,
+            "height": resolved_height,
+            "crop_w": 0,
+            "crop_h": 0,
+            "target_width": resolved_width,
+            "target_height": resolved_height,
+            "text_g": text,
+            "text_l": text,
+            "steps": max(int(steps), 1),
+        },
+    }
+    return node_id
+
+
 def _append_conditioning_range_node(
     workflow: dict[str, object],
     *,
@@ -459,8 +490,31 @@ def _build_sdxl_conditioning(
     width: int,
     height: int,
     clip_source: list[object],
+    steps: int | None = None,
 ) -> tuple[str, str]:
     prompt_encoder_mode = _resolve_conditioning_prompt_encoder(request)
+    resolved_steps = int(request.steps if steps is None else steps)
+    if prompt_encoder_mode == "sdxl" and not _is_legacy_prompt_dsl_enabled():
+        return (
+            _append_rookieui_a1111_text_encode_sdxl_node(
+                workflow,
+                allocator=allocator,
+                clip_source=clip_source,
+                text=request.prompt,
+                width=width,
+                height=height,
+                steps=resolved_steps,
+            ),
+            _append_rookieui_a1111_text_encode_sdxl_node(
+                workflow,
+                allocator=allocator,
+                clip_source=clip_source,
+                text=request.negative_prompt,
+                width=width,
+                height=height,
+                steps=resolved_steps,
+            ),
+        )
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,
         allocator=allocator,
@@ -957,6 +1011,18 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            width=request.width,
+            height=request.height,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -966,6 +1032,18 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     latent_id = allocator.next()
     workflow[latent_id] = {
         "class_type": "EmptyLatentImage",
@@ -1003,8 +1081,8 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1167,6 +1245,18 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            width=request.width,
+            height=request.height,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1176,6 +1266,18 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1237,8 +1339,8 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1425,6 +1527,18 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            width=request.width,
+            height=request.height,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1434,6 +1548,18 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1521,8 +1647,8 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
