@@ -23,6 +23,7 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
+from rookieui.services.a1111_conditioning import build_a1111_conditioning
 from rookieui.services.controlnet_runtime import (
     CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     normalize_module_key,
@@ -296,6 +297,30 @@ class RookieUIControlNetPreprocess:
         return (output,)
 
 
+class RookieUIA1111TextEncode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "clip": ("CLIP",),
+                "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
+            },
+        }
+
+    CATEGORY = "RookieUI/conditioning"
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "encode"
+
+    def encode(self, text, clip, steps=20):
+        if clip is None:
+            raise RuntimeError(
+                "ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model."
+            )
+        # CRITICAL: keep SD15 prompt semantics at the CLIP boundary here; reverting SD-family exact paths to graph-only ConditioningCombine nodes reopens BREAK/schedule drift.
+        return (build_a1111_conditioning(clip, str(text), steps=int(steps)),)
+
+
 class RookieUIVAEEncodeForInpaint:
     _masked_content_modes = ("fill", "original", "latent_noise", "latent_nothing")
 
@@ -460,6 +485,7 @@ NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
+    "RookieUIA1111TextEncode": RookieUIA1111TextEncode,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
 
@@ -467,5 +493,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
+    "RookieUIA1111TextEncode": "RookieUI A1111 Text Encode",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }
