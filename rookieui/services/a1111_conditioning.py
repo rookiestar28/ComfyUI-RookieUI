@@ -30,6 +30,18 @@ def _resolve_single_clip_tokenizer(clip: object) -> tuple[str, Any]:
     return resolved_clip_name, inner
 
 
+def _resolve_sdxl_clip_tokenizers(clip: object) -> tuple[Any, Any]:
+    tokenizer = getattr(clip, "tokenizer", None)
+    if tokenizer is None:
+        raise ValueError("A1111 SDXL conditioning node requires a CLIP object with a tokenizer.")
+
+    inner_l = getattr(tokenizer, "clip_l", None)
+    inner_g = getattr(tokenizer, "clip_g", None)
+    if inner_l is None or inner_g is None:
+        raise ValueError("A1111 SDXL conditioning node requires dual-tokenizer CLIP inputs.")
+    return inner_l, inner_g
+
+
 def _pad_batch(batch: list[tuple[object, float]], inner_tokenizer: Any, amount: int) -> None:
     if amount <= 0:
         return
@@ -85,8 +97,7 @@ def _tokenize_segment_text(inner_tokenizer: Any, segment_text: str, weight: floa
     return token_groups
 
 
-def _build_single_encoder_tokens(clip: object, prompt_text: str) -> dict[str, list[list[tuple[object, float]]]]:
-    clip_name, inner_tokenizer = _resolve_single_clip_tokenizer(clip)
+def _build_token_batches(inner_tokenizer: Any, prompt_text: str) -> list[list[tuple[object, float]]]:
     parsed = parse_prompt_attention(prompt_text)
 
     max_length = int(getattr(inner_tokenizer, "max_length", 77))
@@ -151,13 +162,32 @@ def _build_single_encoder_tokens(clip: object, prompt_text: str) -> dict[str, li
             _pad_batch(empty_batch, inner_tokenizer, max_length - len(empty_batch))
         batches.append(empty_batch)
 
-    return {clip_name: batches}
+    return batches
 
 
-def build_a1111_conditioning(clip: object, prompt_text: str, *, steps: int) -> list[list[object]]:
+def _build_single_encoder_tokens(clip: object, prompt_text: str) -> dict[str, list[list[tuple[object, float]]]]:
+    clip_name, inner_tokenizer = _resolve_single_clip_tokenizer(clip)
+    return {clip_name: _build_token_batches(inner_tokenizer, prompt_text)}
+
+
+def _build_sdxl_tokens(clip: object, text_g: str, text_l: str) -> dict[str, list[list[tuple[object, float]]]]:
+    inner_l, inner_g = _resolve_sdxl_clip_tokenizers(clip)
+    g_batches = _build_token_batches(inner_g, text_g)
+    l_batches = _build_token_batches(inner_l, text_l)
+    empty_g = list(_build_token_batches(inner_g, "")[0])
+    empty_l = list(_build_token_batches(inner_l, "")[0])
+
+    while len(l_batches) < len(g_batches):
+        l_batches.append(list(empty_l))
+    while len(g_batches) < len(l_batches):
+        g_batches.append(list(empty_g))
+
+    return {"g": g_batches, "l": l_batches}
+
+
+def _build_weighted_schedule_segments(prompt_text: str, *, steps: int) -> list[dict[str, object]]:
     resolved_steps = max(int(steps), 1)
-    output: list[list[object]] = []
-
+    output: list[dict[str, object]] = []
     for branch in split_weighted_subprompts(prompt_text):
         branch_text = branch.text
         branch_weight = branch.weight
@@ -167,18 +197,84 @@ def build_a1111_conditioning(clip: object, prompt_text: str, *, steps: int) -> l
             schedule_end = schedule.end_at_step
             schedule_text = schedule.text
             normalized_end = max(schedule_start + 1, int(schedule_end))
-            encoded = clip.encode_from_tokens(
-                _build_single_encoder_tokens(clip, schedule_text),
-                return_pooled=True,
-                return_dict=True,
+            output.append(
+                {
+                    "text": schedule_text,
+                    "start_percent": round(float(schedule_start) / float(resolved_steps), 6),
+                    "end_percent": round(float(min(resolved_steps, normalized_end)) / float(resolved_steps), 6),
+                    "weight": float(branch_weight),
+                }
             )
-            cond = encoded.pop("cond")
-            metadata = dict(encoded)
-            metadata["start_percent"] = round(float(schedule_start) / float(resolved_steps), 6)
-            metadata["end_percent"] = round(float(min(resolved_steps, normalized_end)) / float(resolved_steps), 6)
-            if abs(float(branch_weight) - _DEFAULT_BRANCH_WEIGHT) > 1e-6:
-                metadata["weight"] = float(branch_weight)
-            output.append([cond, metadata])
             schedule_start = normalized_end
+    return output
+
+
+def build_a1111_conditioning(clip: object, prompt_text: str, *, steps: int) -> list[list[object]]:
+    output: list[list[object]] = []
+    for segment in _build_weighted_schedule_segments(prompt_text, steps=steps):
+        encoded = clip.encode_from_tokens(
+            _build_single_encoder_tokens(clip, str(segment["text"])),
+            return_pooled=True,
+            return_dict=True,
+        )
+        cond = encoded.pop("cond")
+        metadata = dict(encoded)
+        metadata["start_percent"] = float(segment["start_percent"])
+        metadata["end_percent"] = float(segment["end_percent"])
+        if abs(float(segment["weight"]) - _DEFAULT_BRANCH_WEIGHT) > 1e-6:
+            metadata["weight"] = float(segment["weight"])
+        output.append([cond, metadata])
+
+    return output
+
+
+def build_a1111_conditioning_sdxl(
+    clip: object,
+    *,
+    text_g: str,
+    text_l: str,
+    steps: int,
+    width: int,
+    height: int,
+    crop_w: int = 0,
+    crop_h: int = 0,
+    target_width: int | None = None,
+    target_height: int | None = None,
+) -> list[list[object]]:
+    segments_g = _build_weighted_schedule_segments(text_g, steps=steps)
+    segments_l = _build_weighted_schedule_segments(text_l, steps=steps)
+    if len(segments_g) != len(segments_l):
+        raise ValueError("A1111 SDXL conditioning currently requires matching prompt schedule structure for text_g/text_l.")
+
+    output: list[list[object]] = []
+    resolved_target_width = int(width if target_width is None else target_width)
+    resolved_target_height = int(height if target_height is None else target_height)
+    for index, segment_g in enumerate(segments_g):
+        segment_l = segments_l[index]
+        if (
+            float(segment_g["start_percent"]) != float(segment_l["start_percent"])
+            or float(segment_g["end_percent"]) != float(segment_l["end_percent"])
+            or abs(float(segment_g["weight"]) - float(segment_l["weight"])) > 1e-6
+        ):
+            raise ValueError("A1111 SDXL conditioning requires aligned schedule windows and branch weights for text_g/text_l.")
+
+        encoded = clip.encode_from_tokens(
+            _build_sdxl_tokens(clip, str(segment_g["text"]), str(segment_l["text"])),
+            return_pooled=True,
+            return_dict=True,
+        )
+        cond = encoded.pop("cond")
+        metadata = dict(encoded)
+        metadata["width"] = int(width)
+        metadata["height"] = int(height)
+        metadata["crop_w"] = int(crop_w)
+        metadata["crop_h"] = int(crop_h)
+        metadata["target_width"] = resolved_target_width
+        metadata["target_height"] = resolved_target_height
+        metadata["start_percent"] = float(segment_g["start_percent"])
+        metadata["end_percent"] = float(segment_g["end_percent"])
+        if abs(float(segment_g["weight"]) - _DEFAULT_BRANCH_WEIGHT) > 1e-6:
+            metadata["weight"] = float(segment_g["weight"])
+        output.append([cond, metadata])
 
     return output

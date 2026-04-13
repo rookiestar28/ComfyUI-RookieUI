@@ -53,6 +53,26 @@ class RookieUINodesTests(unittest.TestCase):
                 "pooled_output": "fake-pooled",
             }
 
+    class _FakeSDXLTokenizer:
+        def __init__(self) -> None:
+            self.clip_l = RookieUINodesTests._FakeInnerTokenizer()
+            self.clip_g = RookieUINodesTests._FakeInnerTokenizer()
+
+    class _FakeSDXLClip:
+        def __init__(self) -> None:
+            self.tokenizer = RookieUINodesTests._FakeSDXLTokenizer()
+
+        def encode_from_tokens(
+            self,
+            tokens,
+            return_pooled=True,
+            return_dict=True,
+        ) -> dict[str, object]:
+            return {
+                "cond": {"tokens": tokens},
+                "pooled_output": "fake-sdxl-pooled",
+            }
+
     def test_load_asset_mask_validate_inputs_accepts_partial_signature(self) -> None:
         with mock.patch.object(nodes, "resolve_asset_path", return_value=Path("C:/tmp/mask.png")):
             result = nodes.RookieUILoadAssetMask.VALIDATE_INPUTS("mask_asset.png")
@@ -85,6 +105,9 @@ class RookieUINodesTests(unittest.TestCase):
     def test_a1111_text_encode_node_is_registered(self) -> None:
         self.assertIn("RookieUIA1111TextEncode", nodes.NODE_CLASS_MAPPINGS)
 
+    def test_a1111_text_encode_sdxl_node_is_registered(self) -> None:
+        self.assertIn("RookieUIA1111TextEncodeSDXL", nodes.NODE_CLASS_MAPPINGS)
+
     def test_a1111_text_encode_node_keeps_break_as_tokenizer_chunk_boundary(self) -> None:
         conditioning, = nodes.RookieUIA1111TextEncode().encode(
             text="hero BREAK villain",
@@ -113,6 +136,49 @@ class RookieUINodesTests(unittest.TestCase):
         self.assertEqual(conditioning[2][1]["start_percent"], 0.5)
         self.assertEqual(conditioning[2][1]["end_percent"], 1.0)
         self.assertEqual(conditioning[2][1]["weight"], 0.7)
+
+    def test_a1111_text_encode_sdxl_node_keeps_break_as_dual_tokenizer_chunk_boundary(self) -> None:
+        conditioning, = nodes.RookieUIA1111TextEncodeSDXL().encode(
+            clip=self._FakeSDXLClip(),
+            width=1024,
+            height=1024,
+            crop_w=0,
+            crop_h=0,
+            target_width=1024,
+            target_height=1024,
+            text_g="hero BREAK villain",
+            text_l="hero BREAK villain",
+            steps=10,
+        )
+
+        self.assertEqual(len(conditioning), 1)
+        token_batches = conditioning[0][0]["tokens"]
+        self.assertEqual(len(token_batches["l"]), 2)
+        self.assertEqual(len(token_batches["g"]), 2)
+
+    def test_a1111_text_encode_sdxl_node_emits_schedule_and_size_metadata(self) -> None:
+        conditioning, = nodes.RookieUIA1111TextEncodeSDXL().encode(
+            clip=self._FakeSDXLClip(),
+            width=1152,
+            height=896,
+            crop_w=0,
+            crop_h=0,
+            target_width=1152,
+            target_height=896,
+            text_g="hero AND villain [soft:sharp:0.5]:0.7",
+            text_l="hero AND villain [soft:sharp:0.5]:0.7",
+            steps=10,
+        )
+
+        self.assertEqual(len(conditioning), 3)
+        self.assertEqual(conditioning[0][1]["pooled_output"], "fake-sdxl-pooled")
+        self.assertEqual(conditioning[0][1]["width"], 1152)
+        self.assertEqual(conditioning[0][1]["height"], 896)
+        self.assertEqual(conditioning[0][1]["target_width"], 1152)
+        self.assertEqual(conditioning[0][1]["target_height"], 896)
+        self.assertEqual(conditioning[1][1]["start_percent"], 0.0)
+        self.assertEqual(conditioning[1][1]["end_percent"], 0.5)
+        self.assertEqual(conditioning[1][1]["weight"], 0.7)
 
     def test_controlnet_preprocess_applies_mask_when_enabled(self) -> None:
         if nodes.torch is None:

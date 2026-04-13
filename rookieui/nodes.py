@@ -23,7 +23,10 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
-from rookieui.services.a1111_conditioning import build_a1111_conditioning
+from rookieui.services.a1111_conditioning import (
+    build_a1111_conditioning,
+    build_a1111_conditioning_sdxl,
+)
 from rookieui.services.controlnet_runtime import (
     CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     normalize_module_key,
@@ -321,6 +324,50 @@ class RookieUIA1111TextEncode:
         return (build_a1111_conditioning(clip, str(text), steps=int(steps)),)
 
 
+class RookieUIA1111TextEncodeSDXL:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "clip": ("CLIP",),
+                "width": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
+                "height": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
+                "crop_w": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION}),
+                "crop_h": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION}),
+                "target_width": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
+                "target_height": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
+                "text_g": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "text_l": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
+            },
+        }
+
+    CATEGORY = "RookieUI/conditioning"
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "encode"
+
+    def encode(self, clip, width, height, crop_w, crop_h, target_width, target_height, text_g, text_l, steps=20):
+        if clip is None:
+            raise RuntimeError(
+                "ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model."
+            )
+        # CRITICAL: preserve SDXL dual-encoder ownership at the tokenizer boundary here; dropping back to graph-only CLIPTextEncodeSDXL expansion loses A1111 BREAK/schedule parity while hiding pooled-output coupling.
+        return (
+            build_a1111_conditioning_sdxl(
+                clip,
+                text_g=str(text_g),
+                text_l=str(text_l),
+                steps=int(steps),
+                width=int(width),
+                height=int(height),
+                crop_w=int(crop_w),
+                crop_h=int(crop_h),
+                target_width=int(target_width),
+                target_height=int(target_height),
+            ),
+        )
+
+
 class RookieUIVAEEncodeForInpaint:
     _masked_content_modes = ("fill", "original", "latent_noise", "latent_nothing")
 
@@ -486,6 +533,7 @@ NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
     "RookieUIA1111TextEncode": RookieUIA1111TextEncode,
+    "RookieUIA1111TextEncodeSDXL": RookieUIA1111TextEncodeSDXL,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
 
@@ -494,5 +542,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
     "RookieUIA1111TextEncode": "RookieUI A1111 Text Encode",
+    "RookieUIA1111TextEncodeSDXL": "RookieUI A1111 Text Encode SDXL",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }
