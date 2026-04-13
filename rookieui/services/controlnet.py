@@ -688,6 +688,20 @@ def _normalize_detect_masks(payload: dict[str, object], *, image_count: int) -> 
     return masks
 
 
+def _runtime_result_has_final_near_empty_output(runtime_result: Any) -> bool:
+    # IMPORTANT: only the final returned processor may surface EMPTY_OUTPUT.
+    # Earlier near-empty probe attempts are diagnostic breadcrumbs, not user-facing final-state warnings.
+    if runtime_result is None or bool(getattr(runtime_result, "used_fallback", False)):
+        return False
+    processor_name = str(getattr(runtime_result, "processor_name", "") or "").strip()
+    if not processor_name:
+        return False
+    diagnostics = [str(entry) for entry in getattr(runtime_result, "diagnostics", ()) if str(entry).strip()]
+    direct_marker = f"{processor_name}:output_near_empty"
+    aio_marker = f"AIO_Preprocessor({processor_name}):output_near_empty"
+    return direct_marker in diagnostics or aio_marker in diagnostics
+
+
 def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError("ControlNet detect payload must be an object.")
@@ -784,7 +798,7 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
             if runtime_result.used_fallback:
                 fallback_used = True
                 fallback_diagnostics.extend(list(runtime_result.diagnostics))
-            else:
+            elif _runtime_result_has_final_near_empty_output(runtime_result):
                 # DEBUG HOTSPOT: successful-host-but-empty-output seam; this isolates black/blank previews
                 # that are not runtime failures and should surface as targeted warnings.
                 near_empty_diagnostics.extend(

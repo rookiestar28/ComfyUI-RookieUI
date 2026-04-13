@@ -247,6 +247,12 @@ _MODULE_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "inpaint": ("InpaintPreprocessor",),
 }
 
+_MODULE_BOUNDED_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
+    # CRITICAL: generic OpenPose must not silently drift into Animal/DensePose lanes.
+    # Those outputs are semantically different enough to mislead users when they selected plain OpenPose.
+    "openpose": ("OpenposePreprocessor", "DWPreprocessor"),
+}
+
 _MODULE_AIO_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "blur": ("ImageIntensityDetector",),
     "canny": ("CannyEdgePreprocessor", "PyraCannyPreprocessor"),
@@ -334,9 +340,9 @@ _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
     # IMPORTANT: keep explicit overrides sparse; default behavior is already single-attempt deterministic probing.
     "depth": 1,
     "normalmap": 1,
-    # IMPORTANT: allow one additional host attempt for openpose so near-empty first-pass outputs can retry
-    # on an alternate pose annotator before declaring fallback.
-    "openpose": 2,
+    # IMPORTANT: openpose frequently returns near-empty maps on specific annotator variants.
+    # Probe the full openpose candidate lane before fallback to avoid premature downgrade.
+    "openpose": 4,
 }
 
 _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT = 1
@@ -422,6 +428,8 @@ def preprocess_controlnet_tensor(
     mask_tensor: "torch.Tensor | np.ndarray | Image.Image | None" = None,
 ) -> ControlNetRuntimeResult:
     _require_runtime_dependencies()
+    # CRITICAL: keep the explicit preprocessor option alive through runtime dispatch.
+    # Collapsing too early to the base module let OpenPose-family variants drift into sibling annotators.
     selected_preprocessor, normalized_module, preferred_host_candidates = _resolve_module_dispatch(module)
     source = _coerce_image_tensor(image_tensor)
     normalized_mask = _coerce_mask_tensor(mask_tensor, image_tensor=source) if mask_tensor is not None else None
@@ -444,6 +452,7 @@ def preprocess_controlnet_tensor(
 
     try:
         host_candidates = _resolve_host_preprocessor_candidates(
+            selected_preprocessor,
             normalized_module,
             host_mappings,
             preferred_candidates=preferred_host_candidates,
@@ -501,7 +510,11 @@ def preprocess_controlnet_tensor(
         if _is_aio_preprocessor_enabled():
             aio_cls = host_mappings.get("AIO_Preprocessor")
             if aio_cls is not None:
-                aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
+                aio_name = _select_aio_preprocessor_name(
+                    aio_cls,
+                    normalized_module,
+                    selected_preprocessor=selected_preprocessor,
+                )
                 if aio_name:
                     try:
                         processed = _run_host_node_preprocessor(
@@ -559,7 +572,9 @@ def preprocess_controlnet_tensor(
         return ControlNetRuntimeResult(
             image=fallback,
             backend="rookieui_internal_fallback",
-            processor_name=normalized_module,
+            # DEBUG HOTSPOT: preserve user-selected variant token for fallback diagnostics/UX messaging.
+            # Collapsing to base module (e.g. openpose) hides the requested variant (e.g. openpose_animal).
+            processor_name=selected_preprocessor,
             used_fallback=True,
             diagnostics=tuple(diagnostics),
         )
@@ -933,11 +948,23 @@ def _extract_primary_node_output_payload(result: object) -> object:
     raise RuntimeError("Unable to resolve host preprocessor image payload.")
 
 
-def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | None:
+def _select_aio_preprocessor_name(
+    aio_cls: type[Any],
+    module_key: str,
+    *,
+    selected_preprocessor: str | None = None,
+) -> str | None:
     required_schema, optional_schema = _extract_node_input_schema(aio_cls)
     _ = required_schema
     choices = _extract_aio_preprocessor_choices(optional_schema.get("preprocessor"))
     if not choices:
+        return None
+
+    normalized_selected = normalize_preprocessor_option_key(selected_preprocessor or module_key)
+    if normalized_selected != module_key:
+        for choice in choices:
+            if normalize_preprocessor_option_key(choice) == normalized_selected:
+                return choice
         return None
 
     for candidate in _MODULE_AIO_PREPROCESSOR_CANDIDATES.get(module_key, ()):
@@ -954,11 +981,21 @@ def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | 
 
 
 def _resolve_host_preprocessor_candidates(
+    selected_preprocessor: str,
     module_key: str,
     host_mappings: dict[str, Any],
     *,
     preferred_candidates: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
+    if preferred_candidates and selected_preprocessor != module_key:
+        # CRITICAL: explicit preprocessor variants must stay variant-stable.
+        # If the selected annotator is unavailable or returns unusable output, fallback should be explicit rather than silently drifting into sibling variants.
+        return tuple(dict.fromkeys(preferred_candidates))
+
+    bounded_candidates = _MODULE_BOUNDED_HOST_PREPROCESSOR_CANDIDATES.get(module_key)
+    if bounded_candidates:
+        return tuple(dict.fromkeys(bounded_candidates))
+
     ordered: list[str] = []
     seen: set[str] = set()
 
@@ -1113,11 +1150,15 @@ def _apply_fallback_module_filter(
     del threshold_b
     if module_key in _PASSTHROUGH_MODULES or module_key in {"tile", "inpaint", "shuffle"}:
         return image_obj.convert("RGB")
+    if module_key in {"openpose"}:
+        # DEBUG HOTSPOT: do not approximate openpose fallback with edge maps.
+        # Edge fallback is visually similar to lineart and misleads users about pose-detect success.
+        return image_obj.convert("RGB")
     if module_key in {"depth", "normalmap", "segmentation"}:
         return image_obj.convert("L").convert("RGB")
     if module_key in {"blur"}:
         radius = max(0.1, min(float(threshold_a), 128.0) / 32.0)
         return image_obj.filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGB")
-    if module_key in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch", "openpose"}:
+    if module_key in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch"}:
         return image_obj.convert("L").filter(ImageFilter.FIND_EDGES).convert("RGB")
     return image_obj.convert("RGB")

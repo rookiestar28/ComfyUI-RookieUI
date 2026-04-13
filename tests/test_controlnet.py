@@ -718,6 +718,30 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(payload["detect_backend"], "comfy_host_preprocessor")
         self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT, payload["warning_codes"])
 
+    def test_detect_payload_does_not_emit_empty_output_warning_for_prior_candidate_only(self) -> None:
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch(
+                    "rookieui.services.controlnet.preprocess_controlnet_tensor",
+                    return_value=ControlNetRuntimeResult(
+                        image=mock.Mock(),
+                        backend="comfy_host_preprocessor",
+                        processor_name="DWPreprocessor",
+                        used_fallback=False,
+                        diagnostics=("OpenposePreprocessor:output_near_empty",),
+                    ),
+                ):
+                    with mock.patch("rookieui.services.controlnet.image_tensor_to_data_url", return_value="data:image/png;base64,cHJldmlldw=="):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "openpose",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
+
+        self.assertEqual(payload["detect_backend"], "comfy_host_preprocessor")
+        self.assertNotIn(CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT, payload["warning_codes"])
+
     def test_detect_payload_forwards_selected_module_without_cross_module_override(self) -> None:
         test_modules = ["canny", "depth", "openpose", "lineart", "scribble", "softedge", "normalmap", "inpaint"]
         for module_name in test_modules:
