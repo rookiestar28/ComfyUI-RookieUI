@@ -201,6 +201,26 @@ def _append_prompt_encode_node(
     return node_id
 
 
+def _append_rookieui_a1111_text_encode_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    clip_source: list[object],
+    text: str,
+    steps: int,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "RookieUIA1111TextEncode",
+        "inputs": {
+            "clip": clip_source,
+            "text": text,
+            "steps": max(int(steps), 1),
+        },
+    }
+    return node_id
+
+
 def _append_conditioning_range_node(
     workflow: dict[str, object],
     *,
@@ -382,6 +402,7 @@ def _build_sd15_conditioning(
     *,
     allocator: NodeIdAllocator,
     clip_source: list[object],
+    steps: int | None = None,
 ) -> tuple[str, str]:
     if request.clip_skip > 1:
         clip_node_id = allocator.next()
@@ -393,6 +414,24 @@ def _build_sd15_conditioning(
             },
         }
         clip_source = [clip_node_id, 0]
+    resolved_steps = int(request.steps if steps is None else steps)
+    if not _is_legacy_prompt_dsl_enabled():
+        return (
+            _append_rookieui_a1111_text_encode_node(
+                workflow,
+                allocator=allocator,
+                clip_source=clip_source,
+                text=request.prompt,
+                steps=resolved_steps,
+            ),
+            _append_rookieui_a1111_text_encode_node(
+                workflow,
+                allocator=allocator,
+                clip_source=clip_source,
+                text=request.negative_prompt,
+                steps=resolved_steps,
+            ),
+        )
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,
         allocator=allocator,
@@ -810,6 +849,16 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -819,6 +868,19 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    # IMPORTANT: SD15 parity-node paths must build a separate hires conditioning lane; reusing the base pass here breaks A1111 schedule/BREAK timing fidelity on the second sampler.
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     latent_id = allocator.next()
     sampler_id = allocator.next()
 
@@ -859,8 +921,8 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -977,6 +1039,16 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -986,6 +1058,18 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1047,8 +1131,8 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1187,6 +1271,16 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
+    hires_positive_id = positive_id
+    hires_negative_id = negative_id
+    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
+        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
+            workflow,
+            request,
+            allocator=allocator,
+            clip_source=clip_source,
+            steps=request.hires_steps,
+        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1196,6 +1290,18 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
+    hires_positive_ref = positive_ref
+    hires_negative_ref = negative_ref
+    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
+        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=hires_positive_id,
+            negative_ref=hires_negative_id,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1283,8 +1389,8 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,

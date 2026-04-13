@@ -244,7 +244,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(result["workflow"]["92"]["inputs"]["lora_name"], "hero_boost.safetensors")
         self.assertEqual(result["workflow"]["5"]["inputs"]["model"], ["92", 0])
 
-    def test_translate_txt2img_request_compiles_prompt_semantics_for_sd15(self) -> None:
+    def test_translate_txt2img_request_uses_a1111_text_encode_node_for_sd15(self) -> None:
         normalized = normalize_txt2img_request(
             {
                 "prompt": "hero AND villain BREAK [calm:chaos:0.4]",
@@ -253,8 +253,9 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         result = translate_txt2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("ConditioningCombine", class_types)
-        self.assertIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("RookieUIA1111TextEncode", class_types)
+        self.assertNotIn("ConditioningCombine", class_types)
+        self.assertNotIn("ConditioningSetTimestepRange", class_types)
 
     def test_translate_txt2img_request_compiles_prompt_semantics_for_sdxl(self) -> None:
         normalized = normalize_txt2img_request(
@@ -279,8 +280,10 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             result = translate_txt2img_request(normalized).to_payload()
 
         class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertNotIn("RookieUIA1111TextEncode", class_types)
         self.assertNotIn("ConditioningCombine", class_types)
         self.assertNotIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("CLIPTextEncode", class_types)
         self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
 
     def test_translate_txt2img_request_keeps_node_ids_unique_with_hires_and_loras(self) -> None:
@@ -503,6 +506,28 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(result["workflow"]["2"]["class_type"], "CLIPTextEncodeSDXL")
         self.assertEqual(result["workflow"]["5"]["inputs"]["scheduler"], "karras")
 
+    def test_translate_txt2img_request_builds_sdxl_hires_workflow(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "fashion editorial",
+                "profile": "pony",
+                "hires_enabled": True,
+                "hires_steps": 12,
+                "hires_scale": 1.8,
+                "hires_denoise": 0.4,
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
+
+        self.assertEqual(result["workflow_kind"], "txt2img-sdxl-hires")
+        self.assertIn("CLIPTextEncodeSDXL", class_types)
+        self.assertIn("LatentUpscaleBy", class_types)
+        self.assertEqual(len(sampler_nodes), 2)
+        self.assertNotIn("RookieUIA1111TextEncode", class_types)
+
     def test_translate_txt2img_request_builds_hires_workflow(self) -> None:
         normalized = normalize_txt2img_request(
             {
@@ -523,7 +548,12 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         sampler_nodes = [
             node for node in result["workflow"].values() if node["class_type"] == "KSampler"
         ]
+        prompt_nodes = [
+            node for node in result["workflow"].values() if node["class_type"] == "RookieUIA1111TextEncode"
+        ]
         self.assertEqual(len(sampler_nodes), 2)
+        self.assertEqual(len(prompt_nodes), 4)
+        self.assertEqual(sorted(node["inputs"]["steps"] for node in prompt_nodes), [12, 12, 28, 28])
 
     def test_txt2img_route_returns_translation_payload(self) -> None:
         response = asyncio.run(

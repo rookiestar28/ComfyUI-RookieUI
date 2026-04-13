@@ -8,6 +8,51 @@ from rookieui import nodes
 
 
 class RookieUINodesTests(unittest.TestCase):
+    class _FakeTokenizerImpl:
+        def __call__(self, text: str) -> dict[str, list[int]]:
+            tokens = [index + 10 for index, _ in enumerate(text.split())]
+            return {"input_ids": tokens or [42]}
+
+        @staticmethod
+        def get_vocab() -> dict[str, int]:
+            return {",</w>": 999}
+
+    class _FakeInnerTokenizer:
+        def __init__(self) -> None:
+            self.start_token = 101
+            self.end_token = 102
+            self.pad_token = 0
+            self.max_length = 6
+            self.max_word_length = 999
+            self.tokens_start = 0
+            self.tokenizer_adds_end_token = False
+            self.pad_to_max_length = True
+            self.pad_left = False
+            self.embedding_identifier = "embedding:"
+            self.embedding_directory = None
+            self.tokenizer = RookieUINodesTests._FakeTokenizerImpl()
+
+    class _FakeTokenizer:
+        def __init__(self) -> None:
+            self.clip_name = "l"
+            self.clip = "clip_l"
+            self.clip_l = RookieUINodesTests._FakeInnerTokenizer()
+
+    class _FakeClip:
+        def __init__(self) -> None:
+            self.tokenizer = RookieUINodesTests._FakeTokenizer()
+
+        def encode_from_tokens(
+            self,
+            tokens,
+            return_pooled=True,
+            return_dict=True,
+        ) -> dict[str, object]:
+            return {
+                "cond": {"tokens": tokens},
+                "pooled_output": "fake-pooled",
+            }
+
     def test_load_asset_mask_validate_inputs_accepts_partial_signature(self) -> None:
         with mock.patch.object(nodes, "resolve_asset_path", return_value=Path("C:/tmp/mask.png")):
             result = nodes.RookieUILoadAssetMask.VALIDATE_INPUTS("mask_asset.png")
@@ -36,6 +81,38 @@ class RookieUINodesTests(unittest.TestCase):
 
     def test_controlnet_preprocess_node_is_registered(self) -> None:
         self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
+
+    def test_a1111_text_encode_node_is_registered(self) -> None:
+        self.assertIn("RookieUIA1111TextEncode", nodes.NODE_CLASS_MAPPINGS)
+
+    def test_a1111_text_encode_node_keeps_break_as_tokenizer_chunk_boundary(self) -> None:
+        conditioning, = nodes.RookieUIA1111TextEncode().encode(
+            text="hero BREAK villain",
+            clip=self._FakeClip(),
+            steps=10,
+        )
+
+        self.assertEqual(len(conditioning), 1)
+        token_batches = conditioning[0][0]["tokens"]["l"]
+        self.assertEqual(len(token_batches), 2)
+
+    def test_a1111_text_encode_node_emits_schedule_and_branch_metadata(self) -> None:
+        conditioning, = nodes.RookieUIA1111TextEncode().encode(
+            text="hero AND villain [soft:sharp:0.5]:0.7",
+            clip=self._FakeClip(),
+            steps=10,
+        )
+
+        self.assertEqual(len(conditioning), 3)
+        self.assertEqual(conditioning[0][1]["start_percent"], 0.0)
+        self.assertEqual(conditioning[0][1]["end_percent"], 1.0)
+        self.assertNotIn("weight", conditioning[0][1])
+        self.assertEqual(conditioning[1][1]["start_percent"], 0.0)
+        self.assertEqual(conditioning[1][1]["end_percent"], 0.5)
+        self.assertEqual(conditioning[1][1]["weight"], 0.7)
+        self.assertEqual(conditioning[2][1]["start_percent"], 0.5)
+        self.assertEqual(conditioning[2][1]["end_percent"], 1.0)
+        self.assertEqual(conditioning[2][1]["weight"], 0.7)
 
     def test_controlnet_preprocess_applies_mask_when_enabled(self) -> None:
         if nodes.torch is None:
