@@ -105,7 +105,7 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertGreaterEqual(len(resolved), 2)
         self.assertEqual(resolved[0], "DepthAnythingV2Preprocessor")
 
-    def test_preprocess_controlnet_depth_stops_after_probe_limit(self) -> None:
+    def test_preprocess_controlnet_non_depth_stops_after_global_probe_limit(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
             with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
@@ -113,19 +113,19 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                     runtime,
                     "_resolve_host_node_class_mappings",
                     return_value={
-                        "DepthAnythingV2Preprocessor": object(),
-                        "MiDaS-DepthMapPreprocessor": object(),
+                        "CannyEdgePreprocessor": object(),
+                        "PyraCannyPreprocessor": object(),
                     },
                 ):
                     with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
                         with mock.patch.object(
                             runtime,
                             "_run_host_node_preprocessor",
-                            side_effect=RuntimeError("DepthAnythingV2Preprocessor failed"),
+                            side_effect=RuntimeError("CannyEdgePreprocessor failed"),
                         ) as run_mock:
                             result = runtime.preprocess_controlnet_tensor(
                                 image_tensor=marker,
-                                module="depth",
+                                module="canny",
                                 processor_res=512,
                                 threshold_a=64.0,
                                 threshold_b=64.0,
@@ -137,7 +137,7 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertEqual(run_mock.call_count, 1)
         self.assertTrue(any("host_probe_limit_reached:1" in entry for entry in result.diagnostics))
 
-    def test_preprocess_controlnet_depth_skips_aio_fallback_when_host_nodes_unavailable(self) -> None:
+    def test_preprocess_controlnet_skips_aio_fallback_when_disabled(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
             with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
@@ -146,7 +146,7 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                         with mock.patch.object(runtime, "_run_host_node_preprocessor") as run_mock:
                             result = runtime.preprocess_controlnet_tensor(
                                 image_tensor=marker,
-                                module="depth",
+                                module="softedge",
                                 processor_res=512,
                                 threshold_a=64.0,
                                 threshold_b=64.0,
@@ -155,7 +155,34 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
 
         self.assertEqual(result.backend, "rookieui_internal_fallback")
         self.assertTrue(result.used_fallback)
+        self.assertIn("aio_preprocessor_disabled", result.diagnostics)
         run_mock.assert_not_called()
+
+    def test_preprocess_controlnet_allows_aio_when_explicitly_enabled(self) -> None:
+        marker = object()
+        with mock.patch.dict("os.environ", {runtime.ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV: "1"}, clear=False):
+            with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+                with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                    with mock.patch.object(
+                        runtime,
+                        "_resolve_host_node_class_mappings",
+                        return_value={"AIO_Preprocessor": object()},
+                    ):
+                        with mock.patch.object(runtime, "_resolve_host_preprocessor_candidates", return_value=()):
+                            with mock.patch.object(runtime, "_select_aio_preprocessor_name", return_value="hed_safe"):
+                                with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker) as run_mock:
+                                    result = runtime.preprocess_controlnet_tensor(
+                                        image_tensor=marker,
+                                        module="softedge",
+                                        processor_res=512,
+                                        threshold_a=64.0,
+                                        threshold_b=64.0,
+                                        mask_tensor=None,
+                                    )
+
+        self.assertEqual(result.backend, "comfy_host_preprocessor_aio")
+        self.assertEqual(result.processor_name, "hed_safe")
+        run_mock.assert_called_once()
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_min_max_normalizes_signed_ranges(self) -> None:
