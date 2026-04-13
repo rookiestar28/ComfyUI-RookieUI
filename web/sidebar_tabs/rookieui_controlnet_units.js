@@ -797,13 +797,6 @@ export function createControlNetUnitEditor({
   body.className = "rookieui-shell__controlnet-body";
   integratedDetails.appendChild(body);
 
-  appendTextElement(
-    body,
-    "p",
-    "rookieui-shell__status rookieui-shell__controlnet-note",
-    "A1111/Forge style integrated units: each enabled unit sets control type, preprocessor, model, and source image.",
-  );
-
   const tabs = document.createElement("div");
   tabs.className = "rookieui-shell__subtabs rookieui-shell__controlnet-tabs";
   body.appendChild(tabs);
@@ -1060,6 +1053,8 @@ export function createControlNetUnitEditor({
       const detectBackend = String(data?.detect_backend ?? "").trim().toLowerCase();
       const processorName = String(data?.processor ?? "").trim();
       const requestedControlModel = String(data?.requested_controlnet_model ?? selectedControlModel).trim();
+      // DEBUG HOTSPOT: backend/processor/status-text stitching seam for run-preprocessor triage.
+      // Keep this branch map aligned with backend warning diagnostics so UI messages explain fallback cause precisely.
       const hostFallback = warningCodes.includes("CONTROLNET_PREPROCESSOR_HOST_FALLBACK");
       let backendText = " via ComfyUI host preprocessor.";
       if (detectBackend === "comfy_host_preprocessor_aio") {
