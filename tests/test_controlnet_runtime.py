@@ -240,17 +240,21 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
         self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
 
-    def test_preprocess_controlnet_marks_host_success_with_near_empty_output_diagnostic(self) -> None:
+    def test_preprocess_controlnet_openpose_near_empty_retries_next_host_candidate(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
             with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
                 with mock.patch.object(
                     runtime,
                     "_resolve_host_node_class_mappings",
-                    return_value={"OpenposePreprocessor": object()},
+                    return_value={"OpenposePreprocessor": object(), "DWPreprocessor": object()},
                 ):
-                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker):
-                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=True):
+                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker) as run_mock:
+                        with mock.patch.object(
+                            runtime,
+                            "_is_visually_empty_image_tensor",
+                            side_effect=[True, False],
+                        ):
                             result = runtime.preprocess_controlnet_tensor(
                                 image_tensor=marker,
                                 module="openpose",
@@ -261,7 +265,33 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                             )
 
         self.assertEqual(result.backend, "comfy_host_preprocessor")
-        self.assertEqual(result.processor_name, "OpenposePreprocessor")
+        self.assertEqual(result.processor_name, "DWPreprocessor")
+        self.assertIn("OpenposePreprocessor:output_near_empty", result.diagnostics)
+        self.assertEqual(run_mock.call_count, 2)
+
+    def test_preprocess_controlnet_openpose_near_empty_falls_back_when_no_alternate_candidate(self) -> None:
+        marker = object()
+        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                with mock.patch.object(
+                    runtime,
+                    "_resolve_host_node_class_mappings",
+                    return_value={"OpenposePreprocessor": object()},
+                ):
+                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker):
+                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=True):
+                            with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
+                                result = runtime.preprocess_controlnet_tensor(
+                                    image_tensor=marker,
+                                    module="openpose",
+                                    processor_res=512,
+                                    threshold_a=64.0,
+                                    threshold_b=64.0,
+                                    mask_tensor=None,
+                                )
+
+        self.assertEqual(result.backend, "rookieui_internal_fallback")
+        self.assertTrue(result.used_fallback)
         self.assertIn("OpenposePreprocessor:output_near_empty", result.diagnostics)
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
