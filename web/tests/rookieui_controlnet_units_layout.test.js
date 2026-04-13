@@ -493,7 +493,11 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       runButton.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(statusMessages.some((entry) => entry.includes("generation model; preprocessor uses host annotator weights"))).toBe(
+      expect(
+        statusMessages.some((entry) =>
+          entry.includes("generation stage only; preprocessor preview is driven by selected preprocessor/annotator"),
+        ),
+      ).toBe(
         true,
       );
     } finally {
