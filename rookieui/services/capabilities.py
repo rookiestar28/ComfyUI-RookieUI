@@ -4,31 +4,51 @@ from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.security.asset_guard import normalize_metadata_text
 
 
+def _normalize_metadata_list(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [
+        normalize_metadata_text(value)
+        for value in values
+        if isinstance(value, str) and value.strip()
+    ]
+
+
+def _normalize_metadata_mapping(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return {}
+    normalized: dict[str, object] = {}
+    for key, value in payload.items():
+        normalized_key = normalize_metadata_text(key)
+        if not normalized_key:
+            continue
+        if isinstance(value, str) and value.strip():
+            normalized[normalized_key] = normalize_metadata_text(value)
+            continue
+        normalized_list = _normalize_metadata_list(value)
+        if normalized_list:
+            normalized[normalized_key] = normalized_list
+    return normalized
+
+
 def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = {
         "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
         "contract_scope": normalize_metadata_text(payload.get("contract_scope", "")),
         "rollout": {},
         "compiler_constraints": {},
+        "warning_codes": {},
         "capabilities": [],
     }
     rollout = payload.get("rollout", {})
-    if isinstance(rollout, dict):
-        normalized["rollout"] = {
-            key: normalize_metadata_text(value)
-            for key, value in rollout.items()
-            if isinstance(value, str) and value.strip()
-        }
+    normalized["rollout"] = _normalize_metadata_mapping(rollout)
     constraints = payload.get("compiler_constraints", {})
     if isinstance(constraints, dict):
         normalized["compiler_constraints"] = {
-            "conditioning_nodes": [
-                normalize_metadata_text(value)
-                for value in constraints.get("conditioning_nodes", [])
-                if isinstance(value, str) and value.strip()
-            ],
+            "conditioning_nodes": _normalize_metadata_list(constraints.get("conditioning_nodes", [])),
             "execution_backend": normalize_metadata_text(constraints.get("execution_backend", "")),
         }
+    normalized["warning_codes"] = _normalize_metadata_mapping(payload.get("warning_codes", {}))
     capabilities = payload.get("capabilities", [])
     if isinstance(capabilities, list):
         normalized_capabilities = []

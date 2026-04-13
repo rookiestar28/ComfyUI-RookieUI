@@ -49,7 +49,10 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
+    expect(result.data.prompt_semantics.contract_version).toBe("f100-20260414");
+    expect(result.data.prompt_semantics.rollout.default_mode).toBe("a1111_parity_nodes_exact");
+    expect(result.data.prompt_semantics.warning_codes.fallback).toContain("PROMPT_LEGACY_FALLBACK_ENABLED");
+    expect(result.data.prompt_semantics.capabilities[0].status).toBe("exact");
   });
 
   test("submits txt2img payloads to the backend", async () => {
