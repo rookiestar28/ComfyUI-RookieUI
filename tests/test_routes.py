@@ -31,9 +31,20 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/controlnet/module_list", payload["routes"])
         self.assertIn("/rookieui/controlnet/control_types", payload["routes"])
         self.assertIn("/rookieui/controlnet/detect", payload["routes"])
+        self.assertIn("/rookieui/adetailer/catalog", payload["routes"])
         self.assertIn("/rookieui/generate/txt2img", payload["routes"])
         self.assertIn("/rookieui/generate/img2img", payload["routes"])
         self.assertIn("/rookieui/extras/run", payload["routes"])
+
+    def test_adetailer_snapshot_exposes_contract_and_detector_catalog(self) -> None:
+        payload = routes.build_adetailer_snapshot()
+
+        self.assertEqual(payload["contract"]["version"], "r74f77-20260414")
+        self.assertEqual(payload["contract"]["unit_count"], 4)
+        self.assertEqual(payload["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
+        self.assertIn("None", payload["detector_list"])
+        self.assertIn("mediapipe_face_full", payload["detector_list"])
+        self.assertIn("none", payload["controlnet_modes"])
 
     def test_parity_payload_lists_sampler_aliases(self) -> None:
         payload = routes.build_parity_snapshot()

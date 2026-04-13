@@ -31,6 +31,29 @@ def _normalize_metadata_mapping(payload: object) -> dict[str, object]:
     return normalized
 
 
+def _normalize_loose_mapping(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict):
+        return {}
+    normalized: dict[str, object] = {}
+    for key, value in payload.items():
+        normalized_key = normalize_metadata_text(key)
+        if not normalized_key:
+            continue
+        if isinstance(value, str):
+            normalized[normalized_key] = normalize_metadata_text(value)
+        elif isinstance(value, bool):
+            normalized[normalized_key] = value
+        elif isinstance(value, (int, float)):
+            normalized[normalized_key] = value
+        elif isinstance(value, list):
+            normalized[normalized_key] = [
+                normalize_metadata_text(entry) if isinstance(entry, str) else entry
+                for entry in value
+                if isinstance(entry, (str, int, float, bool))
+            ]
+    return normalized
+
+
 def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = {
         "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
@@ -67,6 +90,33 @@ def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str,
                 }
             )
         normalized["capabilities"] = normalized_capabilities
+    return normalized
+
+
+def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized = {
+        "contract": {},
+        "behavior_source": normalize_metadata_text(payload.get("behavior_source", "")),
+        "ui_reference": normalize_metadata_text(payload.get("ui_reference", "")),
+        "execution_backend": normalize_metadata_text(payload.get("execution_backend", "")),
+        "skip_img2img_surfaces": _normalize_metadata_list(payload.get("skip_img2img_surfaces", [])),
+        "controlnet_modes": _normalize_metadata_list(payload.get("controlnet_modes", [])),
+        "prompt_tokens": _normalize_metadata_list(payload.get("prompt_tokens", [])),
+        "warning_code_contract": normalize_metadata_text(payload.get("warning_code_contract", "")),
+        "routes": _normalize_metadata_list(payload.get("routes", [])),
+    }
+    contract = payload.get("contract", {})
+    if isinstance(contract, dict):
+        normalized["contract"] = {
+            "version": normalize_metadata_text(contract.get("version", "")),
+            "ui_variant": normalize_metadata_text(contract.get("ui_variant", "")),
+            "unit_count": int(contract.get("unit_count", 0) or 0),
+            "prompt_tokens": _normalize_metadata_list(contract.get("prompt_tokens", [])),
+            "controlnet_modes": _normalize_metadata_list(contract.get("controlnet_modes", [])),
+            "mask_filter_methods": _normalize_metadata_list(contract.get("mask_filter_methods", [])),
+            "mask_merge_modes": _normalize_metadata_list(contract.get("mask_merge_modes", [])),
+            "defaults": _normalize_loose_mapping(contract.get("defaults", {})),
+        }
     return normalized
 
 
@@ -145,4 +195,7 @@ def build_capabilities_payload(
     prompt_semantics = payload.get("prompt_semantics", {})
     if isinstance(prompt_semantics, dict):
         payload["prompt_semantics"] = _normalize_prompt_semantics_payload(prompt_semantics)
+    adetailer = payload.get("adetailer", {})
+    if isinstance(adetailer, dict):
+        payload["adetailer"] = _normalize_adetailer_payload(adetailer)
     return payload

@@ -97,6 +97,34 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 2)
 
+    def test_normalize_txt2img_request_exposes_adetailer_foundation_and_ignores_skip_img2img(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "hero portrait",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [
+                        {
+                            "detector": "face_yolov8n.pt",
+                            "prompt": "repair face [PROMPT]",
+                            "controlnet": {"mode": "passthrough"},
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(normalized.adetailer.enabled)
+        self.assertFalse(normalized.adetailer.skip_img2img)
+        self.assertIn("ADETAILER_SKIP_IMG2IMG_IGNORED", normalized.adetailer.warning_codes)
+        self.assertEqual(len(normalized.adetailer.units), 4)
+        self.assertEqual(normalized.adetailer.units[0].detector, "face_yolov8n.pt")
+        self.assertEqual(normalized.adetailer.units[0].refinement_context_id, "adetailer_unit_1")
+        self.assertFalse(normalized.adetailer.units[0].prompt_uses_main)
+        self.assertEqual(normalized.adetailer.units[0].controlnet.mode, "passthrough")
+        self.assertEqual(normalized.adetailer.units[1].detector, "None")
+
     def test_normalize_txt2img_request_clears_text_encoder_for_sd15(self) -> None:
         normalized = normalize_txt2img_request(
             {
