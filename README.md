@@ -24,6 +24,18 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>ControlNet preprocessor UX and dispatch parity improvements (bugfix/stability)</strong></summary>
+
+- Added Forge-style preprocessor option narrowing by selected Control Type, so each type shows only relevant annotator choices.
+- Expanded preprocessor catalog to include variant-level options (for example depth/lineart/openpose families) in integrated ControlNet units.
+- Updated backend detect/runtime dispatch to respect selected preprocessor variants and prefer matching host annotator nodes.
+- Improved run-preprocessor status messaging to report both selected preprocessor option and actual backend processor used.
+- Expanded backend/frontend regression coverage for variant filtering and variant-aware dispatch behavior.
+
+</details>
+
+<details>
+
 <summary><strong>Diffusion-family decode integrity and selector hardening (bugfix/stability)</strong></summary>
 
 - Fixed a diffusion-family decode mismatch path where sampler preview could look normal but final output degraded due to incompatible fallback VAE pairing.
@@ -221,14 +233,24 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 
 ## ControlNet Support
 
-- Status: under construction; interface and functionality may change.
-- A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img` generation panes.
+Simple usage:
+
+1. Open `txt2img` or `img2img`, then enable a `ControlNet Unit`.
+2. Upload a source image for that unit.
+3. Choose a `Control Type`; the `Preprocessor` dropdown is automatically filtered to matching options.
+4. Select a `Preprocessor` and (optionally) a `Model`, then click `Run Preprocessor` to update the preview lane.
+5. Keep `Allow Preview` enabled if you want to display preprocessor output side-by-side.
+6. Run generation. The ControlNet model is applied at generation stage, while preprocessor preview comes from the selected annotator/preprocessor.
+
+Behavior and compatibility:
+
+- A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img`.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
-- Optional preprocessor/detect dependency is handled with explicit downgrade diagnostics when unavailable.
+- When a host preprocessor is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
 
 ## Support for Other Extensions
 
