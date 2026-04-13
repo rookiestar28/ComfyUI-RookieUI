@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 import unittest
 from unittest import mock
 
@@ -183,6 +184,38 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertEqual(result.backend, "comfy_host_preprocessor_aio")
         self.assertEqual(result.processor_name, "hed_safe")
         run_mock.assert_called_once()
+
+    def test_preprocess_controlnet_applies_prompt_server_last_prompt_id_shim_for_host_node(self) -> None:
+        marker = object()
+        fake_prompt_server_instance = types.SimpleNamespace()
+
+        def _host_runner(**_kwargs: object) -> object:
+            if not hasattr(fake_prompt_server_instance, "last_prompt_id"):
+                raise RuntimeError("missing_last_prompt_id")
+            return marker
+
+        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
+            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
+                with mock.patch.object(
+                    runtime,
+                    "_resolve_host_node_class_mappings",
+                    return_value={"DepthAnythingV2Preprocessor": object()},
+                ):
+                    with mock.patch.object(runtime, "_resolve_prompt_server_instance", return_value=fake_prompt_server_instance):
+                        with mock.patch.object(runtime, "_run_host_node_preprocessor", side_effect=_host_runner):
+                            result = runtime.preprocess_controlnet_tensor(
+                                image_tensor=marker,
+                                module="depth",
+                                processor_res=512,
+                                threshold_a=64.0,
+                                threshold_b=64.0,
+                                mask_tensor=None,
+                            )
+
+        self.assertEqual(result.backend, "comfy_host_preprocessor")
+        self.assertEqual(result.processor_name, "DepthAnythingV2Preprocessor")
+        self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
+        self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_min_max_normalizes_signed_ranges(self) -> None:

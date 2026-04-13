@@ -770,6 +770,8 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
                 threshold_b=threshold_b,
                 mask_tensor=mask_tensor,
             )
+            # DEBUG HOTSPOT: inspect per-image runtime seam first when preprocess output appears visually incorrect.
+            # This captures backend/processor provenance before payload-level warning aggregation.
             backend_labels.append(runtime_result.backend)
             processor_names.append(runtime_result.processor_name)
             if runtime_result.used_fallback:
@@ -782,7 +784,8 @@ def build_controlnet_detect_payload(payload: dict[str, object]) -> dict[str, obj
     if fallback_used:
         warning_codes.append(CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK)
         if fallback_diagnostics:
-            # DEBUG HOTSPOT: if detect previews look visually wrong, inspect this diagnostics seam to identify which host preprocessor node failed before fallback.
+            # DEBUG HOTSPOT: primary fallback triage seam for run-preprocessor regressions.
+            # Prioritize markers like `prompt_server_last_prompt_id_shim_applied`, node exception text, and probe-limit diagnostics.
             _LOGGER.warning(
                 "RookieUI ControlNet detect host preprocessor fallback engaged (module=%s): %s",
                 module,

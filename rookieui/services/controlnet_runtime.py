@@ -5,6 +5,7 @@ import io
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -256,99 +257,106 @@ def preprocess_controlnet_tensor(
         )
 
     host_mappings = _resolve_host_node_class_mappings()
+    prompt_server_instance = _resolve_prompt_server_instance()
+    shim_applied, shim_value = _ensure_prompt_server_last_prompt_id(prompt_server_instance)
+    if shim_applied:
+        diagnostics.append("prompt_server_last_prompt_id_shim_applied")
 
-    host_candidates = _resolve_host_preprocessor_candidates(normalized_module, host_mappings)
-    configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
-        normalized_module,
-        _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
-    )
-    # DEBUG HOTSPOT: enforce single-attempt deterministic probing across all modules to avoid cross-family
-    # annotator side effects (unexpected model bootstrap/download) when host preprocessor chains fan out.
-    host_probe_limit = max(0, int(configured_probe_limit))
-    host_probe_attempts = 0
-    for node_name in host_candidates:
-        if node_name not in host_mappings:
-            continue
-        if host_probe_attempts >= host_probe_limit:
-            diagnostics.append(f"host_probe_limit_reached:{host_probe_limit}")
-            break
-        host_probe_attempts += 1
-        try:
-            processed = _run_host_node_preprocessor(
-                node_name=node_name,
-                node_cls=host_mappings[node_name],
-                image_tensor=source,
-                mask_tensor=normalized_mask,
-                module_key=normalized_module,
-                processor_res=processor_res,
-                threshold_a=threshold_a,
-                threshold_b=threshold_b,
-                aio_preprocessor_name=None,
-            )
-            return ControlNetRuntimeResult(
-                image=processed,
-                backend="comfy_host_preprocessor",
-                processor_name=node_name,
-                used_fallback=False,
-                diagnostics=tuple(diagnostics),
-            )
-        except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
-            diagnostics.append(f"{node_name}: {exc}")
-            continue
-
-    if _is_aio_preprocessor_enabled():
-        aio_cls = host_mappings.get("AIO_Preprocessor")
-        if aio_cls is not None:
-            aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
-            if aio_name:
-                try:
-                    processed = _run_host_node_preprocessor(
-                        node_name="AIO_Preprocessor",
-                        node_cls=aio_cls,
-                        image_tensor=source,
-                        mask_tensor=normalized_mask,
-                        module_key=normalized_module,
-                        processor_res=processor_res,
-                        threshold_a=threshold_a,
-                        threshold_b=threshold_b,
-                        aio_preprocessor_name=aio_name,
-                    )
-                    return ControlNetRuntimeResult(
-                        image=processed,
-                        backend="comfy_host_preprocessor_aio",
-                        processor_name=aio_name,
-                        used_fallback=False,
-                        diagnostics=tuple(diagnostics),
-                    )
-                except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
-                    diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
-    else:
-        # DEBUG HOTSPOT: keep AIO gating explicit; querying AIO INPUT_TYPES can trigger broad annotator enumeration.
-        diagnostics.append("aio_preprocessor_disabled")
-
-    if diagnostics:
-        # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
-        # before fallback so we can pinpoint over-eager node probing without reproducing full host bootstrap logs.
-        _LOGGER.warning(
-            "RookieUI ControlNet host preprocessor chain exhausted (module=%s): %s",
+    try:
+        host_candidates = _resolve_host_preprocessor_candidates(normalized_module, host_mappings)
+        configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
             normalized_module,
-            " | ".join(diagnostics[:3]),
+            _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
         )
+        # DEBUG HOTSPOT: enforce single-attempt deterministic probing across all modules to avoid cross-family
+        # annotator side effects (unexpected model bootstrap/download) when host preprocessor chains fan out.
+        host_probe_limit = max(0, int(configured_probe_limit))
+        host_probe_attempts = 0
+        for node_name in host_candidates:
+            if node_name not in host_mappings:
+                continue
+            if host_probe_attempts >= host_probe_limit:
+                diagnostics.append(f"host_probe_limit_reached:{host_probe_limit}")
+                break
+            host_probe_attempts += 1
+            try:
+                processed = _run_host_node_preprocessor(
+                    node_name=node_name,
+                    node_cls=host_mappings[node_name],
+                    image_tensor=source,
+                    mask_tensor=normalized_mask,
+                    module_key=normalized_module,
+                    processor_res=processor_res,
+                    threshold_a=threshold_a,
+                    threshold_b=threshold_b,
+                    aio_preprocessor_name=None,
+                )
+                return ControlNetRuntimeResult(
+                    image=processed,
+                    backend="comfy_host_preprocessor",
+                    processor_name=node_name,
+                    used_fallback=False,
+                    diagnostics=tuple(diagnostics),
+                )
+            except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
+                diagnostics.append(f"{node_name}: {exc}")
+                continue
 
-    fallback = _apply_fallback_filters(
-        source,
-        module_key=normalized_module,
-        processor_res=processor_res,
-        threshold_a=threshold_a,
-        threshold_b=threshold_b,
-    )
-    return ControlNetRuntimeResult(
-        image=fallback,
-        backend="rookieui_internal_fallback",
-        processor_name=normalized_module,
-        used_fallback=True,
-        diagnostics=tuple(diagnostics),
-    )
+        if _is_aio_preprocessor_enabled():
+            aio_cls = host_mappings.get("AIO_Preprocessor")
+            if aio_cls is not None:
+                aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
+                if aio_name:
+                    try:
+                        processed = _run_host_node_preprocessor(
+                            node_name="AIO_Preprocessor",
+                            node_cls=aio_cls,
+                            image_tensor=source,
+                            mask_tensor=normalized_mask,
+                            module_key=normalized_module,
+                            processor_res=processor_res,
+                            threshold_a=threshold_a,
+                            threshold_b=threshold_b,
+                            aio_preprocessor_name=aio_name,
+                        )
+                        return ControlNetRuntimeResult(
+                            image=processed,
+                            backend="comfy_host_preprocessor_aio",
+                            processor_name=aio_name,
+                            used_fallback=False,
+                            diagnostics=tuple(diagnostics),
+                        )
+                    except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
+                        diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
+        else:
+            # DEBUG HOTSPOT: keep AIO gating explicit; querying AIO INPUT_TYPES can trigger broad annotator enumeration.
+            diagnostics.append("aio_preprocessor_disabled")
+
+        if diagnostics:
+            # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
+            # before fallback so we can pinpoint over-eager node probing without reproducing full host bootstrap logs.
+            _LOGGER.warning(
+                "RookieUI ControlNet host preprocessor chain exhausted (module=%s): %s",
+                normalized_module,
+                " | ".join(diagnostics[:3]),
+            )
+
+        fallback = _apply_fallback_filters(
+            source,
+            module_key=normalized_module,
+            processor_res=processor_res,
+            threshold_a=threshold_a,
+            threshold_b=threshold_b,
+        )
+        return ControlNetRuntimeResult(
+            image=fallback,
+            backend="rookieui_internal_fallback",
+            processor_name=normalized_module,
+            used_fallback=True,
+            diagnostics=tuple(diagnostics),
+        )
+    finally:
+        _restore_prompt_server_last_prompt_id(prompt_server_instance, shim_applied, shim_value)
 
 
 def _require_runtime_dependencies() -> None:
@@ -375,6 +383,42 @@ def _env_flag(name: str, *, default: bool) -> bool:
 
 def _is_aio_preprocessor_enabled() -> bool:
     return _env_flag(ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV, default=False)
+
+
+def _resolve_prompt_server_instance() -> Any | None:
+    try:
+        import server as comfy_server  # type: ignore
+    except Exception:
+        return None
+    prompt_server_cls = getattr(comfy_server, "PromptServer", None)
+    if prompt_server_cls is None:
+        return None
+    return getattr(prompt_server_cls, "instance", None)
+
+
+def _ensure_prompt_server_last_prompt_id(server_instance: Any) -> tuple[bool, str]:
+    if server_instance is None or hasattr(server_instance, "last_prompt_id"):
+        return False, ""
+    synthetic_prompt_id = f"rookieui-controlnet-detect-{int(time.time() * 1000)}"
+    # DEBUG HOTSPOT: some host preprocessors read PromptServer.instance.last_prompt_id even outside queued prompt
+    # execution. Provide a scoped compatibility shim to keep detect routes host-compatible.
+    try:
+        setattr(server_instance, "last_prompt_id", synthetic_prompt_id)
+    except Exception:
+        return False, ""
+    return True, synthetic_prompt_id
+
+
+def _restore_prompt_server_last_prompt_id(server_instance: Any, was_applied: bool, expected_value: str) -> None:
+    if not was_applied or server_instance is None or not expected_value:
+        return
+    current_value = getattr(server_instance, "last_prompt_id", _MISSING)
+    if current_value != expected_value:
+        return
+    try:
+        delattr(server_instance, "last_prompt_id")
+    except Exception:
+        return
 
 
 def _resolve_host_node_class_mappings() -> dict[str, Any]:
