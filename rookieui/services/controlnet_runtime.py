@@ -291,6 +291,10 @@ def preprocess_controlnet_tensor(
                     threshold_b=threshold_b,
                     aio_preprocessor_name=None,
                 )
+                # DEBUG HOTSPOT: host execution succeeded but visual result may still be effectively blank.
+                # Mark this seam explicitly so detect-layer warnings can distinguish "pipeline failure" vs "empty detection result".
+                if _is_visually_empty_image_tensor(processed):
+                    diagnostics.append(f"{node_name}:output_near_empty")
                 return ControlNetRuntimeResult(
                     image=processed,
                     backend="comfy_host_preprocessor",
@@ -319,6 +323,9 @@ def preprocess_controlnet_tensor(
                             threshold_b=threshold_b,
                             aio_preprocessor_name=aio_name,
                         )
+                        # DEBUG HOTSPOT: same near-empty visibility check for AIO branch; keep diagnostics symmetric with direct-host branch.
+                        if _is_visually_empty_image_tensor(processed):
+                            diagnostics.append(f"AIO_Preprocessor({aio_name}):output_near_empty")
                         return ControlNetRuntimeResult(
                             image=processed,
                             backend="comfy_host_preprocessor_aio",
@@ -468,10 +475,28 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
         raise ValueError("Image tensor must be 3D or 4D.")
 
     if tensor.shape[-1] == 4:
-        tensor = tensor[:, :, :, :3]
+        rgb = tensor[:, :, :, :3]
+        alpha = tensor[:, :, :, 3:4]
+        # DEBUG HOTSPOT: some host preprocessors emit annotation strokes via alpha-only RGBA payloads.
+        # Preserve visual content by promoting alpha matte to RGB when color channels are effectively empty.
+        if float(rgb.abs().max().item()) <= 1e-6 and float(alpha.abs().max().item()) > 1e-6:
+            tensor = alpha.repeat(1, 1, 1, 3)
+        else:
+            tensor = rgb
 
     tensor = _normalize_image_value_range(tensor)
     return torch.clamp(tensor, 0.0, 1.0)
+
+
+def _is_visually_empty_image_tensor(image_tensor: "torch.Tensor", *, pixel_threshold: float = 0.01, ratio_threshold: float = 0.0005) -> bool:
+    # DEBUG HOTSPOT: visual-emptiness heuristic seam for preprocess outputs.
+    # Tune thresholds here when users report "completed but black preview" cases with host preprocessors.
+    normalized = _coerce_image_tensor(image_tensor)
+    if normalized.shape[0] == 0:
+        return True
+    luminance = normalized.max(dim=-1).values
+    active_ratio = float((luminance > float(pixel_threshold)).float().mean().item())
+    return active_ratio <= float(ratio_threshold)
 
 
 def _normalize_image_value_range(tensor: "torch.Tensor") -> "torch.Tensor":

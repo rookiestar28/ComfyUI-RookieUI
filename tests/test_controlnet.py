@@ -12,6 +12,7 @@ from rookieui.contracts.controlnet_integrated import (
 )
 from rookieui.services.controlnet import (
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
+    CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT,
     CONTROLNET_WARNING_FEATURE_DISABLED,
     CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK,
     CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE,
@@ -614,6 +615,63 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(payload["detect_backend"], "rookieui_internal_fallback")
         self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK, payload["warning_codes"])
         self.assertEqual(len(payload["images"]), 1)
+
+    def test_detect_payload_emits_empty_output_warning_when_runtime_reports_near_empty(self) -> None:
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch(
+                    "rookieui.services.controlnet.preprocess_controlnet_tensor",
+                    return_value=ControlNetRuntimeResult(
+                        image=mock.Mock(),
+                        backend="comfy_host_preprocessor",
+                        processor_name="OpenposePreprocessor",
+                        used_fallback=False,
+                        diagnostics=("OpenposePreprocessor:output_near_empty",),
+                    ),
+                ):
+                    with mock.patch("rookieui.services.controlnet.image_tensor_to_data_url", return_value="data:image/png;base64,cHJldmlldw=="):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "openpose",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
+
+        self.assertEqual(payload["detect_backend"], "comfy_host_preprocessor")
+        self.assertIn(CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT, payload["warning_codes"])
+
+    def test_detect_payload_forwards_selected_module_without_cross_module_override(self) -> None:
+        test_modules = ["canny", "depth", "openpose", "lineart", "scribble", "softedge", "normalmap", "inpaint"]
+        for module_name in test_modules:
+            with self.subTest(module=module_name):
+                preprocess_mock = mock.Mock(
+                    return_value=ControlNetRuntimeResult(
+                        image=mock.Mock(),
+                        backend="comfy_host_preprocessor",
+                        processor_name=f"{module_name}-processor",
+                        used_fallback=False,
+                        diagnostics=(),
+                    )
+                )
+                with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+                    with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                        with mock.patch("rookieui.services.controlnet.preprocess_controlnet_tensor", preprocess_mock):
+                            with mock.patch(
+                                "rookieui.services.controlnet.image_tensor_to_data_url",
+                                return_value="data:image/png;base64,cHJldmlldw==",
+                            ):
+                                payload = build_controlnet_detect_payload(
+                                    {
+                                        "controlnet_module": module_name,
+                                        "controlnet_model": "unit-selected-model.safetensors",
+                                        "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                    }
+                                )
+
+                self.assertEqual(payload["module"], module_name)
+                self.assertEqual(payload["requested_controlnet_model"], "unit-selected-model.safetensors")
+                preprocess_mock.assert_called_once()
+                self.assertEqual(preprocess_mock.call_args.kwargs["module"], module_name)
 
     def test_controlnet_detect_route_returns_invalid_request_for_missing_image(self) -> None:
         response = asyncio.run(routes.controlnet_detect(_FakeJsonRequest({"controlnet_module": "depth"})))
