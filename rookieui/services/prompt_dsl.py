@@ -50,7 +50,8 @@ _WARNING_MESSAGES = {
     PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT: "Prompt scheduling expansion exceeded guardrail; slices were truncated.",
     PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD: "Prompt scheduling threshold was invalid and fell back to linear full-range slice.",
     PROMPT_WARNING_EXTRA_NETWORK_UNSUPPORTED_REMOVED: "Unsupported A1111 extra network was removed from the prompt.",
-    PROMPT_WARNING_LEGACY_FALLBACK_ENABLED: "Prompt semantic parser/compiler rollback switch is active (legacy mode).",
+    # IMPORTANT: keep this warning explicit about the legacy graph fallback; vague wording causes users to assume the exact parity-node path is still active.
+    PROMPT_WARNING_LEGACY_FALLBACK_ENABLED: "A1111 parity text-encode nodes are disabled by ROOKIEUI_PROMPT_DSL_LEGACY; RookieUI is using the legacy graph fallback path.",
 }
 
 
