@@ -120,6 +120,33 @@ function buildEditor(idPrefix, overrides = {}) {
 }
 
 describe("createControlNetUnitEditor layout and rollback contract", () => {
+  test("keeps exactly one active control-type chip while switching radio options", () => {
+    const { host } = buildEditor("rookieui-img2img-controlnet");
+    document.body.appendChild(host);
+
+    const allRadio = host.querySelector("#rookieui-img2img-controlnet-control-type-0-all");
+    const blurRadio = host.querySelector("#rookieui-img2img-controlnet-control-type-0-blur");
+    const cannyRadio = host.querySelector("#rookieui-img2img-controlnet-control-type-0-canny");
+    const controlTypeGroup = allRadio?.closest(".rookieui-shell__controlnet-radio-grid");
+    expect(allRadio).not.toBeNull();
+    expect(blurRadio).not.toBeNull();
+    expect(cannyRadio).not.toBeNull();
+    expect(controlTypeGroup).not.toBeNull();
+
+    expect(controlTypeGroup.querySelectorAll(".rookieui-shell__controlnet-radio-option[data-active='true']")).toHaveLength(1);
+    expect(allRadio?.parentElement?.dataset.active).toBe("true");
+
+    blurRadio.click();
+    expect(controlTypeGroup.querySelectorAll(".rookieui-shell__controlnet-radio-option[data-active='true']")).toHaveLength(1);
+    expect(blurRadio?.parentElement?.dataset.active).toBe("true");
+    expect(allRadio?.parentElement?.dataset.active).toBe("false");
+
+    cannyRadio.click();
+    expect(controlTypeGroup.querySelectorAll(".rookieui-shell__controlnet-radio-option[data-active='true']")).toHaveLength(1);
+    expect(cannyRadio?.parentElement?.dataset.active).toBe("true");
+    expect(blurRadio?.parentElement?.dataset.active).toBe("false");
+  });
+
   test("pins selector row order, icon semantics, and full-width weight lane for txt2img", () => {
     const { host } = buildEditor("rookieui-txt2img-controlnet");
     const selectorRow = host.querySelector("#rookieui-txt2img-controlnet-selector-row-0");

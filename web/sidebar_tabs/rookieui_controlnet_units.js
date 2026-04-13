@@ -710,7 +710,9 @@ function createControlTypeSelector({ idPrefix, index, controlTypeOptions, onChan
     radios.push(radio);
 
     radio.addEventListener("change", () => {
-      optionLabel.dataset.active = radio.checked ? "true" : "false";
+      // DEBUG HOTSPOT: radio-group highlight sync seam. Always refresh the full group state here;
+      // updating only the clicked label leaves stale `data-active=true` chips after rapid control-type switching.
+      updateActiveStyles();
       if (onChange) {
         onChange();
       }
