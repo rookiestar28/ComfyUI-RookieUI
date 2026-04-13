@@ -147,6 +147,49 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(blurRadio?.parentElement?.dataset.active).toBe("false");
   });
 
+  test("filters preprocessor options by control type using variant catalog entries", () => {
+    const { host, editor } = buildEditor("rookieui-img2img-controlnet");
+    document.body.appendChild(host);
+
+    editor.setControlTypeCatalog({
+      All: {
+        module_list: ["none", "lineart_anime", "lineart_standard", "depth_anything_v2"],
+        model_list: [],
+        default_option: "none",
+      },
+      Lineart: {
+        module_list: ["none", "lineart_anime", "lineart_anime_denoise", "lineart_standard"],
+        model_list: [],
+        default_option: "lineart_anime",
+      },
+      Depth: {
+        module_list: ["none", "depth_anything_v2", "depth_midas"],
+        model_list: [],
+        default_option: "depth_anything_v2",
+      },
+    });
+
+    const moduleSelect = host.querySelector("#rookieui-img2img-controlnet-module-0");
+    const lineartRadio = host.querySelector("#rookieui-img2img-controlnet-control-type-0-lineart");
+    const depthRadio = host.querySelector("#rookieui-img2img-controlnet-control-type-0-depth");
+    expect(moduleSelect).not.toBeNull();
+    expect(lineartRadio).not.toBeNull();
+    expect(depthRadio).not.toBeNull();
+
+    lineartRadio.click();
+    let moduleOptions = Array.from(moduleSelect.options).map((entry) => entry.value);
+    expect(moduleOptions).toEqual(["none", "lineart_anime", "lineart_anime_denoise", "lineart_standard"]);
+    expect(moduleSelect.value).toBe("lineart_anime");
+
+    moduleSelect.value = "lineart_standard";
+    moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+
+    depthRadio.click();
+    moduleOptions = Array.from(moduleSelect.options).map((entry) => entry.value);
+    expect(moduleOptions).toEqual(["none", "depth_anything_v2", "depth_midas"]);
+    expect(moduleSelect.value).toBe("depth_anything_v2");
+  });
+
   test("pins selector row order, icon semantics, and full-width weight lane for txt2img", () => {
     const { host } = buildEditor("rookieui-txt2img-controlnet");
     const selectorRow = host.querySelector("#rookieui-txt2img-controlnet-selector-row-0");

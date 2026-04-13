@@ -52,6 +52,14 @@ class _FakeDictResultNode:
 
 
 class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
+    def test_normalize_preprocessor_option_key_preserves_lineart_variant(self) -> None:
+        normalized = runtime.normalize_preprocessor_option_key("lineart_anime_denoise")
+        self.assertEqual(normalized, "lineart_anime_denoise")
+
+    def test_normalize_module_key_collapses_lineart_variant_to_base_module(self) -> None:
+        normalized = runtime.normalize_module_key("lineart_anime_denoise")
+        self.assertEqual(normalized, "lineart")
+
     def test_select_aio_preprocessor_name_matches_normalized_explicit_candidates(self) -> None:
         selected = runtime._select_aio_preprocessor_name(_FakeAioDepth, "depth")
         self.assertEqual(selected, "depth_anything_v2")
@@ -105,6 +113,19 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         )
         self.assertGreaterEqual(len(resolved), 2)
         self.assertEqual(resolved[0], "DepthAnythingV2Preprocessor")
+
+    def test_resolve_host_preprocessor_candidates_honors_variant_preferred_order(self) -> None:
+        resolved = runtime._resolve_host_preprocessor_candidates(
+            "lineart",
+            {
+                "LineArtPreprocessor": object(),
+                "LineartStandardPreprocessor": object(),
+                "AnimeLineArtPreprocessor": object(),
+            },
+            preferred_candidates=("LineartStandardPreprocessor",),
+        )
+        self.assertGreaterEqual(len(resolved), 2)
+        self.assertEqual(resolved[0], "LineartStandardPreprocessor")
 
     def test_preprocess_controlnet_non_depth_stops_after_global_probe_limit(self) -> None:
         marker = object()

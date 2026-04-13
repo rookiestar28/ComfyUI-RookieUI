@@ -23,7 +23,11 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
-from rookieui.services.controlnet_runtime import normalize_module_key, preprocess_controlnet_tensor
+from rookieui.services.controlnet_runtime import (
+    CONTROLNET_PREPROCESSOR_OPTION_ORDER,
+    normalize_module_key,
+    preprocess_controlnet_tensor,
+)
 
 try:
     from comfy import model_management
@@ -197,27 +201,7 @@ class RookieUILoadAssetMask:
 
 
 class RookieUIControlNetPreprocess:
-    _module_choices = (
-        "none",
-        "blur",
-        "canny",
-        "depth",
-        "normalmap",
-        "openpose",
-        "mlsd",
-        "lineart",
-        "scribble",
-        "segmentation",
-        "shuffle",
-        "sketch",
-        "softedge",
-        "reference",
-        "ipadapter",
-        "instantid",
-        "t2iadapter",
-        "tile",
-        "inpaint",
-    )
+    _module_choices = CONTROLNET_PREPROCESSOR_OPTION_ORDER
     _module_aliases = {
         "ip-adapter": "ipadapter",
         "ip_adapter": "ipadapter",

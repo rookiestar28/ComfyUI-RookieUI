@@ -522,6 +522,8 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertIn("openpose", payload["module_list"])
         self.assertIn("custom_module", payload["module_list"])
         self.assertIn("foo_bar", payload["module_list"])
+        self.assertIn("lineart_anime", payload["module_list"])
+        self.assertIn("depth_anything_v2", payload["module_list"])
 
     def test_control_types_payload_builds_full_dynamic_matrix(self) -> None:
         fake_inventory = mock.Mock(
@@ -560,6 +562,37 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertTrue(
             any("openpose" in model.lower() for model in payload["control_types"]["OpenPose"]["model_list"]),
         )
+        self.assertIn("lineart_anime", payload["control_types"]["Lineart"]["module_list"])
+        self.assertIn("lineart_standard", payload["control_types"]["Lineart"]["module_list"])
+
+    def test_detect_payload_preserves_selected_preprocessor_variant_for_runtime_dispatch(self) -> None:
+        preprocess_mock = mock.Mock(
+            return_value=ControlNetRuntimeResult(
+                image=mock.Mock(),
+                backend="comfy_host_preprocessor",
+                processor_name="AnimeLineArtPreprocessor",
+                used_fallback=False,
+                diagnostics=(),
+            )
+        )
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch("rookieui.services.controlnet.preprocess_controlnet_tensor", preprocess_mock):
+                    with mock.patch(
+                        "rookieui.services.controlnet.image_tensor_to_data_url",
+                        return_value="data:image/png;base64,cHJldmlldw==",
+                    ):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "lineart_anime",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
+
+        preprocess_mock.assert_called_once()
+        self.assertEqual(preprocess_mock.call_args.kwargs["module"], "lineart_anime")
+        self.assertEqual(payload["module"], "lineart_anime")
+        self.assertEqual(payload["processor"], "AnimeLineArtPreprocessor")
 
     def test_detect_payload_supports_depth_module_dispatch(self) -> None:
         payload = build_controlnet_detect_payload(

@@ -14,14 +14,83 @@ const DEFAULT_CONTROL_TYPE = "All";
 
 const MODULE_OPTIONS = [
   { value: "none", label: "None" },
+  { value: "blur", label: "blur" },
   { value: "canny", label: "Canny" },
   { value: "depth", label: "Depth" },
+  { value: "depth_anything_v2", label: "depth_anything_v2" },
+  { value: "depth_anything", label: "depth_anything" },
+  { value: "depth_midas", label: "depth_midas" },
+  { value: "depth_zoe", label: "depth_zoe" },
+  { value: "depth_leres", label: "depth_leres" },
+  { value: "normalmap", label: "normalmap" },
+  { value: "normal_midas", label: "normal_midas" },
+  { value: "normal_bae", label: "normal_bae" },
+  { value: "normal_dsine", label: "normal_dsine" },
   { value: "openpose", label: "OpenPose" },
+  { value: "openpose_full", label: "openpose_full" },
+  { value: "openpose_dw", label: "openpose_dw" },
+  { value: "openpose_animal", label: "openpose_animal" },
+  { value: "openpose_densepose", label: "openpose_densepose" },
+  { value: "mlsd", label: "mlsd" },
   { value: "lineart", label: "Lineart" },
+  { value: "lineart_anime", label: "lineart_anime" },
+  { value: "lineart_anime_denoise", label: "lineart_anime_denoise" },
+  { value: "lineart_coarse", label: "lineart_coarse" },
+  { value: "lineart_realistic", label: "lineart_realistic" },
+  { value: "lineart_standard", label: "lineart_standard" },
   { value: "scribble", label: "Scribble" },
+  { value: "scribble_xdog", label: "scribble_xdog" },
+  { value: "scribble_pidinet", label: "scribble_pidinet" },
+  { value: "scribble_fake", label: "scribble_fake" },
+  { value: "segmentation", label: "segmentation" },
+  { value: "segmentation_oneformer_coco", label: "segmentation_oneformer_coco" },
+  { value: "segmentation_oneformer_ade20k", label: "segmentation_oneformer_ade20k" },
+  { value: "segmentation_uniformer", label: "segmentation_uniformer" },
+  { value: "segmentation_anime_face", label: "segmentation_anime_face" },
+  { value: "shuffle", label: "shuffle" },
+  { value: "sketch", label: "sketch" },
+  { value: "sketch_scribble", label: "sketch_scribble" },
+  { value: "sketch_lineart", label: "sketch_lineart" },
+  { value: "sketch_hed", label: "sketch_hed" },
   { value: "softedge", label: "SoftEdge" },
+  { value: "softedge_hed", label: "softedge_hed" },
+  { value: "softedge_pidinet", label: "softedge_pidinet" },
+  { value: "softedge_teed", label: "softedge_teed" },
+  { value: "reference", label: "reference" },
+  { value: "ipadapter", label: "ipadapter" },
+  { value: "instantid", label: "instantid" },
+  { value: "t2iadapter", label: "t2iadapter" },
+  { value: "tile", label: "tile" },
+  { value: "tile_simple", label: "tile_simple" },
+  { value: "tile_gf", label: "tile_gf" },
   { value: "inpaint", label: "Inpaint" },
 ];
+
+const DEPTH_PREPROCESSOR_OPTIONS = [
+  "depth",
+  "depth_anything_v2",
+  "depth_anything",
+  "depth_midas",
+  "depth_zoe",
+  "depth_leres",
+];
+const LINEART_PREPROCESSOR_OPTIONS = [
+  "lineart",
+  "lineart_anime",
+  "lineart_anime_denoise",
+  "lineart_coarse",
+  "lineart_realistic",
+  "lineart_standard",
+];
+const OPENPOSE_PREPROCESSOR_OPTIONS = [
+  "openpose",
+  "openpose_full",
+  "openpose_dw",
+  "openpose_animal",
+  "openpose_densepose",
+];
+const SOFTEDGE_PREPROCESSOR_OPTIONS = ["softedge", "softedge_hed", "softedge_pidinet", "softedge_teed"];
+const SCRIBBLE_PREPROCESSOR_OPTIONS = ["scribble", "scribble_xdog", "scribble_pidinet", "scribble_fake"];
 
 const DEFAULT_CONTROL_TYPE_OPTIONS = [
   "All",
@@ -482,40 +551,102 @@ function buildFallbackControlTypeCatalog(controlTypeOptions) {
       model_list: [],
       default_option: "none",
     },
+    Blur: {
+      module_list: ["none", "blur"],
+      model_list: [],
+      default_option: "blur",
+    },
     Canny: {
-      module_list: ["canny"],
+      module_list: ["none", "canny"],
       model_list: [],
       default_option: "canny",
     },
     Depth: {
-      module_list: ["depth"],
+      module_list: ["none", ...DEPTH_PREPROCESSOR_OPTIONS],
       model_list: [],
       default_option: "depth",
     },
+    NormalMap: {
+      module_list: ["none", "normalmap", "normal_midas", "normal_bae", "normal_dsine"],
+      model_list: [],
+      default_option: "normalmap",
+    },
+    MLSD: {
+      module_list: ["none", "mlsd"],
+      model_list: [],
+      default_option: "mlsd",
+    },
     Inpaint: {
-      module_list: ["inpaint"],
+      module_list: ["none", "inpaint"],
       model_list: [],
       default_option: "inpaint",
     },
     OpenPose: {
-      module_list: ["openpose"],
+      module_list: ["none", ...OPENPOSE_PREPROCESSOR_OPTIONS],
       model_list: [],
       default_option: "openpose",
     },
     Lineart: {
-      module_list: ["lineart"],
+      module_list: ["none", ...LINEART_PREPROCESSOR_OPTIONS],
       model_list: [],
       default_option: "lineart",
     },
     Scribble: {
-      module_list: ["scribble"],
+      module_list: ["none", ...SCRIBBLE_PREPROCESSOR_OPTIONS],
       model_list: [],
       default_option: "scribble",
     },
+    Segmentation: {
+      module_list: [
+        "none",
+        "segmentation",
+        "segmentation_oneformer_coco",
+        "segmentation_oneformer_ade20k",
+        "segmentation_uniformer",
+        "segmentation_anime_face",
+      ],
+      model_list: [],
+      default_option: "segmentation",
+    },
+    Shuffle: {
+      module_list: ["none", "shuffle"],
+      model_list: [],
+      default_option: "shuffle",
+    },
+    Sketch: {
+      module_list: ["none", "sketch", "sketch_scribble", "sketch_lineart", "sketch_hed"],
+      model_list: [],
+      default_option: "sketch",
+    },
     SoftEdge: {
-      module_list: ["softedge"],
+      module_list: ["none", ...SOFTEDGE_PREPROCESSOR_OPTIONS],
       model_list: [],
       default_option: "softedge",
+    },
+    Reference: {
+      module_list: ["none", "reference"],
+      model_list: [],
+      default_option: "reference",
+    },
+    "IP-Adapter": {
+      module_list: ["none", "ipadapter"],
+      model_list: [],
+      default_option: "ipadapter",
+    },
+    "Instant-ID": {
+      module_list: ["none", "instantid"],
+      model_list: [],
+      default_option: "instantid",
+    },
+    "T2I-Adapter": {
+      module_list: ["none", "t2iadapter"],
+      model_list: [],
+      default_option: "t2iadapter",
+    },
+    Tile: {
+      module_list: ["none", "tile", "tile_simple", "tile_gf"],
+      model_list: [],
+      default_option: "tile",
     },
   };
 
@@ -1054,6 +1185,7 @@ export function createControlNetUnitEditor({
       const warningText = warningMessages.length > 0 ? ` (${warningMessages[0]})` : "";
       const detectBackend = String(data?.detect_backend ?? "").trim().toLowerCase();
       const processorName = String(data?.processor ?? "").trim();
+      const requestedModule = String(data?.module ?? moduleName).trim();
       const requestedControlModel = String(data?.requested_controlnet_model ?? selectedControlModel).trim();
       // DEBUG HOTSPOT: backend/processor/status-text stitching seam for run-preprocessor triage.
       // Keep this branch map aligned with backend warning diagnostics so UI messages explain fallback cause precisely.
@@ -1071,13 +1203,14 @@ export function createControlNetUnitEditor({
       const visibilityText = row.allowPreview.checked
         ? " Preview lane updated."
         : " Preview output is ready but hidden because Allow Preview is off.";
+      const preprocessorText = requestedModule ? ` Preprocessor: ${requestedModule}.` : "";
       const processorText = processorName ? ` Processor: ${processorName}.` : "";
       const controlModelText = requestedControlModel
         ? ` Control model: ${requestedControlModel} (generation stage only; preprocessor preview is driven by selected preprocessor/annotator).`
         : "";
       if (onStatusMessage) {
         onStatusMessage(
-          `ControlNet Unit ${unitIndex + 1}: preprocessor completed${warningText}${backendText}${processorText}${controlModelText}${visibilityText}`,
+          `ControlNet Unit ${unitIndex + 1}: preprocessor completed${warningText}${backendText}${preprocessorText}${processorText}${controlModelText}${visibilityText}`,
         );
       }
     } catch (error) {
