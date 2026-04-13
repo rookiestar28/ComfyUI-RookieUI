@@ -196,6 +196,8 @@ _WARNING_MESSAGES = {
     ),
 }
 
+_CONTROLNET_GENERATION_MODEL_EXTENSIONS = (".safetensors", ".ckpt", ".pt")
+
 
 def _env_flag(name: str, *, default: bool) -> bool:
     raw_value = str(os.getenv(name, "1" if default else "0")).strip().lower()
@@ -273,6 +275,21 @@ def _build_module_alias_map(modules: list[str]) -> dict[str, str]:
         aliases[normalized.replace("_", "-")] = normalized
         aliases[normalized.replace("_", " ")] = normalized
     return aliases
+
+
+def _sanitize_controlnet_model_inventory(models: list[str]) -> list[str]:
+    normalized_models = [str(model).strip() for model in models if isinstance(model, str) and str(model).strip()]
+    if not normalized_models:
+        return []
+    # DEBUG HOTSPOT: control-model inventory filtering seam.
+    # Exclude host annotator/preprocessor checkpoints (commonly *.pth under controlnet_aux ckpts)
+    # so the ControlNet model selector stays generation-only and does not leak preprocessing weights.
+    filtered = [
+        model
+        for model in normalized_models
+        if str(model).strip().lower().endswith(_CONTROLNET_GENERATION_MODEL_EXTENSIONS)
+    ]
+    return filtered if filtered else normalized_models
 
 
 def _filter_models_by_keywords(model_list: list[str], keywords: tuple[str, ...]) -> list[str]:
@@ -457,6 +474,7 @@ def normalize_controlnet_units(
         warning_codes.append(CONTROLNET_WARNING_FEATURE_DISABLED)
         return [], warning_codes, warning_messages_from_codes(warning_codes)
 
+    normalized_inventory_models = _sanitize_controlnet_model_inventory(list(inventory_models or []))
     units = selected_units[:_MAX_CONTROLNET_UNITS]
     if len(selected_units) > _MAX_CONTROLNET_UNITS:
         warning_codes.append(CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED)
@@ -479,7 +497,7 @@ def normalize_controlnet_units(
             _extract_unit_field(raw_unit, "model"),
             f"controlnet_units[{index}].model",
             default_value="",
-            inventory_selectors=inventory_models,
+            inventory_selectors=normalized_inventory_models,
             strict_match=strict_model_match,
         )
         if enabled and not model:
@@ -617,10 +635,11 @@ def build_controlnet_module_list_payload() -> dict[str, object]:
 
 def build_controlnet_model_list_payload() -> dict[str, object]:
     inventory = discover_model_inventory()
+    model_list = _sanitize_controlnet_model_inventory(list(inventory.controlnet))
     return {
         "source": inventory.source,
         "contract": build_controlnet_integrated_contract_meta(),
-        "model_list": list(inventory.controlnet),
+        "model_list": model_list,
         "default_model": "",
     }
 

@@ -18,6 +18,7 @@ from rookieui.services.controlnet import (
     CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE,
     build_controlnet_control_types_payload,
     build_controlnet_detect_payload,
+    build_controlnet_model_list_payload,
     build_controlnet_module_list_payload,
     normalize_controlnet_units,
 )
@@ -253,6 +254,26 @@ class ControlNetNormalizationTests(unittest.TestCase):
         self.assertEqual(request.controlnet_units[0].control_type, "IP-Adapter")
         self.assertEqual(request.controlnet_units[1].control_type, "All")
 
+    def test_controlnet_normalization_strict_match_rejects_preprocessor_weight_from_model_selector(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must match a host inventory entry"):
+            normalize_controlnet_units(
+                {
+                    "controlnet_units": [
+                        {
+                            "enabled": True,
+                            "module": "depth",
+                            "model": "depth_anything_v2_vitl.pth",
+                            "image_asset": "source-image",
+                        }
+                    ]
+                },
+                inventory_models=[
+                    "Xinsir-Controlnet-depth-sdxl.safetensors",
+                    "depth_anything_v2_vitl.pth",
+                ],
+                strict_model_match=True,
+            )
+
 
 class ControlNetWorkflowTranslationTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -468,6 +489,30 @@ class ControlNetRouteTests(unittest.TestCase):
             }
         )
         self.assertEqual(payload["requested_controlnet_model"], "xinsir-controlnet-depth-sdxl.safetensors")
+
+    def test_model_list_payload_filters_out_preprocessor_weight_entries(self) -> None:
+        fake_inventory = mock.Mock(
+            source="host",
+            checkpoints=[],
+            diffusion_models=[],
+            vae=[],
+            text_encoders=[],
+            loras=[],
+            default_checkpoint="",
+            default_vae="",
+            default_text_encoder="",
+            controlnet=[
+                "Xinsir-Controlnet-depth-sdxl.safetensors",
+                "depth_anything_v2_vitl.pth",
+                "control_v11p_sd15_openpose.ckpt",
+            ],
+        )
+        with mock.patch("rookieui.services.controlnet.discover_model_inventory", return_value=fake_inventory):
+            payload = build_controlnet_model_list_payload()
+
+        self.assertIn("Xinsir-Controlnet-depth-sdxl.safetensors", payload["model_list"])
+        self.assertIn("control_v11p_sd15_openpose.ckpt", payload["model_list"])
+        self.assertNotIn("depth_anything_v2_vitl.pth", payload["model_list"])
 
     def test_module_list_payload_accepts_env_extension_modules(self) -> None:
         with mock.patch.dict("os.environ", {"ROOKIEUI_CONTROLNET_EXTRA_MODULES": "OpenPose, custom-module,foo_bar"}):

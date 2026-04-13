@@ -1073,7 +1073,7 @@ export function createControlNetUnitEditor({
         : " Preview output is ready but hidden because Allow Preview is off.";
       const processorText = processorName ? ` Processor: ${processorName}.` : "";
       const controlModelText = requestedControlModel
-        ? ` Control model: ${requestedControlModel} (generation model; preprocessor uses host annotator weights).`
+        ? ` Control model: ${requestedControlModel} (generation stage only; preprocessor preview is driven by selected preprocessor/annotator).`
         : "";
       if (onStatusMessage) {
         onStatusMessage(
