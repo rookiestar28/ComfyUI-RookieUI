@@ -75,9 +75,9 @@ class _FakeOpenPoseNode:
         return {
             "required": {"image": ("IMAGE",)},
             "optional": {
-                "detect_body": ("BOOLEAN", {"default": True}),
-                "detect_hand": ("BOOLEAN", {"default": True}),
-                "detect_face": ("BOOLEAN", {"default": True}),
+                "detect_body": (["enable", "disable"], {"default": "enable"}),
+                "detect_hand": (["enable", "disable"], {"default": "enable"}),
+                "detect_face": (["enable", "disable"], {"default": "enable"}),
                 "resolution": ("INT", {"default": 512}),
             },
         }
@@ -85,9 +85,9 @@ class _FakeOpenPoseNode:
     def execute(
         self,
         image: object,
-        detect_body: bool = True,
-        detect_hand: bool = True,
-        detect_face: bool = True,
+        detect_body: str = "enable",
+        detect_hand: str = "enable",
+        detect_face: str = "enable",
         resolution: int = 512,
     ) -> dict[str, object]:
         _FakeOpenPoseNode.last_inputs = {
@@ -198,9 +198,9 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
             _FakeOpenPoseNode.last_inputs,
             {
                 "image": marker,
-                "detect_body": True,
-                "detect_hand": False,
-                "detect_face": False,
+                "detect_body": "enable",
+                "detect_hand": "disable",
+                "detect_face": "disable",
                 "resolution": 640,
             },
         )
@@ -221,8 +221,35 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                 threshold_b=64.0,
                 aio_preprocessor_name=None,
             )
-        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_hand"], True)
-        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_face"], True)
+        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_hand"], "enable")
+        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_face"], "enable")
+
+    def test_build_node_parameter_value_coerces_detect_flags_for_combo_schema(self) -> None:
+        schema_entry = (["enable", "disable"], {"default": "enable"})
+        enabled = runtime._build_node_parameter_value(
+            "detect_body",
+            schema_entry=schema_entry,
+            host_parameter_overrides={},
+            image_tensor=object(),
+            mask_tensor=None,
+            processor_res=512,
+            threshold_a=64.0,
+            threshold_b=64.0,
+            aio_preprocessor_name=None,
+        )
+        disabled = runtime._build_node_parameter_value(
+            "detect_hand",
+            schema_entry=schema_entry,
+            host_parameter_overrides={"detect_hand": False},
+            image_tensor=object(),
+            mask_tensor=None,
+            processor_res=512,
+            threshold_a=64.0,
+            threshold_b=64.0,
+            aio_preprocessor_name=None,
+        )
+        self.assertEqual(enabled, "enable")
+        self.assertEqual(disabled, "disable")
 
     def test_discover_dynamic_host_preprocessors_skips_heavy_depth_candidates(self) -> None:
         discovered = runtime._discover_dynamic_host_preprocessors(
