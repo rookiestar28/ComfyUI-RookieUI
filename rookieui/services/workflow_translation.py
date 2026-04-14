@@ -9,7 +9,10 @@ from rookieui.contracts.generation import (
     NormalizedTxt2ImgRequest,
     WorkflowTranslationResult,
 )
-from rookieui.contracts.adetailer import NormalizedADetailerUnitRequest
+from rookieui.contracts.adetailer import (
+    NormalizedADetailerControlNetRequest,
+    NormalizedADetailerUnitRequest,
+)
 from rookieui.services.parity_matrix import (
     get_parity_profile,
     get_sampler_alias_payload,
@@ -637,6 +640,38 @@ def _append_adetailer_unit_conditioning(
     return positive_id, negative_id
 
 
+def _build_adetailer_custom_controlnet_unit(unit: NormalizedADetailerUnitRequest) -> dict[str, object]:
+    controlnet = unit.controlnet
+    return {
+        "enabled": True,
+        "module": controlnet.module,
+        "model": controlnet.model,
+        "weight": controlnet.weight,
+        "guidance_start": controlnet.guidance_start,
+        "guidance_end": controlnet.guidance_end,
+        "processor_res": 512,
+        "threshold_a": 64.0,
+        "threshold_b": 64.0,
+        "image_asset": "",
+        "mask_asset": "",
+        "use_mask": False,
+    }
+
+
+def _resolve_adetailer_controlnet_units(
+    unit: NormalizedADetailerUnitRequest,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+) -> list[NormalizedControlNetUnit | dict[str, object]]:
+    mode = str(unit.controlnet.mode or "none").strip().lower()
+    if mode == "passthrough":
+        # IMPORTANT: passthrough snapshots primary units for this refinement pass only;
+        # do not mutate request.controlnet_units or the base generation path will drift.
+        return [controlnet_unit for controlnet_unit in request.controlnet_units if controlnet_unit.enabled]
+    if mode == "custom" and str(unit.controlnet.model or "").strip():
+        return [_build_adetailer_custom_controlnet_unit(unit)]
+    return []
+
+
 def _append_adetailer_units(
     workflow: dict[str, object],
     *,
@@ -684,6 +719,17 @@ def _append_adetailer_units(
             prompt_encoder_mode=prompt_encoder_mode,
             width=unit.inpaint_width if unit.use_inpaint_size else width,
             height=unit.inpaint_height if unit.use_inpaint_size else height,
+        )
+        positive_ref, negative_ref = _apply_controlnet_unit_entries(
+            workflow,
+            allocator=allocator,
+            units=_resolve_adetailer_controlnet_units(unit, request),
+            request=request,
+            positive_ref=positive_id,
+            negative_ref=negative_id,
+            model_source=detail_model_source,
+            vae_source=detail_vae_source,
+            control_image_ref=current_image_ref,
         )
 
         mask_id = allocator.next()
@@ -734,8 +780,8 @@ def _append_adetailer_units(
         _build_sampler_node(
             workflow,
             node_id=sampler_id,
-            positive_id=positive_id,
-            negative_id=negative_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=encode_id,
             request=request,
             denoise=unit.denoising_strength,
@@ -915,48 +961,55 @@ def _resolve_diffusion_model_sources(
     return model_source, clip_source, vae_source
 
 
-def _read_controlnet_unit_value(unit: NormalizedControlNetUnit | dict[str, object], key: str) -> object:
+def _read_controlnet_unit_value(
+    unit: NormalizedControlNetUnit | NormalizedADetailerControlNetRequest | dict[str, object],
+    key: str,
+) -> object:
     if isinstance(unit, dict):
         return unit.get(key)
     return getattr(unit, key, None)
 
 
-def _apply_controlnet_units(
+def _apply_controlnet_unit_entries(
     workflow: dict[str, object],
     *,
     allocator: NodeIdAllocator,
+    units: list[NormalizedControlNetUnit | dict[str, object]],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     positive_ref: str | list[object],
     negative_ref: str | list[object],
     model_source: list[object],
     vae_source: list[object],
+    control_image_ref: list[object] | None = None,
 ) -> tuple[str | list[object], str | list[object]]:
-    units = [
-        unit
-        for unit in request.controlnet_units
-        if bool(_read_controlnet_unit_value(unit, "enabled"))
-    ]
-    if not units:
-        return positive_ref, negative_ref
-
     current_positive = positive_ref
     current_negative = negative_ref
     for unit in units:
+        if not bool(_read_controlnet_unit_value(unit, "enabled")):
+            continue
         image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
         mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
         use_mask = bool(_read_controlnet_unit_value(unit, "use_mask"))
         module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
-        if not image_asset or not model_name:
+        if not model_name:
             continue
 
-        image_id = allocator.next()
-        workflow[image_id] = {
-            "class_type": "RookieUILoadAssetImage",
-            "inputs": {
-                "asset_handle": image_asset,
-            },
-        }
+        if control_image_ref is None:
+            if not image_asset:
+                continue
+            image_id = allocator.next()
+            workflow[image_id] = {
+                "class_type": "RookieUILoadAssetImage",
+                "inputs": {
+                    "asset_handle": image_asset,
+                },
+            }
+            image_ref = [image_id, 0]
+        else:
+            # IMPORTANT: ADetailer-local ControlNet must preprocess the current refinement image;
+            # rebinding this to the original unit source asset makes passthrough/custom act on stale pixels.
+            image_ref = control_image_ref
 
         mask_ref: list[object] | None = None
         if use_mask and mask_asset:
@@ -974,7 +1027,7 @@ def _apply_controlnet_units(
 
         preprocess_id = allocator.next()
         preprocess_inputs: dict[str, object] = {
-            "image": [image_id, 0],
+            "image": image_ref,
             "module": module_name,
             "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
             "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
@@ -1025,6 +1078,29 @@ def _apply_controlnet_units(
         current_negative = [apply_id, 1]
 
     return current_positive, current_negative
+
+
+def _apply_controlnet_units(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    positive_ref: str | list[object],
+    negative_ref: str | list[object],
+    model_source: list[object],
+    vae_source: list[object],
+) -> tuple[str | list[object], str | list[object]]:
+    return _apply_controlnet_unit_entries(
+        workflow,
+        allocator=allocator,
+        units=list(request.controlnet_units),
+        request=request,
+        positive_ref=positive_ref,
+        negative_ref=negative_ref,
+        model_source=model_source,
+        vae_source=vae_source,
+        control_image_ref=None,
+    )
 
 
 def _append_img2img_resize_node(

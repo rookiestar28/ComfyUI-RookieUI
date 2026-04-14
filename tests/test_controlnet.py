@@ -434,6 +434,106 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         loader_node = next(node for node in workflow.values() if node["class_type"] == "DiffControlNetLoader")
         self.assertEqual(loader_node["inputs"]["model"], [unet_node_id, 0])
 
+    def test_txt2img_adetailer_controlnet_none_keeps_refinement_without_controlnet_apply(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "controlnet": {"mode": "none"},
+                        }
+                    ],
+                },
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in payload["workflow"].values()}
+
+        self.assertIn("RookieUIADetailerDetectMask", class_types)
+        self.assertNotIn("ControlNetApplyAdvanced", class_types)
+
+    def test_txt2img_adetailer_controlnet_passthrough_uses_current_refinement_image(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "weight": 0.7,
+                    }
+                ],
+                "adetailer": {
+                    "enabled": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "controlnet": {"mode": "passthrough"},
+                        }
+                    ],
+                },
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        apply_nodes = [node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced"]
+        preprocess_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "RookieUIControlNetPreprocess"]
+        decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
+
+        self.assertEqual(len(apply_nodes), 2)
+        self.assertEqual(len(preprocess_nodes), 2)
+        self.assertEqual(apply_nodes[0]["inputs"]["strength"], 0.7)
+        self.assertEqual(apply_nodes[1]["inputs"]["strength"], 0.7)
+        self.assertEqual(preprocess_nodes[-1][1]["inputs"]["image"], [decode_nodes[0][0], 0])
+
+    def test_txt2img_adetailer_controlnet_custom_is_isolated_to_detailer_context(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "controlnet": {
+                                "mode": "custom",
+                                "module": "depth",
+                                "model": "control_v11f1p_sd15_depth.safetensors",
+                                "weight": 0.55,
+                                "guidance_start": 0.15,
+                                "guidance_end": 0.65,
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        apply_nodes = [node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced"]
+        loader_nodes = [node for node in workflow.values() if node["class_type"] == "DiffControlNetLoader"]
+        preprocess_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "RookieUIControlNetPreprocess"]
+        decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
+
+        self.assertEqual(len(apply_nodes), 1)
+        self.assertEqual(apply_nodes[0]["inputs"]["strength"], 0.55)
+        self.assertEqual(apply_nodes[0]["inputs"]["start_percent"], 0.15)
+        self.assertEqual(apply_nodes[0]["inputs"]["end_percent"], 0.65)
+        self.assertEqual(loader_nodes[0]["inputs"]["control_net_name"], "control_v11f1p_sd15_depth.safetensors")
+        self.assertEqual(preprocess_nodes[0][1]["inputs"]["module"], "depth")
+        self.assertEqual(preprocess_nodes[0][1]["inputs"]["image"], [decode_nodes[0][0], 0])
+
 
 class ControlNetRouteTests(unittest.TestCase):
     def test_bootstrap_routes_include_controlnet_surface(self) -> None:
