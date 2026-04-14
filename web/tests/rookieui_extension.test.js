@@ -1109,7 +1109,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
     expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).not.toBeNull();
-    expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-toggle")?.textContent).toBe("");
+    expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-summary")?.textContent).toContain(
+      "Hires. fix",
+    );
+    expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-summary")?.textContent).not.toContain(
+      "Enable Hires",
+    );
+    expect(document.getElementById("rookieui-txt2img-adetailer-section")?.textContent).toContain("ADetailer");
+    expect(document.getElementById("rookieui-txt2img-adetailer-section")?.textContent).not.toContain("Enable ADetailer");
     expect(txt2imgHiresControls?.textContent).not.toContain(
       "Second latent pass with bounded rookie-safe defaults.",
     );

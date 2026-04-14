@@ -276,6 +276,7 @@ export function createADetailerEditor(options) {
   topEnabled.addEventListener("click", (event) => event.stopPropagation());
   topEnabled.addEventListener("mousedown", (event) => event.stopPropagation());
   topEnabled.addEventListener("keydown", (event) => event.stopPropagation());
+  appendTextElement(header, "span", "rookieui-shell__section-title", "ADetailer");
   appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸");
 
   const body = document.createElement("div");
