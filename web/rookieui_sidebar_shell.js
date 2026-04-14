@@ -18,15 +18,15 @@ import {
   installExplicitFormSubmitShortcuts,
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
-} from "./rookieui_sidebar_shell_utils.js?v=20260415-hotfix-adetailer-selectors";
+} from "./rookieui_sidebar_shell_utils.js?v=20260415-hotfix-controlnet-title-offset";
 import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
 import { createTxt2ImgTabDefinition } from "./sidebar_tabs/rookieui_txt2img_tab.js?v=20260411-r47-tabs";
 import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.js?v=20260411-r47-tabs";
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
-import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260415-hotfix-adetailer-selectors";
-import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260415-hotfix-adetailer-selectors";
+import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260415-hotfix-controlnet-title-offset";
+import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260415-hotfix-controlnet-title-offset";
 import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
 import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
 import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";

@@ -100,6 +100,16 @@
   gap: 8px;
 }
 
+.rookieui-shell__hires-header .rookieui-shell__section-title,
+.rookieui-shell__hires-title {
+  margin: 0;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .rookieui-shell__hires-toggle {
   display: inline-flex;
   align-items: center;
@@ -116,7 +126,6 @@
 .rookieui-shell__hires-title {
   min-width: 0;
   font-size: 13px;
-  font-weight: 600;
   color: var(--rookieui-text-primary);
 }
 
@@ -140,6 +149,10 @@
 
 .rookieui-shell__controlnet-summary .rookieui-shell__hires-header {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rookieui-shell__controlnet-summary .rookieui-shell__hires-title {
+  padding-left: 24px;
 }
 
 .rookieui-shell__controlnet-summary .rookieui-shell__hires-caret {
@@ -169,7 +182,7 @@
 }
 
 .rookieui-shell__adetailer-header {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
 }
 
