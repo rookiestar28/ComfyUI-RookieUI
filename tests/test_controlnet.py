@@ -492,6 +492,43 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertTrue(apply_node["inputs"]["mask_aware_apply"])
         self.assertIn("mask_optional", apply_node["inputs"])
 
+    def test_txt2img_translation_rolls_back_to_base_apply_when_advanced_keyframes_collapse(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "weight": 0.55,
+                        "guidance_start": 0.2,
+                        "guidance_end": 0.7,
+                        "advanced": {
+                            "enabled": True,
+                            "weight_preset": "strong",
+                            "timestep_keyframes": [
+                                {"start_percent": 0.0, "end_percent": 0.1, "strength_scale": 1.0},
+                                {"start_percent": 0.9, "end_percent": 1.0, "strength_scale": 0.0},
+                            ],
+                        },
+                    }
+                ],
+            }
+        )
+
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        apply_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        ]
+
+        self.assertEqual(len(apply_nodes), 1)
+        self.assertEqual(apply_nodes[0]["inputs"]["strength"], 0.55)
+        self.assertEqual(apply_nodes[0]["inputs"]["start_percent"], 0.2)
+        self.assertEqual(apply_nodes[0]["inputs"]["end_percent"], 0.7)
+        self.assertEqual(apply_nodes[0]["inputs"]["weight_preset"], "strong")
+
     def test_img2img_translation_keeps_base_graph_when_no_controlnet_units(self) -> None:
         normalized = normalize_img2img_request(
             {

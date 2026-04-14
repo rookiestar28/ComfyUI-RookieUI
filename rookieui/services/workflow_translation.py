@@ -651,6 +651,10 @@ def _build_adetailer_custom_controlnet_unit(unit: NormalizedADetailerUnitRequest
         "weight": controlnet.weight,
         "guidance_start": controlnet.guidance_start,
         "guidance_end": controlnet.guidance_end,
+        # IMPORTANT: keep the full advanced block when adapting ADetailer-local custom ControlNet
+        # into the shared unit seam. Dropping it here silently desynchronizes local detailer behavior
+        # from the primary ControlNet runtime even though both paths claim the same contract.
+        "advanced": controlnet.advanced,
         "processor_res": 512,
         "threshold_a": 64.0,
         "threshold_b": 64.0,

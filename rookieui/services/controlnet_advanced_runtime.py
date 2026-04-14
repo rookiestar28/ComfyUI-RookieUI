@@ -82,7 +82,17 @@ def build_controlnet_apply_segments(
                 "end_percent": keyframe_end,
             }
         )
-    return segments
+    if segments:
+        return segments
+    # IMPORTANT: when advanced keyframes collapse to nothing, keep the base ControlNet segment alive.
+    # Returning [] here silently drops both primary and ADetailer-local ControlNet lanes from the workflow.
+    return [
+        {
+            "strength": base_strength,
+            "start_percent": base_start,
+            "end_percent": base_end,
+        }
+    ]
 
 
 def _build_weight_preset(total_length: int, preset: str) -> list[float]:
