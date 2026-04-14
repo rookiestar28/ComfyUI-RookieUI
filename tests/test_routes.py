@@ -41,6 +41,10 @@ class RoutePayloadTests(unittest.TestCase):
 
         self.assertEqual(payload["contract"]["version"], "r74f77-20260414")
         self.assertEqual(payload["contract"]["unit_count"], 4)
+        self.assertEqual(
+            payload["contract"]["detector_provider_families"],
+            ["none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face"],
+        )
         self.assertEqual(payload["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertIn("None", payload["detector_list"])
         self.assertIn("mediapipe_face_full", payload["detector_list"])

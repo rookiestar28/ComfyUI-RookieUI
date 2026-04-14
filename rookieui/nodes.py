@@ -334,8 +334,10 @@ class RookieUIADetailerDetectMask:
     def _shape_for_family(detector_family: str, detector: str) -> tuple[float, float, float]:
         family = str(detector_family or "").strip().lower()
         detector_name = str(detector or "").strip().lower()
-        if family == "mediapipe" or "face" in detector_name:
+        if family == "mediapipe_face" or "face" in detector_name:
             return 0.34, 0.28, 0.08
+        if family == "ultralytics_segm":
+            return 0.44, 0.62, 0.04
         if "hand" in detector_name:
             return 0.26, 0.22, 0.10
         if "person" in detector_name:

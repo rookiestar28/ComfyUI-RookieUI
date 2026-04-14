@@ -379,11 +379,11 @@ export function createADetailerEditor(options) {
 
   function syncUnitVisibility(row) {
     const detectorMeta = detectorLookup.get(row.controls.detector.value) ?? {};
-    const isWorld = String(detectorMeta.family ?? "").trim().toLowerCase() === "world";
-    row.detectorClassesField.hidden = !isWorld;
-    row.detectorClassesField.style.display = isWorld ? "" : "none";
-    row.controls.detectorClasses.disabled = !isWorld;
-    row.controls.detectorClasses.readOnly = !isWorld;
+    const supportsClassFilter = Boolean(detectorMeta.supports_class_filter);
+    row.detectorClassesField.hidden = !supportsClassFilter;
+    row.detectorClassesField.style.display = supportsClassFilter ? "" : "none";
+    row.controls.detectorClasses.disabled = !supportsClassFilter;
+    row.controls.detectorClasses.readOnly = !supportsClassFilter;
 
     const useInpaintSize = row.controls.useInpaintSize.checked;
     row.controls.inpaintWidth.disabled = !useInpaintSize;

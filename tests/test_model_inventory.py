@@ -30,7 +30,7 @@ class ModelInventoryTests(unittest.TestCase):
                 "text_encoders": ["clip_l.safetensors"],
                 "embeddings": ["badhandv4.pt"],
                 "loras": ["detail_tweaker.safetensors"],
-                "ultralytics": ["face_yolov8m.pt"],
+                "ultralytics": ["face_yolov8m.pt", "person_yolov8m-seg.pt"],
                 "unet": ["sdxl_unet.safetensors"],
                 "upscale_models": ["4x_foolhardy.pth"],
             }.get(folder_name, [])
@@ -48,7 +48,9 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.diffusion_models, ["flux1-dev.safetensors"])
         self.assertEqual(snapshot.embeddings, ["badhandv4.pt"])
         self.assertEqual(snapshot.loras, ["detail_tweaker.safetensors"])
-        self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt"])
+        self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt", "person_yolov8m-seg.pt"])
+        self.assertEqual(snapshot.ultralytics_bbox, ["face_yolov8m.pt"])
+        self.assertEqual(snapshot.ultralytics_segm, ["person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.unet, ["sdxl_unet.safetensors"])
         self.assertEqual(snapshot.upscale_models, ["4x_foolhardy.pth"])
 
@@ -61,6 +63,8 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.embeddings, [])
         self.assertEqual(snapshot.loras, [])
         self.assertEqual(snapshot.diffusion_models, [])
+        self.assertEqual(snapshot.ultralytics_bbox, [])
+        self.assertEqual(snapshot.ultralytics_segm, [])
         self.assertEqual(snapshot.upscale_models, [])
 
     def test_model_inventory_payload_exposes_catalog_groups(self) -> None:
@@ -79,6 +83,8 @@ class ModelInventoryTests(unittest.TestCase):
         )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
+        self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
+        self.assertIn("ultralytics_segm", payload["catalog"]["categories"])
 
     def test_build_preset_payload_uses_inventory_defaults(self) -> None:
         module = types.SimpleNamespace(
