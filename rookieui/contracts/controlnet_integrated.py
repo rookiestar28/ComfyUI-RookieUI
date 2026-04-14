@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from rookieui.contracts.controlnet import CONTROLNET_ADVANCED_WEIGHT_PRESETS
+
 CONTROLNET_INTEGRATED_CONTRACT_VERSION = "r72-20260412"
 CONTROLNET_INTEGRATED_UI_VARIANT = "integrated_sidebar_controlnet"
 CONTROLNET_INTEGRATED_DEFAULT_UNIT_COUNT = 3
+CONTROLNET_ADVANCED_CONTRACT_VERSION = "r111-20260415"
 
 CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER = (
     "All",
@@ -49,6 +52,14 @@ def build_controlnet_integrated_contract_meta() -> dict[str, object]:
         "unit_count": CONTROLNET_INTEGRATED_DEFAULT_UNIT_COUNT,
         "control_type_order": list(CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER),
         "defaults": dict(CONTROLNET_INTEGRATED_DEFAULTS),
+        "advanced_contract": {
+            "version": CONTROLNET_ADVANCED_CONTRACT_VERSION,
+            "weight_presets": list(CONTROLNET_ADVANCED_WEIGHT_PRESETS),
+            "supports_layer_weights": True,
+            "supports_timestep_keyframes": True,
+            "supports_mask_aware_apply": True,
+            "runtime_state": "reserved_contract_only",
+        },
         # IMPORTANT: reserve this extensibility signal so future integrated packs (e.g. ADetailer coupling) can extend without rebreaking base ControlNet contracts.
         "integrated_extension_slots": "reserved",
     }

@@ -69,6 +69,12 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(adetailer["contract"]["version"], "r74f77-20260414")
         self.assertEqual(adetailer["contract"]["ui_variant"], "a1111_integrated_detailer")
         self.assertEqual(adetailer["contract"]["unit_count"], 4)
+        self.assertEqual(
+            adetailer["contract"]["detector_provider_families"],
+            ["none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face"],
+        )
+        self.assertEqual(adetailer["contract"]["detector_result_contract"], "rookieui_detection_regions_v1")
+        self.assertEqual(adetailer["contract"]["controlnet_advanced_contract"]["runtime_state"], "reserved_contract_only")
         self.assertEqual(adetailer["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])
         self.assertIn("/rookieui/adetailer/catalog", adetailer["routes"])

@@ -9,7 +9,11 @@ from rookieui.contracts.controlnet_integrated import (
     CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER,
     build_controlnet_integrated_contract_meta,
 )
-from rookieui.contracts.controlnet import NormalizedControlNetUnit
+from rookieui.contracts.controlnet import (
+    CONTROLNET_ADVANCED_WEIGHT_PRESETS,
+    NormalizedControlNetAdvancedRequest,
+    NormalizedControlNetUnit,
+)
 from rookieui.security.request_guard import normalize_option_label, resolve_inventory_selector
 from rookieui.services.asset_store import decode_image_data, resolve_asset_path, store_uploaded_image
 from rookieui.services.coercion import (
@@ -45,6 +49,8 @@ CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT = "CONTROLNET_PREPROCESSOR_EMPTY_OU
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 _MAX_CONTROLNET_UNITS = 8
+_MAX_CONTROLNET_LAYER_WEIGHTS = 32
+_MAX_CONTROLNET_TIMESTEP_KEYFRAMES = 16
 _MIN_WEIGHT = 0.0
 _MAX_WEIGHT = 2.0
 _MIN_GUIDANCE = 0.0
@@ -158,6 +164,9 @@ _HR_OPTION_ALIASES = {
     "low_res_only": "low_res_only",
     "high res only": "high_res_only",
     "high_res_only": "high_res_only",
+}
+_ADVANCED_WEIGHT_PRESET_ALIASES = {
+    preset: preset for preset in CONTROLNET_ADVANCED_WEIGHT_PRESETS
 }
 
 _WARNING_MESSAGES = {
@@ -358,6 +367,94 @@ def _coerce_threshold(value: object, field_name: str, default_value: float) -> f
     return normalized
 
 
+def _normalize_controlnet_advanced_block(
+    raw_block: object,
+    *,
+    field_prefix: str,
+) -> NormalizedControlNetAdvancedRequest:
+    if raw_block in (None, "", False):
+        return NormalizedControlNetAdvancedRequest()
+    if not isinstance(raw_block, dict):
+        raise ValueError(f"{field_prefix} must be an object.")
+
+    enabled = _coerce_bool(raw_block.get("enabled", True), f"{field_prefix}.enabled", default=True, strict=False)
+    preset = _normalize_choice(
+        raw_block.get("weight_preset"),
+        field_name=f"{field_prefix}.weight_preset",
+        aliases=_ADVANCED_WEIGHT_PRESET_ALIASES,
+        default_value="balanced",
+    )
+
+    raw_layer_weights = raw_block.get("layer_weights", [])
+    if raw_layer_weights in (None, ""):
+        raw_layer_weights = []
+    if not isinstance(raw_layer_weights, list):
+        raise ValueError(f"{field_prefix}.layer_weights must be an array.")
+    if len(raw_layer_weights) > _MAX_CONTROLNET_LAYER_WEIGHTS:
+        raise ValueError(
+            f"{field_prefix}.layer_weights supports at most {_MAX_CONTROLNET_LAYER_WEIGHTS} entries."
+        )
+    layer_weights = [
+        round(_coerce_float(value, f"{field_prefix}.layer_weights[{index}]"), 4)
+        for index, value in enumerate(raw_layer_weights)
+    ]
+    for index, value in enumerate(layer_weights):
+        if value < 0.0 or value > _MAX_WEIGHT:
+            raise ValueError(f"{field_prefix}.layer_weights[{index}] must be between 0.0 and {_MAX_WEIGHT}.")
+
+    raw_keyframes = raw_block.get("timestep_keyframes", [])
+    if raw_keyframes in (None, ""):
+        raw_keyframes = []
+    if not isinstance(raw_keyframes, list):
+        raise ValueError(f"{field_prefix}.timestep_keyframes must be an array.")
+    if len(raw_keyframes) > _MAX_CONTROLNET_TIMESTEP_KEYFRAMES:
+        raise ValueError(
+            f"{field_prefix}.timestep_keyframes supports at most {_MAX_CONTROLNET_TIMESTEP_KEYFRAMES} entries."
+        )
+    timestep_keyframes: list[dict[str, float]] = []
+    for index, entry in enumerate(raw_keyframes):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{field_prefix}.timestep_keyframes[{index}] must be an object.")
+        start_percent = _coerce_unit_guidance(
+            entry.get("start_percent"),
+            f"{field_prefix}.timestep_keyframes[{index}].start_percent",
+            0.0,
+        )
+        end_percent = _coerce_unit_guidance(
+            entry.get("end_percent"),
+            f"{field_prefix}.timestep_keyframes[{index}].end_percent",
+            1.0,
+        )
+        if end_percent < start_percent:
+            raise ValueError(
+                f"{field_prefix}.timestep_keyframes[{index}].end_percent must be >= start_percent."
+            )
+        strength_scale = _coerce_unit_weight(
+            entry.get("strength_scale", 1.0),
+            f"{field_prefix}.timestep_keyframes[{index}].strength_scale",
+        )
+        timestep_keyframes.append(
+            {
+                "start_percent": start_percent,
+                "end_percent": end_percent,
+                "strength_scale": strength_scale,
+            }
+        )
+
+    return NormalizedControlNetAdvancedRequest(
+        enabled=enabled,
+        weight_preset=preset,
+        layer_weights=layer_weights,
+        timestep_keyframes=timestep_keyframes,
+        mask_aware_apply=_coerce_bool(
+            raw_block.get("mask_aware_apply"),
+            f"{field_prefix}.mask_aware_apply",
+            default=False,
+            strict=False,
+        ),
+    )
+
+
 def _resolve_unit_asset(
     *,
     asset_value: object,
@@ -526,6 +623,10 @@ def normalize_controlnet_units(
             default=False,
             strict=False,
         )
+        advanced = _normalize_controlnet_advanced_block(
+            _extract_unit_field(raw_unit, "advanced"),
+            field_prefix=f"controlnet_units[{index}].advanced",
+        )
 
         weight = _coerce_unit_weight(raw_unit.get("weight", 1.0), f"controlnet_units[{index}].weight")
         guidance_start = _coerce_unit_guidance(
@@ -599,6 +700,7 @@ def normalize_controlnet_units(
                 control_type=control_type,
                 use_mask=use_mask,
                 allow_preview=allow_preview,
+                advanced=advanced,
             )
         )
 

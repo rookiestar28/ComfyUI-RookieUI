@@ -66,7 +66,7 @@ class RookieUINodesTests(unittest.TestCase):
         mask, = detector.detect(
             image=image,
             detector="face_yolov8n.pt",
-            detector_family="ultralytics",
+            detector_family="ultralytics_bbox",
             confidence=0.4,
             mask_min_ratio=0.0,
             mask_max_ratio=1.0,

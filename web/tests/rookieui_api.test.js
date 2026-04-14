@@ -255,7 +255,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "host",
-              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+              },
               model_list: ["control_v11p_sd15_canny.safetensors"],
               default_model: "control_v11p_sd15_canny.safetensors",
             };
@@ -268,7 +273,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+              },
               module_list: ["none", "canny", "depth"],
               default_module: "none",
             };
@@ -281,7 +291,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+              },
               control_type_order: ["All", "Canny", "Depth"],
               default_type: "All",
               control_types: {
@@ -319,6 +334,7 @@ describe("fetchRookieUICapabilities", () => {
     });
     expect(fallbackTypes.ok).toBe(false);
     expect(fallbackTypes.data.contract.version).toBe("r72-20260412");
+    expect(fallbackTypes.data.contract.advanced_contract.runtime_state).toBe("reserved_contract_only");
     expect(fallbackTypes.data.default_type).toBe("All");
   });
 
@@ -330,6 +346,12 @@ describe("fetchRookieUICapabilities", () => {
     expect(fallbackCatalog.ok).toBe(false);
     expect(fallbackCatalog.data.contract.version).toBe("r74f77-20260414");
     expect(fallbackCatalog.data.contract.unit_count).toBe(4);
+    expect(fallbackCatalog.data.contract.detector_provider_families).toEqual([
+      "none",
+      "ultralytics_bbox",
+      "ultralytics_segm",
+      "mediapipe_face",
+    ]);
     expect(fallbackCatalog.data.prompt_tokens).toEqual(["[PROMPT]", "[SEP]", "[SKIP]"]);
     expect(fallbackCatalog.data.controlnet_modes).toEqual(["none", "passthrough", "custom"]);
     expect(fallbackCatalog.data.availability.runtime_stages).toContain("detect_mask");

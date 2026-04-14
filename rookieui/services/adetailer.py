@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rookieui.contracts.adetailer import (
     ADETAILER_CONTROLNET_MODES,
+    ADETAILER_DETECTOR_PROVIDER_FAMILIES,
     ADETAILER_FALLBACK_ULTRALYTICS_DETECTORS,
     ADETAILER_INTEGRATED_DEFAULT_UNIT_COUNT,
     ADETAILER_MASK_FILTER_METHODS,
@@ -18,7 +19,11 @@ from rookieui.services.coercion import coerce_bool as _coerce_bool
 from rookieui.services.coercion import coerce_float as _coerce_float
 from rookieui.services.coercion import coerce_int as _coerce_int
 from rookieui.services.compatibility import build_compatibility_payload
-from rookieui.services.controlnet import build_controlnet_model_list_payload, build_controlnet_module_list_payload
+from rookieui.services.controlnet import (
+    _normalize_controlnet_advanced_block,
+    build_controlnet_model_list_payload,
+    build_controlnet_module_list_payload,
+)
 from rookieui.services.model_inventory import discover_model_inventory
 
 ADETAILER_WARNING_UNIT_LIMIT_TRUNCATED = "ADETAILER_UNIT_LIMIT_TRUNCATED"
@@ -45,6 +50,7 @@ _ADETAILER_SAMPLER_COMPATIBILITY_LABELS = {"DPM++ 2M Karras"}
 _ADETAILER_DEFAULT_DETECTOR = "None"
 _ADETAILER_CONTROLNET_DEFAULT_MODULE = "None"
 _ADETAILER_WORLD_MARKER = "-world"
+_ADETAILER_SEGM_MARKERS = ("-seg", "_seg", "segm")
 
 
 def _warning_messages_from_codes(codes: list[str]) -> list[str]:
@@ -66,10 +72,11 @@ def build_adetailer_availability_payload() -> dict[str, object]:
         "controlnet_model_count": len(list(controlnet_models.get("model_list", []))),
         "detector_runtime": {
             "none": "disabled",
-            "ultralytics": "deterministic_mask_fallback",
-            "world": "deterministic_mask_fallback",
-            "mediapipe": "deterministic_mask_fallback",
+            "ultralytics_bbox": "deterministic_mask_fallback",
+            "ultralytics_segm": "deterministic_mask_fallback",
+            "mediapipe_face": "deterministic_mask_fallback",
         },
+        "detector_provider_families": list(ADETAILER_DETECTOR_PROVIDER_FAMILIES),
         "degraded_warning_codes": [
             ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG,
             ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK,
@@ -79,9 +86,24 @@ def build_adetailer_availability_payload() -> dict[str, object]:
     }
 
 
+def _classify_ultralytics_detector_family(detector: str) -> str:
+    normalized = str(detector or "").strip().lower()
+    if any(marker in normalized for marker in _ADETAILER_SEGM_MARKERS):
+        return "ultralytics_segm"
+    return "ultralytics_bbox"
+
+
+def _supports_detector_class_filter(detector: str) -> bool:
+    return _ADETAILER_WORLD_MARKER in str(detector or "").strip().lower()
+
+
 def _build_detector_entries() -> tuple[list[dict[str, object]], str]:
     inventory = discover_model_inventory()
-    ultralytics_models = [selector for selector in inventory.ultralytics if isinstance(selector, str) and selector.strip()]
+    ultralytics_models = [
+        selector
+        for selector in [*inventory.ultralytics_bbox, *inventory.ultralytics_segm]
+        if isinstance(selector, str) and selector.strip()
+    ]
     source = inventory.source
     if not ultralytics_models:
         ultralytics_models = list(ADETAILER_FALLBACK_ULTRALYTICS_DETECTORS)
@@ -98,14 +120,16 @@ def _build_detector_entries() -> tuple[list[dict[str, object]], str]:
     ]
 
     for detector in ultralytics_models:
-        detector_family = "world" if _ADETAILER_WORLD_MARKER in detector else "ultralytics"
+        detector_family = _classify_ultralytics_detector_family(detector)
         entries.append(
             {
                 "id": detector,
                 "label": detector,
                 "family": detector_family,
+                "provider_family": detector_family,
                 "source": source,
-                "supports_class_filter": detector_family == "world",
+                "supports_class_filter": _supports_detector_class_filter(detector),
+                "supports_mask_refine": detector_family == "ultralytics_segm",
             }
         )
 
@@ -114,9 +138,11 @@ def _build_detector_entries() -> tuple[list[dict[str, object]], str]:
             {
                 "id": detector,
                 "label": detector,
-                "family": "mediapipe",
+                "family": "mediapipe_face",
+                "provider_family": "mediapipe_face",
                 "source": "builtin",
                 "supports_class_filter": False,
+                "supports_mask_refine": False,
             }
         )
     return entries, source
@@ -195,10 +221,8 @@ def _resolve_detector_family(detector: str) -> str:
     if detector == _ADETAILER_DEFAULT_DETECTOR:
         return "none"
     if detector in ADETAILER_MEDIAPIPE_DETECTORS:
-        return "mediapipe"
-    if _ADETAILER_WORLD_MARKER in detector:
-        return "world"
-    return "ultralytics"
+        return "mediapipe_face"
+    return _classify_ultralytics_detector_family(detector)
 
 
 def _normalize_controlnet_block(
@@ -248,6 +272,10 @@ def _normalize_controlnet_block(
         weight=weight,
         guidance_start=guidance_start,
         guidance_end=guidance_end,
+        advanced=_normalize_controlnet_advanced_block(
+            raw_block.get("advanced"),
+            field_prefix=f"{field_prefix}.advanced",
+        ),
     )
 
 
@@ -303,7 +331,7 @@ def normalize_adetailer_payload(
         )
         detector_family = _resolve_detector_family(detector)
         detector_classes = normalize_option_label(raw_unit.get("detector_classes"), f"{field_prefix}.detector_classes", max_length=256)
-        if detector_family != "world":
+        if not _supports_detector_class_filter(detector):
             detector_classes = ""
 
         confidence = round(_coerce_float(raw_unit.get("confidence", 0.3), f"{field_prefix}.confidence"), 3)
@@ -467,7 +495,7 @@ def normalize_adetailer_payload(
     for unit in active_units:
         if unit.detector not in detector_choices:
             warning_codes.append(ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG)
-        if unit.detector_family in {"ultralytics", "world", "mediapipe"}:
+        if unit.detector_family in {"ultralytics_bbox", "ultralytics_segm", "mediapipe_face"}:
             # DEBUG HOTSPOT: keep this warning aligned with `RookieUIADetailerDetectMask`;
             # removing it would make detector-runtime fallback behavior invisible to users.
             warning_codes.append(ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK)

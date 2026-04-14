@@ -133,6 +133,18 @@ def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[
     return values
 
 
+def _partition_ultralytics_models(selectors: list[str]) -> tuple[list[str], list[str]]:
+    bbox: list[str] = []
+    segm: list[str] = []
+    for selector in selectors:
+        normalized = _normalize_selector_token(selector)
+        if "-seg" in normalized or "_seg" in normalized or "segm" in normalized:
+            segm.append(selector)
+        else:
+            bbox.append(selector)
+    return bbox, segm
+
+
 def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
     # CRITICAL: keep these folder names aligned with ComfyUI host folder_paths keys; renaming them breaks host inventory discovery for non-checkpoint families.
     inventory_map = {
@@ -149,6 +161,7 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
     loras = inventory_map["loras"]
     text_encoders = inventory_map["text_encoders"]
     ultralytics = inventory_map["ultralytics"]
+    ultralytics_bbox, ultralytics_segm = _partition_ultralytics_models(ultralytics)
     unet = inventory_map["unet"]
     upscale_models = inventory_map["upscale_models"]
     vae = inventory_map["vae"]
@@ -174,6 +187,8 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
         embeddings=embeddings,
         loras=loras,
         ultralytics=ultralytics,
+        ultralytics_bbox=ultralytics_bbox,
+        ultralytics_segm=ultralytics_segm,
         unet=unet,
         upscale_models=upscale_models,
         default_checkpoint=checkpoints[0],

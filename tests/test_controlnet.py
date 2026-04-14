@@ -254,6 +254,37 @@ class ControlNetNormalizationTests(unittest.TestCase):
         self.assertEqual(request.controlnet_units[0].control_type, "IP-Adapter")
         self.assertEqual(request.controlnet_units[1].control_type, "All")
 
+    def test_controlnet_normalization_accepts_reserved_advanced_block(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "advanced": {
+                            "enabled": True,
+                            "weight_preset": "soft",
+                            "layer_weights": [0.25, 0.5, 0.75],
+                            "timestep_keyframes": [
+                                {"start_percent": 0.0, "end_percent": 0.5, "strength_scale": 0.8},
+                                {"start_percent": 0.5, "end_percent": 1.0, "strength_scale": 1.2},
+                            ],
+                            "mask_aware_apply": True,
+                        },
+                    }
+                ],
+            }
+        )
+
+        unit = request.controlnet_units[0]
+        self.assertTrue(unit.advanced.enabled)
+        self.assertEqual(unit.advanced.weight_preset, "soft")
+        self.assertEqual(unit.advanced.layer_weights, [0.25, 0.5, 0.75])
+        self.assertEqual(len(unit.advanced.timestep_keyframes), 2)
+        self.assertTrue(unit.advanced.mask_aware_apply)
+
     def test_controlnet_normalization_strict_match_rejects_preprocessor_weight_from_model_selector(self) -> None:
         with self.assertRaisesRegex(ValueError, "must match a host inventory entry"):
             normalize_controlnet_units(
@@ -566,6 +597,10 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(
             control_types["payload"]["contract"]["ui_variant"],
             CONTROLNET_INTEGRATED_UI_VARIANT,
+        )
+        self.assertEqual(
+            control_types["payload"]["contract"]["advanced_contract"]["runtime_state"],
+            "reserved_contract_only",
         )
         self.assertEqual(control_types["payload"]["default_type"], "All")
 

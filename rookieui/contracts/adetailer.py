@@ -3,11 +3,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from rookieui.contracts.controlnet import NormalizedControlNetAdvancedRequest
+from rookieui.contracts.controlnet_integrated import build_controlnet_integrated_contract_meta
+
 ADETAILER_INTEGRATED_CONTRACT_VERSION = "r74f77-20260414"
 ADETAILER_INTEGRATED_UI_VARIANT = "a1111_integrated_detailer"
 ADETAILER_INTEGRATED_DEFAULT_UNIT_COUNT = 4
 ADETAILER_PROMPT_TOKENS = ("[PROMPT]", "[SEP]", "[SKIP]")
 ADETAILER_CONTROLNET_MODES = ("none", "passthrough", "custom")
+ADETAILER_DETECTOR_PROVIDER_FAMILIES = ("none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face")
 ADETAILER_MASK_FILTER_METHODS = ("Area", "Confidence")
 ADETAILER_MASK_MERGE_MODES = ("None", "Merge", "Merge and Invert")
 ADETAILER_MEDIAPIPE_DETECTORS = (
@@ -73,6 +77,9 @@ def build_adetailer_integrated_contract_meta() -> dict[str, object]:
         "unit_count": ADETAILER_INTEGRATED_DEFAULT_UNIT_COUNT,
         "prompt_tokens": list(ADETAILER_PROMPT_TOKENS),
         "controlnet_modes": list(ADETAILER_CONTROLNET_MODES),
+        "detector_provider_families": list(ADETAILER_DETECTOR_PROVIDER_FAMILIES),
+        "detector_result_contract": "rookieui_detection_regions_v1",
+        "controlnet_advanced_contract": dict(build_controlnet_integrated_contract_meta()["advanced_contract"]),
         "mask_filter_methods": list(ADETAILER_MASK_FILTER_METHODS),
         "mask_merge_modes": list(ADETAILER_MASK_MERGE_MODES),
         "defaults": dict(ADETAILER_UNIT_DEFAULTS),
@@ -87,6 +94,7 @@ class NormalizedADetailerControlNetRequest:
     weight: float = 1.0
     guidance_start: float = 0.0
     guidance_end: float = 1.0
+    advanced: NormalizedControlNetAdvancedRequest = field(default_factory=NormalizedControlNetAdvancedRequest)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
