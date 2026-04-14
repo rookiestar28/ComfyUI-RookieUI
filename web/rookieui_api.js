@@ -1,4 +1,4 @@
-import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
+import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
 const DEFAULT_CAPABILITIES = Object.freeze({
   service: "rookieui",
