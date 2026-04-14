@@ -23,6 +23,7 @@ from rookieui.services.controlnet import (
     normalize_controlnet_units,
 )
 from rookieui.services.controlnet_runtime import ControlNetRuntimeResult
+from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_img2img_request, translate_txt2img_request
@@ -344,8 +345,10 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in payload["workflow"].values()}
 
         self.assertIn("DiffControlNetLoader", class_types)
-        self.assertIn("ControlNetApplyAdvanced", class_types)
-        controlnet_apply = [node for node in payload["workflow"].values() if node["class_type"] == "ControlNetApplyAdvanced"]
+        self.assertIn("RookieUIControlNetApplyNativeAdvanced", class_types)
+        controlnet_apply = [
+            node for node in payload["workflow"].values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        ]
         self.assertEqual(len(controlnet_apply), 1)
         self.assertEqual(controlnet_apply[0]["inputs"]["start_percent"], 0.2)
         self.assertEqual(controlnet_apply[0]["inputs"]["end_percent"], 0.8)
@@ -384,8 +387,12 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         mask_node = next(node for node in workflow.values() if node["class_type"] == "RookieUILoadAssetMask")
         self.assertEqual(mask_node["inputs"]["asset_handle"], "mask-image")
 
-        apply_node = next(node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced")
+        apply_node = next(
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
         self.assertEqual(apply_node["inputs"]["image"], [preprocess_node_id, 0])
+        self.assertEqual(apply_node["inputs"]["weight_preset"], "balanced")
+        self.assertEqual(apply_node["inputs"]["layer_weights_json"], "[]")
 
     def test_txt2img_translation_does_not_wire_mask_when_use_mask_disabled(self) -> None:
         normalized = normalize_txt2img_request(
@@ -411,6 +418,80 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertNotIn("mask", preprocess_node["inputs"])
         self.assertFalse(any(node["class_type"] == "RookieUILoadAssetMask" for node in workflow.values()))
 
+    def test_txt2img_translation_splits_advanced_timestep_keyframes_into_native_apply_nodes(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "weight": 0.75,
+                        "guidance_start": 0.1,
+                        "guidance_end": 0.9,
+                        "advanced": {
+                            "enabled": True,
+                            "weight_preset": "soft",
+                            "layer_weights": [0.2, 0.4, 0.8],
+                            "timestep_keyframes": [
+                                {"start_percent": 0.0, "end_percent": 0.5, "strength_scale": 0.5},
+                                {"start_percent": 0.5, "end_percent": 1.0, "strength_scale": 1.25},
+                            ],
+                        },
+                    }
+                ],
+            }
+        )
+
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        apply_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        ]
+
+        self.assertEqual(len(apply_nodes), 2)
+        self.assertEqual(apply_nodes[0]["inputs"]["start_percent"], 0.1)
+        self.assertEqual(apply_nodes[0]["inputs"]["end_percent"], 0.5)
+        self.assertEqual(apply_nodes[0]["inputs"]["strength"], 0.375)
+        self.assertEqual(apply_nodes[1]["inputs"]["start_percent"], 0.5)
+        self.assertEqual(apply_nodes[1]["inputs"]["end_percent"], 0.9)
+        self.assertEqual(apply_nodes[1]["inputs"]["strength"], 0.9375)
+        self.assertEqual(apply_nodes[0]["inputs"]["weight_preset"], "soft")
+        self.assertEqual(apply_nodes[0]["inputs"]["layer_weights_json"], "[0.2, 0.4, 0.8]")
+
+    def test_txt2img_translation_keeps_mask_for_mask_aware_apply_without_preprocess_masking(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "depth",
+                        "model": "control_v11f1p_sd15_depth.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "mask-image",
+                        "use_mask": False,
+                        "advanced": {
+                            "enabled": True,
+                            "mask_aware_apply": True,
+                        },
+                    }
+                ],
+            }
+        )
+
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        preprocess_node = next(node for node in workflow.values() if node["class_type"] == "RookieUIControlNetPreprocess")
+        apply_node = next(
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
+
+        self.assertFalse(preprocess_node["inputs"]["use_mask"])
+        self.assertNotIn("mask", preprocess_node["inputs"])
+        self.assertTrue(apply_node["inputs"]["mask_aware_apply"])
+        self.assertIn("mask_optional", apply_node["inputs"])
+
     def test_img2img_translation_keeps_base_graph_when_no_controlnet_units(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -420,7 +501,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         )
         payload = translate_img2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in payload["workflow"].values()}
-        self.assertNotIn("ControlNetApplyAdvanced", class_types)
+        self.assertNotIn("RookieUIControlNetApplyNativeAdvanced", class_types)
 
     def test_txt2img_controlnet_uses_unet_model_source_on_diffusion_model_path(self) -> None:
         with mock.patch(
@@ -486,7 +567,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in payload["workflow"].values()}
 
         self.assertIn("RookieUIADetailerDetectMask", class_types)
-        self.assertNotIn("ControlNetApplyAdvanced", class_types)
+        self.assertNotIn("RookieUIControlNetApplyNativeAdvanced", class_types)
 
     def test_txt2img_adetailer_controlnet_passthrough_uses_current_refinement_image(self) -> None:
         normalized = normalize_txt2img_request(
@@ -516,7 +597,9 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
 
         payload = translate_txt2img_request(normalized).to_payload()
         workflow = payload["workflow"]
-        apply_nodes = [node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced"]
+        apply_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        ]
         preprocess_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "RookieUIControlNetPreprocess"]
         decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
 
@@ -552,7 +635,9 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
 
         payload = translate_txt2img_request(normalized).to_payload()
         workflow = payload["workflow"]
-        apply_nodes = [node for node in workflow.values() if node["class_type"] == "ControlNetApplyAdvanced"]
+        apply_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        ]
         loader_nodes = [node for node in workflow.values() if node["class_type"] == "DiffControlNetLoader"]
         preprocess_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "RookieUIControlNetPreprocess"]
         decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
@@ -561,6 +646,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(apply_nodes[0]["inputs"]["strength"], 0.55)
         self.assertEqual(apply_nodes[0]["inputs"]["start_percent"], 0.15)
         self.assertEqual(apply_nodes[0]["inputs"]["end_percent"], 0.65)
+        self.assertEqual(apply_nodes[0]["inputs"]["weight_preset"], "balanced")
         self.assertEqual(loader_nodes[0]["inputs"]["control_net_name"], "control_v11f1p_sd15_depth.safetensors")
         self.assertEqual(preprocess_nodes[0][1]["inputs"]["module"], "depth")
         self.assertEqual(preprocess_nodes[0][1]["inputs"]["image"], [decode_nodes[0][0], 0])
@@ -600,7 +686,7 @@ class ControlNetRouteTests(unittest.TestCase):
         )
         self.assertEqual(
             control_types["payload"]["contract"]["advanced_contract"]["runtime_state"],
-            "reserved_contract_only",
+            CONTROLNET_ADVANCED_RUNTIME_STATE,
         )
         self.assertEqual(control_types["payload"]["default_type"], "All")
 

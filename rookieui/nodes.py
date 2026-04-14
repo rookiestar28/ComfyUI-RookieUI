@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 
@@ -29,11 +30,19 @@ from rookieui.services.controlnet_runtime import (
     normalize_module_key,
     preprocess_controlnet_tensor,
 )
+from rookieui.services.controlnet_advanced_runtime import (
+    build_controlnet_stage_weights,
+)
 
 try:
     from comfy import model_management
 except Exception:  # pragma: no cover - host-only import path
     model_management = None
+
+try:
+    from comfy.controlnet import ControlBase
+except Exception:  # pragma: no cover - host-only import path
+    ControlBase = None
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
@@ -300,6 +309,234 @@ class RookieUIControlNetPreprocess:
             output = output * normalized_mask.unsqueeze(-1)
 
         return (output,)
+
+
+class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None else object):
+    def __init__(self, base_control, *, weight_preset: str, layer_weights: list[float]) -> None:
+        if ControlBase is None:  # pragma: no cover - guarded by apply node runtime check
+            raise RuntimeError("ComfyUI controlnet runtime is unavailable in this environment.")
+        super().__init__()
+        self.base_control = base_control
+        self.weight_preset = str(weight_preset or "balanced").strip().lower() or "balanced"
+        self.layer_weights = [round(float(value), 4) for value in list(layer_weights or [])]
+        self.latent_format = getattr(base_control, "latent_format", None)
+        self.global_average_pooling = getattr(base_control, "global_average_pooling", False)
+        self.compression_ratio = getattr(base_control, "compression_ratio", 8)
+        self.upscale_algorithm = getattr(base_control, "upscale_algorithm", "nearest-exact")
+        self.extra_args = getattr(base_control, "extra_args", {}).copy()
+        self.extra_conds = list(getattr(base_control, "extra_conds", []))
+        self.strength_type = getattr(base_control, "strength_type", None)
+        self.concat_mask = getattr(base_control, "concat_mask", False)
+        self.preprocess_image = getattr(base_control, "preprocess_image", lambda image: image)
+
+    def copy(self):
+        return type(self)(
+            self.base_control.copy(),
+            weight_preset=self.weight_preset,
+            layer_weights=self.layer_weights,
+        )
+
+    def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=[]):
+        self.base_control.set_cond_hint(
+            cond_hint,
+            strength=strength,
+            timestep_percent_range=timestep_percent_range,
+            vae=vae,
+            extra_concat=extra_concat,
+        )
+        return self
+
+    def set_previous_controlnet(self, controlnet):
+        self.previous_controlnet = controlnet
+        return self
+
+    def pre_run(self, model, percent_to_timestep_function):
+        self.base_control.pre_run(model, percent_to_timestep_function)
+        if self.previous_controlnet is not None:
+            self.previous_controlnet.pre_run(model, percent_to_timestep_function)
+
+    def cleanup(self):
+        self.base_control.cleanup()
+        if self.previous_controlnet is not None:
+            self.previous_controlnet.cleanup()
+
+    def get_models(self):
+        out = list(self.base_control.get_models())
+        if self.previous_controlnet is not None:
+            out += self.previous_controlnet.get_models()
+        return out
+
+    def get_extra_hooks(self):
+        out = list(self.base_control.get_extra_hooks())
+        if self.previous_controlnet is not None:
+            out += self.previous_controlnet.get_extra_hooks()
+        return out
+
+    def inference_memory_requirements(self, dtype):
+        requirements = self.base_control.inference_memory_requirements(dtype)
+        if self.previous_controlnet is not None:
+            requirements += self.previous_controlnet.inference_memory_requirements(dtype)
+        return requirements
+
+    def _scale_control_outputs(self, control: dict[str, list["torch.Tensor"]] | None):
+        if control is None:
+            return None
+        stage_weights = build_controlnet_stage_weights(
+            input_count=len(list(control.get("input", []))),
+            middle_count=len(list(control.get("middle", []))),
+            output_count=len(list(control.get("output", []))),
+            weight_preset=self.weight_preset,
+            layer_weights=self.layer_weights,
+        )
+        scaled: dict[str, list["torch.Tensor" | None]] = {"input": [], "middle": [], "output": []}
+        for key in ("input", "middle", "output"):
+            weight_values = list(stage_weights.get(key, []))
+            for index, value in enumerate(list(control.get(key, []))):
+                if value is None:
+                    scaled[key].append(None)
+                    continue
+                weight = float(weight_values[index]) if index < len(weight_values) else 1.0
+                if abs(weight - 1.0) <= 1e-6:
+                    scaled[key].append(value)
+                    continue
+                scaled[key].append(value * weight)
+        return scaled
+
+    def get_control(self, x_noisy, t, cond, batched_number, transformer_options):
+        control_prev = None
+        if self.previous_controlnet is not None:
+            control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number, transformer_options)
+
+        self.base_control.previous_controlnet = None
+        control = self.base_control.get_control(x_noisy, t, cond, batched_number, transformer_options)
+        if control is None:
+            return control_prev
+        return self.control_merge(self._scale_control_outputs(control), control_prev, output_dtype=None)
+
+
+class RookieUIControlNetApplyNativeAdvanced:
+    _weight_presets = ("balanced", "soft", "strong")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "control_net": ("CONTROL_NET",),
+                "image": ("IMAGE",),
+                "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "start_percent": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+                "end_percent": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+                "weight_preset": (list(cls._weight_presets),),
+                "layer_weights_json": ("STRING", {"default": "[]"}),
+                "mask_aware_apply": ("BOOLEAN", {"default": False}),
+            },
+            "optional": {
+                "mask_optional": ("MASK",),
+                "vae_optional": ("VAE",),
+            },
+        }
+
+    CATEGORY = "RookieUI/controlnet"
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING")
+    RETURN_NAMES = ("positive", "negative")
+    FUNCTION = "apply_controlnet"
+
+    @staticmethod
+    def _require_controlnet_runtime() -> None:
+        if ControlBase is None:
+            raise RuntimeError("RookieUI advanced ControlNet apply requires a live ComfyUI controlnet runtime.")
+        if torch is None:
+            raise RuntimeError("RookieUI advanced ControlNet apply requires torch to be installed.")
+
+    @staticmethod
+    def _parse_layer_weights(raw_layer_weights: str) -> list[float]:
+        text = str(raw_layer_weights or "").strip()
+        if not text:
+            return []
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("layer_weights_json must be valid JSON.") from exc
+        if payload in (None, ""):
+            return []
+        if not isinstance(payload, list):
+            raise ValueError("layer_weights_json must decode to an array.")
+        return [round(float(value), 4) for value in payload]
+
+    @staticmethod
+    def _normalize_mask(mask):
+        if mask is None:
+            return None
+        mask = mask.clone()
+        if len(mask.shape) < 3:
+            mask = mask.unsqueeze(0)
+        return torch.clamp(mask, 0.0, 1.0)
+
+    def apply_controlnet(
+        self,
+        positive,
+        negative,
+        control_net,
+        image,
+        strength,
+        start_percent,
+        end_percent,
+        weight_preset="balanced",
+        layer_weights_json="[]",
+        mask_aware_apply=False,
+        mask_optional=None,
+        vae_optional=None,
+    ):
+        self._require_controlnet_runtime()
+        if strength == 0:
+            return (positive, negative)
+
+        layer_weights = self._parse_layer_weights(layer_weights_json)
+        control_hint = image.movedim(-1, 1)
+        normalized_mask = self._normalize_mask(mask_optional) if mask_aware_apply else None
+        cnets = {}
+        out = []
+
+        for conditioning in [positive, negative]:
+            conditioned = []
+            if conditioning is not None:
+                for token, conditioning_state in conditioning:
+                    cloned_state = conditioning_state.copy()
+                    prev_cnet = cloned_state.get("control", None)
+                    if prev_cnet in cnets:
+                        c_net = cnets[prev_cnet]
+                    else:
+                        if control_net is None:
+                            raise RuntimeError("control_net is None; ControlNet loader failed before advanced apply.")
+                        c_net = control_net.copy()
+                        if layer_weights or str(weight_preset).strip().lower() != "balanced":
+                            c_net = _RookieUIStageWeightedControlNet(
+                                c_net,
+                                weight_preset=str(weight_preset).strip().lower(),
+                                layer_weights=layer_weights,
+                            )
+                        c_net = c_net.set_cond_hint(
+                            control_hint,
+                            float(strength),
+                            (float(start_percent), float(end_percent)),
+                            vae=vae_optional,
+                        )
+                        c_net.set_previous_controlnet(prev_cnet)
+                        cnets[prev_cnet] = c_net
+
+                    cloned_state["control"] = c_net
+                    cloned_state["control_apply_to_uncond"] = False
+                    if normalized_mask is not None:
+                        # IMPORTANT: mask-aware apply must stay attached only to the ControlNet-conditioned entries.
+                        # Promoting this to a broader conditioning mutation leaks the mask into unrelated prompt lanes.
+                        cloned_state["mask"] = normalized_mask
+                        cloned_state["mask_strength"] = 1.0
+                        cloned_state["set_area_to_bounds"] = False
+                    conditioned.append([token, cloned_state])
+            out.append(conditioned)
+        return (out[0], out[1])
 
 
 class RookieUIADetailerDetectMask:
@@ -581,6 +818,7 @@ NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
+    "RookieUIControlNetApplyNativeAdvanced": RookieUIControlNetApplyNativeAdvanced,
     "RookieUIADetailerDetectMask": RookieUIADetailerDetectMask,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
@@ -589,6 +827,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
+    "RookieUIControlNetApplyNativeAdvanced": "RookieUI ControlNet Apply (Advanced)",
     "RookieUIADetailerDetectMask": "RookieUI ADetailer Detect Mask",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }

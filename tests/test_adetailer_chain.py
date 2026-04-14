@@ -65,7 +65,7 @@ class ADetailerChainRegressionTests(unittest.TestCase):
         class_types = [node["class_type"] for node in workflow.values()]
         self.assertIn("RookieUIADetailerDetectMask", class_types)
         self.assertIn("RookieUIVAEEncodeForInpaint", class_types)
-        self.assertEqual(class_types.count("ControlNetApplyAdvanced"), 2)
+        self.assertEqual(class_types.count("RookieUIControlNetApplyNativeAdvanced"), 2)
         self.assertEqual(class_types.count("KSampler"), 2)
         self.assertIn(
             "ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK",
