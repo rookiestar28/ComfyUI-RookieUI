@@ -222,6 +222,24 @@
   padding-top: 4px;
 }
 
+.rookieui-shell__adetailer-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+
+.rookieui-shell__adetailer-toggle-grid .rookieui-shell__inline-checkbox-field {
+  min-height: 28px;
+  gap: 10px;
+}
+
+.rookieui-shell__adetailer-controlnet-grid .rookieui-shell__slider-field,
+.rookieui-shell__adetailer-controlnet-grid .rookieui-shell__field {
+  align-self: start;
+}
+
 .rookieui-shell__controlnet-body {
   display: grid;
   gap: 10px;
