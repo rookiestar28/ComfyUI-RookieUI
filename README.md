@@ -177,14 +177,24 @@ ComfyUI process (single runtime)
 
 1. Install via ComfyUI-Manager (recommended)
    Update ComfyUI-Manager to the latest version first, then search for `ComfyUI-RookieUI` in Manager and install it.
+   RookieUI now ships a root `requirements.txt` so Manager-style installs can resolve the extension's extra Python dependencies in the host environment.
 
 2. Install as a ComfyUI custom node (manual)
 
 ```bash
 git clone https://github.com/rookiestar28/ComfyUI-RookieUI custom_nodes/ComfyUI-RookieUI
+cd custom_nodes/ComfyUI-RookieUI
+python -m pip install -r requirements.txt
 ```
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
+
+Required extra Python packages for RookieUI:
+
+- `opencv-python-headless>=4.10.0`
+- `ultralytics>=8.3.0`
+
+If your host or Manager install path does not automatically install custom-node dependencies, run `python -m pip install -r requirements.txt` manually in the same Python environment used by ComfyUI.
 
 ## Feature Overview
 
