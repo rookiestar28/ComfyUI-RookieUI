@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from rookieui.contracts.adetailer import NormalizedADetailerRequest
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
 
@@ -35,6 +36,7 @@ class Txt2ImgRequest:
     hires_steps: int | None = None
     hires_denoise: float = 0.35
     hires_upscale_method: str = "bislerp"
+    adetailer: dict[str, Any] = field(default_factory=dict)
     controlnet_units: list[dict[str, Any]] = field(default_factory=list)
     alwayson_scripts: dict[str, Any] = field(default_factory=dict)
 
@@ -90,6 +92,7 @@ class Img2ImgRequest:
     hires_steps: int | None = None
     hires_denoise: float = 0.35
     hires_upscale_method: str = "bislerp"
+    adetailer: dict[str, Any] = field(default_factory=dict)
     controlnet_units: list[dict[str, Any]] = field(default_factory=list)
     alwayson_scripts: dict[str, Any] = field(default_factory=dict)
 
@@ -129,6 +132,7 @@ class NormalizedTxt2ImgRequest:
     hires_steps: int
     hires_denoise: float
     hires_upscale_method: str
+    adetailer: NormalizedADetailerRequest = field(default_factory=NormalizedADetailerRequest)
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
     prompt_warning_codes: list[str] = field(default_factory=list)
@@ -194,6 +198,7 @@ class NormalizedImg2ImgRequest:
     hires_steps: int
     hires_denoise: float
     hires_upscale_method: str
+    adetailer: NormalizedADetailerRequest = field(default_factory=NormalizedADetailerRequest)
     lora_activations: list[PromptLoraActivation] = field(default_factory=list)
     prompt_warnings: list[str] = field(default_factory=list)
     prompt_warning_codes: list[str] = field(default_factory=list)

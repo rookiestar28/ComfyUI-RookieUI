@@ -159,6 +159,69 @@
   margin-top: 12px;
 }
 
+.rookieui-shell__adetailer-integrated {
+  margin-top: 12px;
+}
+
+.rookieui-shell__adetailer-body {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__adetailer-header {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.rookieui-shell__adetailer-version {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rookieui-border);
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 82%, transparent);
+  color: var(--rookieui-text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.rookieui-shell__adetailer-shell-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.rookieui-shell__adetailer-shell-note {
+  margin: 0;
+  flex: 1 1 260px;
+}
+
+.rookieui-shell__adetailer-tabs {
+  margin-bottom: 0;
+}
+
+.rookieui-shell__adetailer-panel-host {
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, transparent);
+}
+
+.rookieui-shell__adetailer-panel {
+  gap: 12px;
+}
+
+.rookieui-shell__adetailer-subsection {
+  margin-top: 0;
+}
+
+.rookieui-shell__adetailer-subsection-summary .rookieui-shell__section-title {
+  font-size: 0.9rem;
+}
+
+.rookieui-shell__adetailer-controlnet-grid {
+  padding-top: 4px;
+}
+
 .rookieui-shell__controlnet-body {
   display: grid;
   gap: 10px;

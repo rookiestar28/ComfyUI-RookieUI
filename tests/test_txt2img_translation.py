@@ -43,6 +43,31 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.dtype_profile, "automatic_fp16_lora")
 
+    def test_normalize_txt2img_request_normalizes_adetailer_block(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "prompt": "repair eyes",
+                            "controlnet": {"mode": "passthrough"},
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(request.adetailer.enabled)
+        self.assertFalse(request.adetailer.skip_img2img)
+        self.assertEqual(request.adetailer.warning_codes, ["ADETAILER_SKIP_IMG2IMG_IGNORED"])
+        self.assertEqual(request.adetailer.units[0].detector, "face_yolov8n.pt")
+        self.assertEqual(request.adetailer.units[0].controlnet.mode, "passthrough")
+
     def test_normalize_txt2img_request_rejects_unsupported_dtype_profile(self) -> None:
         with self.assertRaisesRegex(ValueError, "dtype_profile is unsupported"):
             normalize_txt2img_request(

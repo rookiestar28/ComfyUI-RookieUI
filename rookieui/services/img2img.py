@@ -39,6 +39,7 @@ from rookieui.services.parity_matrix import (
     normalize_scheduler_name,
 )
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
+from rookieui.services.adetailer import normalize_adetailer_payload
 from rookieui.services.controlnet import normalize_controlnet_units
 from rookieui.services.txt2img import (
     _coerce_cfg_scale,
@@ -203,6 +204,13 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         strict_model_match=inventory_is_host,
         fallback_image_asset=image_asset,
         fallback_image_data=request.image_data or batch_image_seed,
+    )
+    # IMPORTANT: keep ADetailer refinement intent on its own normalized block.
+    # The main img2img request must stay reusable even when future detailer units add local ControlNet/inpaint overrides.
+    adetailer = normalize_adetailer_payload(
+        payload,
+        surface="img2img",
+        strict_inventory_match=inventory_is_host,
     )
 
     width = _coerce_dimension(
@@ -457,6 +465,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         hires_steps=hires_steps,
         hires_denoise=hires_denoise,
         hires_upscale_method=hires_upscale_method,
+        adetailer=adetailer,
         lora_activations=lora_activations,
         prompt_warnings=prompt_preprocess.prompt_warnings,
         prompt_warning_codes=prompt_preprocess.warning_codes,

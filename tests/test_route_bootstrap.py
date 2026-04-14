@@ -41,6 +41,7 @@ class RouteBootstrapTests(unittest.TestCase):
                 "/rookieui/controlnet/model_list",
                 "/rookieui/controlnet/module_list",
                 "/rookieui/controlnet/control_types",
+                "/rookieui/adetailer/catalog",
                 "/rookieui/queue",
                 "/rookieui/queue/{prompt_id}",
                 "/rookieui/pnginfo/parse",
@@ -71,4 +72,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 22)
+        self.assertEqual(len(prompt_server.app.router.routes), 23)
