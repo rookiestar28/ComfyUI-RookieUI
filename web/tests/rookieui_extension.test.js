@@ -987,6 +987,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-1")?.checked).toBe(false);
     expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-2")?.checked).toBe(false);
     expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-3")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-detector-classes-field-0")?.hidden).toBe(true);
+    expect(document.getElementById("rookieui-txt2img-adetailer-detector-classes-0")?.disabled).toBe(true);
     expect(JSON.parse(document.getElementById("rookieui-adetailer").value)).toMatchObject({
       enabled: false,
       units: [
@@ -1013,6 +1015,15 @@ describe("registerRookieUIBootstrapExtension", () => {
         { enabled: false },
       ],
     });
+    document.getElementById("rookieui-txt2img-adetailer-detector-0").value = "yolov8x-worldv2.pt";
+    document
+      .getElementById("rookieui-txt2img-adetailer-detector-0")
+      .dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-txt2img-adetailer-detector-classes-field-0")?.hidden).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-detector-classes-0")?.disabled).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-detector-classes-0")?.placeholder).toContain(
+      "YOLO-World classes",
+    );
     expect(document.getElementById("rookieui-txt2img-controlnet-allow-preview-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-use-mask-0")).not.toBeNull();
     expect(txt2imgControlNetSection?.textContent).toContain("Instant-ID");

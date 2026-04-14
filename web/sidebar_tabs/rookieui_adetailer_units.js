@@ -381,7 +381,9 @@ export function createADetailerEditor(options) {
     const detectorMeta = detectorLookup.get(row.controls.detector.value) ?? {};
     const isWorld = String(detectorMeta.family ?? "").trim().toLowerCase() === "world";
     row.detectorClassesField.hidden = !isWorld;
+    row.detectorClassesField.style.display = isWorld ? "" : "none";
     row.controls.detectorClasses.disabled = !isWorld;
+    row.controls.detectorClasses.readOnly = !isWorld;
 
     const useInpaintSize = row.controls.useInpaintSize.checked;
     row.controls.inpaintWidth.disabled = !useInpaintSize;
@@ -406,6 +408,8 @@ export function createADetailerEditor(options) {
 
     const customMode = row.controls.controlnetMode.value === "custom";
     row.controlnetCustomGrid.hidden = !customMode;
+    row.controlnetModuleField.hidden = !customMode;
+    row.controlnetModuleField.style.display = customMode ? "" : "none";
     row.controls.controlnetModel.disabled = !customMode;
     row.controls.controlnetModule.disabled = !customMode;
     row.controls.controlnetWeight.disabled = !customMode;
@@ -626,11 +630,16 @@ export function createADetailerEditor(options) {
     bindSliderPair(controls.controlnetWeight, controls.controlnetWeightSlider);
     bindSliderPair(controls.controlnetGuidanceStart, controls.controlnetGuidanceStartSlider);
     bindSliderPair(controls.controlnetGuidanceEnd, controls.controlnetGuidanceEndSlider);
+    controls.detectorClasses.placeholder = "YOLO-World classes, comma-separated";
 
     const enableField = createInlineCheckboxField(panel, "Enable this tab", controls.enabled);
     enableField.id = `${idPrefix}-unit-enabled-field-${index}`;
     createField(panel, "ADetailer detector", controls.detector);
-    const detectorClassesField = createField(panel, "ADetailer detector classes", controls.detectorClasses);
+    const detectorClassesField = createField(
+      panel,
+      "ADetailer detector classes (YOLO-World only)",
+      controls.detectorClasses,
+    );
     detectorClassesField.id = `${idPrefix}-detector-classes-field-${index}`;
     const promptField = createField(panel, "ad_prompt", controls.prompt);
     promptField.classList.add("rookieui-shell__field--full");
@@ -652,42 +661,48 @@ export function createADetailerEditor(options) {
 
     const inpaintGrid = createSectionDetails(panel, "Inpainting", `${idPrefix}-inpaint-section-${index}`, appendTextElement);
     createField(inpaintGrid, "Inpaint mask blur", controls.maskBlur);
-    createSliderField(inpaintGrid, "Inpaint denoising strength", controls.denoisingStrength, controls.denoisingStrengthSlider);
-    createInlineCheckboxField(inpaintGrid, "Inpaint only masked", controls.inpaintOnlyMasked);
     createField(inpaintGrid, "Inpaint only masked padding", controls.inpaintPadding);
-    createInlineCheckboxField(inpaintGrid, "Use separate width/height", controls.useInpaintSize);
-    createSliderField(inpaintGrid, "ADetailer width", controls.inpaintWidth, controls.inpaintWidthSlider);
-    createSliderField(inpaintGrid, "ADetailer height", controls.inpaintHeight, controls.inpaintHeightSlider);
-    createInlineCheckboxField(inpaintGrid, "Use separate steps", controls.useSteps);
-    createSliderField(inpaintGrid, "ADetailer steps", controls.steps, controls.stepsSlider);
-    createInlineCheckboxField(inpaintGrid, "Use separate CFG scale", controls.useCfgScale);
-    createSliderField(inpaintGrid, "ADetailer CFG scale", controls.cfgScale, controls.cfgScaleSlider);
-    createInlineCheckboxField(inpaintGrid, "Use separate checkpoint", controls.useCheckpoint);
+    createSliderField(inpaintGrid, "Inpaint denoising strength", controls.denoisingStrength, controls.denoisingStrengthSlider);
     createField(inpaintGrid, "ADetailer checkpoint", controls.checkpointName);
-    createInlineCheckboxField(inpaintGrid, "Use separate VAE", controls.useVae);
+    createSliderField(inpaintGrid, "ADetailer width", controls.inpaintWidth, controls.inpaintWidthSlider);
     createField(inpaintGrid, "ADetailer VAE", controls.vaeName);
-    createInlineCheckboxField(inpaintGrid, "Use separate sampler", controls.useSampler);
+    createSliderField(inpaintGrid, "ADetailer height", controls.inpaintHeight, controls.inpaintHeightSlider);
     createField(inpaintGrid, "ADetailer sampler", controls.samplerName);
+    createSliderField(inpaintGrid, "ADetailer steps", controls.steps, controls.stepsSlider);
     createField(inpaintGrid, "ADetailer scheduler", controls.schedulerName);
-    createInlineCheckboxField(inpaintGrid, "Use separate noise multiplier", controls.useNoiseMultiplier);
+    createSliderField(inpaintGrid, "ADetailer CFG scale", controls.cfgScale, controls.cfgScaleSlider);
     createField(inpaintGrid, "Noise multiplier for img2img", controls.noiseMultiplier);
-    createInlineCheckboxField(inpaintGrid, "Use separate CLIP skip", controls.useClipSkip);
-    createField(inpaintGrid, "ADetailer CLIP skip", controls.clipSkip);
-    createInlineCheckboxField(inpaintGrid, "Restore faces after ADetailer", controls.restoreFace);
+    const clipSkipField = createField(inpaintGrid, "ADetailer CLIP skip", controls.clipSkip);
+    clipSkipField.classList.add("rookieui-shell__field--full");
+
+    const inpaintToggleGrid = document.createElement("div");
+    inpaintToggleGrid.className = "rookieui-shell__adetailer-toggle-grid";
+    inpaintGrid.appendChild(inpaintToggleGrid);
+    createInlineCheckboxField(inpaintToggleGrid, "Inpaint only masked", controls.inpaintOnlyMasked);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate width/height", controls.useInpaintSize);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate steps", controls.useSteps);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate CFG scale", controls.useCfgScale);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate checkpoint", controls.useCheckpoint);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate VAE", controls.useVae);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate sampler", controls.useSampler);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate noise multiplier", controls.useNoiseMultiplier);
+    createInlineCheckboxField(inpaintToggleGrid, "Use separate CLIP skip", controls.useClipSkip);
+    createInlineCheckboxField(inpaintToggleGrid, "Restore faces after ADetailer", controls.restoreFace);
 
     const controlnetGrid = createSectionDetails(panel, "ControlNet", `${idPrefix}-controlnet-section-${index}`, appendTextElement);
     createField(controlnetGrid, "ControlNet mode", controls.controlnetMode);
+    const controlnetModuleField = createField(controlnetGrid, "ControlNet module", controls.controlnetModule);
     const controlnetCustomGrid = document.createElement("div");
     controlnetCustomGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column rookieui-shell__adetailer-controlnet-grid";
     controlnetCustomGrid.style.gridColumn = "1 / -1";
     controlnetGrid.appendChild(controlnetCustomGrid);
-    createField(controlnetCustomGrid, "ControlNet model", controls.controlnetModel);
-    createField(controlnetCustomGrid, "ControlNet module", controls.controlnetModule);
+    const controlnetModelField = createField(controlnetCustomGrid, "ControlNet model", controls.controlnetModel);
+    controlnetModelField.classList.add("rookieui-shell__field--full");
     createSliderField(controlnetCustomGrid, "ControlNet weight", controls.controlnetWeight, controls.controlnetWeightSlider);
     createSliderField(controlnetCustomGrid, "ControlNet guidance start", controls.controlnetGuidanceStart, controls.controlnetGuidanceStartSlider);
     createSliderField(controlnetCustomGrid, "ControlNet guidance end", controls.controlnetGuidanceEnd, controls.controlnetGuidanceEndSlider);
 
-    const row = { tab, panel, controls, detectorClassesField, controlnetCustomGrid };
+    const row = { tab, panel, controls, detectorClassesField, controlnetCustomGrid, controlnetModuleField };
     Object.values(controls).forEach((control) => bindChange(control, row));
     syncUnitVisibility(row);
     rows.push(row);
