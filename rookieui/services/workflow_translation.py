@@ -776,7 +776,7 @@ def _append_adetailer_units(
         }
         sampler_name, scheduler_name = _resolve_adetailer_sampler_override(unit, request)
         # IMPORTANT: ADetailer refinement must stay after base decode and before final SaveImage;
-        # moving it into the primary sampler/control path breaks A1111/Forge execution ordering.
+        # moving it into the primary sampler/control path breaks the intended A1111-compatible execution ordering.
         _build_sampler_node(
             workflow,
             node_id=sampler_id,

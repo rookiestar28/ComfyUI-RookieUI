@@ -8,7 +8,7 @@
 <br>
 <br>
 
-ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/Forge-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style **workflow semantics** for Stable Diffusion in a ComfyUI host:
+ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style **workflow semantics** for Stable Diffusion in a ComfyUI host:
 
 - **prompt and negative prompt handling**
 - **sampler/scheduler/seed/CFG behavior mapping**
@@ -26,7 +26,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <summary><strong>ADetailer integrated parity rollout (new functionality)</strong></summary>
 
-- Added an integrated ADetailer editor in `txt2img` and `img2img` with four unit tabs, grouped controls, and Forge/A1111-style layout on top of RookieUI's native sidebar shell.
+- Added an integrated ADetailer editor in `txt2img` and `img2img` with four unit tabs, grouped controls, and A1111-style layout on top of RookieUI's native sidebar shell.
 - Added host-native detect-mask-refine workflow translation so enabled ADetailer units run as a secondary refinement stage without embedding A1111 ScriptRunner runtime.
 - Added ControlNet `none` / `passthrough` / `custom` behavior inside the ADetailer refinement context, keeping base-generation ControlNet state isolated from detailer-local execution.
 - Added detector/model availability guidance, warning codes, and diagnostics so degraded ADetailer behavior is reported explicitly instead of silently disappearing.
@@ -49,7 +49,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <summary><strong>ControlNet preprocessor execution and diagnostics hardening (bugfix/stability)</strong></summary>
 
-- Added Forge-style preprocessor option narrowing by selected Control Type, so each type shows only relevant annotator choices.
+- Added control-type-aware preprocessor option narrowing, so each type shows only relevant annotator choices.
 - Expanded preprocessor catalog to include variant-level options (for example depth/lineart/openpose families) in integrated ControlNet units.
 - Updated backend detect/runtime dispatch to respect selected preprocessor variants, prefer matching host annotator nodes, and keep OpenPose-family execution isolated to the requested variant instead of cross-family fallback synthesis.
 - Improved run-preprocessor status messaging to report both the selected preprocessor option and the actual backend processor used, with explicit warning diagnostics when the host output is degraded or unavailable.
@@ -195,7 +195,7 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 </div>
 <br>
 
-- A1111/Forge-like compact tab rail and control panel layout
+- A1111-like compact tab rail and control panel layout
 - Hero `Generate` rail with compact action icons
 - Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
 - Progress text and queue/history integration in sidebar flow

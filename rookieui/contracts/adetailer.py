@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 ADETAILER_INTEGRATED_CONTRACT_VERSION = "r74f77-20260414"
-ADETAILER_INTEGRATED_UI_VARIANT = "a1111_forge_integrated"
+ADETAILER_INTEGRATED_UI_VARIANT = "a1111_integrated_detailer"
 ADETAILER_INTEGRATED_DEFAULT_UNIT_COUNT = 4
 ADETAILER_PROMPT_TOKENS = ("[PROMPT]", "[SEP]", "[SKIP]")
 ADETAILER_CONTROLNET_MODES = ("none", "passthrough", "custom")

@@ -1365,7 +1365,7 @@ function resolveToolEmoji(iconToken) {
   if (!normalized) {
     return "🔹";
   }
-  // IMPORTANT: keep A1111/Forge emoji semantics here; replacing this with icon-font classes breaks the target ToolButton parity.
+  // IMPORTANT: keep A1111-compatible emoji semantics here; replacing this with icon-font classes breaks the target ToolButton parity.
   return A1111_TOOL_EMOJI_MAP[normalized] ?? normalized;
 }
 
@@ -1712,7 +1712,7 @@ function buildPaneModuleContext() {
     buildShellHeader,
     buildCompatibilitySection,
     buildCompatibilityList,
-    resolveForgeNeoTheme,
+    resolveIntegratedShellTheme,
   };
 }
 
@@ -1981,7 +1981,7 @@ function buildShellHeader(container, bootstrapState) {
   actions.appendChild(githubLink);
 }
 
-function resolveForgeNeoTheme(documentRef, windowRef = documentRef?.defaultView) {
+function resolveIntegratedShellTheme(documentRef, windowRef = documentRef?.defaultView) {
   const classHints = [
     documentRef?.body?.className ?? "",
     documentRef?.documentElement?.className ?? "",
@@ -2090,7 +2090,7 @@ function buildShellFooter(container, bootstrapState) {
 export function renderRookieUISidebar(container, bootstrapState) {
   container.replaceChildren();
   container.className = "rookieui-shell";
-  container.dataset.theme = resolveForgeNeoTheme(container.ownerDocument);
+  container.dataset.theme = resolveIntegratedShellTheme(container.ownerDocument);
   const formRegistry = {};
   const shellStateContract = createShellStateEventContract(formRegistry);
   formRegistry.__shellStateContract = shellStateContract;

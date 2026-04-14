@@ -255,7 +255,7 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "host",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
               model_list: ["control_v11p_sd15_canny.safetensors"],
               default_model: "control_v11p_sd15_canny.safetensors",
             };
@@ -268,7 +268,7 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
               module_list: ["none", "canny", "depth"],
               default_module: "none",
             };
@@ -281,7 +281,7 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: { version: "r72-20260412", ui_variant: "integrated_sidebar_controlnet", unit_count: 3 },
               control_type_order: ["All", "Canny", "Depth"],
               default_type: "All",
               control_types: {
