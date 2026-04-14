@@ -1,5 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f96-preprocessor-variants";
-import { createADetailerEditor } from "./rookieui_adetailer_units.js?v=20260415-hotfix-enter-submit";
+import { createControlNetUnitEditor, createADetailerEditor } from "./rookieui_pane_deps.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {

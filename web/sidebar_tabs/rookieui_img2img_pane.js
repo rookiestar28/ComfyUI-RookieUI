@@ -1,5 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f96-preprocessor-variants";
-import { createADetailerEditor } from "./rookieui_adetailer_units.js?v=20260415-hotfix-enter-submit";
+import { createControlNetUnitEditor, createADetailerEditor } from "./rookieui_pane_deps.js";
 import {
   CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
@@ -9,7 +8,7 @@ import {
   resolveCanvasInteractionMode,
   toggleCanvasFullscreen,
 } from "./rookieui_canvas_surface_contract.js";
-import { createSourceCanvasBrushController } from "./rookieui_source_canvas_brush.js?v=20260413-f93-source-brush-sync";
+import { createSourceCanvasBrushController } from "./rookieui_canvas_brush_deps.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
