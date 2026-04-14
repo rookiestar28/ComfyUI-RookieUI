@@ -20,10 +20,10 @@ import {
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260415-hotfix-adetailer-selectors";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260415-hotfix-controlnet-title-offset";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260415-hotfix-adetailer-selectors";
+const ROOKIEUI_ASSET_REVISION = "20260415-hotfix-controlnet-title-offset";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
