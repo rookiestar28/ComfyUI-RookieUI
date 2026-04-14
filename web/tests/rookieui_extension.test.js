@@ -893,7 +893,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260414-adetailer-ui-parity");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260415-hotfix-enter-submit");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -1092,8 +1092,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     ).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__section")).toBe(true);
     expect(txt2imgHiresControls?.classList.contains("rookieui-shell__hires--integrated")).toBe(true);
-    expect(txt2imgHiresControls?.textContent).toContain("Hires. fix");
     expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).not.toBeNull();
+    expect(document.querySelector("#rookieui-advanced-controls .rookieui-shell__hires-toggle")?.textContent).toBe("");
     expect(txt2imgHiresControls?.textContent).not.toContain(
       "Second latent pass with bounded rookie-safe defaults.",
     );
@@ -1102,6 +1102,19 @@ describe("registerRookieUIBootstrapExtension", () => {
 
     document.getElementById("rookieui-prompt").value = "sunset harbor";
     document.getElementById("rookieui-prompt").dispatchEvent(new Event("input", { bubbles: true }));
+    const bootstrapFetchCalls = [...fetchCalls];
+    fetchCalls.length = 0;
+    document.getElementById("rookieui-width").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/txt2img")).toHaveLength(0);
+    document.getElementById("rookieui-prompt").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/txt2img")).toHaveLength(1);
+    fetchCalls.length = 0;
     app.api.clientId = "socket-client-2";
     // CRITICAL: regression matrix must keep Clip Skip editable across all preset profiles.
     const diffusionModelOptions = [
@@ -1481,13 +1494,13 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(fetchCalls.some(([url]) => url === "/rookieui/generate/img2img")).toBe(true);
     expect(fetchCalls.some(([url]) => String(url).startsWith("/rookieui/queue"))).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/pnginfo/inspect")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/models")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/presets")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/compatibility")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/model_list")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/module_list")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/control_types")).toBe(true);
-    expect(fetchCalls.some(([url]) => url === "/rookieui/adetailer/catalog")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/models")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/presets")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/compatibility")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/controlnet/model_list")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/controlnet/module_list")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/controlnet/control_types")).toBe(true);
+    expect(bootstrapFetchCalls.some(([url]) => url === "/rookieui/adetailer/catalog")).toBe(true);
     const txt2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/txt2img");
     expect(JSON.parse(txt2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(txt2imgCall[1].body).hires_scale).toBe(1.8);

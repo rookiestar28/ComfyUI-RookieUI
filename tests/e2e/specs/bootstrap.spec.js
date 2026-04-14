@@ -250,8 +250,8 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-txt2img-generation-section #rookieui-advanced-controls")).toHaveCount(1);
   await expect(page.locator("#rookieui-advanced-controls")).toHaveClass(/rookieui-shell__section/);
   await expect(page.locator("#rookieui-advanced-controls")).toHaveClass(/rookieui-shell__hires--integrated/);
-  await expect(page.locator("#rookieui-advanced-controls")).toContainText("Hires. fix");
   await expect(page.locator("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).toBeVisible();
+  await expect(page.locator("#rookieui-advanced-controls .rookieui-shell__hires-toggle")).toHaveText("");
   await expect(page.locator("#rookieui-advanced-controls .rookieui-shell__hires-caret")).toHaveCSS("font-size", "30px");
   await expect(page.locator("#rookieui-advanced-controls")).not.toContainText(
     "Second latent pass with bounded rookie-safe defaults.",
