@@ -257,6 +257,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     # Later refinement runtime work depends on this seam so per-unit overrides do not pollute base generation units.
     adetailer = normalize_adetailer_payload(
         payload,
+        profile_id=profile.id,
         surface="txt2img",
         strict_inventory_match=inventory_is_host,
         primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
