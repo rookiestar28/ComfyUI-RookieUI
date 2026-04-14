@@ -1,5 +1,5 @@
 import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f96-preprocessor-variants";
-import { createADetailerEditor } from "./rookieui_adetailer_units.js?v=20260414-f78-ui";
+import { createADetailerEditor } from "./rookieui_adetailer_units.js?v=20260415-hotfix-enter-submit";
 import {
   CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
@@ -27,6 +27,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     createHiresFixSection,
     createSeedControlField,
     createPromptField,
+    installExplicitFormSubmitShortcuts,
     createActionButton,
     createIconActionButton,
     buildQuicksettingCard,
@@ -69,6 +70,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   form.className = "rookieui-shell__form rookieui-shell__integrated-form";
   form.id = "rookieui-img2img-form";
   section.appendChild(form);
+  installExplicitFormSubmitShortcuts(form);
 
   const profileLookup = buildProfileLookup(bootstrapState.capabilities);
   const presetLookup = buildPresetLookup(bootstrapState.presets?.presets ?? []);

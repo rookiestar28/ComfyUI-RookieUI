@@ -269,13 +269,13 @@ export function createADetailerEditor(options) {
   const topEnabled = createCheckbox(`${idPrefix}-enabled`, state.enabled);
   const topEnabledField = document.createElement("label");
   topEnabledField.className = "rookieui-shell__hires-toggle";
+  topEnabled.setAttribute("aria-label", "Enable ADetailer");
+  topEnabled.title = "Enable ADetailer";
   topEnabledField.appendChild(topEnabled);
-  appendTextElement(topEnabledField, "span", "rookieui-shell__field-label", "Enable ADetailer");
   header.appendChild(topEnabledField);
   topEnabled.addEventListener("click", (event) => event.stopPropagation());
   topEnabled.addEventListener("mousedown", (event) => event.stopPropagation());
-
-  appendTextElement(header, "span", "rookieui-shell__hires-title", "ADetailer");
+  topEnabled.addEventListener("keydown", (event) => event.stopPropagation());
   appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸");
 
   const body = document.createElement("div");
