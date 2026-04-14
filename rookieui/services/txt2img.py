@@ -259,6 +259,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         payload,
         surface="txt2img",
         strict_inventory_match=inventory_is_host,
+        primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
     )
 
     primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(

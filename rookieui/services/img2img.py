@@ -211,6 +211,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         payload,
         surface="img2img",
         strict_inventory_match=inventory_is_host,
+        primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
     )
 
     width = _coerce_dimension(

@@ -23,9 +23,19 @@ from rookieui.services.model_inventory import discover_model_inventory
 
 ADETAILER_WARNING_UNIT_LIMIT_TRUNCATED = "ADETAILER_UNIT_LIMIT_TRUNCATED"
 ADETAILER_WARNING_SKIP_IMG2IMG_IGNORED = "ADETAILER_SKIP_IMG2IMG_IGNORED"
+ADETAILER_WARNING_NO_ACTIVE_UNITS = "ADETAILER_NO_ACTIVE_UNITS"
+ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG = "ADETAILER_DETECTOR_NOT_IN_CATALOG"
+ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK = "ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK"
+ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY = "ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY"
+ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING = "ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING"
 _ADETAILER_WARNING_MESSAGES = {
     ADETAILER_WARNING_UNIT_LIMIT_TRUNCATED: "ADetailer unit payload exceeded the supported 4-unit contract and was truncated.",
     ADETAILER_WARNING_SKIP_IMG2IMG_IGNORED: "ADetailer skip-img2img is only meaningful for img2img surfaces and was ignored.",
+    ADETAILER_WARNING_NO_ACTIVE_UNITS: "ADetailer is enabled but no enabled unit has a detector selected.",
+    ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG: "ADetailer detector is not present in the current host catalog; fallback mask behavior may be used.",
+    ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK: "ADetailer detector runs through RookieUI's deterministic Comfy-native mask seam in this build.",
+    ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY: "ADetailer ControlNet passthrough was requested but no primary ControlNet unit is enabled.",
+    ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING: "ADetailer custom ControlNet mode was requested without a ControlNet model.",
 }
 _ADETAILER_CONTROLNET_MODEL_SENTINELS = {"", "None"}
 _ADETAILER_CHECKPOINT_SENTINELS = {"", "__host_default__", "Use same checkpoint"}
@@ -39,6 +49,34 @@ _ADETAILER_WORLD_MARKER = "-world"
 
 def _warning_messages_from_codes(codes: list[str]) -> list[str]:
     return [_ADETAILER_WARNING_MESSAGES[code] for code in codes if code in _ADETAILER_WARNING_MESSAGES]
+
+
+def build_adetailer_warning_code_payload() -> dict[str, str]:
+    return dict(_ADETAILER_WARNING_MESSAGES)
+
+
+def build_adetailer_availability_payload() -> dict[str, object]:
+    detectors, detector_source = _build_detector_entries()
+    controlnet_models = build_controlnet_model_list_payload()
+    return {
+        "execution_backend": "rookieui_comfy_native_refinement_pipeline",
+        "runtime_stages": ["base_decode", "detect_mask", "inpaint_encode", "refine_sampler", "final_decode"],
+        "detector_source": detector_source,
+        "detector_count": len(detectors),
+        "controlnet_model_count": len(list(controlnet_models.get("model_list", []))),
+        "detector_runtime": {
+            "none": "disabled",
+            "ultralytics": "deterministic_mask_fallback",
+            "world": "deterministic_mask_fallback",
+            "mediapipe": "deterministic_mask_fallback",
+        },
+        "degraded_warning_codes": [
+            ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG,
+            ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK,
+            ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY,
+            ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING,
+        ],
+    }
 
 
 def _build_detector_entries() -> tuple[list[dict[str, object]], str]:
@@ -114,6 +152,8 @@ def build_adetailer_catalog_payload() -> dict[str, object]:
         "scheduler_choices": [entry["title"] for entry in compatibility.get("schedulers", []) if isinstance(entry, dict)],
         "mask_filter_methods": list(ADETAILER_MASK_FILTER_METHODS),
         "mask_merge_modes": list(ADETAILER_MASK_MERGE_MODES),
+        "availability": build_adetailer_availability_payload(),
+        "warning_codes": build_adetailer_warning_code_payload(),
     }
 
 
@@ -122,11 +162,13 @@ def build_adetailer_capability_payload() -> dict[str, object]:
         "contract": build_adetailer_integrated_contract_meta(),
         "behavior_source": "reference/adetailer",
         "ui_reference": "localhost_7860_a1111_forge_neo_host",
-        "execution_backend": "rookieui_comfy_native_refinement_pipeline_planned",
+        "execution_backend": "rookieui_comfy_native_refinement_pipeline",
         "skip_img2img_surfaces": ["img2img"],
         "controlnet_modes": list(ADETAILER_CONTROLNET_MODES),
         "prompt_tokens": list(ADETAILER_PROMPT_TOKENS),
-        "warning_code_contract": "provisional_until_f81",
+        "warning_code_contract": "stable_f81",
+        "availability": build_adetailer_availability_payload(),
+        "warning_codes": build_adetailer_warning_code_payload(),
         "routes": ["/rookieui/adetailer/catalog"],
     }
 
@@ -214,6 +256,7 @@ def normalize_adetailer_payload(
     *,
     surface: str,
     strict_inventory_match: bool,
+    primary_controlnet_unit_count: int = 0,
 ) -> NormalizedADetailerRequest:
     raw_block = payload.get("adetailer", {})
     if raw_block in (None, ""):
@@ -251,8 +294,9 @@ def normalize_adetailer_payload(
         field_prefix = f"adetailer.units[{index}]"
         prompt_text = normalize_prompt_text(raw_unit.get("prompt", ""), f"{field_prefix}.prompt")
         negative_prompt_text = normalize_prompt_text(raw_unit.get("negative_prompt", ""), f"{field_prefix}.negative_prompt")
+        raw_detector_value = raw_unit.get("detector")
         detector = _normalize_detector(
-            raw_unit.get("detector"),
+            raw_detector_value,
             detector_choices=detector_choices,
             strict_match=strict_inventory_match,
             field_name=f"{field_prefix}.detector",
@@ -413,10 +457,46 @@ def normalize_adetailer_payload(
             )
         )
 
+    active_units = [
+        unit
+        for unit in units
+        if unit.enabled and str(unit.detector or "").strip() and str(unit.detector or "").strip() != _ADETAILER_DEFAULT_DETECTOR
+    ]
+    if enabled and not active_units:
+        warning_codes.append(ADETAILER_WARNING_NO_ACTIVE_UNITS)
+    for unit in active_units:
+        if unit.detector not in detector_choices:
+            warning_codes.append(ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG)
+        if unit.detector_family in {"ultralytics", "world", "mediapipe"}:
+            # DEBUG HOTSPOT: keep this warning aligned with `RookieUIADetailerDetectMask`;
+            # removing it would make detector-runtime fallback behavior invisible to users.
+            warning_codes.append(ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK)
+        if unit.controlnet.mode == "passthrough" and primary_controlnet_unit_count <= 0:
+            warning_codes.append(ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY)
+        if unit.controlnet.mode == "custom" and not unit.controlnet.model:
+            warning_codes.append(ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING)
+
+    warning_codes = list(dict.fromkeys(warning_codes))
+    diagnostics = {
+        "active_unit_count": len(active_units) if enabled else 0,
+        "primary_controlnet_unit_count": max(0, int(primary_controlnet_unit_count)),
+        "detector_runtime": "rookieui_deterministic_mask_fallback",
+        "degraded": bool(
+            set(warning_codes)
+            & {
+                ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG,
+                ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK,
+                ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY,
+                ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING,
+            }
+        ),
+    }
+
     return NormalizedADetailerRequest(
         enabled=enabled,
         skip_img2img=skip_img2img,
         units=units,
         warning_codes=warning_codes,
         warnings=_warning_messages_from_codes(warning_codes),
+        diagnostics=diagnostics,
     )

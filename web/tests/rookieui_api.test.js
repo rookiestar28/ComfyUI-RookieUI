@@ -53,6 +53,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
+    expect(result.data.adetailer.execution_backend).toBe("rookieui_comfy_native_refinement_pipeline");
+    expect(result.data.adetailer.warning_code_contract).toBe("stable_f81");
+    expect(result.data.adetailer.warning_codes.ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK).toContain("deterministic");
     expect(result.data.adetailer.routes).toContain("/rookieui/adetailer/catalog");
   });
 
@@ -329,6 +332,8 @@ describe("fetchRookieUICapabilities", () => {
     expect(fallbackCatalog.data.contract.unit_count).toBe(4);
     expect(fallbackCatalog.data.prompt_tokens).toEqual(["[PROMPT]", "[SEP]", "[SKIP]"]);
     expect(fallbackCatalog.data.controlnet_modes).toEqual(["none", "passthrough", "custom"]);
+    expect(fallbackCatalog.data.availability.runtime_stages).toContain("detect_mask");
+    expect(fallbackCatalog.data.warning_codes.ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY).toContain("passthrough");
   });
 
   test("emits guarded debug warnings only when ROOKIEUI_DEBUG is enabled", async () => {

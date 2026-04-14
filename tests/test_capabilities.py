@@ -73,6 +73,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])
         self.assertIn("/rookieui/adetailer/catalog", adetailer["routes"])
         self.assertEqual(adetailer["contract"]["defaults"]["checkpoint_name"], "Use same checkpoint")
+        self.assertEqual(adetailer["execution_backend"], "rookieui_comfy_native_refinement_pipeline")
+        self.assertEqual(adetailer["warning_code_contract"], "stable_f81")
+        self.assertIn("ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING", adetailer["warning_codes"])
+        self.assertIn("detect_mask", adetailer["availability"]["runtime_stages"])
 
     def test_capabilities_snapshot_uses_pyproject_shell_version(self) -> None:
         payload = build_capabilities_snapshot()
