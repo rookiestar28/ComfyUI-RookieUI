@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from rookieui.api import routes
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.workflow_translation import translate_img2img_request
 
@@ -223,6 +224,34 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.inpaint_mask_mode, "inpaint_not_masked")
         self.assertEqual(normalized.inpaint_masked_content, "latent_noise")
         self.assertEqual(normalized.inpaint_area, "whole_picture")
+
+    def test_normalize_img2img_request_accepts_host_default_sentinels_on_live_inventory(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["SD15\\vae-ft-mse-840000.safetensors"],
+            text_encoders=["clip_l.safetensors"],
+            controlnet=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="SD15\\vae-ft-mse-840000.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "sd15",
+                    "checkpoint_name": "__host_default__",
+                    "vae_name": "Automatic",
+                    "text_encoder_name": "Automatic",
+                }
+            )
+
+        self.assertEqual(normalized.checkpoint_name, "SD15\\dreamshaper.safetensors")
+        self.assertEqual(normalized.vae_name, "SD15\\vae-ft-mse-840000.safetensors")
+        self.assertEqual(normalized.text_encoder_name, "")
 
     def test_normalize_img2img_request_uses_batch_image_as_source_fallback(self) -> None:
         with mock.patch(

@@ -1518,6 +1518,228 @@ describe("registerRookieUIBootstrapExtension", () => {
     ).toBe(true);
   });
 
+  test("surfaces backend invalid-request detail in txt2img status feedback", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-invalid-request",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+    const fetchImpl = async (url) => {
+      if (url === "/rookieui/generate/txt2img") {
+        return {
+          ok: false,
+          status: 400,
+          async json() {
+            return {
+              status: "invalid-request",
+              detail: "checkpoint_name must match a host inventory entry.",
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/bootstrap") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { service: "rookieui", status: "bootstrap-ready", routes: [] };
+          },
+        };
+      }
+      if (url === "/rookieui/capabilities") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              features: { controlnet: true, adetailer: true, extras: true, pnginfo: true, queue: true },
+              parity: {
+                profiles: [
+                  {
+                    id: "sd15",
+                    title: "Stable Diffusion 1.5",
+                    base_family: "sd15",
+                    prompt_encoder: "clip_text_encode",
+                    default_width: 512,
+                    default_height: 512,
+                    default_steps: 28,
+                    default_cfg_scale: 7,
+                    default_sampler: "euler_ancestral",
+                    default_scheduler: "normal",
+                    default_clip_skip: 1,
+                    supports_clip_skip: true,
+                    notes: [],
+                  },
+                ],
+              },
+              routes: [],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/models") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              checkpoints: ["dreamshaper.safetensors"],
+              clip: [],
+              clip_vision: [],
+              controlnet: [],
+              diffusion_models: [],
+              vae: ["Automatic"],
+              text_encoders: ["clip_l.safetensors"],
+              embeddings: [],
+              loras: [],
+              ultralytics: [],
+              unet: [],
+              upscale_models: [],
+              default_checkpoint: "dreamshaper.safetensors",
+              default_vae: "Automatic",
+              default_text_encoder: "clip_l.safetensors",
+              catalog: {
+                surface_groups: [],
+                primary_model_category_by_family: { sd15: "checkpoints", sdxl: "checkpoints" },
+                categories: {
+                  checkpoints: {
+                    title: "Checkpoints",
+                    items: ["dreamshaper.safetensors"],
+                    default_value: "dreamshaper.safetensors",
+                    sidebar_visible: true,
+                  },
+                  vae: {
+                    title: "VAE",
+                    items: ["Automatic"],
+                    default_value: "Automatic",
+                    sidebar_visible: true,
+                  },
+                  text_encoders: {
+                    title: "Text Encoders",
+                    items: ["clip_l.safetensors"],
+                    default_value: "clip_l.safetensors",
+                    sidebar_visible: true,
+                  },
+                },
+              },
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/presets") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              presets: [
+                {
+                  id: "sd15",
+                  title: "SD1.5",
+                  profile: "sd15",
+                  base_family: "sd15",
+                  checkpoint_name: "dreamshaper.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "clip_l.safetensors",
+                  width: 512,
+                  height: 512,
+                  steps: 28,
+                  cfg_scale: 7,
+                  sampler_name: "euler_ancestral",
+                  scheduler_name: "normal",
+                  clip_skip: 1,
+                },
+              ],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/compatibility") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              samplers: [{ id: "euler_ancestral", title: "Euler a", default: true }],
+              schedulers: [{ id: "normal", title: "Normal", default: true }],
+              dtype_profiles: [{ id: "automatic", title: "Automatic", default: true }],
+              runtime_profiles: [],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/model_list") {
+        return { ok: true, status: 200, async json() { return { model_list: [], default_model: "" }; } };
+      }
+      if (url === "/rookieui/controlnet/module_list") {
+        return { ok: true, status: 200, async json() { return { module_list: [], default_module: "none" }; } };
+      }
+      if (url === "/rookieui/controlnet/control_types") {
+        return { ok: true, status: 200, async json() { return { control_types: {}, control_type_order: [] }; } };
+      }
+      if (url === "/rookieui/adetailer/catalog") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              detectors: [{ id: "None", label: "None", family: "none", supports_class_filter: false }],
+              detector_list: ["None"],
+              default_detector: "None",
+              controlnet_modes: ["none", "passthrough", "custom"],
+              controlnet_model_list: [],
+              controlnet_module_list: ["none"],
+              controlnet_default_module: "none",
+              checkpoint_choices: ["Use same checkpoint"],
+              vae_choices: ["Use same VAE"],
+              sampler_choices: ["DPM++ 2M Karras"],
+              scheduler_choices: ["Use same scheduler"],
+              mask_filter_methods: ["Area", "Confidence"],
+              mask_merge_modes: ["None", "Merge", "Merge and Invert"],
+              contract: { defaults: {} },
+            };
+          },
+        };
+      }
+      return { ok: true, status: 200, async json() { return {}; } };
+    };
+
+    await registerRookieUIBootstrapExtension({ app, fetchImpl });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    document.getElementById("rookieui-prompt").value = "test prompt";
+    document.getElementById("rookieui-txt2img-form").dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(document.getElementById("rookieui-txt2img-status").textContent).toContain(
+      "Request failed: invalid-request (checkpoint_name must match a host inventory entry.)",
+    );
+  });
+
   test("falls back to image_asset transfer when preview decode fails", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">

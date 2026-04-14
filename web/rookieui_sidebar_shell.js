@@ -1119,7 +1119,10 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
   }
   const result = await bootstrapState.submitTxt2ImgRequest(payload);
   if (!result.ok) {
-    statusNode.textContent = `Request failed: ${result.data.status}`;
+    const detail = String(result?.data?.detail ?? "").trim();
+    statusNode.textContent = detail
+      ? `Request failed: ${result.data.status} (${detail})`
+      : `Request failed: ${result.data.status}`;
     return;
   }
 
@@ -1310,7 +1313,10 @@ async function submitImg2Img(
   }
   const result = await bootstrapState.submitImg2ImgRequest(payload);
   if (!result.ok) {
-    statusNode.textContent = `Request failed: ${result.data.status}`;
+    const detail = String(result?.data?.detail ?? "").trim();
+    statusNode.textContent = detail
+      ? `Request failed: ${result.data.status} (${detail})`
+      : `Request failed: ${result.data.status}`;
     return;
   }
 
