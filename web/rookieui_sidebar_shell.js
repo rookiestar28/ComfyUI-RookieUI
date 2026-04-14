@@ -489,6 +489,59 @@ function createActionButton(id, text) {
   return button;
 }
 
+function installExplicitGenerationSubmitGuard(form, submitButton = null) {
+  if (!form) {
+    return;
+  }
+
+  const requestExplicitSubmit = () => {
+    if (typeof form.requestSubmit === "function") {
+      if (submitButton) {
+        form.requestSubmit(submitButton);
+        return;
+      }
+      form.requestSubmit();
+      return;
+    }
+    if (submitButton?.click) {
+      submitButton.click();
+      return;
+    }
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  };
+
+  form.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.isComposing || event.key !== "Enter") {
+      return;
+    }
+
+    const target = event.target;
+    const tagName = String(target?.tagName ?? "").toUpperCase();
+    const inputType = String(target?.type ?? "").toLowerCase();
+    const isTextarea = tagName === "TEXTAREA";
+    const isSelect = tagName === "SELECT";
+    const isButton = tagName === "BUTTON";
+    const isImplicitSubmitInput =
+      tagName === "INPUT" &&
+      !["checkbox", "radio", "button", "submit", "reset", "file", "range", "color", "hidden"].includes(inputType);
+
+    if (isTextarea) {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        requestExplicitSubmit();
+      }
+      return;
+    }
+
+    if (isButton || (!isImplicitSubmitInput && !isSelect)) {
+      return;
+    }
+
+    // CRITICAL: browser implicit Enter submit from single-line form controls can launch backend generation while the user is still editing parameters.
+    event.preventDefault();
+  });
+}
+
 function updateFormFromPreset(presetLookup, presetId, elements, profileLookup, modelsPayload = null) {
   const preset = presetLookup.get(presetId);
   if (!preset) {
@@ -1669,6 +1722,7 @@ function buildPaneModuleContext() {
     readFileAsDataUrl,
     setPreviewContent,
     installPaneStateLock,
+    installExplicitGenerationSubmitGuard,
     findPresetIdForProfile,
     setElementValue,
     syncBoundControls,

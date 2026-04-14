@@ -33,6 +33,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     readFileAsDataUrl,
     bindSliderPair,
     installPaneStateLock,
+    installExplicitGenerationSubmitGuard,
     applyPayloadToElements,
     findPresetIdForProfile,
     setElementValue,
@@ -608,6 +609,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     event.preventDefault();
     await submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, txt2imgPreviewBox);
   });
+  installExplicitGenerationSubmitGuard(form, submitButton);
 
   const txt2imgStateLock = installPaneStateLock(formRegistry, "txt2img", elements, () => {
     // IMPORTANT: tab restore must re-apply Clip Skip editability; otherwise old profile lock state can persist and look frozen.
