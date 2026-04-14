@@ -47,6 +47,10 @@ def _normalize_loose_mapping(payload: object) -> dict[str, object]:
                 for entry in value
                 if isinstance(entry, (str, int, float, bool))
             ]
+        elif isinstance(value, dict):
+            nested = _normalize_loose_mapping(value)
+            if nested:
+                normalized[normalized_key] = nested
     return normalized
 
 

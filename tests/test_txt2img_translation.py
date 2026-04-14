@@ -68,6 +68,10 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("ADETAILER_SKIP_IMG2IMG_IGNORED", request.adetailer.warning_codes)
         self.assertIn("ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK", request.adetailer.warning_codes)
         self.assertIn("ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY", request.adetailer.warning_codes)
+        self.assertEqual(
+            request.adetailer.diagnostics["detector_runtime"],
+            "rookieui_native_detector_runtime_with_fallback",
+        )
         self.assertEqual(request.adetailer.units[0].detector, "face_yolov8n.pt")
         self.assertEqual(request.adetailer.units[0].controlnet.mode, "passthrough")
 

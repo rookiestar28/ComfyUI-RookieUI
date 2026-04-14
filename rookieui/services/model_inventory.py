@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import Any
@@ -100,6 +101,40 @@ _PROFILE_VAE_DENY_HINTS: dict[str, tuple[str, ...]] = {
     "wan": ("qwen",),
     "anima": ("qwen",),
 }
+_NATIVE_ULTRALYTICS_MODEL_FOLDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ultralytics", ("ultralytics",)),
+    ("ultralytics_bbox", ("ultralytics", "bbox")),
+    ("ultralytics_segm", ("ultralytics", "segm")),
+)
+
+
+def ensure_native_ultralytics_model_paths(folder_paths_module: Any | None) -> Any | None:
+    if folder_paths_module is None:
+        return None
+
+    models_dir = getattr(folder_paths_module, "models_dir", None)
+    add_model_folder_path = getattr(folder_paths_module, "add_model_folder_path", None)
+    folder_names_and_paths = getattr(folder_paths_module, "folder_names_and_paths", None)
+    supported_pt_extensions = getattr(folder_paths_module, "supported_pt_extensions", None)
+    if not isinstance(models_dir, str) or not callable(add_model_folder_path):
+        return folder_paths_module
+
+    # IMPORTANT: register native detector model folders here so RookieUI does not require an external detector pack
+    # just to make host `folder_paths` aware of Ultralytics bbox/segm model locations.
+    for folder_name, relative_parts in _NATIVE_ULTRALYTICS_MODEL_FOLDERS:
+        full_path = os.path.join(models_dir, *relative_parts)
+        try:
+            add_model_folder_path(folder_name, full_path, is_default=True)
+        except TypeError:
+            add_model_folder_path(folder_name, full_path)
+        if isinstance(folder_names_and_paths, dict) and folder_name in folder_names_and_paths:
+            paths, extensions = folder_names_and_paths[folder_name]
+            if isinstance(paths, list) and full_path in paths and isinstance(supported_pt_extensions, set):
+                if not isinstance(extensions, set):
+                    extensions = set()
+                extensions.update(supported_pt_extensions)
+                folder_names_and_paths[folder_name] = (paths, extensions)
+    return folder_paths_module
 
 
 def _load_folder_paths_module() -> Any:
@@ -107,7 +142,7 @@ def _load_folder_paths_module() -> Any:
         import folder_paths
     except ImportError:
         return None
-    return folder_paths
+    return ensure_native_ultralytics_model_paths(folder_paths)
 
 
 def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[str]:

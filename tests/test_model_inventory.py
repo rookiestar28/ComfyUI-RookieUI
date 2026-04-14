@@ -7,6 +7,7 @@ from unittest import mock
 from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
+    ensure_native_ultralytics_model_paths,
     resolve_primary_model_selector_context,
     resolve_text_encoder_selector_context,
     resolve_vae_selector_context,
@@ -53,6 +54,24 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.ultralytics_segm, ["person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.unet, ["sdxl_unet.safetensors"])
         self.assertEqual(snapshot.upscale_models, ["4x_foolhardy.pth"])
+
+    def test_ensure_native_ultralytics_model_paths_updates_extensions(self) -> None:
+        module = types.SimpleNamespace(
+            models_dir="C:\\models",
+            supported_pt_extensions={".pt", ".pth"},
+            folder_names_and_paths={},
+        )
+
+        def _add_model_folder_path(folder_name: str, full_folder_path: str, is_default: bool = False) -> None:
+            module.folder_names_and_paths.setdefault(folder_name, ([full_folder_path], set()))
+
+        module.add_model_folder_path = _add_model_folder_path
+
+        ensure_native_ultralytics_model_paths(module)
+
+        self.assertEqual(module.folder_names_and_paths["ultralytics"][1], {".pt", ".pth"})
+        self.assertEqual(module.folder_names_and_paths["ultralytics_bbox"][1], {".pt", ".pth"})
+        self.assertEqual(module.folder_names_and_paths["ultralytics_segm"][1], {".pt", ".pth"})
 
     def test_discover_model_inventory_falls_back_without_host_module(self) -> None:
         snapshot = discover_model_inventory(folder_paths_module=None)
