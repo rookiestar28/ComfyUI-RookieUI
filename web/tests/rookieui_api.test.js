@@ -259,7 +259,7 @@ describe("fetchRookieUICapabilities", () => {
                 version: "r72-20260412",
                 ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
-                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
               },
               model_list: ["control_v11p_sd15_canny.safetensors"],
               default_model: "control_v11p_sd15_canny.safetensors",
@@ -277,7 +277,7 @@ describe("fetchRookieUICapabilities", () => {
                 version: "r72-20260412",
                 ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
-                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
               },
               module_list: ["none", "canny", "depth"],
               default_module: "none",
@@ -295,7 +295,7 @@ describe("fetchRookieUICapabilities", () => {
                 version: "r72-20260412",
                 ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
-                advanced_contract: { version: "r111-20260415", runtime_state: "reserved_contract_only" },
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
               },
               control_type_order: ["All", "Canny", "Depth"],
               default_type: "All",
@@ -334,7 +334,7 @@ describe("fetchRookieUICapabilities", () => {
     });
     expect(fallbackTypes.ok).toBe(false);
     expect(fallbackTypes.data.contract.version).toBe("r72-20260412");
-    expect(fallbackTypes.data.contract.advanced_contract.runtime_state).toBe("reserved_contract_only");
+    expect(fallbackTypes.data.contract.advanced_contract.runtime_state).toBe("rookieui_native_advanced_runtime");
     expect(fallbackTypes.data.default_type).toBe("All");
   });
 

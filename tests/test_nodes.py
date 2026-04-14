@@ -36,6 +36,11 @@ class RookieUINodesTests(unittest.TestCase):
 
     def test_controlnet_preprocess_node_is_registered(self) -> None:
         self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
+        self.assertIn("RookieUIControlNetApplyNativeAdvanced", nodes.NODE_CLASS_MAPPINGS)
+        self.assertEqual(
+            nodes.NODE_DISPLAY_NAME_MAPPINGS["RookieUIControlNetApplyNativeAdvanced"],
+            "RookieUI ControlNet Apply (Advanced)",
+        )
 
     def test_adetailer_detect_mask_node_is_registered(self) -> None:
         self.assertIn("RookieUIADetailerDetectMask", nodes.NODE_CLASS_MAPPINGS)

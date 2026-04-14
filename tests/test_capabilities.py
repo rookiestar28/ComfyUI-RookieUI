@@ -4,6 +4,7 @@ import unittest
 
 from rookieui.api.routes import build_capabilities_snapshot
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
+from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.version import resolve_shell_version
 
@@ -74,7 +75,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
             ["none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face"],
         )
         self.assertEqual(adetailer["contract"]["detector_result_contract"], "rookieui_detection_regions_v1")
-        self.assertEqual(adetailer["contract"]["controlnet_advanced_contract"]["runtime_state"], "reserved_contract_only")
+        self.assertEqual(
+            adetailer["contract"]["controlnet_advanced_contract"]["runtime_state"],
+            CONTROLNET_ADVANCED_RUNTIME_STATE,
+        )
         self.assertEqual(adetailer["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])
         self.assertIn("/rookieui/adetailer/catalog", adetailer["routes"])
