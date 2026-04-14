@@ -98,7 +98,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Parsed and compiled to multi-branch conditioning composition for SD-family execution lanes.",
         status: "supported",
         translation: "conditioning_combine",
-        reference: "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        reference: "a1111_prompt_parser",
       },
       {
         id: "break_chunks",
@@ -107,7 +107,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Parsed into prompt chunks and compiled with explicit chunk-composition nodes.",
         status: "supported",
         translation: "conditioning_concat",
-        reference: "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        reference: "a1111_prompt_parser",
       },
       {
         id: "prompt_scheduling",
@@ -116,7 +116,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Parsed into schedule slices and compiled with timestep range conditioning.",
         status: "supported",
         translation: "conditioning_set_timestep_range",
-        reference: "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        reference: "a1111_prompt_parser",
       },
       {
         id: "attention_weighting",
@@ -125,7 +125,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Structured detection with SD-family-first weighted text preservation.",
         status: "supported",
         translation: "weighted_text_tokens",
-        reference: "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        reference: "a1111_prompt_parser",
       },
       {
         id: "extra_network_lora",
@@ -134,7 +134,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Deterministic extraction + merged activation chain through LoraLoader nodes.",
         status: "supported",
         translation: "lora_loader_chain",
-        reference: "reference/stable-diffusion-webui/modules/extra_networks.py",
+        reference: "a1111_extra_networks",
       },
       {
         id: "extra_network_other",
@@ -143,14 +143,14 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         rookieui_contract: "Removed from prompt payload with explicit warning diagnostics.",
         status: "guarded",
         translation: "warning_and_strip",
-        reference: "reference/stable-diffusion-webui/modules/extra_networks.py",
+        reference: "a1111_extra_networks",
       },
     ],
   },
   adetailer: {
     contract: {
       version: "r74f77-20260414",
-      ui_variant: "a1111_forge_integrated",
+      ui_variant: "a1111_integrated_detailer",
       unit_count: 4,
       prompt_tokens: ["[PROMPT]", "[SEP]", "[SKIP]"],
       controlnet_modes: ["none", "passthrough", "custom"],
@@ -193,8 +193,8 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         restore_face: false,
       },
     },
-    behavior_source: "reference/adetailer",
-    ui_reference: "localhost_7860_a1111_forge_neo_host",
+    behavior_source: "integrated_detailer_contract",
+    ui_reference: "localhost_7860_a1111_integrated_host",
     execution_backend: "rookieui_comfy_native_refinement_pipeline",
     skip_img2img_surfaces: ["img2img"],
     controlnet_modes: ["none", "passthrough", "custom"],
@@ -668,7 +668,7 @@ export async function fetchRookieUIControlNetModels(fetchImpl = globalThis.fetch
       source: "fallback",
       contract: {
         version: "r72-20260412",
-        ui_variant: "forge_neo_integrated",
+        ui_variant: "integrated_sidebar_controlnet",
         unit_count: 3,
       },
       model_list: [],
@@ -685,7 +685,7 @@ export async function fetchRookieUIControlNetModules(fetchImpl = globalThis.fetc
       source: "fallback",
       contract: {
         version: "r72-20260412",
-        ui_variant: "forge_neo_integrated",
+        ui_variant: "integrated_sidebar_controlnet",
         unit_count: 3,
       },
       module_list: ["none", "canny"],
@@ -702,7 +702,7 @@ export async function fetchRookieUIControlNetTypes(fetchImpl = globalThis.fetch)
       source: "fallback",
       contract: {
         version: "r72-20260412",
-        ui_variant: "forge_neo_integrated",
+        ui_variant: "integrated_sidebar_controlnet",
         unit_count: 3,
       },
       control_type_order: [
@@ -746,7 +746,7 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
       source: "fallback",
       contract: {
         version: "r74f77-20260414",
-        ui_variant: "a1111_forge_integrated",
+        ui_variant: "a1111_integrated_detailer",
         unit_count: 4,
         prompt_tokens: ["[PROMPT]", "[SEP]", "[SKIP]"],
         controlnet_modes: ["none", "passthrough", "custom"],

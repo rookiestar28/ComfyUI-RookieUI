@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 _MISSING = object()
 
-# Forge-style preprocessor option catalog consumed by both backend payload validation and
+# Integrated preprocessor option catalog consumed by both backend payload validation and
 # workflow/runtime dispatch. Keep this list deterministic to preserve UI filter order.
 CONTROLNET_PREPROCESSOR_OPTION_ORDER: tuple[str, ...] = (
     "none",
@@ -309,13 +309,13 @@ _HOST_NODE_EXCLUDE_TOKENS = (
 
 _MODULE_DYNAMIC_NODE_EXCLUDE_TOKENS: dict[str, tuple[str, ...]] = {
     # IMPORTANT: keep heavyweight depth/normal candidates out of generic dynamic probing; these nodes may trigger
-    # large auxiliary model bootstrap/download flows when merely probed and are not the default Forge-like depth path.
+    # large auxiliary model bootstrap/download flows when merely probed and are not the default integrated depth path.
     "depth": ("metric3d", "meshgraphormer"),
     "normalmap": ("metric3d",),
 }
 
 _MODULE_HOST_PREPROCESSOR_PRIORITIES: dict[str, tuple[str, ...]] = {
-    # IMPORTANT: prefer deterministic Forge-like host nodes first so depth preview does not oscillate across preprocessor families.
+    # IMPORTANT: prefer deterministic host nodes first so depth preview does not oscillate across preprocessor families.
     "depth": (
         "DepthAnythingV2Preprocessor",
         "DepthAnythingPreprocessor",
@@ -931,7 +931,7 @@ def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | 
 
     ranked = _rank_preprocessor_choices_by_keywords(choices, _MODULE_AIO_KEYWORDS.get(module_key, ()))
     if ranked:
-        # DEBUG HOTSPOT: if AIO choice differs from expected Forge-like defaults, inspect keyword ranking behavior at this seam.
+        # DEBUG HOTSPOT: if AIO choice differs from expected integrated defaults, inspect keyword ranking behavior at this seam.
         return ranked[0]
     return None
 

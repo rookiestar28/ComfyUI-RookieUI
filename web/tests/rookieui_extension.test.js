@@ -359,7 +359,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               source: "host",
               contract: {
                 version: "r72-20260412",
-                ui_variant: "forge_neo_integrated",
+                ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
               },
               model_list: ["control_v11p_sd15_canny.safetensors", "control_v11f1p_sd15_depth.safetensors"],
@@ -378,7 +378,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               source: "internal",
               contract: {
                 version: "r72-20260412",
-                ui_variant: "forge_neo_integrated",
+                ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
               },
               module_list: ["none", "canny", "depth", "openpose"],
@@ -397,7 +397,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               source: "internal",
               contract: {
                 version: "r72-20260412",
-                ui_variant: "forge_neo_integrated",
+                ui_variant: "integrated_sidebar_controlnet",
                 unit_count: 3,
               },
               control_type_order: ["All", "Canny", "Depth", "OpenPose", "SoftEdge", "Tile"],
@@ -428,7 +428,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               source: "host",
               contract: {
                 version: "r74f77-20260414",
-                ui_variant: "a1111_forge_integrated",
+                ui_variant: "a1111_integrated_detailer",
                 unit_count: 4,
                 prompt_tokens: ["[PROMPT]", "[SEP]", "[SKIP]"],
                 controlnet_modes: ["none", "passthrough", "custom"],

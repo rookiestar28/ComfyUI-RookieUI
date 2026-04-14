@@ -39,11 +39,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     setElementValue,
     syncBoundControls,
   } = context;  const section = document.createElement("section");
-  section.className = "rookieui-shell__forge-pane";
+  section.className = "rookieui-shell__integrated-pane";
   parent.appendChild(section);
 
   const form = document.createElement("form");
-  form.className = "rookieui-shell__form rookieui-shell__forge-form";
+  form.className = "rookieui-shell__form rookieui-shell__integrated-form";
   form.id = "rookieui-txt2img-form";
   section.appendChild(form);
 

@@ -67,7 +67,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
 
         adetailer = payload["adetailer"]
         self.assertEqual(adetailer["contract"]["version"], "r74f77-20260414")
-        self.assertEqual(adetailer["contract"]["ui_variant"], "a1111_forge_integrated")
+        self.assertEqual(adetailer["contract"]["ui_variant"], "a1111_integrated_detailer")
         self.assertEqual(adetailer["contract"]["unit_count"], 4)
         self.assertEqual(adetailer["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])

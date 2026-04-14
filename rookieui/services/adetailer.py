@@ -160,8 +160,8 @@ def build_adetailer_catalog_payload() -> dict[str, object]:
 def build_adetailer_capability_payload() -> dict[str, object]:
     return {
         "contract": build_adetailer_integrated_contract_meta(),
-        "behavior_source": "reference/adetailer",
-        "ui_reference": "localhost_7860_a1111_forge_neo_host",
+        "behavior_source": "integrated_detailer_contract",
+        "ui_reference": "localhost_7860_a1111_integrated_host",
         "execution_backend": "rookieui_comfy_native_refinement_pipeline",
         "skip_img2img_surfaces": ["img2img"],
         "controlnet_modes": list(ADETAILER_CONTROLNET_MODES),

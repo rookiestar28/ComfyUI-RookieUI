@@ -75,7 +75,7 @@ function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
       modelResult?.data?.contract ??
       moduleResult?.data?.contract ?? {
         version: "r72-20260412",
-        ui_variant: "forge_neo_integrated",
+        ui_variant: "integrated_sidebar_controlnet",
         unit_count: 3,
       },
     model_list: modelList,

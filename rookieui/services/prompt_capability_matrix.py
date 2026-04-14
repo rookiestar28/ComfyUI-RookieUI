@@ -10,7 +10,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Parsed and compiled to multi-branch conditioning composition for SD-family execution lanes.",
         "status": "supported",
         "translation": "conditioning_combine",
-        "reference": "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        "reference": "a1111_prompt_parser",
     },
     {
         "id": "break_chunks",
@@ -19,7 +19,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Parsed into prompt chunks and compiled with explicit chunk-composition nodes.",
         "status": "supported",
         "translation": "conditioning_concat",
-        "reference": "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        "reference": "a1111_prompt_parser",
     },
     {
         "id": "prompt_scheduling",
@@ -28,7 +28,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Parsed into schedule slices and compiled with timestep range conditioning.",
         "status": "supported",
         "translation": "conditioning_set_timestep_range",
-        "reference": "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        "reference": "a1111_prompt_parser",
     },
     {
         "id": "attention_weighting",
@@ -37,7 +37,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Structured detection with SD-family-first weighted text preservation.",
         "status": "supported",
         "translation": "weighted_text_tokens",
-        "reference": "reference/stable-diffusion-webui/modules/prompt_parser.py",
+        "reference": "a1111_prompt_parser",
     },
     {
         "id": "extra_network_lora",
@@ -46,7 +46,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Deterministic extraction + merged activation chain through LoraLoader nodes.",
         "status": "supported",
         "translation": "lora_loader_chain",
-        "reference": "reference/stable-diffusion-webui/modules/extra_networks.py",
+        "reference": "a1111_extra_networks",
     },
     {
         "id": "extra_network_other",
@@ -55,7 +55,7 @@ _PROMPT_CAPABILITIES = (
         "rookieui_contract": "Removed from prompt payload with explicit warning diagnostics.",
         "status": "guarded",
         "translation": "warning_and_strip",
-        "reference": "reference/stable-diffusion-webui/modules/extra_networks.py",
+        "reference": "a1111_extra_networks",
     },
 )
 

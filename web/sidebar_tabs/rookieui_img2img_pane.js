@@ -62,11 +62,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncBoundControls,
   } = context;
   const section = document.createElement("section");
-  section.className = "rookieui-shell__forge-pane";
+  section.className = "rookieui-shell__integrated-pane";
   parent.appendChild(section);
 
   const form = document.createElement("form");
-  form.className = "rookieui-shell__form rookieui-shell__forge-form";
+  form.className = "rookieui-shell__form rookieui-shell__integrated-form";
   form.id = "rookieui-img2img-form";
   section.appendChild(form);
 
@@ -1185,7 +1185,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
         imageCanvasStage.addEventListener("click", () => {
           if (!canCanvasStageOpenUpload(elements.imageData.value, elements.imageAsset.value)) {
-            // CRITICAL: once source image exists, stage click must stop forcing file-picker opens; Forge-style parity switches the stage to edit-first behavior.
+            // CRITICAL: once source image exists, stage click must stop forcing file-picker opens; the integrated A1111-like flow switches the stage to edit-first behavior.
             return;
           }
           openSourceFilePicker();
