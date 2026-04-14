@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 from rookieui.api import routes
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_txt2img_request
 
@@ -178,6 +179,33 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             }
         )
 
+        self.assertEqual(normalized.text_encoder_name, "")
+
+    def test_normalize_txt2img_request_accepts_host_default_sentinels_on_live_inventory(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["SD15\\vae-ft-mse-840000.safetensors"],
+            text_encoders=["clip_l.safetensors"],
+            controlnet=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="SD15\\vae-ft-mse-840000.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+        with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "city skyline",
+                    "profile": "sd15",
+                    "checkpoint_name": "__host_default__",
+                    "vae_name": "Automatic",
+                    "text_encoder_name": "Automatic",
+                }
+            )
+
+        self.assertEqual(normalized.checkpoint_name, "SD15\\dreamshaper.safetensors")
+        self.assertEqual(normalized.vae_name, "SD15\\vae-ft-mse-840000.safetensors")
         self.assertEqual(normalized.text_encoder_name, "")
 
     def test_normalize_txt2img_request_keeps_text_encoder_for_flux_profile(self) -> None:
