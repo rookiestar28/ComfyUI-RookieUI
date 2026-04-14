@@ -46,7 +46,7 @@ function parseJsonObjectField(rawValue, fallbackValue) {
 function buildUnitDefaults(catalog = {}) {
   const defaults = catalog?.contract?.defaults ?? {};
   return {
-    enabled: true,
+    enabled: false,
     detector: String(catalog?.default_detector ?? defaults.detector ?? "None"),
     detector_classes: String(defaults.detector_classes ?? ""),
     prompt: "",
@@ -96,10 +96,10 @@ function buildUnitDefaults(catalog = {}) {
 
 function buildDefaultPayload(catalog = {}, surface = "txt2img") {
   const unitDefaults = buildUnitDefaults(catalog);
-  const units = Array.from({ length: DEFAULT_UNIT_COUNT }, (_, index) => ({
+  const units = Array.from({ length: DEFAULT_UNIT_COUNT }, () => ({
     ...unitDefaults,
-    enabled: index === 0,
-    detector: index === 0 ? unitDefaults.detector : "None",
+    enabled: false,
+    detector: unitDefaults.detector,
     controlnet: { ...unitDefaults.controlnet },
   }));
   return {
@@ -109,13 +109,15 @@ function buildDefaultPayload(catalog = {}, surface = "txt2img") {
   };
 }
 
-function normalizeUnitPayload(rawUnit, catalog) {
+function normalizeUnitPayload(rawUnit, catalog, fallbackUnit = null) {
   const defaults = buildUnitDefaults(catalog);
+  const populatedRawUnit =
+    rawUnit && typeof rawUnit === "object" && !Array.isArray(rawUnit) && Object.keys(rawUnit).length > 0;
   const controlnet = rawUnit?.controlnet && typeof rawUnit.controlnet === "object" ? rawUnit.controlnet : {};
   return {
     ...defaults,
     ...rawUnit,
-    enabled: normalizeBoolean(rawUnit?.enabled, defaults.enabled),
+    enabled: normalizeBoolean(rawUnit?.enabled, populatedRawUnit ? true : Boolean(fallbackUnit?.enabled)),
     detector: normalizeString(rawUnit?.detector, defaults.detector),
     detector_classes: String(rawUnit?.detector_classes ?? defaults.detector_classes),
     prompt: String(rawUnit?.prompt ?? ""),
@@ -171,7 +173,9 @@ function normalizePayload(rawPayload, catalog, surface) {
   return {
     enabled: normalizeBoolean(rawPayload?.enabled, defaults.enabled),
     skip_img2img: surface === "img2img" ? normalizeBoolean(rawPayload?.skip_img2img, defaults.skip_img2img) : false,
-    units: Array.from({ length: DEFAULT_UNIT_COUNT }, (_, index) => normalizeUnitPayload(rawUnits[index], catalog)),
+    units: Array.from({ length: DEFAULT_UNIT_COUNT }, (_, index) =>
+      normalizeUnitPayload(rawUnits[index], catalog, defaults.units[index]),
+    ),
   };
 }
 
@@ -272,12 +276,6 @@ export function createADetailerEditor(options) {
   topEnabled.addEventListener("mousedown", (event) => event.stopPropagation());
 
   appendTextElement(header, "span", "rookieui-shell__hires-title", "ADetailer");
-  appendTextElement(
-    header,
-    "span",
-    "rookieui-shell__adetailer-version",
-    String(catalog?.contract?.version ?? "catalog-unavailable"),
-  );
   appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸");
 
   const body = document.createElement("div");
@@ -368,6 +366,15 @@ export function createADetailerEditor(options) {
       })),
     };
     hiddenInput.value = JSON.stringify(state);
+  }
+
+  function handleTopEnabledChange() {
+    // IMPORTANT: top-level enable must bootstrap only the first ADetailer tab on an empty state.
+    if (topEnabled.checked && !rows.some((row) => row.controls.enabled.checked) && rows[0]) {
+      rows[0].controls.enabled.checked = true;
+    }
+    syncHiddenInput();
+    syncBoundControls([topEnabled, ...rows.map((row) => row.controls.enabled)]);
   }
 
   function syncUnitVisibility(row) {
@@ -687,8 +694,9 @@ export function createADetailerEditor(options) {
     tab.addEventListener("click", () => activateTab(index));
   });
 
-  bindChange(topEnabled);
   bindChange(skipImg2Img);
+  topEnabled.addEventListener("input", handleTopEnabledChange);
+  topEnabled.addEventListener("change", handleTopEnabledChange);
   activateTab(0);
   syncHiddenInput();
 
