@@ -1,5 +1,6 @@
 import {
   fetchRookieUICapabilities,
+  fetchRookieUIADetailerCatalog,
   fetchRookieUICompatibility,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
@@ -19,10 +20,10 @@ import {
   detectHostSurface,
   isHostSurfaceSupported,
 } from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260413-f96-preprocessor-variants";
+import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260414-f78-adetailer-ui";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260413-controlnet-zoom-sync";
+const ROOKIEUI_ASSET_REVISION = "20260414-adetailer-ui-parity";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
@@ -187,6 +188,7 @@ export function registerRookieUIBootstrapExtension({
         controlNetModelResult,
         controlNetModuleResult,
         controlNetTypeResult,
+        adetailerCatalogResult,
       ] = await Promise.all([
         fetchRookieUICapabilities(fetchImpl),
         fetchRookieUICompatibility(fetchImpl),
@@ -195,6 +197,7 @@ export function registerRookieUIBootstrapExtension({
         fetchRookieUIControlNetModels(fetchImpl),
         fetchRookieUIControlNetModules(fetchImpl),
         fetchRookieUIControlNetTypes(fetchImpl),
+        fetchRookieUIADetailerCatalog(fetchImpl),
       ]);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
       if (clientId && windowRef?.sessionStorage?.setItem) {
@@ -225,6 +228,7 @@ export function registerRookieUIBootstrapExtension({
         models: modelResult.data,
         presets: presetResult.data,
         controlnetCatalog,
+        adetailerCatalog: adetailerCatalogResult.data,
         queue: queueResult.data,
         clientId,
         runtimeApi,
@@ -240,6 +244,7 @@ export function registerRookieUIBootstrapExtension({
         fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(fetchImpl),
         fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(fetchImpl),
         fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
+        fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(fetchImpl),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {

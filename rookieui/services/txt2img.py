@@ -29,6 +29,7 @@ from rookieui.services.coercion import (
     coerce_int as _coerce_int,
 )
 from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
+from rookieui.services.adetailer import normalize_adetailer_payload
 from rookieui.services.controlnet import normalize_controlnet_units
 
 _MIN_DIMENSION = 64
@@ -252,6 +253,13 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         inventory_models=inventory.controlnet,
         strict_model_match=inventory_is_host,
     )
+    # IMPORTANT: keep ADetailer normalization detached from main ControlNet ownership here.
+    # Later refinement runtime work depends on this seam so per-unit overrides do not pollute base generation units.
+    adetailer = normalize_adetailer_payload(
+        payload,
+        surface="txt2img",
+        strict_inventory_match=inventory_is_host,
+    )
 
     primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
         profile.id, inventory
@@ -360,6 +368,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         hires_steps=hires_steps,
         hires_denoise=hires_denoise,
         hires_upscale_method=hires_upscale_method,
+        adetailer=adetailer,
         lora_activations=lora_activations,
         prompt_warnings=prompt_preprocess.prompt_warnings,
         prompt_warning_codes=prompt_preprocess.warning_codes,

@@ -1,4 +1,5 @@
 import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f96-preprocessor-variants";
+import { createADetailerEditor } from "./rookieui_adetailer_units.js?v=20260414-f78-ui";
 import {
   CANVAS_FULLSCREEN_ACTIONS,
   CANVAS_ACTIONS,
@@ -83,6 +84,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     default_text_encoder: "Automatic",
   };
   const controlnetCatalog = bootstrapState.controlnetCatalog ?? {};
+  const adetailerCatalog = bootstrapState.adetailerCatalog ?? {};
   const controlnetModelValues =
     Array.isArray(controlnetCatalog.model_list) && controlnetCatalog.model_list.length > 0
       ? controlnetCatalog.model_list
@@ -130,6 +132,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   };
   let refreshSourceCanvasSurface = null;
   let img2imgControlNetEditor = null;
+  let img2imgADetailerEditor = null;
 
   const elements = {
     prompt: createTextarea("rookieui-img2img-prompt", "", 4, {
@@ -367,8 +370,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       ],
       "bislerp",
     ),
+    adetailer: createInput("hidden", "rookieui-img2img-adetailer", "{}"),
     controlnetUnits: createInput("hidden", "rookieui-img2img-controlnet-units", "[]"),
   };
+  form.appendChild(elements.adetailer);
   form.appendChild(elements.controlnetUnits);
   bindSliderPair(elements.width, elements.widthSlider);
   bindSliderPair(elements.height, elements.heightSlider);
@@ -772,6 +777,24 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           },
         });
         img2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
+        img2imgADetailerEditor = createADetailerEditor({
+          idPrefix: "rookieui-img2img-adetailer",
+          parent: generationSection,
+          hiddenInput: elements.adetailer,
+          catalog: adetailerCatalog,
+          surface: "img2img",
+          createInput,
+          createRangeInput,
+          createSelect,
+          createTextarea,
+          createCheckbox,
+          createField,
+          createSliderField,
+          createInlineCheckboxField,
+          appendTextElement,
+          bindSliderPair,
+          syncBoundControls,
+        });
 
         createSliderField(
           generationGrid,
@@ -1630,6 +1653,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       if (Array.isArray(payload.controlnet_units)) {
         elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);
         img2imgControlNetEditor?.setUnits(payload.controlnet_units);
+      }
+      if (payload.adetailer && typeof payload.adetailer === "object") {
+        elements.adetailer.value = JSON.stringify(payload.adetailer);
+        img2imgADetailerEditor?.setValue(payload.adetailer);
       }
       const resolvedPresetId = findPresetIdForProfile(allPresets, elements.profileState.value);
       if (resolvedPresetId) {

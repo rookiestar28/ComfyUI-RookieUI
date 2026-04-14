@@ -24,8 +24,8 @@ import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.
 import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
 import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
 import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
-import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260413-f96-preprocessor-variants";
-import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260413-f96-preprocessor-variants";
+import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260414-f78-adetailer-ui";
+import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260414-f78-adetailer-ui";
 import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
 import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
 import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";
@@ -611,6 +611,7 @@ function readTxt2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
@@ -1187,6 +1188,7 @@ function readImg2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
@@ -1618,6 +1620,23 @@ function parseJsonObjectArrayField(rawValue) {
       _error,
     );
     return [];
+  }
+}
+
+function parseJsonObjectField(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(rawValue);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    emitFrontendDebugWarning(
+      "shell.adetailer_parse",
+      "Failed to parse ADetailer JSON field; returning empty object.",
+      _error,
+    );
+    return {};
   }
 }
 

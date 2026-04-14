@@ -78,6 +78,34 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.hires_denoise, 1.0)
 
+    def test_normalize_img2img_request_normalizes_adetailer_block(self) -> None:
+        request = normalize_img2img_request(
+            {
+                "prompt": "city skyline",
+                "image_asset": "input-image",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "mediapipe_face_full",
+                            "controlnet": {
+                                "mode": "custom",
+                                "module": "none",
+                                "model": "",
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(request.adetailer.enabled)
+        self.assertTrue(request.adetailer.skip_img2img)
+        self.assertEqual(request.adetailer.units[0].detector, "mediapipe_face_full")
+        self.assertEqual(request.adetailer.units[0].controlnet.mode, "custom")
+
     def test_normalize_img2img_request_does_not_require_hires_values_when_disabled(self) -> None:
         request = normalize_img2img_request(
             {

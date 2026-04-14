@@ -419,6 +419,102 @@ describe("registerRookieUIBootstrapExtension", () => {
         };
       }
 
+      if (url === "/rookieui/adetailer/catalog") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              contract: {
+                version: "r74f77-20260414",
+                ui_variant: "a1111_forge_integrated",
+                unit_count: 4,
+                prompt_tokens: ["[PROMPT]", "[SEP]", "[SKIP]"],
+                controlnet_modes: ["none", "passthrough", "custom"],
+                mask_filter_methods: ["Area", "Confidence"],
+                mask_merge_modes: ["None", "Merge", "Merge and Invert"],
+                defaults: {
+                  detector: "None",
+                  detector_classes: "",
+                  confidence: 0.3,
+                  mask_filter_method: "Area",
+                  mask_k: 0,
+                  mask_min_ratio: 0.0,
+                  mask_max_ratio: 1.0,
+                  x_offset: 0,
+                  y_offset: 0,
+                  dilate_erode: 4,
+                  mask_merge_mode: "None",
+                  mask_blur: 4,
+                  denoising_strength: 0.4,
+                  inpaint_only_masked: true,
+                  inpaint_padding: 32,
+                  use_inpaint_size: false,
+                  inpaint_width: 512,
+                  inpaint_height: 512,
+                  use_steps: false,
+                  steps: 28,
+                  use_cfg_scale: false,
+                  cfg_scale: 7.0,
+                  use_checkpoint: false,
+                  checkpoint_name: "Use same checkpoint",
+                  use_vae: false,
+                  vae_name: "Use same VAE",
+                  use_sampler: false,
+                  sampler_name: "DPM++ 2M Karras",
+                  scheduler_name: "Use same scheduler",
+                  use_noise_multiplier: false,
+                  noise_multiplier: 1.0,
+                  use_clip_skip: false,
+                  clip_skip: 1,
+                  restore_face: false,
+                },
+              },
+              detector_list: ["None", "face_yolov8n.pt", "yolov8x-worldv2.pt", "mediapipe_face_full"],
+              detectors: [
+                { id: "None", label: "None", family: "none", source: "builtin", supports_class_filter: false },
+                {
+                  id: "face_yolov8n.pt",
+                  label: "face_yolov8n.pt",
+                  family: "ultralytics",
+                  source: "host",
+                  supports_class_filter: false,
+                },
+                {
+                  id: "yolov8x-worldv2.pt",
+                  label: "yolov8x-worldv2.pt",
+                  family: "world",
+                  source: "host",
+                  supports_class_filter: true,
+                },
+                {
+                  id: "mediapipe_face_full",
+                  label: "mediapipe_face_full",
+                  family: "mediapipe",
+                  source: "builtin",
+                  supports_class_filter: false,
+                },
+              ],
+              default_detector: "None",
+              prompt_tokens: ["[PROMPT]", "[SEP]", "[SKIP]"],
+              skip_img2img_surfaces: ["img2img"],
+              controlnet_modes: ["none", "passthrough", "custom"],
+              controlnet_model_list: ["control_v11p_sd15_canny.safetensors"],
+              controlnet_default_model: "",
+              controlnet_module_list: ["none", "openpose"],
+              controlnet_default_module: "none",
+              checkpoint_choices: ["dreamshaper.safetensors"],
+              vae_choices: ["Automatic"],
+              sampler_choices: ["Euler a", "DPM++ 2M Karras"],
+              scheduler_choices: ["Normal", "Karras"],
+              mask_filter_methods: ["Area", "Confidence"],
+              mask_merge_modes: ["None", "Merge", "Merge and Invert"],
+            };
+          },
+        };
+      }
+
       if (url.startsWith("/rookieui/queue")) {
         return {
           ok: true,
@@ -792,7 +888,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260413-controlnet-zoom-sync");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260414-adetailer-ui-parity");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -882,6 +978,9 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(txt2imgControlNetSection?.textContent).toContain("Controlnet");
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")?.textContent).toContain("ControlNet Unit 1");
+    expect(document.getElementById("rookieui-txt2img-adetailer-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-adetailer-tab-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-adetailer-tab-3")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-allow-preview-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-use-mask-0")).not.toBeNull();
     expect(txt2imgControlNetSection?.textContent).toContain("Instant-ID");
@@ -1034,6 +1133,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-txt2img-workspace-tab-generation").click();
     document.getElementById("rookieui-cfg-scale").value = "7.25";
     document.getElementById("rookieui-cfg-scale").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-adetailer").value = JSON.stringify({
+      enabled: true,
+      units: [
+        {
+          enabled: true,
+          detector: "face_yolov8n.pt",
+          prompt: "repair eyes",
+          controlnet: { mode: "passthrough" },
+        },
+      ],
+    });
     document.getElementById("rookieui-controlnet-units").value = JSON.stringify([
       {
         enabled: true,
@@ -1099,6 +1209,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgControlNetSection?.classList.contains("rookieui-shell__controlnet-integrated")).toBe(true);
     expect(img2imgControlNetSection?.textContent).toContain("Controlnet");
     expect(document.getElementById("rookieui-img2img-controlnet-tab-0")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-adetailer-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-adetailer-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-allow-preview-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-use-mask-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-image-upload-button-0")?.textContent).toBe(
@@ -1202,6 +1314,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-img2img-hires-denoise").value = "0.4";
     document.getElementById("rookieui-image-asset").value = "source-asset";
     document.getElementById("rookieui-mask-asset").value = "mask-asset";
+    document.getElementById("rookieui-img2img-adetailer").value = JSON.stringify({
+      enabled: true,
+      skip_img2img: true,
+      units: [
+        {
+          enabled: true,
+          detector: "mediapipe_face_full",
+          controlnet: { mode: "custom", module: "openpose", model: "control_v11p_sd15_canny.safetensors" },
+        },
+      ],
+    });
     document.getElementById("rookieui-img2img-controlnet-units").value = JSON.stringify([
       {
         enabled: true,
@@ -1316,6 +1439,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/model_list")).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/module_list")).toBe(true);
     expect(fetchCalls.some(([url]) => url === "/rookieui/controlnet/control_types")).toBe(true);
+    expect(fetchCalls.some(([url]) => url === "/rookieui/adetailer/catalog")).toBe(true);
     const txt2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/txt2img");
     expect(JSON.parse(txt2imgCall[1].body).hires_enabled).toBe(true);
     expect(JSON.parse(txt2imgCall[1].body).hires_scale).toBe(1.8);
@@ -1326,6 +1450,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_model).toBe(0.9);
     expect(JSON.parse(txt2imgCall[1].body).lora_strength_clip).toBe(0.7);
     expect(JSON.parse(txt2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(txt2imgCall[1].body).adetailer.enabled).toBe(true);
+    expect(JSON.parse(txt2imgCall[1].body).adetailer.units[0].detector).toBe("face_yolov8n.pt");
     expect(JSON.parse(txt2imgCall[1].body).controlnet_units[0].image_asset).toBe("txt2img-control-asset");
     const img2imgCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
     expect(JSON.parse(img2imgCall[1].body).hires_enabled).toBe(true);
@@ -1334,6 +1460,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(JSON.parse(img2imgCall[1].body).hires_denoise).toBe(0.4);
     expect(JSON.parse(img2imgCall[1].body).seed_extra).toBe(true);
     expect(JSON.parse(img2imgCall[1].body).client_id).toBe("socket-client-2");
+    expect(JSON.parse(img2imgCall[1].body).adetailer.skip_img2img).toBe(true);
+    expect(JSON.parse(img2imgCall[1].body).adetailer.units[0].controlnet.mode).toBe("custom");
     expect(JSON.parse(img2imgCall[1].body).controlnet_units[0].image_asset).toBe("img2img-control-asset");
     const extrasCall = fetchCalls.find(([url]) => url === "/rookieui/extras/run");
     expect(extrasCall).toBeDefined();
