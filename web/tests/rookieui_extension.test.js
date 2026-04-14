@@ -1185,6 +1185,22 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-img2img-generation-mode-img2img").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(false);
+    const txt2imgCfgEnterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    document.getElementById("rookieui-cfg-scale").dispatchEvent(txt2imgCfgEnterEvent);
+    expect(txt2imgCfgEnterEvent.defaultPrevented).toBe(true);
+    expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/txt2img")).toHaveLength(1);
+    const img2imgCfgEnterEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    document.getElementById("rookieui-img2img-cfg-scale").dispatchEvent(img2imgCfgEnterEvent);
+    expect(img2imgCfgEnterEvent.defaultPrevented).toBe(true);
+    expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/img2img")).toHaveLength(0);
     expect(document.getElementById("rookieui-image-asset").value).toBe("");
     document.getElementById("rookieui-img2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),

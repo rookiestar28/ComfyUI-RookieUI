@@ -56,6 +56,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     readFileAsDataUrl,
     setPreviewContent,
     installPaneStateLock,
+    installExplicitGenerationSubmitGuard,
     findPresetIdForProfile,
     setElementValue,
     syncBoundControls,
@@ -1559,6 +1560,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       img2imgMaskCanvasContract,
     );
   });
+  installExplicitGenerationSubmitGuard(form, submitButton);
 
   const img2imgStateLock = installPaneStateLock(formRegistry, "img2img", elements, () => {
     // IMPORTANT: img2img pane restore follows the same Clip Skip editability contract as txt2img.
