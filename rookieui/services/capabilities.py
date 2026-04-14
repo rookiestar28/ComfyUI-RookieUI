@@ -99,6 +99,8 @@ def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object
         "controlnet_modes": _normalize_metadata_list(payload.get("controlnet_modes", [])),
         "prompt_tokens": _normalize_metadata_list(payload.get("prompt_tokens", [])),
         "warning_code_contract": normalize_metadata_text(payload.get("warning_code_contract", "")),
+        "availability": _normalize_loose_mapping(payload.get("availability", {})),
+        "warning_codes": _normalize_loose_mapping(payload.get("warning_codes", {})),
         "routes": _normalize_metadata_list(payload.get("routes", [])),
     }
     contract = payload.get("contract", {})

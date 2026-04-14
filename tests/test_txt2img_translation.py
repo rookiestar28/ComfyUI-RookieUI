@@ -64,9 +64,45 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertTrue(request.adetailer.enabled)
         self.assertFalse(request.adetailer.skip_img2img)
-        self.assertEqual(request.adetailer.warning_codes, ["ADETAILER_SKIP_IMG2IMG_IGNORED"])
+        self.assertIn("ADETAILER_SKIP_IMG2IMG_IGNORED", request.adetailer.warning_codes)
+        self.assertIn("ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK", request.adetailer.warning_codes)
+        self.assertIn("ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY", request.adetailer.warning_codes)
         self.assertEqual(request.adetailer.units[0].detector, "face_yolov8n.pt")
         self.assertEqual(request.adetailer.units[0].controlnet.mode, "passthrough")
+
+    def test_normalize_txt2img_request_reports_adetailer_no_active_units(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [{"enabled": True, "detector": "None"}],
+                },
+            }
+        )
+
+        self.assertIn("ADETAILER_NO_ACTIVE_UNITS", request.adetailer.warning_codes)
+        self.assertEqual(request.adetailer.diagnostics["active_unit_count"], 0)
+
+    def test_normalize_txt2img_request_reports_adetailer_custom_controlnet_without_model(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "controlnet": {"mode": "custom", "module": "none", "model": ""},
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertIn("ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING", request.adetailer.warning_codes)
+        self.assertTrue(request.adetailer.diagnostics["degraded"])
 
     def test_normalize_txt2img_request_rejects_unsupported_dtype_profile(self) -> None:
         with self.assertRaisesRegex(ValueError, "dtype_profile is unsupported"):

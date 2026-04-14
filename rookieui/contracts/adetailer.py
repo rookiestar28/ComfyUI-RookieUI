@@ -148,6 +148,7 @@ class NormalizedADetailerRequest:
     units: list[NormalizedADetailerUnitRequest] = field(default_factory=list)
     warning_codes: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

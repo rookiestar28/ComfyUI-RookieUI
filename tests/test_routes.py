@@ -45,6 +45,9 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("None", payload["detector_list"])
         self.assertIn("mediapipe_face_full", payload["detector_list"])
         self.assertIn("none", payload["controlnet_modes"])
+        self.assertEqual(payload["availability"]["execution_backend"], "rookieui_comfy_native_refinement_pipeline")
+        self.assertIn("detect_mask", payload["availability"]["runtime_stages"])
+        self.assertIn("ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK", payload["warning_codes"])
 
     def test_parity_payload_lists_sampler_aliases(self) -> None:
         payload = routes.build_parity_snapshot()
