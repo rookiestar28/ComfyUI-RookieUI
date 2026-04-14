@@ -37,6 +37,47 @@ class RookieUINodesTests(unittest.TestCase):
     def test_controlnet_preprocess_node_is_registered(self) -> None:
         self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
 
+    def test_adetailer_detect_mask_node_is_registered(self) -> None:
+        self.assertIn("RookieUIADetailerDetectMask", nodes.NODE_CLASS_MAPPINGS)
+        self.assertEqual(
+            nodes.NODE_DISPLAY_NAME_MAPPINGS["RookieUIADetailerDetectMask"],
+            "RookieUI ADetailer Detect Mask",
+        )
+
+    def test_adetailer_detect_mask_returns_zero_for_none_detector(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
+
+        detector = nodes.RookieUIADetailerDetectMask()
+        image = nodes.torch.ones((1, 16, 16, 3), dtype=nodes.torch.float32)
+
+        mask, = detector.detect(image=image, detector="None")
+
+        self.assertEqual(tuple(mask.shape), (1, 16, 16))
+        self.assertAlmostEqual(float(mask.max()), 0.0, places=4)
+
+    def test_adetailer_detect_mask_generates_detector_mask(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
+
+        detector = nodes.RookieUIADetailerDetectMask()
+        image = nodes.torch.ones((1, 32, 32, 3), dtype=nodes.torch.float32)
+
+        mask, = detector.detect(
+            image=image,
+            detector="face_yolov8n.pt",
+            detector_family="ultralytics",
+            confidence=0.4,
+            mask_min_ratio=0.0,
+            mask_max_ratio=1.0,
+            dilate_erode=2,
+            mask_blur=1,
+        )
+
+        self.assertEqual(tuple(mask.shape), (1, 32, 32))
+        self.assertGreater(float(mask.max()), 0.0)
+        self.assertLessEqual(float(mask.max()), 1.0)
+
     def test_controlnet_preprocess_applies_mask_when_enabled(self) -> None:
         if nodes.torch is None:
             self.skipTest("torch is unavailable in this environment")

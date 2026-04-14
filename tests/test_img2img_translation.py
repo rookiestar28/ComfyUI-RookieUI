@@ -738,6 +738,68 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(result["normalized_request"]["hires_scale"], 1.8)
         self.assertEqual(result["normalized_request"]["hires_steps"], 12)
 
+    def test_translate_img2img_request_respects_adetailer_skip_img2img(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "image_asset": "portrait-input",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [{"enabled": True, "detector": "face_yolov8n.pt"}],
+                },
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertNotIn("RookieUIADetailerDetectMask", class_types)
+        self.assertEqual(
+            len([node for node in result["workflow"].values() if node["class_type"] == "KSampler"]),
+            1,
+        )
+
+    def test_translate_img2img_request_appends_adetailer_refinement_when_not_skipped(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "negative_prompt": "bad hands",
+                "image_asset": "portrait-input",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": False,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "hand_yolov8n.pt",
+                            "prompt": "repair hands",
+                            "denoising_strength": 0.35,
+                            "inpaint_padding": 48,
+                        }
+                    ],
+                },
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        mask_nodes = [node for node in workflow.values() if node["class_type"] == "RookieUIADetailerDetectMask"]
+        inpaint_encode_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIVAEEncodeForInpaint"
+        ]
+        sampler_nodes = [node for node in workflow.values() if node["class_type"] == "KSampler"]
+        save_node = [node for node in workflow.values() if node["class_type"] == "SaveImage"][0]
+        decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
+
+        self.assertEqual(len(mask_nodes), 1)
+        self.assertEqual(mask_nodes[0]["inputs"]["detector"], "hand_yolov8n.pt")
+        self.assertEqual(len(inpaint_encode_nodes), 1)
+        self.assertEqual(inpaint_encode_nodes[0]["inputs"]["grow_mask_by"], 48)
+        self.assertEqual(len(sampler_nodes), 2)
+        self.assertEqual(sampler_nodes[-1]["inputs"]["denoise"], 0.35)
+        self.assertEqual(save_node["inputs"]["images"], [decode_nodes[-1][0], 0])
+
     def test_img2img_route_returns_translation_payload(self) -> None:
         response = asyncio.run(
             routes.img2img(
