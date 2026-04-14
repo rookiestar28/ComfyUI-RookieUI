@@ -981,6 +981,38 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-adetailer-section")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-adetailer-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-adetailer-tab-3")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-adetailer-section")?.textContent).not.toContain("r74f77-20260414");
+    expect(document.getElementById("rookieui-txt2img-adetailer-enabled")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-0")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-1")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-2")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-3")?.checked).toBe(false);
+    expect(JSON.parse(document.getElementById("rookieui-adetailer").value)).toMatchObject({
+      enabled: false,
+      units: [
+        { enabled: false },
+        { enabled: false },
+        { enabled: false },
+        { enabled: false },
+      ],
+    });
+    document.getElementById("rookieui-txt2img-adetailer-enabled").checked = true;
+    document
+      .getElementById("rookieui-txt2img-adetailer-enabled")
+      .dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-0")?.checked).toBe(true);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-1")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-2")?.checked).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-unit-enabled-3")?.checked).toBe(false);
+    expect(JSON.parse(document.getElementById("rookieui-adetailer").value)).toMatchObject({
+      enabled: true,
+      units: [
+        { enabled: true },
+        { enabled: false },
+        { enabled: false },
+        { enabled: false },
+      ],
+    });
     expect(document.getElementById("rookieui-txt2img-controlnet-allow-preview-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-use-mask-0")).not.toBeNull();
     expect(txt2imgControlNetSection?.textContent).toContain("Instant-ID");
