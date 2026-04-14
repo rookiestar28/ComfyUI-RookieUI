@@ -550,6 +550,90 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         ]
         self.assertEqual(len(sampler_nodes), 2)
 
+    def test_translate_txt2img_request_appends_adetailer_refinement_after_base_decode(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "master portrait",
+                "negative_prompt": "blur",
+                "profile": "sd15",
+                "steps": 22,
+                "cfg_scale": 6.5,
+                "sampler_name": "Euler a",
+                "scheduler_name": "normal",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "face_yolov8n.pt",
+                            "prompt": "[SKIP] [SEP] face [PROMPT]",
+                            "negative_prompt": "",
+                            "confidence": 0.42,
+                            "mask_k": 2,
+                            "mask_min_ratio": 0.01,
+                            "mask_max_ratio": 0.8,
+                            "x_offset": 4,
+                            "y_offset": -3,
+                            "dilate_erode": 6,
+                            "mask_blur": 5,
+                            "use_steps": True,
+                            "steps": 9,
+                            "use_cfg_scale": True,
+                            "cfg_scale": 8.5,
+                            "use_sampler": True,
+                            "sampler_name": "DPM++ 2M Karras",
+                        }
+                    ],
+                },
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        mask_nodes = [node for node in workflow.values() if node["class_type"] == "RookieUIADetailerDetectMask"]
+        sampler_nodes = [node for node in workflow.values() if node["class_type"] == "KSampler"]
+        decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
+        save_nodes = [node for node in workflow.values() if node["class_type"] == "SaveImage"]
+        encode_texts = [
+            node["inputs"]["text"]
+            for node in workflow.values()
+            if node["class_type"] == "CLIPTextEncode" and "text" in node["inputs"]
+        ]
+
+        self.assertEqual(len(mask_nodes), 1)
+        self.assertEqual(mask_nodes[0]["inputs"]["detector"], "face_yolov8n.pt")
+        self.assertEqual(mask_nodes[0]["inputs"]["confidence"], 0.42)
+        self.assertEqual(mask_nodes[0]["inputs"]["x_offset"], 4)
+        self.assertEqual(len(sampler_nodes), 2)
+        detailer_sampler = sampler_nodes[-1]
+        self.assertEqual(detailer_sampler["inputs"]["steps"], 9)
+        self.assertEqual(detailer_sampler["inputs"]["cfg"], 8.5)
+        self.assertEqual(detailer_sampler["inputs"]["sampler_name"], "dpmpp_2m")
+        self.assertEqual(detailer_sampler["inputs"]["scheduler"], "karras")
+        self.assertIn("face master portrait", encode_texts)
+        self.assertIn("blur", encode_texts)
+        self.assertEqual(save_nodes[0]["inputs"]["images"], [decode_nodes[-1][0], 0])
+
+    def test_translate_txt2img_request_ignores_adetailer_none_detector_units(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "master portrait",
+                "adetailer": {
+                    "enabled": True,
+                    "units": [{"enabled": True, "detector": "None"}],
+                },
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertNotIn("RookieUIADetailerDetectMask", class_types)
+        self.assertEqual(
+            len([node for node in result["workflow"].values() if node["class_type"] == "KSampler"]),
+            1,
+        )
+
     def test_txt2img_route_returns_translation_payload(self) -> None:
         response = asyncio.run(
             routes.txt2img(

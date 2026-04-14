@@ -9,7 +9,14 @@ from rookieui.contracts.generation import (
     NormalizedTxt2ImgRequest,
     WorkflowTranslationResult,
 )
-from rookieui.services.parity_matrix import get_parity_profile, get_sampler_alias_payload
+from rookieui.contracts.adetailer import NormalizedADetailerUnitRequest
+from rookieui.services.parity_matrix import (
+    get_parity_profile,
+    get_sampler_alias_payload,
+    normalize_sampler_name,
+    normalize_scheduler_name,
+)
+from rookieui.services.prompt_dsl import preprocess_prompt_bundle
 
 _PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
@@ -473,6 +480,9 @@ def _build_sampler_node(
     model_source: list[object],
     seed: int | None = None,
     steps: int | None = None,
+    cfg_scale: float | None = None,
+    sampler_name: str | None = None,
+    scheduler_name: str | None = None,
 ) -> None:
     workflow[node_id] = {
         "class_type": "KSampler",
@@ -483,10 +493,41 @@ def _build_sampler_node(
             "latent_image": _to_node_ref(latent_id),
             "seed": request.execution_seed if seed is None else seed,
             "steps": request.steps if steps is None else steps,
-            "cfg": request.cfg_scale,
-            "sampler_name": request.sampler_name,
-            "scheduler": request.scheduler_name,
+            "cfg": request.cfg_scale if cfg_scale is None else cfg_scale,
+            "sampler_name": request.sampler_name if sampler_name is None else sampler_name,
+            "scheduler": request.scheduler_name if scheduler_name is None else scheduler_name,
             "denoise": denoise,
+        },
+    }
+
+
+def _append_decode_node(
+    workflow: dict[str, object],
+    *,
+    sampler_id: str | list[object],
+    decode_id: str,
+    vae_source: list[object],
+) -> None:
+    workflow[decode_id] = {
+        "class_type": "VAEDecode",
+        "inputs": {
+            "samples": _to_node_ref(sampler_id),
+            "vae": vae_source,
+        },
+    }
+
+
+def _append_save_node(
+    workflow: dict[str, object],
+    *,
+    image_ref: list[object],
+    save_id: str,
+) -> None:
+    workflow[save_id] = {
+        "class_type": "SaveImage",
+        "inputs": {
+            "images": image_ref,
+            "filename_prefix": "RookieUI",
         },
     }
 
@@ -499,20 +540,260 @@ def _build_decode_and_save(
     save_id: str,
     vae_source: list[object],
 ) -> None:
-    workflow[decode_id] = {
-        "class_type": "VAEDecode",
-        "inputs": {
-            "samples": _to_node_ref(sampler_id),
-            "vae": vae_source,
-        },
-    }
-    workflow[save_id] = {
-        "class_type": "SaveImage",
-        "inputs": {
-            "images": [decode_id, 0],
-            "filename_prefix": "RookieUI",
-        },
-    }
+    _append_decode_node(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        vae_source=vae_source,
+    )
+    _append_save_node(
+        workflow,
+        image_ref=[decode_id, 0],
+        save_id=save_id,
+    )
+
+
+def _is_adetailer_unit_active(unit: NormalizedADetailerUnitRequest) -> bool:
+    detector = str(unit.detector or "").strip().lower()
+    return bool(unit.enabled and detector and detector != "none")
+
+
+def _resolve_adetailer_prompt_text(unit_prompt: str, main_prompt: str) -> str:
+    raw_prompt = str(unit_prompt or "").strip()
+    main = str(main_prompt or "").strip()
+    if not raw_prompt:
+        return main
+    segments = [segment.strip() for segment in re.split(r"\s*\[SEP\]\s*", raw_prompt)]
+    for segment in segments:
+        if not segment or "[SKIP]" in segment:
+            continue
+        return segment.replace("[PROMPT]", main).strip() or main
+    return main
+
+
+def _resolve_adetailer_sampler_override(
+    unit: NormalizedADetailerUnitRequest,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+) -> tuple[str, str]:
+    if not unit.use_sampler:
+        return request.sampler_name, request.scheduler_name
+
+    raw_sampler = str(unit.sampler_name or "").strip()
+    raw_scheduler = str(unit.scheduler_name or "").strip()
+    sampler_for_scheduler = raw_sampler
+    sampler_for_comfy = raw_sampler
+    if raw_sampler.lower().endswith(" karras"):
+        sampler_for_comfy = raw_sampler[: -len(" karras")].strip()
+    normalized_sampler = normalize_sampler_name(sampler_for_comfy) or request.sampler_name
+    if raw_scheduler.lower() in {"", "use same scheduler"}:
+        normalized_scheduler = normalize_scheduler_name(
+            sampler_for_scheduler,
+            "",
+            default_scheduler=request.scheduler_name,
+        )
+    else:
+        normalized_scheduler = normalize_scheduler_name(
+            sampler_for_scheduler,
+            raw_scheduler,
+            default_scheduler=request.scheduler_name,
+        )
+    return normalized_sampler, normalized_scheduler
+
+
+def _append_adetailer_unit_conditioning(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    unit: NormalizedADetailerUnitRequest,
+    clip_source: list[object],
+    prompt_encoder_mode: str,
+    width: int,
+    height: int,
+) -> tuple[str, str]:
+    prompt_text = _resolve_adetailer_prompt_text(unit.prompt, request.prompt)
+    negative_text = _resolve_adetailer_prompt_text(unit.negative_prompt, request.negative_prompt)
+    prompt_bundle = preprocess_prompt_bundle(prompt_text, negative_text, strict_match=False)
+    positive_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=prompt_bundle.cleaned_prompt,
+        semantic_payload=prompt_bundle.prompt_semantics.to_payload(),
+        prompt_encoder=prompt_encoder_mode,
+        width=width,
+        height=height,
+    )
+    negative_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=prompt_bundle.cleaned_negative_prompt,
+        semantic_payload=prompt_bundle.negative_prompt_semantics.to_payload(),
+        prompt_encoder=prompt_encoder_mode,
+        width=width,
+        height=height,
+    )
+    return positive_id, negative_id
+
+
+def _append_adetailer_units(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    base_image_ref: list[object],
+    model_source: list[object],
+    clip_source: list[object],
+    vae_source: list[object],
+    prompt_encoder_mode: str,
+    width: int,
+    height: int,
+) -> list[object]:
+    if not request.adetailer.enabled:
+        return base_image_ref
+    if isinstance(request, NormalizedImg2ImgRequest) and request.adetailer.skip_img2img:
+        return base_image_ref
+
+    current_image_ref = base_image_ref
+    active_units = [unit for unit in request.adetailer.units if _is_adetailer_unit_active(unit)]
+    if not active_units:
+        return current_image_ref
+
+    for index, unit in enumerate(active_units):
+        detail_model_source = model_source
+        detail_clip_source = clip_source
+        detail_vae_source = vae_source
+        if unit.use_checkpoint and unit.checkpoint_name and unit.checkpoint_name != "Use same checkpoint":
+            checkpoint_id = allocator.next()
+            workflow[checkpoint_id] = _build_checkpoint_loader_node(unit.checkpoint_name)
+            detail_model_source = [checkpoint_id, 0]
+            detail_clip_source = [checkpoint_id, 1]
+            detail_vae_source = [checkpoint_id, 2]
+        if unit.use_vae and unit.vae_name and unit.vae_name != "Use same VAE":
+            vae_id = allocator.next()
+            workflow[vae_id] = _build_vae_loader_node(unit.vae_name)
+            detail_vae_source = [vae_id, 0]
+
+        positive_id, negative_id = _append_adetailer_unit_conditioning(
+            workflow,
+            allocator=allocator,
+            request=request,
+            unit=unit,
+            clip_source=detail_clip_source,
+            prompt_encoder_mode=prompt_encoder_mode,
+            width=unit.inpaint_width if unit.use_inpaint_size else width,
+            height=unit.inpaint_height if unit.use_inpaint_size else height,
+        )
+
+        mask_id = allocator.next()
+        encode_id = allocator.next()
+        sampler_id = allocator.next()
+        decode_id = allocator.next()
+        grow_mask_by = max(0, int(unit.inpaint_padding if unit.inpaint_only_masked else unit.dilate_erode))
+        workflow[mask_id] = {
+            "class_type": "RookieUIADetailerDetectMask",
+            "inputs": {
+                "image": current_image_ref,
+                "detector": unit.detector,
+                "detector_family": unit.detector_family,
+                "detector_classes": unit.detector_classes,
+                "confidence": unit.confidence,
+                "mask_filter_method": unit.mask_filter_method,
+                "mask_k": unit.mask_k,
+                "mask_min_ratio": unit.mask_min_ratio,
+                "mask_max_ratio": unit.mask_max_ratio,
+                "x_offset": unit.x_offset,
+                "y_offset": unit.y_offset,
+                "dilate_erode": unit.dilate_erode,
+                "mask_merge_mode": unit.mask_merge_mode,
+                "mask_blur": unit.mask_blur,
+            },
+        }
+        workflow[encode_id] = {
+            "class_type": "RookieUIVAEEncodeForInpaint",
+            "inputs": {
+                "pixels": current_image_ref,
+                "vae": detail_vae_source,
+                "mask": [mask_id, 0],
+                "grow_mask_by": grow_mask_by,
+                "masked_content": "original",
+                "seed": request.execution_seed + index + 1,
+                "soft_inpainting_enabled": False,
+                "soft_inpainting_schedule_bias": 1.0,
+                "soft_inpainting_preservation_strength": 0.5,
+                "soft_inpainting_transition_contrast_boost": 4.0,
+                "soft_inpainting_mask_influence": 0.0,
+                "soft_inpainting_difference_threshold": 0.5,
+                "soft_inpainting_difference_contrast": 2.0,
+            },
+        }
+        sampler_name, scheduler_name = _resolve_adetailer_sampler_override(unit, request)
+        # IMPORTANT: ADetailer refinement must stay after base decode and before final SaveImage;
+        # moving it into the primary sampler/control path breaks A1111/Forge execution ordering.
+        _build_sampler_node(
+            workflow,
+            node_id=sampler_id,
+            positive_id=positive_id,
+            negative_id=negative_id,
+            latent_id=encode_id,
+            request=request,
+            denoise=unit.denoising_strength,
+            model_source=detail_model_source,
+            seed=request.execution_seed + index + 1,
+            steps=unit.steps if unit.use_steps else request.steps,
+            cfg_scale=unit.cfg_scale if unit.use_cfg_scale else request.cfg_scale,
+            sampler_name=sampler_name,
+            scheduler_name=scheduler_name,
+        )
+        _append_decode_node(
+            workflow,
+            sampler_id=sampler_id,
+            decode_id=decode_id,
+            vae_source=detail_vae_source,
+        )
+        current_image_ref = [decode_id, 0]
+
+    return current_image_ref
+
+
+def _append_decode_adetailer_and_save(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    sampler_id: str | list[object],
+    decode_id: str,
+    save_id: str,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    model_source: list[object],
+    clip_source: list[object],
+    vae_source: list[object],
+    width: int,
+    height: int,
+) -> None:
+    _append_decode_node(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        vae_source=vae_source,
+    )
+    final_image_ref = _append_adetailer_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        base_image_ref=[decode_id, 0],
+        model_source=model_source,
+        clip_source=clip_source,
+        vae_source=vae_source,
+        prompt_encoder_mode=_resolve_conditioning_prompt_encoder(request),
+        width=width,
+        height=height,
+    )
+    _append_save_node(
+        workflow,
+        image_ref=final_image_ref,
+        save_id=save_id,
+    )
 
 
 def _resolve_model_sources(
@@ -869,12 +1150,18 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -953,12 +1240,18 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         final_sampler_id = hires_sampler_id
         decode_id = allocator.next()
         save_id = allocator.next()
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1057,12 +1350,18 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1163,12 +1462,18 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1293,12 +1598,18 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1425,12 +1736,18 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 

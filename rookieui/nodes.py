@@ -63,6 +63,11 @@ def _require_runtime_dependencies() -> None:
         )
 
 
+def _require_tensor_dependency() -> None:
+    if torch is None:
+        raise RuntimeError("RookieUI tensor nodes require torch to be installed in the active environment.")
+
+
 def _load_image_with_alpha(path):
     _require_runtime_dependencies()
     img = Image.open(path)
@@ -296,6 +301,134 @@ class RookieUIControlNetPreprocess:
         return (output,)
 
 
+class RookieUIADetailerDetectMask:
+    _mask_filter_methods = ("Area", "Confidence")
+    _mask_merge_modes = ("None", "Merge", "Merge and Invert")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "detector": ("STRING", {"default": "None"}),
+                "detector_family": ("STRING", {"default": "none"}),
+                "detector_classes": ("STRING", {"default": ""}),
+                "confidence": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "mask_filter_method": (cls._mask_filter_methods,),
+                "mask_k": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+                "mask_min_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "mask_max_ratio": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "x_offset": ("INT", {"default": 0, "min": -2048, "max": 2048, "step": 1}),
+                "y_offset": ("INT", {"default": 0, "min": -2048, "max": 2048, "step": 1}),
+                "dilate_erode": ("INT", {"default": 4, "min": -128, "max": 128, "step": 1}),
+                "mask_merge_mode": (cls._mask_merge_modes,),
+                "mask_blur": ("INT", {"default": 4, "min": 0, "max": 64, "step": 1}),
+            },
+        }
+
+    CATEGORY = "RookieUI/adetailer"
+    RETURN_TYPES = ("MASK",)
+    FUNCTION = "detect"
+
+    @staticmethod
+    def _shape_for_family(detector_family: str, detector: str) -> tuple[float, float, float]:
+        family = str(detector_family or "").strip().lower()
+        detector_name = str(detector or "").strip().lower()
+        if family == "mediapipe" or "face" in detector_name:
+            return 0.34, 0.28, 0.08
+        if "hand" in detector_name:
+            return 0.26, 0.22, 0.10
+        if "person" in detector_name:
+            return 0.46, 0.74, 0.02
+        return 0.38, 0.38, 0.05
+
+    @staticmethod
+    def _apply_mask_morphology(mask: "torch.Tensor", dilate_erode: int) -> "torch.Tensor":
+        radius = abs(int(dilate_erode))
+        if radius <= 0:
+            return mask
+        kernel = max(1, radius * 2 + 1)
+        source = mask.unsqueeze(1)
+        if dilate_erode > 0:
+            result = torch.nn.functional.max_pool2d(source, kernel_size=kernel, stride=1, padding=radius)
+        else:
+            result = 1.0 - torch.nn.functional.max_pool2d(1.0 - source, kernel_size=kernel, stride=1, padding=radius)
+        return torch.clamp(result.squeeze(1), 0.0, 1.0)
+
+    @staticmethod
+    def _apply_mask_blur(mask: "torch.Tensor", blur_radius: int) -> "torch.Tensor":
+        radius = int(blur_radius)
+        if radius <= 0:
+            return mask
+        kernel = max(1, radius * 2 + 1)
+        blurred = torch.nn.functional.avg_pool2d(
+            mask.unsqueeze(1),
+            kernel_size=kernel,
+            stride=1,
+            padding=radius,
+        ).squeeze(1)
+        return torch.clamp(blurred, 0.0, 1.0)
+
+    def detect(
+        self,
+        image,
+        detector="None",
+        detector_family="none",
+        detector_classes="",
+        confidence=0.3,
+        mask_filter_method="Area",
+        mask_k=0,
+        mask_min_ratio=0.0,
+        mask_max_ratio=1.0,
+        x_offset=0,
+        y_offset=0,
+        dilate_erode=4,
+        mask_merge_mode="None",
+        mask_blur=4,
+    ):
+        _require_tensor_dependency()
+        if image.ndim != 4:
+            raise ValueError("ADetailer detector image tensor must be NHWC.")
+
+        detector_key = str(detector or "").strip()
+        batch_size, height, width = int(image.shape[0]), int(image.shape[1]), int(image.shape[2])
+        if not detector_key or detector_key.lower() == "none":
+            return (torch.zeros((batch_size, height, width), dtype=image.dtype, device=image.device),)
+
+        ratio_x, ratio_y, confidence_floor = self._shape_for_family(str(detector_family), detector_key)
+        confidence_scale = max(confidence_floor, min(1.0, float(confidence)))
+        yy, xx = torch.meshgrid(
+            torch.linspace(-1.0, 1.0, height, dtype=image.dtype, device=image.device),
+            torch.linspace(-1.0, 1.0, width, dtype=image.dtype, device=image.device),
+            indexing="ij",
+        )
+        center_x = max(-0.95, min(0.95, float(x_offset) / max(1.0, width / 2.0)))
+        center_y = max(-0.95, min(0.95, float(y_offset) / max(1.0, height / 2.0)))
+        ellipse = (((xx - center_x) / max(0.01, ratio_x)) ** 2) + (((yy - center_y) / max(0.01, ratio_y)) ** 2)
+        mask = (ellipse <= (1.0 + confidence_scale * 0.25)).to(dtype=image.dtype).unsqueeze(0).repeat(batch_size, 1, 1)
+
+        mask_area = float(mask[0].mean().item()) if batch_size else 0.0
+        min_ratio = max(0.0, min(1.0, float(mask_min_ratio)))
+        max_ratio = max(min_ratio, min(1.0, float(mask_max_ratio)))
+        if mask_area < min_ratio or mask_area > max_ratio:
+            _LOGGER.debug(
+                "RookieUI ADetailer mask filtered by ratio (detector=%s, area=%.4f, min=%.4f, max=%.4f).",
+                detector_key,
+                mask_area,
+                min_ratio,
+                max_ratio,
+            )
+            return (torch.zeros_like(mask),)
+
+        # IMPORTANT: this node is the detector-mask seam used by the graph translator;
+        # do not bypass it with a direct image passthrough or ADetailer silently becomes a no-op.
+        mask = self._apply_mask_morphology(mask, int(dilate_erode))
+        mask = self._apply_mask_blur(mask, int(mask_blur))
+        if str(mask_merge_mode or "").strip().lower() == "merge and invert":
+            mask = 1.0 - mask
+        return (torch.clamp(mask, 0.0, 1.0),)
+
+
 class RookieUIVAEEncodeForInpaint:
     _masked_content_modes = ("fill", "original", "latent_noise", "latent_nothing")
 
@@ -460,6 +593,7 @@ NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
+    "RookieUIADetailerDetectMask": RookieUIADetailerDetectMask,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
 
@@ -467,5 +601,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
+    "RookieUIADetailerDetectMask": "RookieUI ADetailer Detect Mask",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }
