@@ -52,6 +52,31 @@ class ControlNetAdvancedRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_build_controlnet_apply_segments_rolls_back_to_base_segment_when_keyframes_collapse(self) -> None:
+        segments = build_controlnet_apply_segments(
+            weight=0.55,
+            guidance_start=0.2,
+            guidance_end=0.7,
+            advanced={
+                "enabled": True,
+                "timestep_keyframes": [
+                    {"start_percent": 0.0, "end_percent": 0.1, "strength_scale": 1.0},
+                    {"start_percent": 0.9, "end_percent": 1.0, "strength_scale": 0.0},
+                ],
+            },
+        )
+
+        self.assertEqual(
+            segments,
+            [
+                {
+                    "strength": 0.55,
+                    "start_percent": 0.2,
+                    "end_percent": 0.7,
+                }
+            ],
+        )
+
     def test_build_controlnet_stage_weights_uses_preset_and_explicit_overrides(self) -> None:
         stage_weights = build_controlnet_stage_weights(
             input_count=2,
