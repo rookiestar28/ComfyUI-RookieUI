@@ -121,7 +121,7 @@ export function preventSummaryToggleOnCheckbox(toggleInput) {
   toggleInput.addEventListener("keydown", stopToggle);
 }
 
-export function createHiresFixSection(parent, sectionId, hiresEnabledInput) {
+export function createHiresFixSection(parent, sectionId, hiresEnabledInput, titleText = "Hires. fix") {
   const section = document.createElement("details");
   section.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires";
   section.id = sectionId;
@@ -143,6 +143,7 @@ export function createHiresFixSection(parent, sectionId, hiresEnabledInput) {
   header.appendChild(toggle);
   preventSummaryToggleOnCheckbox(hiresEnabledInput);
 
+  appendTextElement(header, "span", "rookieui-shell__section-title", titleText);
   appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸", "");
 
   const grid = document.createElement("div");
