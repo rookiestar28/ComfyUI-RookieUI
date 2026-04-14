@@ -83,6 +83,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(adetailer["warning_code_contract"], "stable_f81")
         self.assertIn("ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING", adetailer["warning_codes"])
         self.assertIn("detect_mask", adetailer["availability"]["runtime_stages"])
+        self.assertEqual(
+            adetailer["availability"]["detector_runtime"]["ultralytics_bbox"],
+            "native_runtime_dependency_missing",
+        )
 
     def test_capabilities_snapshot_uses_pyproject_shell_version(self) -> None:
         payload = build_capabilities_snapshot()

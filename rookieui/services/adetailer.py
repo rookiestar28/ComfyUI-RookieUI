@@ -24,6 +24,11 @@ from rookieui.services.controlnet import (
     build_controlnet_model_list_payload,
     build_controlnet_module_list_payload,
 )
+from rookieui.services.adetailer_runtime import (
+    build_detector_runtime_availability,
+    detector_runtime_is_degraded,
+    summarize_detector_runtime,
+)
 from rookieui.services.model_inventory import discover_model_inventory
 
 ADETAILER_WARNING_UNIT_LIMIT_TRUNCATED = "ADETAILER_UNIT_LIMIT_TRUNCATED"
@@ -38,7 +43,7 @@ _ADETAILER_WARNING_MESSAGES = {
     ADETAILER_WARNING_SKIP_IMG2IMG_IGNORED: "ADetailer skip-img2img is only meaningful for img2img surfaces and was ignored.",
     ADETAILER_WARNING_NO_ACTIVE_UNITS: "ADetailer is enabled but no enabled unit has a detector selected.",
     ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG: "ADetailer detector is not present in the current host catalog; fallback mask behavior may be used.",
-    ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK: "ADetailer detector runs through RookieUI's deterministic Comfy-native mask seam in this build.",
+    ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK: "ADetailer detector runtime degraded to RookieUI's fallback mask seam for the selected provider family.",
     ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY: "ADetailer ControlNet passthrough was requested but no primary ControlNet unit is enabled.",
     ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING: "ADetailer custom ControlNet mode was requested without a ControlNet model.",
 }
@@ -64,18 +69,14 @@ def build_adetailer_warning_code_payload() -> dict[str, str]:
 def build_adetailer_availability_payload() -> dict[str, object]:
     detectors, detector_source = _build_detector_entries()
     controlnet_models = build_controlnet_model_list_payload()
+    detector_runtime = build_detector_runtime_availability()
     return {
         "execution_backend": "rookieui_comfy_native_refinement_pipeline",
         "runtime_stages": ["base_decode", "detect_mask", "inpaint_encode", "refine_sampler", "final_decode"],
         "detector_source": detector_source,
         "detector_count": len(detectors),
         "controlnet_model_count": len(list(controlnet_models.get("model_list", []))),
-        "detector_runtime": {
-            "none": "disabled",
-            "ultralytics_bbox": "deterministic_mask_fallback",
-            "ultralytics_segm": "deterministic_mask_fallback",
-            "mediapipe_face": "deterministic_mask_fallback",
-        },
+        "detector_runtime": detector_runtime,
         "detector_provider_families": list(ADETAILER_DETECTOR_PROVIDER_FAMILIES),
         "degraded_warning_codes": [
             ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG,
@@ -490,14 +491,15 @@ def normalize_adetailer_payload(
         for unit in units
         if unit.enabled and str(unit.detector or "").strip() and str(unit.detector or "").strip() != _ADETAILER_DEFAULT_DETECTOR
     ]
+    detector_runtime = build_detector_runtime_availability()
     if enabled and not active_units:
         warning_codes.append(ADETAILER_WARNING_NO_ACTIVE_UNITS)
     for unit in active_units:
         if unit.detector not in detector_choices:
             warning_codes.append(ADETAILER_WARNING_DETECTOR_NOT_IN_CATALOG)
-        if unit.detector_family in {"ultralytics_bbox", "ultralytics_segm", "mediapipe_face"}:
-            # DEBUG HOTSPOT: keep this warning aligned with `RookieUIADetailerDetectMask`;
-            # removing it would make detector-runtime fallback behavior invisible to users.
+        if detector_runtime_is_degraded(unit.detector_family):
+            # DEBUG HOTSPOT: keep this warning aligned with `RookieUIADetailerDetectMask` and
+            # `rookieui.services.adetailer_runtime`; removing it would hide real runtime degradation from users.
             warning_codes.append(ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK)
         if unit.controlnet.mode == "passthrough" and primary_controlnet_unit_count <= 0:
             warning_codes.append(ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY)
@@ -508,7 +510,8 @@ def normalize_adetailer_payload(
     diagnostics = {
         "active_unit_count": len(active_units) if enabled else 0,
         "primary_controlnet_unit_count": max(0, int(primary_controlnet_unit_count)),
-        "detector_runtime": "rookieui_deterministic_mask_fallback",
+        "detector_runtime": summarize_detector_runtime([unit.detector_family for unit in active_units]) if enabled else "disabled",
+        "detector_runtime_by_family": detector_runtime,
         "degraded": bool(
             set(warning_codes)
             & {

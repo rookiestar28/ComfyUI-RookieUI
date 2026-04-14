@@ -23,6 +23,7 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
+from rookieui.services.adetailer_runtime import detect_adetailer_mask
 from rookieui.services.controlnet_runtime import (
     CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     normalize_module_key,
@@ -331,20 +332,6 @@ class RookieUIADetailerDetectMask:
     FUNCTION = "detect"
 
     @staticmethod
-    def _shape_for_family(detector_family: str, detector: str) -> tuple[float, float, float]:
-        family = str(detector_family or "").strip().lower()
-        detector_name = str(detector or "").strip().lower()
-        if family == "mediapipe_face" or "face" in detector_name:
-            return 0.34, 0.28, 0.08
-        if family == "ultralytics_segm":
-            return 0.44, 0.62, 0.04
-        if "hand" in detector_name:
-            return 0.26, 0.22, 0.10
-        if "person" in detector_name:
-            return 0.46, 0.74, 0.02
-        return 0.38, 0.38, 0.05
-
-    @staticmethod
     def _apply_mask_morphology(mask: "torch.Tensor", dilate_erode: int) -> "torch.Tensor":
         radius = abs(int(dilate_erode))
         if radius <= 0:
@@ -397,17 +384,18 @@ class RookieUIADetailerDetectMask:
         if not detector_key or detector_key.lower() == "none":
             return (torch.zeros((batch_size, height, width), dtype=image.dtype, device=image.device),)
 
-        ratio_x, ratio_y, confidence_floor = self._shape_for_family(str(detector_family), detector_key)
-        confidence_scale = max(confidence_floor, min(1.0, float(confidence)))
-        yy, xx = torch.meshgrid(
-            torch.linspace(-1.0, 1.0, height, dtype=image.dtype, device=image.device),
-            torch.linspace(-1.0, 1.0, width, dtype=image.dtype, device=image.device),
-            indexing="ij",
+        # IMPORTANT: this node is the detector-mask seam used by the graph translator;
+        # do not bypass the runtime service or ADetailer silently collapses back into a no-op.
+        detector_result = detect_adetailer_mask(
+            image,
+            detector=detector_key,
+            detector_family=str(detector_family),
+            detector_classes=str(detector_classes),
+            confidence=float(confidence),
+            x_offset=int(x_offset),
+            y_offset=int(y_offset),
         )
-        center_x = max(-0.95, min(0.95, float(x_offset) / max(1.0, width / 2.0)))
-        center_y = max(-0.95, min(0.95, float(y_offset) / max(1.0, height / 2.0)))
-        ellipse = (((xx - center_x) / max(0.01, ratio_x)) ** 2) + (((yy - center_y) / max(0.01, ratio_y)) ** 2)
-        mask = (ellipse <= (1.0 + confidence_scale * 0.25)).to(dtype=image.dtype).unsqueeze(0).repeat(batch_size, 1, 1)
+        mask = detector_result.mask
 
         mask_area = float(mask[0].mean().item()) if batch_size else 0.0
         min_ratio = max(0.0, min(1.0, float(mask_min_ratio)))
@@ -422,8 +410,6 @@ class RookieUIADetailerDetectMask:
             )
             return (torch.zeros_like(mask),)
 
-        # IMPORTANT: this node is the detector-mask seam used by the graph translator;
-        # do not bypass it with a direct image passthrough or ADetailer silently becomes a no-op.
         mask = self._apply_mask_morphology(mask, int(dilate_erode))
         mask = self._apply_mask_blur(mask, int(mask_blur))
         if str(mask_merge_mode or "").strip().lower() == "merge and invert":

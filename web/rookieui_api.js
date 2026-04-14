@@ -218,9 +218,9 @@ const DEFAULT_CAPABILITIES = Object.freeze({
       controlnet_model_count: 0,
       detector_runtime: {
         none: "disabled",
-        ultralytics_bbox: "deterministic_mask_fallback",
-        ultralytics_segm: "deterministic_mask_fallback",
-        mediapipe_face: "deterministic_mask_fallback",
+        ultralytics_bbox: "native_runtime_dependency_missing",
+        ultralytics_segm: "native_runtime_dependency_missing",
+        mediapipe_face: "native_runtime_dependency_missing",
       },
       detector_provider_families: ["none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face"],
       degraded_warning_codes: [
@@ -235,7 +235,8 @@ const DEFAULT_CAPABILITIES = Object.freeze({
       ADETAILER_SKIP_IMG2IMG_IGNORED: "ADetailer skip-img2img is only meaningful for img2img surfaces and was ignored.",
       ADETAILER_NO_ACTIVE_UNITS: "ADetailer is enabled but no enabled unit has a detector selected.",
       ADETAILER_DETECTOR_NOT_IN_CATALOG: "ADetailer detector is not present in the current host catalog; fallback mask behavior may be used.",
-      ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK: "ADetailer detector runs through RookieUI's deterministic Comfy-native mask seam in this build.",
+      ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK:
+        "ADetailer detector runtime degraded to RookieUI's fallback mask seam for the selected provider family.",
       ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY: "ADetailer ControlNet passthrough was requested but no primary ControlNet unit is enabled.",
       ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING: "ADetailer custom ControlNet mode was requested without a ControlNet model.",
     },
@@ -876,9 +877,9 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
         controlnet_model_count: 0,
         detector_runtime: {
           none: "disabled",
-          ultralytics_bbox: "deterministic_mask_fallback",
-          ultralytics_segm: "deterministic_mask_fallback",
-          mediapipe_face: "deterministic_mask_fallback",
+          ultralytics_bbox: "native_runtime_dependency_missing",
+          ultralytics_segm: "native_runtime_dependency_missing",
+          mediapipe_face: "native_runtime_dependency_missing",
         },
         detector_provider_families: ["none", "ultralytics_bbox", "ultralytics_segm", "mediapipe_face"],
         degraded_warning_codes: [
@@ -893,7 +894,8 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
         ADETAILER_SKIP_IMG2IMG_IGNORED: "ADetailer skip-img2img is only meaningful for img2img surfaces and was ignored.",
         ADETAILER_NO_ACTIVE_UNITS: "ADetailer is enabled but no enabled unit has a detector selected.",
         ADETAILER_DETECTOR_NOT_IN_CATALOG: "ADetailer detector is not present in the current host catalog; fallback mask behavior may be used.",
-        ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK: "ADetailer detector runs through RookieUI's deterministic Comfy-native mask seam in this build.",
+        ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK:
+          "ADetailer detector runtime degraded to RookieUI's fallback mask seam for the selected provider family.",
         ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY: "ADetailer ControlNet passthrough was requested but no primary ControlNet unit is enabled.",
         ADETAILER_CONTROLNET_CUSTOM_MODEL_MISSING: "ADetailer custom ControlNet mode was requested without a ControlNet model.",
       },

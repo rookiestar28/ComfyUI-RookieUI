@@ -55,7 +55,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
     expect(result.data.adetailer.execution_backend).toBe("rookieui_comfy_native_refinement_pipeline");
     expect(result.data.adetailer.warning_code_contract).toBe("stable_f81");
-    expect(result.data.adetailer.warning_codes.ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK).toContain("deterministic");
+    expect(result.data.adetailer.warning_codes.ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK).toContain("fallback");
     expect(result.data.adetailer.routes).toContain("/rookieui/adetailer/catalog");
   });
 
