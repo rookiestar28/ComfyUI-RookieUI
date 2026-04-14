@@ -24,6 +24,7 @@ from rookieui.services.controlnet import (
     build_controlnet_model_list_payload,
     build_controlnet_module_list_payload,
 )
+from rookieui.services.model_inventory import resolve_primary_model_selector_context
 from rookieui.services.adetailer_runtime import (
     build_detector_runtime_availability,
     detector_runtime_is_degraded,
@@ -156,6 +157,19 @@ def build_adetailer_catalog_payload() -> dict[str, object]:
     controlnet_modules = build_controlnet_module_list_payload()
     inventory = discover_model_inventory()
 
+    checkpoint_choices = list(
+        dict.fromkeys(
+            [
+                *[value for value in inventory.checkpoints if isinstance(value, str) and value.strip()],
+                *[
+                    value
+                    for value in getattr(inventory, "diffusion_models", [])
+                    if isinstance(value, str) and value.strip()
+                ],
+            ]
+        )
+    )
+
     # IMPORTANT: keep this payload Comfy-native and inventory-backed; future runtime work must build on this seam instead
     # of reintroducing A1111 script-owned detector/runtime state.
     return {
@@ -173,7 +187,7 @@ def build_adetailer_catalog_payload() -> dict[str, object]:
         "controlnet_default_module": str(
             controlnet_modules.get("default_module", _ADETAILER_CONTROLNET_DEFAULT_MODULE)
         ),
-        "checkpoint_choices": list(inventory.checkpoints),
+        "checkpoint_choices": checkpoint_choices,
         "vae_choices": list(inventory.vae),
         "sampler_choices": [entry["title"] for entry in compatibility.get("samplers", []) if isinstance(entry, dict)],
         "scheduler_choices": [entry["title"] for entry in compatibility.get("schedulers", []) if isinstance(entry, dict)],
@@ -283,6 +297,7 @@ def _normalize_controlnet_block(
 def normalize_adetailer_payload(
     payload: dict[str, object],
     *,
+    profile_id: str,
     surface: str,
     strict_inventory_match: bool,
     primary_controlnet_unit_count: int = 0,
@@ -313,6 +328,7 @@ def normalize_adetailer_payload(
     controlnet_model_list = list(build_controlnet_model_list_payload().get("model_list", []))
     controlnet_module_list = list(build_controlnet_module_list_payload().get("module_list", []))
     inventory = discover_model_inventory()
+    _, primary_model_selectors, _ = resolve_primary_model_selector_context(profile_id, inventory)
     compatibility = build_compatibility_payload()
     sampler_choices = [entry["title"] for entry in compatibility.get("samplers", []) if isinstance(entry, dict)]
     scheduler_choices = [entry["title"] for entry in compatibility.get("schedulers", []) if isinstance(entry, dict)]
@@ -392,23 +408,31 @@ def normalize_adetailer_payload(
         if cfg_scale < 1.0 or cfg_scale > 30.0:
             raise ValueError(f"{field_prefix}.cfg_scale must be between 1.0 and 30.0.")
         use_checkpoint = _coerce_bool(raw_unit.get("use_checkpoint", False), f"{field_prefix}.use_checkpoint", strict=False)
-        checkpoint_name = resolve_inventory_selector(
-            raw_unit.get("checkpoint_name"),
-            f"{field_prefix}.checkpoint_name",
-            default_value="",
-            inventory_selectors=inventory.checkpoints,
-            strict_match=strict_inventory_match,
-        )
-        if checkpoint_name in _ADETAILER_CHECKPOINT_SENTINELS:
+        raw_checkpoint_name = str(raw_unit.get("checkpoint_name") or "").strip()
+        if not use_checkpoint or raw_checkpoint_name in _ADETAILER_CHECKPOINT_SENTINELS:
+            # CRITICAL: ADetailer unit checkpoint overrides must stay sentinel-safe and profile-aware;
+            # validating "__host_default__" or diffusion-model selectors against the legacy checkpoints list breaks SDXL/native-family generation.
             checkpoint_name = "Use same checkpoint"
+        else:
+            checkpoint_name = resolve_inventory_selector(
+                raw_checkpoint_name,
+                f"{field_prefix}.checkpoint_name",
+                default_value="",
+                inventory_selectors=primary_model_selectors,
+                strict_match=strict_inventory_match,
+            )
         use_vae = _coerce_bool(raw_unit.get("use_vae", False), f"{field_prefix}.use_vae", strict=False)
-        vae_name = resolve_inventory_selector(
-            raw_unit.get("vae_name"),
-            f"{field_prefix}.vae_name",
-            default_value="",
-            inventory_selectors=inventory.vae,
-            strict_match=strict_inventory_match,
-        )
+        raw_vae_name = str(raw_unit.get("vae_name") or "").strip()
+        if not use_vae or raw_vae_name in _ADETAILER_VAE_SENTINELS:
+            vae_name = "Use same VAE"
+        else:
+            vae_name = resolve_inventory_selector(
+                raw_vae_name,
+                f"{field_prefix}.vae_name",
+                default_value="",
+                inventory_selectors=inventory.vae,
+                strict_match=strict_inventory_match,
+            )
         if vae_name in _ADETAILER_VAE_SENTINELS:
             vae_name = "Use same VAE"
         use_sampler = _coerce_bool(raw_unit.get("use_sampler", False), f"{field_prefix}.use_sampler", strict=False)

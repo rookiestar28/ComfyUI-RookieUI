@@ -212,6 +212,84 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.vae_name, "SD15\\vae-ft-mse-840000.safetensors")
         self.assertEqual(normalized.text_encoder_name, "")
 
+    def test_normalize_txt2img_request_keeps_adetailer_same_checkpoint_sentinel_for_sdxl_host_inventory(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["flux\\flux1-dev.safetensors"],
+            vae=["sdxl_vae.safetensors"],
+            text_encoders=["clip_l.safetensors"],
+            controlnet=[],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="sdxl_vae.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+        with (
+            mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=fake_inventory),
+            mock.patch("rookieui.services.adetailer.discover_model_inventory", return_value=fake_inventory),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "sdxl",
+                    "checkpoint_name": "SDXL\\realvisxl.safetensors",
+                    "adetailer": {
+                        "enabled": True,
+                        "units": [
+                            {
+                                "enabled": True,
+                                "detector": "face_yolov8n.pt",
+                                "use_checkpoint": False,
+                                "checkpoint_name": "__host_default__",
+                            }
+                        ],
+                    },
+                }
+            )
+
+        self.assertFalse(normalized.adetailer.units[0].use_checkpoint)
+        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "Use same checkpoint")
+
+    def test_normalize_txt2img_request_accepts_adetailer_diffusion_family_checkpoint_override(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["flux\\flux1-dev.safetensors", "lumina\\lumina2.safetensors"],
+            vae=["flux_vae.safetensors"],
+            text_encoders=["t5xxl.safetensors"],
+            controlnet=[],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="flux_vae.safetensors",
+            default_text_encoder="t5xxl.safetensors",
+        )
+
+        with (
+            mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=fake_inventory),
+            mock.patch("rookieui.services.adetailer.discover_model_inventory", return_value=fake_inventory),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux",
+                    "checkpoint_name": "flux\\flux1-dev.safetensors",
+                    "adetailer": {
+                        "enabled": True,
+                        "units": [
+                            {
+                                "enabled": True,
+                                "detector": "face_yolov8n.pt",
+                                "use_checkpoint": True,
+                                "checkpoint_name": "flux\\flux1-dev.safetensors",
+                            }
+                        ],
+                    },
+                }
+            )
+
+        self.assertTrue(normalized.adetailer.units[0].use_checkpoint)
+        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "flux\\flux1-dev.safetensors")
+
     def test_normalize_txt2img_request_keeps_text_encoder_for_flux_profile(self) -> None:
         normalized = normalize_txt2img_request(
             {

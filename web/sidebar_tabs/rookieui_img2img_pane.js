@@ -91,6 +91,32 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     Array.isArray(controlnetCatalog.model_list) && controlnetCatalog.model_list.length > 0
       ? controlnetCatalog.model_list
       : inventory.controlnet ?? [];
+  const adetailerCheckpointChoices = Array.from(
+    new Set(
+      [
+        ...(Array.isArray(adetailerCatalog.checkpoint_choices) ? adetailerCatalog.checkpoint_choices : []),
+        ...(Array.isArray(inventory.checkpoints) ? inventory.checkpoints : []),
+        ...(Array.isArray(inventory.diffusion_models) ? inventory.diffusion_models : []),
+      ]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const mergedADetailerCatalog = {
+    ...adetailerCatalog,
+    // IMPORTANT: ADetailer-local ControlNet must fall back to the primary ControlNet catalog when the dedicated payload is stale or partial.
+    controlnet_model_list:
+      Array.isArray(adetailerCatalog.controlnet_model_list) && adetailerCatalog.controlnet_model_list.length > 0
+        ? adetailerCatalog.controlnet_model_list
+        : controlnetModelValues,
+    controlnet_module_list:
+      Array.isArray(adetailerCatalog.controlnet_module_list) && adetailerCatalog.controlnet_module_list.length > 0
+        ? adetailerCatalog.controlnet_module_list
+        : Array.isArray(controlnetCatalog.module_list) && controlnetCatalog.module_list.length > 0
+          ? controlnetCatalog.module_list
+          : ["none"],
+    checkpoint_choices: adetailerCheckpointChoices,
+  };
   const controlnetTypeCatalog =
     controlnetCatalog.control_types && typeof controlnetCatalog.control_types === "object"
       ? controlnetCatalog.control_types
@@ -783,7 +809,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           idPrefix: "rookieui-img2img-adetailer",
           parent: generationSection,
           hiddenInput: elements.adetailer,
-          catalog: adetailerCatalog,
+          catalog: mergedADetailerCatalog,
           surface: "img2img",
           createInput,
           createRangeInput,

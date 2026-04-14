@@ -893,7 +893,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
-    expect(document.getElementById("rookieui-styles").href).toContain("20260415-hotfix-enter-submit");
+    expect(document.getElementById("rookieui-styles").href).toContain("20260415-hotfix-adetailer-selectors");
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -1020,6 +1020,22 @@ describe("registerRookieUIBootstrapExtension", () => {
         { enabled: false },
       ],
     });
+    document.getElementById("rookieui-txt2img-adetailer-controlnet-mode-0").value = "custom";
+    document
+      .getElementById("rookieui-txt2img-adetailer-controlnet-mode-0")
+      .dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-txt2img-adetailer-controlnet-model-0")?.disabled).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-controlnet-module-0")?.disabled).toBe(false);
+    expect(
+      Array.from(document.getElementById("rookieui-txt2img-adetailer-controlnet-model-0")?.options ?? []).map(
+        (option) => option.value,
+      ),
+    ).toContain("control_v11p_sd15_canny.safetensors");
+    expect(
+      Array.from(document.getElementById("rookieui-txt2img-adetailer-controlnet-module-0")?.options ?? []).map(
+        (option) => option.value,
+      ),
+    ).toContain("openpose");
     document.getElementById("rookieui-txt2img-adetailer-detector-0").value = "yolov8x-worldv2.pt";
     document
       .getElementById("rookieui-txt2img-adetailer-detector-0")
@@ -1756,6 +1772,244 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-status").textContent).toContain(
       "Request failed: invalid-request (checkpoint_name must match a host inventory entry.)",
     );
+  });
+
+  test("falls back to primary controlnet catalog for adetailer custom controlnet selectors", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-adetailer-controlnet-fallback",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    const fetchImpl = async (url) => {
+      if (url === "/rookieui/bootstrap") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { service: "rookieui", status: "bootstrap-ready", routes: [] };
+          },
+        };
+      }
+      if (url === "/rookieui/capabilities") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              features: { controlnet: true, adetailer: true, extras: true, pnginfo: true, queue: true },
+              parity: {
+                profiles: [
+                  {
+                    id: "sd15",
+                    title: "Stable Diffusion 1.5",
+                    base_family: "sd15",
+                    prompt_encoder: "clip_text_encode",
+                    default_width: 512,
+                    default_height: 512,
+                    default_steps: 28,
+                    default_cfg_scale: 7,
+                    default_sampler: "euler_ancestral",
+                    default_scheduler: "normal",
+                    default_clip_skip: 1,
+                    supports_clip_skip: true,
+                    notes: [],
+                  },
+                ],
+              },
+              routes: [],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/models") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              checkpoints: ["dreamshaper.safetensors"],
+              clip: [],
+              clip_vision: [],
+              controlnet: ["control_v11p_sd15_canny.safetensors", "control_v11f1p_sd15_depth.safetensors"],
+              diffusion_models: ["flux1-dev.safetensors"],
+              vae: ["Automatic"],
+              text_encoders: ["clip_l.safetensors"],
+              embeddings: [],
+              loras: [],
+              ultralytics: [],
+              unet: [],
+              upscale_models: [],
+              default_checkpoint: "dreamshaper.safetensors",
+              default_vae: "Automatic",
+              default_text_encoder: "clip_l.safetensors",
+              catalog: {
+                surface_groups: [],
+                primary_model_category_by_family: { sd15: "checkpoints", flux: "diffusion_models" },
+                categories: {
+                  checkpoints: {
+                    title: "Checkpoints",
+                    items: ["dreamshaper.safetensors"],
+                    default_value: "dreamshaper.safetensors",
+                    sidebar_visible: true,
+                  },
+                  diffusion_models: {
+                    title: "Diffusion Models",
+                    items: ["flux1-dev.safetensors"],
+                    default_value: "flux1-dev.safetensors",
+                    sidebar_visible: false,
+                  },
+                },
+              },
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/presets") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              presets: [
+                {
+                  id: "sd15",
+                  title: "SD1.5",
+                  profile: "sd15",
+                  base_family: "sd15",
+                  checkpoint_name: "dreamshaper.safetensors",
+                  vae_name: "Automatic",
+                  text_encoder_name: "clip_l.safetensors",
+                  width: 512,
+                  height: 512,
+                  steps: 28,
+                  cfg_scale: 7,
+                  sampler_name: "euler_ancestral",
+                  scheduler_name: "normal",
+                  clip_skip: 1,
+                },
+              ],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/compatibility") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              samplers: [{ id: "euler_ancestral", title: "Euler a", default: true }],
+              schedulers: [{ id: "normal", title: "Normal", default: true }],
+              dtype_profiles: [{ id: "automatic", title: "Automatic", default: true }],
+              runtime_profiles: [],
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/model_list") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              model_list: ["control_v11p_sd15_canny.safetensors", "control_v11f1p_sd15_depth.safetensors"],
+              default_model: "control_v11p_sd15_canny.safetensors",
+            };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/module_list") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { module_list: ["none", "openpose", "depth"], default_module: "none" };
+          },
+        };
+      }
+      if (url === "/rookieui/controlnet/control_types") {
+        return { ok: true, status: 200, async json() { return { control_types: {}, control_type_order: [] }; } };
+      }
+      if (url === "/rookieui/adetailer/catalog") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              detectors: [{ id: "None", label: "None", family: "none", supports_class_filter: false }],
+              detector_list: ["None"],
+              default_detector: "None",
+              controlnet_modes: ["none", "passthrough", "custom"],
+              controlnet_model_list: [],
+              controlnet_module_list: [],
+              controlnet_default_module: "none",
+              checkpoint_choices: ["Use same checkpoint"],
+              vae_choices: ["Use same VAE"],
+              sampler_choices: ["DPM++ 2M Karras"],
+              scheduler_choices: ["Use same scheduler"],
+              mask_filter_methods: ["Area", "Confidence"],
+              mask_merge_modes: ["None", "Merge", "Merge and Invert"],
+              contract: { defaults: {} },
+            };
+          },
+        };
+      }
+      return { ok: true, status: 200, async json() { return {}; } };
+    };
+
+    await registerRookieUIBootstrapExtension({ app, fetchImpl });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    document.getElementById("rookieui-txt2img-adetailer-enabled").checked = true;
+    document
+      .getElementById("rookieui-txt2img-adetailer-enabled")
+      .dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-txt2img-adetailer-controlnet-mode-0").value = "custom";
+    document
+      .getElementById("rookieui-txt2img-adetailer-controlnet-mode-0")
+      .dispatchEvent(new Event("change", { bubbles: true }));
+
+    const adetailerControlnetModels = Array.from(
+      document.getElementById("rookieui-txt2img-adetailer-controlnet-model-0")?.options ?? [],
+    ).map((option) => option.value);
+    const adetailerControlnetModules = Array.from(
+      document.getElementById("rookieui-txt2img-adetailer-controlnet-module-0")?.options ?? [],
+    ).map((option) => option.value);
+    const adetailerCheckpointChoices = Array.from(
+      document.getElementById("rookieui-txt2img-adetailer-checkpoint-name-0")?.options ?? [],
+    ).map((option) => option.value);
+
+    expect(document.getElementById("rookieui-txt2img-adetailer-controlnet-model-0")?.disabled).toBe(false);
+    expect(document.getElementById("rookieui-txt2img-adetailer-controlnet-module-0")?.disabled).toBe(false);
+    expect(adetailerControlnetModels).toContain("control_v11p_sd15_canny.safetensors");
+    expect(adetailerControlnetModels).toContain("control_v11f1p_sd15_depth.safetensors");
+    expect(adetailerControlnetModules).toContain("openpose");
+    expect(adetailerControlnetModules).toContain("depth");
+    expect(adetailerCheckpointChoices).toContain("dreamshaper.safetensors");
+    expect(adetailerCheckpointChoices).toContain("flux1-dev.safetensors");
   });
 
   test("falls back to image_asset transfer when preview decode fails", async () => {

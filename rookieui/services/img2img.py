@@ -209,6 +209,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     # The main img2img request must stay reusable even when future detailer units add local ControlNet/inpaint overrides.
     adetailer = normalize_adetailer_payload(
         payload,
+        profile_id=profile.id,
         surface="img2img",
         strict_inventory_match=inventory_is_host,
         primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
