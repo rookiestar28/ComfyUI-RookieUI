@@ -921,7 +921,12 @@ describe("registerRookieUIBootstrapExtension", () => {
       document.querySelectorAll(
         "#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon",
       ).length,
-    ).toBe(7);
+    ).toBe(6);
+    expect(
+      document.querySelector(
+        "#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen",
+      ),
+    ).not.toBeNull();
     expect(document.getElementById("mock-sidebar-tabs").textContent).not.toContain("Rookie Mode");
     expect(document.getElementById("mock-sidebar-tabs").textContent).not.toContain("Server capabilities");
     expect(document.getElementById("mock-sidebar-tabs").textContent).toContain("Txt2Img");

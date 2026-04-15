@@ -67,8 +67,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-txt2img-preview-extras .rookieui-shell__mini-action-icon")).toHaveText("📐");
   await expect(
     page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon"),
-  ).toHaveCount(7);
-  await expect(page.locator("#rookieui-txt2img-preview-fullscreen")).toBeVisible();
+  ).toHaveCount(6);
+  await expect(
+    page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen"),
+  ).toBeVisible();
   await expect(page.locator("#rookieui-steps-slider")).toHaveCSS("accent-color", "rgb(78, 134, 235)");
   const sliderBackground = await page.locator("#rookieui-steps-slider").evaluate((node) => {
     return getComputedStyle(node).backgroundImage;
