@@ -350,11 +350,11 @@
   white-space: nowrap;
 }
 
-.rookieui-shell__forge-pane {
+.rookieui-shell__integrated-pane {
   min-width: 0;
 }
 
-.rookieui-shell__forge-form {
+.rookieui-shell__integrated-form {
   display: grid;
   gap: 10px;
 }

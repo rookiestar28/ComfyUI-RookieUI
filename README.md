@@ -8,7 +8,7 @@
 <br>
 <br>
 
-ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/Forge-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style **workflow semantics** for Stable Diffusion in a ComfyUI host:
+ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style **workflow semantics** for Stable Diffusion in a ComfyUI host:
 
 - **prompt and negative prompt handling**
 - **sampler/scheduler/seed/CFG behavior mapping**
@@ -18,51 +18,63 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111/For
 
 <br>
 
-The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. That being said, RookieUI's support extends far beyond just the SD models.
+The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Newer model families remain available in the same RookieUI surface, but they continue to use their native ComfyUI execution semantics instead of claiming exact A1111 prompt parity.
 
 <details><summary><h2>Last Update - Click to expand</h2></summary>
 
 <details>
 
-<summary><strong>A1111-native prompt parity node delivery (new functionality)</strong></summary>
+<summary><strong>Native ADetailer and advanced ControlNet runtime upgrade (new functionality)</strong></summary>
 
-- Added RookieUI-owned A1111 parity text-encode nodes for SD-family default routes, moving `AND`, `BREAK`, scheduling, and attention handling to the CLIP/tokenizer boundary instead of relying on graph-only approximation.
-- Added SD1.x / SD2.x parity-node execution for standard CLIP paths and SDXL dual-encoder parity-node execution with pooled-output/size metadata preservation.
-- Added hires-pass prompt-conditioning separation for SDXL parity routes so second-pass scheduling and chunk timing no longer collapse back onto the base pass.
-- Preserved rollback-safe legacy graph fallback behavior for environments that still need the older prompt path.
-
-</details>
-
-<details>
-
-<summary><strong>Prompt capability and warning truthfulness realignment (bugfix/stability)</strong></summary>
-
-- Updated backend/frontend capability payloads so default SD-family prompt behavior is reported as exact, while legacy fallback and secondary-family approximate lanes are surfaced explicitly.
-- Added structured warning-code metadata for semantic detection, fallback, guardrails, and unsupported extra-network families.
-- Corrected legacy warning copy so prompt-path downgrades clearly state when RookieUI is running the legacy graph fallback instead of the default parity-node route.
-- Synced offline/frontend fallback capability payloads with the same post-cutover prompt contract to avoid contradictory UI messaging.
+- Upgraded ADetailer to a RookieUI-owned detector/runtime path with packaged Ultralytics/OpenCV-backed dependency support instead of relying on an external A1111 script or third-party node pack.
+- Added native advanced ControlNet execution support for stage-aware weights, timestep scheduling, and mask-aware application in the shared RookieUI workflow translator.
+- Kept main-generation ControlNet and ADetailer-local ControlNet on the same native apply seam so advanced behavior stays consistent across base and refinement stages.
+- Improved runtime availability metadata so the UI can report the real detector/advanced-ControlNet capability surface instead of implying unsupported host features.
 
 </details>
 
 <details>
 
-<summary><strong>ControlNet OpenPose and host-preprocessor execution hardening (bugfix/stability)</strong></summary>
+<summary><strong>Preview fullscreen viewer and frontend regression hardening (new functionality/stability)</strong></summary>
 
-- Fixed OpenPose-family host preprocessing so selected variants execute with exact host-node/flag binding instead of drifting into unrelated preprocessors.
-- Removed the generic visual-empty rejection that incorrectly treated sparse pose outputs as failures, especially for OpenPose-family previews.
-- Corrected fallback preview behavior so host failures no longer echo the source image as if preprocessing succeeded.
-- Expanded schema-aware host parameter coercion and regression coverage for OpenPose-family and other variant-driven preprocessor paths.
+- Added a preview-only fullscreen viewer for generated images in `txt2img` and `img2img`, with direct surface activation and zoom-only inspection.
+- Improved preview discoverability with visible overlay controls and consistent fullscreen enter/exit feedback.
+- Hardened frontend regression coverage so fullscreen behavior is validated through real user actions instead of DOM-existence checks only.
+- Added a shipped-frontend asset revision fingerprint guard to reduce stale-browser-cache regressions after UI hotfixes.
 
 </details>
 
 <details>
 
-<summary><strong>ControlNet preprocessor UX and dispatch parity improvements (bugfix/stability)</strong></summary>
+<summary><strong>ADetailer integrated parity rollout (new functionality)</strong></summary>
 
-- Added Forge-style preprocessor option narrowing by selected Control Type, so each type shows only relevant annotator choices.
+- Added an integrated ADetailer editor in `txt2img` and `img2img` with four unit tabs, grouped controls, and A1111-style layout on top of RookieUI's native sidebar shell.
+- Added host-native detect-mask-refine workflow translation so enabled ADetailer units run as a secondary refinement stage without embedding A1111 ScriptRunner runtime.
+- Added ControlNet `none` / `passthrough` / `custom` behavior inside the ADetailer refinement context, keeping base-generation ControlNet state isolated from detailer-local execution.
+- Added detector/model availability guidance, warning codes, and diagnostics so degraded ADetailer behavior is reported explicitly instead of silently disappearing.
+- Added route-level regression coverage and rollback/no-op validation for the full ADetailer runtime chain.
+
+</details>
+
+<details>
+
+<summary><strong>Stable Diffusion prompt parity rollout (new functionality)</strong></summary>
+
+- Added RookieUI-owned A1111-style prompt compilation for the Stable Diffusion family, including support for `BREAK`, `AND`, scheduling slices, and attention markers.
+- Added SD-family parity text-encode routing so prompt semantics compile into deterministic ComfyUI conditioning graphs instead of relying on raw prompt passthrough.
+- Kept newer/non-SD families on their native ComfyUI text-encode/runtime paths, aligning the product scope to A1111 reproduction where it is actually meaningful.
+- Added capability and API truthfulness updates so the UI reports the real prompt-semantics support surface instead of implying unsupported parity on unrelated model families.
+
+</details>
+
+<details>
+
+<summary><strong>ControlNet preprocessor execution and diagnostics hardening (bugfix/stability)</strong></summary>
+
+- Added control-type-aware preprocessor option narrowing, so each type shows only relevant annotator choices.
 - Expanded preprocessor catalog to include variant-level options (for example depth/lineart/openpose families) in integrated ControlNet units.
-- Updated backend detect/runtime dispatch to respect selected preprocessor variants and prefer matching host annotator nodes.
-- Improved run-preprocessor status messaging to report both selected preprocessor option and actual backend processor used.
+- Updated backend detect/runtime dispatch to respect selected preprocessor variants, prefer matching host annotator nodes, and keep OpenPose-family execution isolated to the requested variant instead of cross-family fallback synthesis.
+- Improved run-preprocessor status messaging to report both the selected preprocessor option and the actual backend processor used, with explicit warning diagnostics when the host output is degraded or unavailable.
 - Expanded backend/frontend regression coverage for variant filtering and variant-aware dispatch behavior.
 
 </details>
@@ -161,9 +173,9 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Architecture Snapshot](#architecture-snapshot)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
-- [Prompt Semantics and A1111 Parity](#prompt-semantics-and-a1111-parity)
 - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [ControlNet Support](#controlnet-support)
+- [ADetailer Support](#adetailer-support)
 - [Support for Other Extensions](#support-for-other-extensions)
 - [License](#license)
 
@@ -187,14 +199,26 @@ ComfyUI process (single runtime)
 
 1. Install via ComfyUI-Manager (recommended)
    Update ComfyUI-Manager to the latest version first, then search for `ComfyUI-RookieUI` in Manager and install it.
+   RookieUI now ships a root `requirements.txt` so Manager-style installs can resolve the extension's extra Python dependencies in the host environment.
 
 2. Install as a ComfyUI custom node (manual)
 
 ```bash
 git clone https://github.com/rookiestar28/ComfyUI-RookieUI custom_nodes/ComfyUI-RookieUI
+cd custom_nodes/ComfyUI-RookieUI
+python -m pip install -r requirements.txt
 ```
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
+
+`ControlNet` and `ADetailer` support are built into RookieUI itself. You do not need to install separate external custom-node packs just to use RookieUI's integrated ControlNet or ADetailer surfaces.
+
+Required extra Python packages for RookieUI:
+
+- `opencv-python-headless>=4.10.0`
+- `ultralytics>=8.3.0`
+
+If your host or Manager install path does not automatically install custom-node dependencies, run `python -m pip install -r requirements.txt` manually in the same Python environment used by ComfyUI. These packages power RookieUI's native ADetailer detector/runtime path and related image-processing helpers.
 
 ## Feature Overview
 
@@ -205,11 +229,12 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 </div>
 <br>
 
-- A1111/Forge-like compact tab rail and control panel layout
+- A1111-like compact tab rail and control panel layout
 - Hero `Generate` rail with compact action icons
 - Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
 - Progress text and queue/history integration in sidebar flow
 - Live preview panel with runtime updates and flicker-mitigated rendering
+- Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
 
 ### Generation
 
@@ -217,8 +242,7 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 - `img2img` request normalization with guarded asset-handle path
 - `img2img` mode surface: `img2img`, `sketch`, `inpaint`, `inpaint_sketch`, `inpaint_upload`, `batch`
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
-- SD-family default prompt execution uses RookieUI A1111 parity text-encode nodes instead of graph-only prompt approximation
-- Exact prompt support on default SD-family routes for `AND`, `BREAK`, scheduling, and attention weighting
+- Stable Diffusion family prompt semantics parity for `BREAK`, `AND`, scheduling slices, and attention markers
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
 ### PNG Info
@@ -233,9 +257,18 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 - single-image/batch postprocessing surface
 - dedicated extras contract and execution path
 
+### ADetailer
+
+- integrated multi-unit ADetailer surface in `txt2img` and `img2img`
+- four-unit editor with grouped controls and override gating
+- host-native detect-mask-refine runtime chain
+- RookieUI-native detector/runtime path backed by packaged Python dependencies instead of an external ADetailer node pack
+- ControlNet `none` / `passthrough` / `custom` support inside detailer refinement
+- explicit diagnostics and availability guidance for degraded detector/model states
+
 ### Model Controls
 
-- SD1.5/SDXL default routes use RookieUI-owned A1111 parity text-encode nodes at the host CLIP boundary
+- SD1.5/SDXL use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics
 - Flux and Qwen-Image expose selectable text encoder controls
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
@@ -250,17 +283,10 @@ Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the fronte
 - Lumina family
 - Anima family
 
-## Prompt Semantics and A1111 Parity
+Prompt semantics note:
 
-- Default Stable Diffusion-family routes (`sd15`, `sdxl`, Pony, Illustrious, Noob) execute prompt semantics through RookieUI A1111 parity text-encode nodes.
-- Supported default SD-family prompt features include:
-  - `AND` composition
-  - `BREAK` chunking
-  - prompt scheduling syntax such as `[from:to:at]`
-  - parenthesis/bracket attention weighting and explicit `(text:weight)` emphasis
-  - inline LoRA / LyCORIS extraction into deterministic loader chains
-- Secondary newer-family routes still exist, but they are not described as exact A1111 prompt-parity lanes in RookieUI capability surfaces.
-- If you enable `ROOKIEUI_PROMPT_DSL_LEGACY`, RookieUI falls back to the older graph-based prompt path and reports that downgrade explicitly in warning diagnostics.
+- Exact A1111-style prompt parsing and conditioning parity is currently targeted at the Stable Diffusion family.
+- Newer/non-SD families continue to use their native ComfyUI execution semantics even when exposed in the same RookieUI interface.
 
 ## Default Model Read Paths (Host ComfyUI)
 
@@ -282,7 +308,7 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 ## ControlNet Support
 
 <div align="left">
-  <img src="assets/controlnet.png" width="85%" />
+  <img src="assets/controlnet.png" width="80%" />
 </div>
 <br>
 
@@ -299,13 +325,39 @@ Behavior and compatibility:
 
 - A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img`.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
-- Preprocessor selection is Control Type-aware and preserves explicit variant choice for families such as depth, lineart, and OpenPose.
-- OpenPose-family host preprocessing keeps exact selected variant semantics and avoids misleading source-image echo on fallback failure.
+- RookieUI ships its own integrated ControlNet request/runtime layer, so the feature does not depend on installing a separate external ControlNet UI extension.
+- Selected preprocessor variants are dispatched to matching host annotator nodes when available, including exact OpenPose-family variant routing.
+- Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
-- When a host preprocessor is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
+- ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
+
+## ADetailer Support
+
+<div align="left">
+  <img src="assets/adetailer.png" width="40%" />
+</div>
+<br>
+
+Simple usage:
+
+1. Open `txt2img` or `img2img`, then enable `ADetailer`.
+2. Pick an enabled ADetailer unit and select a detector.
+3. Adjust prompt, negative prompt, mask, inpaint, and refinement overrides as needed.
+4. Optionally choose ADetailer-local ControlNet mode: `none`, `passthrough`, or `custom`.
+5. Run generation. Enabled ADetailer units refine the base result in a host-native secondary pass.
+
+Behavior and compatibility:
+
+- The ADetailer surface is integrated directly into RookieUI's generation panes instead of relying on an external A1111 script runner.
+- Runtime behavior follows a detect-mask-refine pipeline built from native ComfyUI/RookieUI workflow nodes.
+- Detector/runtime support is packaged with RookieUI's own dependency/runtime layer; no separate external ADetailer custom-node pack is required.
+- Up to four ADetailer units are supported in the integrated editor.
+- ControlNet coupling supports `none`, `passthrough`, and `custom` modes inside the refinement context.
+- Native detector runtime uses RookieUI's packaged Python dependencies together with host model inventory, so matching detector/model files must still exist in the host environment.
+- Availability guidance and warning diagnostics are exposed when detector/model/runtime dependencies are degraded.
 
 ## Support for Other Extensions
 

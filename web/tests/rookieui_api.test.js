@@ -50,12 +50,12 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.prompt_semantics.contract_version).toBe("f100-20260414");
-    expect(result.data.prompt_semantics.rollout.default_mode).toBe("a1111_parity_nodes_exact");
-    expect(result.data.prompt_semantics.warning_codes.fallback).toContain("PROMPT_LEGACY_FALLBACK_ENABLED");
-    expect(result.data.prompt_semantics.capabilities[0].status).toBe("exact");
+    expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
+    expect(result.data.adetailer.execution_backend).toBe("rookieui_comfy_native_refinement_pipeline");
+    expect(result.data.adetailer.warning_code_contract).toBe("stable_f81");
+    expect(result.data.adetailer.warning_codes.ADETAILER_DETECTOR_RUNTIME_FALLBACK_MASK).toContain("fallback");
     expect(result.data.adetailer.routes).toContain("/rookieui/adetailer/catalog");
   });
 
@@ -255,7 +255,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "host",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
+              },
               model_list: ["control_v11p_sd15_canny.safetensors"],
               default_model: "control_v11p_sd15_canny.safetensors",
             };
@@ -268,7 +273,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
+              },
               module_list: ["none", "canny", "depth"],
               default_module: "none",
             };
@@ -281,7 +291,12 @@ describe("fetchRookieUICapabilities", () => {
           async json() {
             return {
               source: "internal",
-              contract: { version: "r72-20260412", ui_variant: "forge_neo_integrated", unit_count: 3 },
+              contract: {
+                version: "r72-20260412",
+                ui_variant: "integrated_sidebar_controlnet",
+                unit_count: 3,
+                advanced_contract: { version: "r111-20260415", runtime_state: "rookieui_native_advanced_runtime" },
+              },
               control_type_order: ["All", "Canny", "Depth"],
               default_type: "All",
               control_types: {
@@ -319,6 +334,7 @@ describe("fetchRookieUICapabilities", () => {
     });
     expect(fallbackTypes.ok).toBe(false);
     expect(fallbackTypes.data.contract.version).toBe("r72-20260412");
+    expect(fallbackTypes.data.contract.advanced_contract.runtime_state).toBe("rookieui_native_advanced_runtime");
     expect(fallbackTypes.data.default_type).toBe("All");
   });
 
@@ -330,8 +346,16 @@ describe("fetchRookieUICapabilities", () => {
     expect(fallbackCatalog.ok).toBe(false);
     expect(fallbackCatalog.data.contract.version).toBe("r74f77-20260414");
     expect(fallbackCatalog.data.contract.unit_count).toBe(4);
+    expect(fallbackCatalog.data.contract.detector_provider_families).toEqual([
+      "none",
+      "ultralytics_bbox",
+      "ultralytics_segm",
+      "mediapipe_face",
+    ]);
     expect(fallbackCatalog.data.prompt_tokens).toEqual(["[PROMPT]", "[SEP]", "[SKIP]"]);
     expect(fallbackCatalog.data.controlnet_modes).toEqual(["none", "passthrough", "custom"]);
+    expect(fallbackCatalog.data.availability.runtime_stages).toContain("detect_mask");
+    expect(fallbackCatalog.data.warning_codes.ADETAILER_CONTROLNET_PASSTHROUGH_EMPTY).toContain("passthrough");
   });
 
   test("emits guarded debug warnings only when ROOKIEUI_DEBUG is enabled", async () => {

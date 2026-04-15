@@ -29,6 +29,8 @@ class ModelInventorySnapshot:
     embeddings: list[str] = field(default_factory=list)
     loras: list[str] = field(default_factory=list)
     ultralytics: list[str] = field(default_factory=list)
+    ultralytics_bbox: list[str] = field(default_factory=list)
+    ultralytics_segm: list[str] = field(default_factory=list)
     unet: list[str] = field(default_factory=list)
     upscale_models: list[str] = field(default_factory=list)
     default_checkpoint: str = "__host_default__"
@@ -72,6 +74,8 @@ class ModelInventorySnapshot:
                     "categories": [
                         "upscale_models",
                         "ultralytics",
+                        "ultralytics_bbox",
+                        "ultralytics_segm",
                     ],
                 },
             ],
@@ -128,6 +132,18 @@ class ModelInventorySnapshot:
                 "ultralytics": {
                     "title": "Ultralytics",
                     "items": self.ultralytics,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "ultralytics_bbox": {
+                    "title": "Ultralytics BBox",
+                    "items": self.ultralytics_bbox,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "ultralytics_segm": {
+                    "title": "Ultralytics Segm",
+                    "items": self.ultralytics_segm,
                     "default_value": "",
                     "sidebar_visible": False,
                 },

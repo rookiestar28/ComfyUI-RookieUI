@@ -61,7 +61,7 @@ _DTYPE_PROFILE_ALIASES = {
 }
 
 
-def _is_diffusion_global_selector(value: str) -> bool:
+def _is_unresolved_inventory_selector(value: str) -> bool:
     normalized = str(value or "").strip().lower()
     return normalized in {"", "automatic", "__host_default__"}
 
@@ -253,26 +253,28 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         inventory_models=inventory.controlnet,
         strict_model_match=inventory_is_host,
     )
-    # IMPORTANT: keep ADetailer normalization detached from main ControlNet ownership here;
-    # F80 depends on this seam to support passthrough/custom refinement state without polluting base generation units.
+    # IMPORTANT: keep ADetailer normalization detached from main ControlNet ownership here.
+    # Later refinement runtime work depends on this seam so per-unit overrides do not pollute base generation units.
     adetailer = normalize_adetailer_payload(
         payload,
+        profile_id=profile.id,
         surface="txt2img",
         strict_inventory_match=inventory_is_host,
+        primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
     )
 
     primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
         profile.id, inventory
     )
-    raw_vae_selector = request.vae_name
-    raw_text_encoder_selector = request.text_encoder_name
-    if primary_model_category == "diffusion_models":
-        if _is_diffusion_global_selector(raw_vae_selector):
-            raw_vae_selector = ""
-        if _is_diffusion_global_selector(raw_text_encoder_selector):
-            raw_text_encoder_selector = ""
+    # CRITICAL: host-backed defaults arrive as sentinel strings from request/dataclass/UI contracts;
+    # convert them back to unresolved state before strict host matching or bare generate requests fail early.
+    raw_checkpoint_selector = "" if _is_unresolved_inventory_selector(request.checkpoint_name) else request.checkpoint_name
+    raw_vae_selector = "" if _is_unresolved_inventory_selector(request.vae_name) else request.vae_name
+    raw_text_encoder_selector = (
+        "" if _is_unresolved_inventory_selector(request.text_encoder_name) else request.text_encoder_name
+    )
     checkpoint_name = resolve_inventory_selector(
-        request.checkpoint_name,
+        raw_checkpoint_selector,
         "checkpoint_name",
         default_value=primary_model_default,
         inventory_selectors=primary_model_selectors,
@@ -300,11 +302,11 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         text_encoder_name = ""
     if primary_model_category == "diffusion_models":
         # CRITICAL: diffusion families do not support global text encoder/VAE defaults; unresolved/Automatic selectors must fail fast instead of silently degrading final decode quality.
-        if _is_diffusion_global_selector(text_encoder_name):
+        if _is_unresolved_inventory_selector(text_encoder_name):
             raise ValueError(
                 f"text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
-        if _is_diffusion_global_selector(vae_name):
+        if _is_unresolved_inventory_selector(vae_name):
             raise ValueError(
                 f"vae_name requires a family-specific host selector for profile '{profile.id}'."
             )

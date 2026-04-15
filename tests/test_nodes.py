@@ -8,71 +8,6 @@ from rookieui import nodes
 
 
 class RookieUINodesTests(unittest.TestCase):
-    class _FakeTokenizerImpl:
-        def __call__(self, text: str) -> dict[str, list[int]]:
-            tokens = [index + 10 for index, _ in enumerate(text.split())]
-            return {"input_ids": tokens or [42]}
-
-        @staticmethod
-        def get_vocab() -> dict[str, int]:
-            return {",</w>": 999}
-
-    class _FakeInnerTokenizer:
-        def __init__(self) -> None:
-            self.start_token = 101
-            self.end_token = 102
-            self.pad_token = 0
-            self.max_length = 6
-            self.max_word_length = 999
-            self.tokens_start = 0
-            self.tokenizer_adds_end_token = False
-            self.pad_to_max_length = True
-            self.pad_left = False
-            self.embedding_identifier = "embedding:"
-            self.embedding_directory = None
-            self.tokenizer = RookieUINodesTests._FakeTokenizerImpl()
-
-    class _FakeTokenizer:
-        def __init__(self) -> None:
-            self.clip_name = "l"
-            self.clip = "clip_l"
-            self.clip_l = RookieUINodesTests._FakeInnerTokenizer()
-
-    class _FakeClip:
-        def __init__(self) -> None:
-            self.tokenizer = RookieUINodesTests._FakeTokenizer()
-
-        def encode_from_tokens(
-            self,
-            tokens,
-            return_pooled=True,
-            return_dict=True,
-        ) -> dict[str, object]:
-            return {
-                "cond": {"tokens": tokens},
-                "pooled_output": "fake-pooled",
-            }
-
-    class _FakeSDXLTokenizer:
-        def __init__(self) -> None:
-            self.clip_l = RookieUINodesTests._FakeInnerTokenizer()
-            self.clip_g = RookieUINodesTests._FakeInnerTokenizer()
-
-    class _FakeSDXLClip:
-        def __init__(self) -> None:
-            self.tokenizer = RookieUINodesTests._FakeSDXLTokenizer()
-
-        def encode_from_tokens(
-            self,
-            tokens,
-            return_pooled=True,
-            return_dict=True,
-        ) -> dict[str, object]:
-            return {
-                "cond": {"tokens": tokens},
-                "pooled_output": "fake-sdxl-pooled",
-            }
-
     def test_load_asset_mask_validate_inputs_accepts_partial_signature(self) -> None:
         with mock.patch.object(nodes, "resolve_asset_path", return_value=Path("C:/tmp/mask.png")):
             result = nodes.RookieUILoadAssetMask.VALIDATE_INPUTS("mask_asset.png")
@@ -101,84 +36,52 @@ class RookieUINodesTests(unittest.TestCase):
 
     def test_controlnet_preprocess_node_is_registered(self) -> None:
         self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
-
-    def test_a1111_text_encode_node_is_registered(self) -> None:
-        self.assertIn("RookieUIA1111TextEncode", nodes.NODE_CLASS_MAPPINGS)
-
-    def test_a1111_text_encode_sdxl_node_is_registered(self) -> None:
-        self.assertIn("RookieUIA1111TextEncodeSDXL", nodes.NODE_CLASS_MAPPINGS)
-
-    def test_a1111_text_encode_node_keeps_break_as_tokenizer_chunk_boundary(self) -> None:
-        conditioning, = nodes.RookieUIA1111TextEncode().encode(
-            text="hero BREAK villain",
-            clip=self._FakeClip(),
-            steps=10,
+        self.assertIn("RookieUIControlNetApplyNativeAdvanced", nodes.NODE_CLASS_MAPPINGS)
+        self.assertEqual(
+            nodes.NODE_DISPLAY_NAME_MAPPINGS["RookieUIControlNetApplyNativeAdvanced"],
+            "RookieUI ControlNet Apply (Advanced)",
         )
 
-        self.assertEqual(len(conditioning), 1)
-        token_batches = conditioning[0][0]["tokens"]["l"]
-        self.assertEqual(len(token_batches), 2)
-
-    def test_a1111_text_encode_node_emits_schedule_and_branch_metadata(self) -> None:
-        conditioning, = nodes.RookieUIA1111TextEncode().encode(
-            text="hero AND villain [soft:sharp:0.5]:0.7",
-            clip=self._FakeClip(),
-            steps=10,
+    def test_adetailer_detect_mask_node_is_registered(self) -> None:
+        self.assertIn("RookieUIADetailerDetectMask", nodes.NODE_CLASS_MAPPINGS)
+        self.assertEqual(
+            nodes.NODE_DISPLAY_NAME_MAPPINGS["RookieUIADetailerDetectMask"],
+            "RookieUI ADetailer Detect Mask",
         )
 
-        self.assertEqual(len(conditioning), 3)
-        self.assertEqual(conditioning[0][1]["start_percent"], 0.0)
-        self.assertEqual(conditioning[0][1]["end_percent"], 1.0)
-        self.assertNotIn("weight", conditioning[0][1])
-        self.assertEqual(conditioning[1][1]["start_percent"], 0.0)
-        self.assertEqual(conditioning[1][1]["end_percent"], 0.5)
-        self.assertEqual(conditioning[1][1]["weight"], 0.7)
-        self.assertEqual(conditioning[2][1]["start_percent"], 0.5)
-        self.assertEqual(conditioning[2][1]["end_percent"], 1.0)
-        self.assertEqual(conditioning[2][1]["weight"], 0.7)
+    def test_adetailer_detect_mask_returns_zero_for_none_detector(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
 
-    def test_a1111_text_encode_sdxl_node_keeps_break_as_dual_tokenizer_chunk_boundary(self) -> None:
-        conditioning, = nodes.RookieUIA1111TextEncodeSDXL().encode(
-            clip=self._FakeSDXLClip(),
-            width=1024,
-            height=1024,
-            crop_w=0,
-            crop_h=0,
-            target_width=1024,
-            target_height=1024,
-            text_g="hero BREAK villain",
-            text_l="hero BREAK villain",
-            steps=10,
+        detector = nodes.RookieUIADetailerDetectMask()
+        image = nodes.torch.ones((1, 16, 16, 3), dtype=nodes.torch.float32)
+
+        mask, = detector.detect(image=image, detector="None")
+
+        self.assertEqual(tuple(mask.shape), (1, 16, 16))
+        self.assertAlmostEqual(float(mask.max()), 0.0, places=4)
+
+    def test_adetailer_detect_mask_generates_detector_mask(self) -> None:
+        if nodes.torch is None:
+            self.skipTest("torch is unavailable in this environment")
+
+        detector = nodes.RookieUIADetailerDetectMask()
+        image = nodes.torch.ones((1, 32, 32, 3), dtype=nodes.torch.float32)
+
+        mask, = detector.detect(
+            image=image,
+            detector="face_yolov8n.pt",
+            detector_family="ultralytics_bbox",
+            confidence=0.4,
+            mask_min_ratio=0.0,
+            mask_max_ratio=1.0,
+            dilate_erode=2,
+            mask_blur=1,
         )
 
-        self.assertEqual(len(conditioning), 1)
-        token_batches = conditioning[0][0]["tokens"]
-        self.assertEqual(len(token_batches["l"]), 2)
-        self.assertEqual(len(token_batches["g"]), 2)
-
-    def test_a1111_text_encode_sdxl_node_emits_schedule_and_size_metadata(self) -> None:
-        conditioning, = nodes.RookieUIA1111TextEncodeSDXL().encode(
-            clip=self._FakeSDXLClip(),
-            width=1152,
-            height=896,
-            crop_w=0,
-            crop_h=0,
-            target_width=1152,
-            target_height=896,
-            text_g="hero AND villain [soft:sharp:0.5]:0.7",
-            text_l="hero AND villain [soft:sharp:0.5]:0.7",
-            steps=10,
-        )
-
-        self.assertEqual(len(conditioning), 3)
-        self.assertEqual(conditioning[0][1]["pooled_output"], "fake-sdxl-pooled")
-        self.assertEqual(conditioning[0][1]["width"], 1152)
-        self.assertEqual(conditioning[0][1]["height"], 896)
-        self.assertEqual(conditioning[0][1]["target_width"], 1152)
-        self.assertEqual(conditioning[0][1]["target_height"], 896)
-        self.assertEqual(conditioning[1][1]["start_percent"], 0.0)
-        self.assertEqual(conditioning[1][1]["end_percent"], 0.5)
-        self.assertEqual(conditioning[1][1]["weight"], 0.7)
+        self.assertEqual(tuple(mask.shape), (1, 32, 32))
+        self.assertGreater(float(mask.max()), 0.0)
+        self.assertLessEqual(float(mask.max()), 1.0)
 
     def test_controlnet_preprocess_applies_mask_when_enabled(self) -> None:
         if nodes.torch is None:

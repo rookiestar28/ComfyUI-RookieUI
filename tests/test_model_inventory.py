@@ -7,6 +7,7 @@ from unittest import mock
 from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
+    ensure_native_ultralytics_model_paths,
     resolve_primary_model_selector_context,
     resolve_text_encoder_selector_context,
     resolve_vae_selector_context,
@@ -30,7 +31,7 @@ class ModelInventoryTests(unittest.TestCase):
                 "text_encoders": ["clip_l.safetensors"],
                 "embeddings": ["badhandv4.pt"],
                 "loras": ["detail_tweaker.safetensors"],
-                "ultralytics": ["face_yolov8m.pt"],
+                "ultralytics": ["face_yolov8m.pt", "person_yolov8m-seg.pt"],
                 "unet": ["sdxl_unet.safetensors"],
                 "upscale_models": ["4x_foolhardy.pth"],
             }.get(folder_name, [])
@@ -48,9 +49,29 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.diffusion_models, ["flux1-dev.safetensors"])
         self.assertEqual(snapshot.embeddings, ["badhandv4.pt"])
         self.assertEqual(snapshot.loras, ["detail_tweaker.safetensors"])
-        self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt"])
+        self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt", "person_yolov8m-seg.pt"])
+        self.assertEqual(snapshot.ultralytics_bbox, ["face_yolov8m.pt"])
+        self.assertEqual(snapshot.ultralytics_segm, ["person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.unet, ["sdxl_unet.safetensors"])
         self.assertEqual(snapshot.upscale_models, ["4x_foolhardy.pth"])
+
+    def test_ensure_native_ultralytics_model_paths_updates_extensions(self) -> None:
+        module = types.SimpleNamespace(
+            models_dir="C:\\models",
+            supported_pt_extensions={".pt", ".pth"},
+            folder_names_and_paths={},
+        )
+
+        def _add_model_folder_path(folder_name: str, full_folder_path: str, is_default: bool = False) -> None:
+            module.folder_names_and_paths.setdefault(folder_name, ([full_folder_path], set()))
+
+        module.add_model_folder_path = _add_model_folder_path
+
+        ensure_native_ultralytics_model_paths(module)
+
+        self.assertEqual(module.folder_names_and_paths["ultralytics"][1], {".pt", ".pth"})
+        self.assertEqual(module.folder_names_and_paths["ultralytics_bbox"][1], {".pt", ".pth"})
+        self.assertEqual(module.folder_names_and_paths["ultralytics_segm"][1], {".pt", ".pth"})
 
     def test_discover_model_inventory_falls_back_without_host_module(self) -> None:
         snapshot = discover_model_inventory(folder_paths_module=None)
@@ -61,6 +82,8 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.embeddings, [])
         self.assertEqual(snapshot.loras, [])
         self.assertEqual(snapshot.diffusion_models, [])
+        self.assertEqual(snapshot.ultralytics_bbox, [])
+        self.assertEqual(snapshot.ultralytics_segm, [])
         self.assertEqual(snapshot.upscale_models, [])
 
     def test_model_inventory_payload_exposes_catalog_groups(self) -> None:
@@ -79,6 +102,8 @@ class ModelInventoryTests(unittest.TestCase):
         )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
+        self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
+        self.assertIn("ultralytics_segm", payload["catalog"]["categories"])
 
     def test_build_preset_payload_uses_inventory_defaults(self) -> None:
         module = types.SimpleNamespace(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import math
 
@@ -23,20 +24,25 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
     ImageSequence = None
 
 from rookieui.services.asset_store import resolve_asset_path
-from rookieui.services.a1111_conditioning import (
-    build_a1111_conditioning,
-    build_a1111_conditioning_sdxl,
-)
+from rookieui.services.adetailer_runtime import detect_adetailer_mask
 from rookieui.services.controlnet_runtime import (
     CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     normalize_module_key,
     preprocess_controlnet_tensor,
+)
+from rookieui.services.controlnet_advanced_runtime import (
+    build_controlnet_stage_weights,
 )
 
 try:
     from comfy import model_management
 except Exception:  # pragma: no cover - host-only import path
     model_management = None
+
+try:
+    from comfy.controlnet import ControlBase
+except Exception:  # pragma: no cover - host-only import path
+    ControlBase = None
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
@@ -65,6 +71,11 @@ def _require_runtime_dependencies() -> None:
         raise RuntimeError(
             f"RookieUI asset nodes require {', '.join(missing)} to be installed in the active environment."
         )
+
+
+def _require_tensor_dependency() -> None:
+    if torch is None:
+        raise RuntimeError("RookieUI tensor nodes require torch to be installed in the active environment.")
 
 
 def _load_image_with_alpha(path):
@@ -300,72 +311,347 @@ class RookieUIControlNetPreprocess:
         return (output,)
 
 
-class RookieUIA1111TextEncode:
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "clip": ("CLIP",),
-                "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
-            },
-        }
+class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None else object):
+    def __init__(self, base_control, *, weight_preset: str, layer_weights: list[float]) -> None:
+        if ControlBase is None:  # pragma: no cover - guarded by apply node runtime check
+            raise RuntimeError("ComfyUI controlnet runtime is unavailable in this environment.")
+        super().__init__()
+        self.base_control = base_control
+        self.weight_preset = str(weight_preset or "balanced").strip().lower() or "balanced"
+        self.layer_weights = [round(float(value), 4) for value in list(layer_weights or [])]
+        self.latent_format = getattr(base_control, "latent_format", None)
+        self.global_average_pooling = getattr(base_control, "global_average_pooling", False)
+        self.compression_ratio = getattr(base_control, "compression_ratio", 8)
+        self.upscale_algorithm = getattr(base_control, "upscale_algorithm", "nearest-exact")
+        self.extra_args = getattr(base_control, "extra_args", {}).copy()
+        self.extra_conds = list(getattr(base_control, "extra_conds", []))
+        self.strength_type = getattr(base_control, "strength_type", None)
+        self.concat_mask = getattr(base_control, "concat_mask", False)
+        self.preprocess_image = getattr(base_control, "preprocess_image", lambda image: image)
 
-    CATEGORY = "RookieUI/conditioning"
-    RETURN_TYPES = ("CONDITIONING",)
-    FUNCTION = "encode"
-
-    def encode(self, text, clip, steps=20):
-        if clip is None:
-            raise RuntimeError(
-                "ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model."
-            )
-        # CRITICAL: keep SD15 prompt semantics at the CLIP boundary here; reverting SD-family exact paths to graph-only ConditioningCombine nodes reopens BREAK/schedule drift.
-        return (build_a1111_conditioning(clip, str(text), steps=int(steps)),)
-
-
-class RookieUIA1111TextEncodeSDXL:
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "clip": ("CLIP",),
-                "width": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
-                "height": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
-                "crop_w": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION}),
-                "crop_h": ("INT", {"default": 0, "min": 0, "max": MAX_RESOLUTION}),
-                "target_width": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
-                "target_height": ("INT", {"default": 1024, "min": 0, "max": MAX_RESOLUTION}),
-                "text_g": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "text_l": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-                "steps": ("INT", {"default": 20, "min": 1, "max": 10000, "step": 1}),
-            },
-        }
-
-    CATEGORY = "RookieUI/conditioning"
-    RETURN_TYPES = ("CONDITIONING",)
-    FUNCTION = "encode"
-
-    def encode(self, clip, width, height, crop_w, crop_h, target_width, target_height, text_g, text_l, steps=20):
-        if clip is None:
-            raise RuntimeError(
-                "ERROR: clip input is invalid: None\n\nIf the clip is from a checkpoint loader node your checkpoint does not contain a valid clip or text encoder model."
-            )
-        # CRITICAL: preserve SDXL dual-encoder ownership at the tokenizer boundary here; dropping back to graph-only CLIPTextEncodeSDXL expansion loses A1111 BREAK/schedule parity while hiding pooled-output coupling.
-        return (
-            build_a1111_conditioning_sdxl(
-                clip,
-                text_g=str(text_g),
-                text_l=str(text_l),
-                steps=int(steps),
-                width=int(width),
-                height=int(height),
-                crop_w=int(crop_w),
-                crop_h=int(crop_h),
-                target_width=int(target_width),
-                target_height=int(target_height),
-            ),
+    def copy(self):
+        return type(self)(
+            self.base_control.copy(),
+            weight_preset=self.weight_preset,
+            layer_weights=self.layer_weights,
         )
+
+    def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=[]):
+        self.base_control.set_cond_hint(
+            cond_hint,
+            strength=strength,
+            timestep_percent_range=timestep_percent_range,
+            vae=vae,
+            extra_concat=extra_concat,
+        )
+        return self
+
+    def set_previous_controlnet(self, controlnet):
+        self.previous_controlnet = controlnet
+        return self
+
+    def pre_run(self, model, percent_to_timestep_function):
+        self.base_control.pre_run(model, percent_to_timestep_function)
+        if self.previous_controlnet is not None:
+            self.previous_controlnet.pre_run(model, percent_to_timestep_function)
+
+    def cleanup(self):
+        self.base_control.cleanup()
+        if self.previous_controlnet is not None:
+            self.previous_controlnet.cleanup()
+
+    def get_models(self):
+        out = list(self.base_control.get_models())
+        if self.previous_controlnet is not None:
+            out += self.previous_controlnet.get_models()
+        return out
+
+    def get_extra_hooks(self):
+        out = list(self.base_control.get_extra_hooks())
+        if self.previous_controlnet is not None:
+            out += self.previous_controlnet.get_extra_hooks()
+        return out
+
+    def inference_memory_requirements(self, dtype):
+        requirements = self.base_control.inference_memory_requirements(dtype)
+        if self.previous_controlnet is not None:
+            requirements += self.previous_controlnet.inference_memory_requirements(dtype)
+        return requirements
+
+    def _scale_control_outputs(self, control: dict[str, list["torch.Tensor"]] | None):
+        if control is None:
+            return None
+        stage_weights = build_controlnet_stage_weights(
+            input_count=len(list(control.get("input", []))),
+            middle_count=len(list(control.get("middle", []))),
+            output_count=len(list(control.get("output", []))),
+            weight_preset=self.weight_preset,
+            layer_weights=self.layer_weights,
+        )
+        scaled: dict[str, list["torch.Tensor" | None]] = {"input": [], "middle": [], "output": []}
+        for key in ("input", "middle", "output"):
+            weight_values = list(stage_weights.get(key, []))
+            for index, value in enumerate(list(control.get(key, []))):
+                if value is None:
+                    scaled[key].append(None)
+                    continue
+                weight = float(weight_values[index]) if index < len(weight_values) else 1.0
+                if abs(weight - 1.0) <= 1e-6:
+                    scaled[key].append(value)
+                    continue
+                scaled[key].append(value * weight)
+        return scaled
+
+    def get_control(self, x_noisy, t, cond, batched_number, transformer_options):
+        control_prev = None
+        if self.previous_controlnet is not None:
+            control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number, transformer_options)
+
+        self.base_control.previous_controlnet = None
+        control = self.base_control.get_control(x_noisy, t, cond, batched_number, transformer_options)
+        if control is None:
+            return control_prev
+        return self.control_merge(self._scale_control_outputs(control), control_prev, output_dtype=None)
+
+
+class RookieUIControlNetApplyNativeAdvanced:
+    _weight_presets = ("balanced", "soft", "strong")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "control_net": ("CONTROL_NET",),
+                "image": ("IMAGE",),
+                "strength": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "start_percent": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+                "end_percent": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+                "weight_preset": (list(cls._weight_presets),),
+                "layer_weights_json": ("STRING", {"default": "[]"}),
+                "mask_aware_apply": ("BOOLEAN", {"default": False}),
+            },
+            "optional": {
+                "mask_optional": ("MASK",),
+                "vae_optional": ("VAE",),
+            },
+        }
+
+    CATEGORY = "RookieUI/controlnet"
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING")
+    RETURN_NAMES = ("positive", "negative")
+    FUNCTION = "apply_controlnet"
+
+    @staticmethod
+    def _require_controlnet_runtime() -> None:
+        if ControlBase is None:
+            raise RuntimeError("RookieUI advanced ControlNet apply requires a live ComfyUI controlnet runtime.")
+        if torch is None:
+            raise RuntimeError("RookieUI advanced ControlNet apply requires torch to be installed.")
+
+    @staticmethod
+    def _parse_layer_weights(raw_layer_weights: str) -> list[float]:
+        text = str(raw_layer_weights or "").strip()
+        if not text:
+            return []
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("layer_weights_json must be valid JSON.") from exc
+        if payload in (None, ""):
+            return []
+        if not isinstance(payload, list):
+            raise ValueError("layer_weights_json must decode to an array.")
+        return [round(float(value), 4) for value in payload]
+
+    @staticmethod
+    def _normalize_mask(mask):
+        if mask is None:
+            return None
+        mask = mask.clone()
+        if len(mask.shape) < 3:
+            mask = mask.unsqueeze(0)
+        return torch.clamp(mask, 0.0, 1.0)
+
+    def apply_controlnet(
+        self,
+        positive,
+        negative,
+        control_net,
+        image,
+        strength,
+        start_percent,
+        end_percent,
+        weight_preset="balanced",
+        layer_weights_json="[]",
+        mask_aware_apply=False,
+        mask_optional=None,
+        vae_optional=None,
+    ):
+        self._require_controlnet_runtime()
+        if strength == 0:
+            return (positive, negative)
+
+        layer_weights = self._parse_layer_weights(layer_weights_json)
+        control_hint = image.movedim(-1, 1)
+        normalized_mask = self._normalize_mask(mask_optional) if mask_aware_apply else None
+        cnets = {}
+        out = []
+
+        for conditioning in [positive, negative]:
+            conditioned = []
+            if conditioning is not None:
+                for token, conditioning_state in conditioning:
+                    cloned_state = conditioning_state.copy()
+                    prev_cnet = cloned_state.get("control", None)
+                    if prev_cnet in cnets:
+                        c_net = cnets[prev_cnet]
+                    else:
+                        if control_net is None:
+                            raise RuntimeError("control_net is None; ControlNet loader failed before advanced apply.")
+                        c_net = control_net.copy()
+                        if layer_weights or str(weight_preset).strip().lower() != "balanced":
+                            c_net = _RookieUIStageWeightedControlNet(
+                                c_net,
+                                weight_preset=str(weight_preset).strip().lower(),
+                                layer_weights=layer_weights,
+                            )
+                        c_net = c_net.set_cond_hint(
+                            control_hint,
+                            float(strength),
+                            (float(start_percent), float(end_percent)),
+                            vae=vae_optional,
+                        )
+                        c_net.set_previous_controlnet(prev_cnet)
+                        cnets[prev_cnet] = c_net
+
+                    cloned_state["control"] = c_net
+                    cloned_state["control_apply_to_uncond"] = False
+                    if normalized_mask is not None:
+                        # IMPORTANT: mask-aware apply must stay attached only to the ControlNet-conditioned entries.
+                        # Promoting this to a broader conditioning mutation leaks the mask into unrelated prompt lanes.
+                        cloned_state["mask"] = normalized_mask
+                        cloned_state["mask_strength"] = 1.0
+                        cloned_state["set_area_to_bounds"] = False
+                    conditioned.append([token, cloned_state])
+            out.append(conditioned)
+        return (out[0], out[1])
+
+
+class RookieUIADetailerDetectMask:
+    _mask_filter_methods = ("Area", "Confidence")
+    _mask_merge_modes = ("None", "Merge", "Merge and Invert")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "detector": ("STRING", {"default": "None"}),
+                "detector_family": ("STRING", {"default": "none"}),
+                "detector_classes": ("STRING", {"default": ""}),
+                "confidence": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "mask_filter_method": (cls._mask_filter_methods,),
+                "mask_k": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
+                "mask_min_ratio": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "mask_max_ratio": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "x_offset": ("INT", {"default": 0, "min": -2048, "max": 2048, "step": 1}),
+                "y_offset": ("INT", {"default": 0, "min": -2048, "max": 2048, "step": 1}),
+                "dilate_erode": ("INT", {"default": 4, "min": -128, "max": 128, "step": 1}),
+                "mask_merge_mode": (cls._mask_merge_modes,),
+                "mask_blur": ("INT", {"default": 4, "min": 0, "max": 64, "step": 1}),
+            },
+        }
+
+    CATEGORY = "RookieUI/adetailer"
+    RETURN_TYPES = ("MASK",)
+    FUNCTION = "detect"
+
+    @staticmethod
+    def _apply_mask_morphology(mask: "torch.Tensor", dilate_erode: int) -> "torch.Tensor":
+        radius = abs(int(dilate_erode))
+        if radius <= 0:
+            return mask
+        kernel = max(1, radius * 2 + 1)
+        source = mask.unsqueeze(1)
+        if dilate_erode > 0:
+            result = torch.nn.functional.max_pool2d(source, kernel_size=kernel, stride=1, padding=radius)
+        else:
+            result = 1.0 - torch.nn.functional.max_pool2d(1.0 - source, kernel_size=kernel, stride=1, padding=radius)
+        return torch.clamp(result.squeeze(1), 0.0, 1.0)
+
+    @staticmethod
+    def _apply_mask_blur(mask: "torch.Tensor", blur_radius: int) -> "torch.Tensor":
+        radius = int(blur_radius)
+        if radius <= 0:
+            return mask
+        kernel = max(1, radius * 2 + 1)
+        blurred = torch.nn.functional.avg_pool2d(
+            mask.unsqueeze(1),
+            kernel_size=kernel,
+            stride=1,
+            padding=radius,
+        ).squeeze(1)
+        return torch.clamp(blurred, 0.0, 1.0)
+
+    def detect(
+        self,
+        image,
+        detector="None",
+        detector_family="none",
+        detector_classes="",
+        confidence=0.3,
+        mask_filter_method="Area",
+        mask_k=0,
+        mask_min_ratio=0.0,
+        mask_max_ratio=1.0,
+        x_offset=0,
+        y_offset=0,
+        dilate_erode=4,
+        mask_merge_mode="None",
+        mask_blur=4,
+    ):
+        _require_tensor_dependency()
+        if image.ndim != 4:
+            raise ValueError("ADetailer detector image tensor must be NHWC.")
+
+        detector_key = str(detector or "").strip()
+        batch_size, height, width = int(image.shape[0]), int(image.shape[1]), int(image.shape[2])
+        if not detector_key or detector_key.lower() == "none":
+            return (torch.zeros((batch_size, height, width), dtype=image.dtype, device=image.device),)
+
+        # IMPORTANT: this node is the detector-mask seam used by the graph translator;
+        # do not bypass the runtime service or ADetailer silently collapses back into a no-op.
+        detector_result = detect_adetailer_mask(
+            image,
+            detector=detector_key,
+            detector_family=str(detector_family),
+            detector_classes=str(detector_classes),
+            confidence=float(confidence),
+            x_offset=int(x_offset),
+            y_offset=int(y_offset),
+        )
+        mask = detector_result.mask
+
+        mask_area = float(mask[0].mean().item()) if batch_size else 0.0
+        min_ratio = max(0.0, min(1.0, float(mask_min_ratio)))
+        max_ratio = max(min_ratio, min(1.0, float(mask_max_ratio)))
+        if mask_area < min_ratio or mask_area > max_ratio:
+            _LOGGER.debug(
+                "RookieUI ADetailer mask filtered by ratio (detector=%s, area=%.4f, min=%.4f, max=%.4f).",
+                detector_key,
+                mask_area,
+                min_ratio,
+                max_ratio,
+            )
+            return (torch.zeros_like(mask),)
+
+        mask = self._apply_mask_morphology(mask, int(dilate_erode))
+        mask = self._apply_mask_blur(mask, int(mask_blur))
+        if str(mask_merge_mode or "").strip().lower() == "merge and invert":
+            mask = 1.0 - mask
+        return (torch.clamp(mask, 0.0, 1.0),)
 
 
 class RookieUIVAEEncodeForInpaint:
@@ -532,8 +818,8 @@ NODE_CLASS_MAPPINGS = {
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
-    "RookieUIA1111TextEncode": RookieUIA1111TextEncode,
-    "RookieUIA1111TextEncodeSDXL": RookieUIA1111TextEncodeSDXL,
+    "RookieUIControlNetApplyNativeAdvanced": RookieUIControlNetApplyNativeAdvanced,
+    "RookieUIADetailerDetectMask": RookieUIADetailerDetectMask,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
 }
 
@@ -541,7 +827,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",
-    "RookieUIA1111TextEncode": "RookieUI A1111 Text Encode",
-    "RookieUIA1111TextEncodeSDXL": "RookieUI A1111 Text Encode SDXL",
+    "RookieUIControlNetApplyNativeAdvanced": "RookieUI ControlNet Apply (Advanced)",
+    "RookieUIADetailerDetectMask": "RookieUI ADetailer Detect Mask",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
 }

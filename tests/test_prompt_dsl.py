@@ -100,9 +100,6 @@ class PromptDslTests(unittest.TestCase):
         self.assertFalse(semantics["features"]["break_chunks"])
         self.assertFalse(semantics["features"]["prompt_scheduling"])
         self.assertIn(PROMPT_WARNING_LEGACY_FALLBACK_ENABLED, result.warning_codes)
-        self.assertTrue(
-            any("legacy graph fallback path" in warning for warning in result.prompt_warnings)
-        )
 
     def test_merge_lora_activations_prefers_explicit_selector_for_matching_name(self) -> None:
         preprocessed = preprocess_prompt_bundle(

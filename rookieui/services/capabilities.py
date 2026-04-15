@@ -7,11 +7,7 @@ from rookieui.security.asset_guard import normalize_metadata_text
 def _normalize_metadata_list(values: object) -> list[str]:
     if not isinstance(values, list):
         return []
-    return [
-        normalize_metadata_text(value)
-        for value in values
-        if isinstance(value, str) and value.strip()
-    ]
+    return [normalize_metadata_text(value) for value in values if isinstance(value, str) and value.strip()]
 
 
 def _normalize_metadata_mapping(payload: object) -> dict[str, object]:
@@ -51,6 +47,10 @@ def _normalize_loose_mapping(payload: object) -> dict[str, object]:
                 for entry in value
                 if isinstance(entry, (str, int, float, bool))
             ]
+        elif isinstance(value, dict):
+            nested = _normalize_loose_mapping(value)
+            if nested:
+                normalized[normalized_key] = nested
     return normalized
 
 
@@ -103,6 +103,8 @@ def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object
         "controlnet_modes": _normalize_metadata_list(payload.get("controlnet_modes", [])),
         "prompt_tokens": _normalize_metadata_list(payload.get("prompt_tokens", [])),
         "warning_code_contract": normalize_metadata_text(payload.get("warning_code_contract", "")),
+        "availability": _normalize_loose_mapping(payload.get("availability", {})),
+        "warning_codes": _normalize_loose_mapping(payload.get("warning_codes", {})),
         "routes": _normalize_metadata_list(payload.get("routes", [])),
     }
     contract = payload.get("contract", {})
@@ -113,6 +115,9 @@ def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object
             "unit_count": int(contract.get("unit_count", 0) or 0),
             "prompt_tokens": _normalize_metadata_list(contract.get("prompt_tokens", [])),
             "controlnet_modes": _normalize_metadata_list(contract.get("controlnet_modes", [])),
+            "detector_provider_families": _normalize_metadata_list(contract.get("detector_provider_families", [])),
+            "detector_result_contract": normalize_metadata_text(contract.get("detector_result_contract", "")),
+            "controlnet_advanced_contract": _normalize_loose_mapping(contract.get("controlnet_advanced_contract", {})),
             "mask_filter_methods": _normalize_metadata_list(contract.get("mask_filter_methods", [])),
             "mask_merge_modes": _normalize_metadata_list(contract.get("mask_merge_modes", [])),
             "defaults": _normalize_loose_mapping(contract.get("defaults", {})),

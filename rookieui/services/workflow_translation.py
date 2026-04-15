@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import json
 
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.generation import (
@@ -9,7 +10,18 @@ from rookieui.contracts.generation import (
     NormalizedTxt2ImgRequest,
     WorkflowTranslationResult,
 )
-from rookieui.services.parity_matrix import get_parity_profile, get_sampler_alias_payload
+from rookieui.contracts.adetailer import (
+    NormalizedADetailerControlNetRequest,
+    NormalizedADetailerUnitRequest,
+)
+from rookieui.services.parity_matrix import (
+    get_parity_profile,
+    get_sampler_alias_payload,
+    normalize_sampler_name,
+    normalize_scheduler_name,
+)
+from rookieui.services.prompt_dsl import preprocess_prompt_bundle
+from rookieui.services.controlnet_advanced_runtime import build_controlnet_apply_segments
 
 _PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
@@ -201,57 +213,6 @@ def _append_prompt_encode_node(
     return node_id
 
 
-def _append_rookieui_a1111_text_encode_node(
-    workflow: dict[str, object],
-    *,
-    allocator: NodeIdAllocator,
-    clip_source: list[object],
-    text: str,
-    steps: int,
-) -> str:
-    node_id = allocator.next()
-    workflow[node_id] = {
-        "class_type": "RookieUIA1111TextEncode",
-        "inputs": {
-            "clip": clip_source,
-            "text": text,
-            "steps": max(int(steps), 1),
-        },
-    }
-    return node_id
-
-
-def _append_rookieui_a1111_text_encode_sdxl_node(
-    workflow: dict[str, object],
-    *,
-    allocator: NodeIdAllocator,
-    clip_source: list[object],
-    text: str,
-    width: int,
-    height: int,
-    steps: int,
-) -> str:
-    resolved_width = int(width or 1024)
-    resolved_height = int(height or 1024)
-    node_id = allocator.next()
-    workflow[node_id] = {
-        "class_type": "RookieUIA1111TextEncodeSDXL",
-        "inputs": {
-            "clip": clip_source,
-            "width": resolved_width,
-            "height": resolved_height,
-            "crop_w": 0,
-            "crop_h": 0,
-            "target_width": resolved_width,
-            "target_height": resolved_height,
-            "text_g": text,
-            "text_l": text,
-            "steps": max(int(steps), 1),
-        },
-    }
-    return node_id
-
-
 def _append_conditioning_range_node(
     workflow: dict[str, object],
     *,
@@ -433,7 +394,6 @@ def _build_sd15_conditioning(
     *,
     allocator: NodeIdAllocator,
     clip_source: list[object],
-    steps: int | None = None,
 ) -> tuple[str, str]:
     if request.clip_skip > 1:
         clip_node_id = allocator.next()
@@ -445,24 +405,6 @@ def _build_sd15_conditioning(
             },
         }
         clip_source = [clip_node_id, 0]
-    resolved_steps = int(request.steps if steps is None else steps)
-    if not _is_legacy_prompt_dsl_enabled():
-        return (
-            _append_rookieui_a1111_text_encode_node(
-                workflow,
-                allocator=allocator,
-                clip_source=clip_source,
-                text=request.prompt,
-                steps=resolved_steps,
-            ),
-            _append_rookieui_a1111_text_encode_node(
-                workflow,
-                allocator=allocator,
-                clip_source=clip_source,
-                text=request.negative_prompt,
-                steps=resolved_steps,
-            ),
-        )
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,
         allocator=allocator,
@@ -490,31 +432,8 @@ def _build_sdxl_conditioning(
     width: int,
     height: int,
     clip_source: list[object],
-    steps: int | None = None,
 ) -> tuple[str, str]:
     prompt_encoder_mode = _resolve_conditioning_prompt_encoder(request)
-    resolved_steps = int(request.steps if steps is None else steps)
-    if prompt_encoder_mode == "sdxl" and not _is_legacy_prompt_dsl_enabled():
-        return (
-            _append_rookieui_a1111_text_encode_sdxl_node(
-                workflow,
-                allocator=allocator,
-                clip_source=clip_source,
-                text=request.prompt,
-                width=width,
-                height=height,
-                steps=resolved_steps,
-            ),
-            _append_rookieui_a1111_text_encode_sdxl_node(
-                workflow,
-                allocator=allocator,
-                clip_source=clip_source,
-                text=request.negative_prompt,
-                width=width,
-                height=height,
-                steps=resolved_steps,
-            ),
-        )
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,
         allocator=allocator,
@@ -566,6 +485,9 @@ def _build_sampler_node(
     model_source: list[object],
     seed: int | None = None,
     steps: int | None = None,
+    cfg_scale: float | None = None,
+    sampler_name: str | None = None,
+    scheduler_name: str | None = None,
 ) -> None:
     workflow[node_id] = {
         "class_type": "KSampler",
@@ -576,10 +498,41 @@ def _build_sampler_node(
             "latent_image": _to_node_ref(latent_id),
             "seed": request.execution_seed if seed is None else seed,
             "steps": request.steps if steps is None else steps,
-            "cfg": request.cfg_scale,
-            "sampler_name": request.sampler_name,
-            "scheduler": request.scheduler_name,
+            "cfg": request.cfg_scale if cfg_scale is None else cfg_scale,
+            "sampler_name": request.sampler_name if sampler_name is None else sampler_name,
+            "scheduler": request.scheduler_name if scheduler_name is None else scheduler_name,
             "denoise": denoise,
+        },
+    }
+
+
+def _append_decode_node(
+    workflow: dict[str, object],
+    *,
+    sampler_id: str | list[object],
+    decode_id: str,
+    vae_source: list[object],
+) -> None:
+    workflow[decode_id] = {
+        "class_type": "VAEDecode",
+        "inputs": {
+            "samples": _to_node_ref(sampler_id),
+            "vae": vae_source,
+        },
+    }
+
+
+def _append_save_node(
+    workflow: dict[str, object],
+    *,
+    image_ref: list[object],
+    save_id: str,
+) -> None:
+    workflow[save_id] = {
+        "class_type": "SaveImage",
+        "inputs": {
+            "images": image_ref,
+            "filename_prefix": "RookieUI",
         },
     }
 
@@ -592,20 +545,307 @@ def _build_decode_and_save(
     save_id: str,
     vae_source: list[object],
 ) -> None:
-    workflow[decode_id] = {
-        "class_type": "VAEDecode",
-        "inputs": {
-            "samples": _to_node_ref(sampler_id),
-            "vae": vae_source,
-        },
+    _append_decode_node(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        vae_source=vae_source,
+    )
+    _append_save_node(
+        workflow,
+        image_ref=[decode_id, 0],
+        save_id=save_id,
+    )
+
+
+def _is_adetailer_unit_active(unit: NormalizedADetailerUnitRequest) -> bool:
+    detector = str(unit.detector or "").strip().lower()
+    return bool(unit.enabled and detector and detector != "none")
+
+
+def _resolve_adetailer_prompt_text(unit_prompt: str, main_prompt: str) -> str:
+    raw_prompt = str(unit_prompt or "").strip()
+    main = str(main_prompt or "").strip()
+    if not raw_prompt:
+        return main
+    segments = [segment.strip() for segment in re.split(r"\s*\[SEP\]\s*", raw_prompt)]
+    for segment in segments:
+        if not segment or "[SKIP]" in segment:
+            continue
+        return segment.replace("[PROMPT]", main).strip() or main
+    return main
+
+
+def _resolve_adetailer_sampler_override(
+    unit: NormalizedADetailerUnitRequest,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+) -> tuple[str, str]:
+    if not unit.use_sampler:
+        return request.sampler_name, request.scheduler_name
+
+    raw_sampler = str(unit.sampler_name or "").strip()
+    raw_scheduler = str(unit.scheduler_name or "").strip()
+    sampler_for_scheduler = raw_sampler
+    sampler_for_comfy = raw_sampler
+    if raw_sampler.lower().endswith(" karras"):
+        sampler_for_comfy = raw_sampler[: -len(" karras")].strip()
+    normalized_sampler = normalize_sampler_name(sampler_for_comfy) or request.sampler_name
+    if raw_scheduler.lower() in {"", "use same scheduler"}:
+        normalized_scheduler = normalize_scheduler_name(
+            sampler_for_scheduler,
+            "",
+            default_scheduler=request.scheduler_name,
+        )
+    else:
+        normalized_scheduler = normalize_scheduler_name(
+            sampler_for_scheduler,
+            raw_scheduler,
+            default_scheduler=request.scheduler_name,
+        )
+    return normalized_sampler, normalized_scheduler
+
+
+def _append_adetailer_unit_conditioning(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    unit: NormalizedADetailerUnitRequest,
+    clip_source: list[object],
+    prompt_encoder_mode: str,
+    width: int,
+    height: int,
+) -> tuple[str, str]:
+    prompt_text = _resolve_adetailer_prompt_text(unit.prompt, request.prompt)
+    negative_text = _resolve_adetailer_prompt_text(unit.negative_prompt, request.negative_prompt)
+    prompt_bundle = preprocess_prompt_bundle(prompt_text, negative_text, strict_match=False)
+    positive_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=prompt_bundle.cleaned_prompt,
+        semantic_payload=prompt_bundle.prompt_semantics.to_payload(),
+        prompt_encoder=prompt_encoder_mode,
+        width=width,
+        height=height,
+    )
+    negative_id = _compile_prompt_semantic_conditioning(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        prompt_text=prompt_bundle.cleaned_negative_prompt,
+        semantic_payload=prompt_bundle.negative_prompt_semantics.to_payload(),
+        prompt_encoder=prompt_encoder_mode,
+        width=width,
+        height=height,
+    )
+    return positive_id, negative_id
+
+
+def _build_adetailer_custom_controlnet_unit(unit: NormalizedADetailerUnitRequest) -> dict[str, object]:
+    controlnet = unit.controlnet
+    return {
+        "enabled": True,
+        "module": controlnet.module,
+        "model": controlnet.model,
+        "weight": controlnet.weight,
+        "guidance_start": controlnet.guidance_start,
+        "guidance_end": controlnet.guidance_end,
+        # IMPORTANT: keep the full advanced block when adapting ADetailer-local custom ControlNet
+        # into the shared unit seam. Dropping it here silently desynchronizes local detailer behavior
+        # from the primary ControlNet runtime even though both paths claim the same contract.
+        "advanced": controlnet.advanced,
+        "processor_res": 512,
+        "threshold_a": 64.0,
+        "threshold_b": 64.0,
+        "image_asset": "",
+        "mask_asset": "",
+        "use_mask": False,
     }
-    workflow[save_id] = {
-        "class_type": "SaveImage",
-        "inputs": {
-            "images": [decode_id, 0],
-            "filename_prefix": "RookieUI",
-        },
-    }
+
+
+def _resolve_adetailer_controlnet_units(
+    unit: NormalizedADetailerUnitRequest,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+) -> list[NormalizedControlNetUnit | dict[str, object]]:
+    mode = str(unit.controlnet.mode or "none").strip().lower()
+    if mode == "passthrough":
+        # IMPORTANT: passthrough snapshots primary units for this refinement pass only;
+        # do not mutate request.controlnet_units or the base generation path will drift.
+        return [controlnet_unit for controlnet_unit in request.controlnet_units if controlnet_unit.enabled]
+    if mode == "custom" and str(unit.controlnet.model or "").strip():
+        return [_build_adetailer_custom_controlnet_unit(unit)]
+    return []
+
+
+def _append_adetailer_units(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    base_image_ref: list[object],
+    model_source: list[object],
+    clip_source: list[object],
+    vae_source: list[object],
+    prompt_encoder_mode: str,
+    width: int,
+    height: int,
+) -> list[object]:
+    if not request.adetailer.enabled:
+        return base_image_ref
+    if isinstance(request, NormalizedImg2ImgRequest) and request.adetailer.skip_img2img:
+        return base_image_ref
+
+    current_image_ref = base_image_ref
+    active_units = [unit for unit in request.adetailer.units if _is_adetailer_unit_active(unit)]
+    if not active_units:
+        return current_image_ref
+
+    for index, unit in enumerate(active_units):
+        detail_model_source = model_source
+        detail_clip_source = clip_source
+        detail_vae_source = vae_source
+        if unit.use_checkpoint and unit.checkpoint_name and unit.checkpoint_name != "Use same checkpoint":
+            checkpoint_id = allocator.next()
+            workflow[checkpoint_id] = _build_checkpoint_loader_node(unit.checkpoint_name)
+            detail_model_source = [checkpoint_id, 0]
+            detail_clip_source = [checkpoint_id, 1]
+            detail_vae_source = [checkpoint_id, 2]
+        if unit.use_vae and unit.vae_name and unit.vae_name != "Use same VAE":
+            vae_id = allocator.next()
+            workflow[vae_id] = _build_vae_loader_node(unit.vae_name)
+            detail_vae_source = [vae_id, 0]
+
+        positive_id, negative_id = _append_adetailer_unit_conditioning(
+            workflow,
+            allocator=allocator,
+            request=request,
+            unit=unit,
+            clip_source=detail_clip_source,
+            prompt_encoder_mode=prompt_encoder_mode,
+            width=unit.inpaint_width if unit.use_inpaint_size else width,
+            height=unit.inpaint_height if unit.use_inpaint_size else height,
+        )
+        positive_ref, negative_ref = _apply_controlnet_unit_entries(
+            workflow,
+            allocator=allocator,
+            units=_resolve_adetailer_controlnet_units(unit, request),
+            request=request,
+            positive_ref=positive_id,
+            negative_ref=negative_id,
+            model_source=detail_model_source,
+            vae_source=detail_vae_source,
+            control_image_ref=current_image_ref,
+        )
+
+        mask_id = allocator.next()
+        encode_id = allocator.next()
+        sampler_id = allocator.next()
+        decode_id = allocator.next()
+        grow_mask_by = max(0, int(unit.inpaint_padding if unit.inpaint_only_masked else unit.dilate_erode))
+        workflow[mask_id] = {
+            "class_type": "RookieUIADetailerDetectMask",
+            "inputs": {
+                "image": current_image_ref,
+                "detector": unit.detector,
+                "detector_family": unit.detector_family,
+                "detector_classes": unit.detector_classes,
+                "confidence": unit.confidence,
+                "mask_filter_method": unit.mask_filter_method,
+                "mask_k": unit.mask_k,
+                "mask_min_ratio": unit.mask_min_ratio,
+                "mask_max_ratio": unit.mask_max_ratio,
+                "x_offset": unit.x_offset,
+                "y_offset": unit.y_offset,
+                "dilate_erode": unit.dilate_erode,
+                "mask_merge_mode": unit.mask_merge_mode,
+                "mask_blur": unit.mask_blur,
+            },
+        }
+        workflow[encode_id] = {
+            "class_type": "RookieUIVAEEncodeForInpaint",
+            "inputs": {
+                "pixels": current_image_ref,
+                "vae": detail_vae_source,
+                "mask": [mask_id, 0],
+                "grow_mask_by": grow_mask_by,
+                "masked_content": "original",
+                "seed": request.execution_seed + index + 1,
+                "soft_inpainting_enabled": False,
+                "soft_inpainting_schedule_bias": 1.0,
+                "soft_inpainting_preservation_strength": 0.5,
+                "soft_inpainting_transition_contrast_boost": 4.0,
+                "soft_inpainting_mask_influence": 0.0,
+                "soft_inpainting_difference_threshold": 0.5,
+                "soft_inpainting_difference_contrast": 2.0,
+            },
+        }
+        sampler_name, scheduler_name = _resolve_adetailer_sampler_override(unit, request)
+        # IMPORTANT: ADetailer refinement must stay after base decode and before final SaveImage;
+        # moving it into the primary sampler/control path breaks the intended A1111-compatible execution ordering.
+        _build_sampler_node(
+            workflow,
+            node_id=sampler_id,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
+            latent_id=encode_id,
+            request=request,
+            denoise=unit.denoising_strength,
+            model_source=detail_model_source,
+            seed=request.execution_seed + index + 1,
+            steps=unit.steps if unit.use_steps else request.steps,
+            cfg_scale=unit.cfg_scale if unit.use_cfg_scale else request.cfg_scale,
+            sampler_name=sampler_name,
+            scheduler_name=scheduler_name,
+        )
+        _append_decode_node(
+            workflow,
+            sampler_id=sampler_id,
+            decode_id=decode_id,
+            vae_source=detail_vae_source,
+        )
+        current_image_ref = [decode_id, 0]
+
+    return current_image_ref
+
+
+def _append_decode_adetailer_and_save(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    sampler_id: str | list[object],
+    decode_id: str,
+    save_id: str,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    model_source: list[object],
+    clip_source: list[object],
+    vae_source: list[object],
+    width: int,
+    height: int,
+) -> None:
+    _append_decode_node(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        vae_source=vae_source,
+    )
+    final_image_ref = _append_adetailer_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        base_image_ref=[decode_id, 0],
+        model_source=model_source,
+        clip_source=clip_source,
+        vae_source=vae_source,
+        prompt_encoder_mode=_resolve_conditioning_prompt_encoder(request),
+        width=width,
+        height=height,
+    )
+    _append_save_node(
+        workflow,
+        image_ref=final_image_ref,
+        save_id=save_id,
+    )
 
 
 def _resolve_model_sources(
@@ -727,51 +967,66 @@ def _resolve_diffusion_model_sources(
     return model_source, clip_source, vae_source
 
 
-def _read_controlnet_unit_value(unit: NormalizedControlNetUnit | dict[str, object], key: str) -> object:
+def _read_controlnet_unit_value(
+    unit: NormalizedControlNetUnit | NormalizedADetailerControlNetRequest | dict[str, object],
+    key: str,
+) -> object:
     if isinstance(unit, dict):
         return unit.get(key)
     return getattr(unit, key, None)
 
 
-def _apply_controlnet_units(
+def _read_controlnet_advanced_request(
+    unit: NormalizedControlNetUnit | NormalizedADetailerControlNetRequest | dict[str, object],
+) -> object:
+    return _read_controlnet_unit_value(unit, "advanced")
+
+
+def _apply_controlnet_unit_entries(
     workflow: dict[str, object],
     *,
     allocator: NodeIdAllocator,
+    units: list[NormalizedControlNetUnit | dict[str, object]],
     request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
     positive_ref: str | list[object],
     negative_ref: str | list[object],
     model_source: list[object],
     vae_source: list[object],
+    control_image_ref: list[object] | None = None,
 ) -> tuple[str | list[object], str | list[object]]:
-    units = [
-        unit
-        for unit in request.controlnet_units
-        if bool(_read_controlnet_unit_value(unit, "enabled"))
-    ]
-    if not units:
-        return positive_ref, negative_ref
-
     current_positive = positive_ref
     current_negative = negative_ref
     for unit in units:
+        if not bool(_read_controlnet_unit_value(unit, "enabled")):
+            continue
         image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
         mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
         use_mask = bool(_read_controlnet_unit_value(unit, "use_mask"))
+        advanced = _read_controlnet_advanced_request(unit)
         module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
-        if not image_asset or not model_name:
+        if not model_name:
             continue
 
-        image_id = allocator.next()
-        workflow[image_id] = {
-            "class_type": "RookieUILoadAssetImage",
-            "inputs": {
-                "asset_handle": image_asset,
-            },
-        }
+        if control_image_ref is None:
+            if not image_asset:
+                continue
+            image_id = allocator.next()
+            workflow[image_id] = {
+                "class_type": "RookieUILoadAssetImage",
+                "inputs": {
+                    "asset_handle": image_asset,
+                },
+            }
+            image_ref = [image_id, 0]
+        else:
+            # IMPORTANT: ADetailer-local ControlNet must preprocess the current refinement image;
+            # rebinding this to the original unit source asset makes passthrough/custom act on stale pixels.
+            image_ref = control_image_ref
 
         mask_ref: list[object] | None = None
-        if use_mask and mask_asset:
+        apply_mask_aware = bool(getattr(advanced, "enabled", False) and getattr(advanced, "mask_aware_apply", False))
+        if (use_mask or apply_mask_aware) and mask_asset:
             mask_id = allocator.next()
             workflow[mask_id] = {
                 "class_type": "RookieUILoadAssetMask",
@@ -786,14 +1041,14 @@ def _apply_controlnet_units(
 
         preprocess_id = allocator.next()
         preprocess_inputs: dict[str, object] = {
-            "image": [image_id, 0],
+            "image": image_ref,
             "module": module_name,
             "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
             "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
             "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
-            "use_mask": bool(mask_ref),
+            "use_mask": bool(use_mask and mask_ref),
         }
-        if mask_ref is not None:
+        if use_mask and mask_ref is not None:
             preprocess_inputs["mask"] = mask_ref
         # IMPORTANT: keep preprocess node in the runtime path so integrated selector changes (module/threshold/use_mask) are not UI-only and always affect the emitted workflow.
         workflow[preprocess_id] = {
@@ -818,25 +1073,61 @@ def _apply_controlnet_units(
                 },
             }
 
-        apply_id = allocator.next()
-        workflow[apply_id] = {
-            "class_type": "ControlNetApplyAdvanced",
-            "inputs": {
+        apply_segments = build_controlnet_apply_segments(
+            weight=float(_read_controlnet_unit_value(unit, "weight") or 1.0),
+            guidance_start=float(_read_controlnet_unit_value(unit, "guidance_start") or 0.0),
+            guidance_end=float(_read_controlnet_unit_value(unit, "guidance_end") or 1.0),
+            advanced=advanced,
+        )
+        for segment in apply_segments:
+            apply_id = allocator.next()
+            apply_inputs: dict[str, object] = {
                 "positive": _to_node_ref(current_positive),
                 "negative": _to_node_ref(current_negative),
                 "control_net": [loader_id, 0],
                 "image": [preprocess_id, 0],
-                "strength": float(_read_controlnet_unit_value(unit, "weight") or 1.0),
-                "start_percent": float(_read_controlnet_unit_value(unit, "guidance_start") or 0.0),
-                "end_percent": float(_read_controlnet_unit_value(unit, "guidance_end") or 1.0),
-                "vae": vae_source,
-            },
-        }
-        # IMPORTANT: keep positive/negative references split by output slot; flattening both to slot 0 silently drops half the ControlNet conditioning update.
-        current_positive = [apply_id, 0]
-        current_negative = [apply_id, 1]
+                "strength": float(segment["strength"]),
+                "start_percent": float(segment["start_percent"]),
+                "end_percent": float(segment["end_percent"]),
+                "vae_optional": vae_source,
+                "weight_preset": str(getattr(advanced, "weight_preset", "balanced") or "balanced"),
+                "layer_weights_json": json.dumps(list(getattr(advanced, "layer_weights", []) or [])),
+                "mask_aware_apply": apply_mask_aware,
+            }
+            if apply_mask_aware and mask_ref is not None:
+                apply_inputs["mask_optional"] = mask_ref
+            workflow[apply_id] = {
+                "class_type": "RookieUIControlNetApplyNativeAdvanced",
+                "inputs": apply_inputs,
+            }
+            # IMPORTANT: keep positive/negative references split by output slot; flattening both to slot 0 silently drops half the ControlNet conditioning update.
+            current_positive = [apply_id, 0]
+            current_negative = [apply_id, 1]
 
     return current_positive, current_negative
+
+
+def _apply_controlnet_units(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    positive_ref: str | list[object],
+    negative_ref: str | list[object],
+    model_source: list[object],
+    vae_source: list[object],
+) -> tuple[str | list[object], str | list[object]]:
+    return _apply_controlnet_unit_entries(
+        workflow,
+        allocator=allocator,
+        units=list(request.controlnet_units),
+        request=request,
+        positive_ref=positive_ref,
+        negative_ref=negative_ref,
+        model_source=model_source,
+        vae_source=vae_source,
+        control_image_ref=None,
+    )
 
 
 def _append_img2img_resize_node(
@@ -903,16 +1194,6 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -922,19 +1203,6 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    # IMPORTANT: SD15 parity-node paths must build a separate hires conditioning lane; reusing the base pass here breaks A1111 schedule/BREAK timing fidelity on the second sampler.
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     latent_id = allocator.next()
     sampler_id = allocator.next()
 
@@ -975,8 +1243,8 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -985,12 +1253,18 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1011,18 +1285,6 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            width=request.width,
-            height=request.height,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1032,18 +1294,6 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     latent_id = allocator.next()
     workflow[latent_id] = {
         "class_type": "EmptyLatentImage",
@@ -1081,8 +1331,8 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1093,12 +1343,18 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         final_sampler_id = hires_sampler_id
         decode_id = allocator.next()
         save_id = allocator.next()
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1117,16 +1373,6 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1136,18 +1382,6 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1209,8 +1443,8 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1219,12 +1453,18 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1245,18 +1485,6 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            width=request.width,
-            height=request.height,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1266,18 +1494,6 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1339,8 +1555,8 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1349,12 +1565,18 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1373,16 +1595,6 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sd15_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1392,18 +1604,6 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1491,8 +1691,8 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1501,12 +1701,18 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 
@@ -1527,18 +1733,6 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    hires_positive_id = positive_id
-    hires_negative_id = negative_id
-    if request.hires_enabled and _resolve_conditioning_prompt_encoder(request) == "sdxl" and not _is_legacy_prompt_dsl_enabled():
-        hires_positive_id, hires_negative_id = _build_sdxl_conditioning(
-            workflow,
-            request,
-            allocator=allocator,
-            width=request.width,
-            height=request.height,
-            clip_source=clip_source,
-            steps=request.hires_steps,
-        )
     positive_ref, negative_ref = _apply_controlnet_units(
         workflow,
         allocator=allocator,
@@ -1548,18 +1742,6 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         model_source=model_source,
         vae_source=vae_source,
     )
-    hires_positive_ref = positive_ref
-    hires_negative_ref = negative_ref
-    if request.hires_enabled and (hires_positive_id != positive_id or hires_negative_id != negative_id):
-        hires_positive_ref, hires_negative_ref = _apply_controlnet_units(
-            workflow,
-            allocator=allocator,
-            request=request,
-            positive_ref=hires_positive_id,
-            negative_ref=hires_negative_id,
-            model_source=model_source,
-            vae_source=vae_source,
-        )
     image_id = allocator.next()
     workflow[image_id] = {
         "class_type": "RookieUILoadAssetImage",
@@ -1647,8 +1829,8 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=hires_positive_ref,
-            negative_id=hires_negative_ref,
+            positive_id=positive_ref,
+            negative_id=negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -1657,12 +1839,18 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
             steps=request.hires_steps,
         )
         final_sampler_id = hires_sampler_id
-    _build_decode_and_save(
+    _append_decode_adetailer_and_save(
         workflow,
+        allocator=allocator,
         sampler_id=final_sampler_id,
         decode_id=decode_id,
         save_id=save_id,
+        request=request,
+        model_source=model_source,
+        clip_source=clip_source,
         vae_source=vae_source,
+        width=request.width,
+        height=request.height,
     )
     return workflow
 

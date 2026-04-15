@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 _MISSING = object()
 
-# Forge-style preprocessor option catalog consumed by both backend payload validation and
+# Integrated preprocessor option catalog consumed by both backend payload validation and
 # workflow/runtime dispatch. Keep this list deterministic to preserve UI filter order.
 CONTROLNET_PREPROCESSOR_OPTION_ORDER: tuple[str, ...] = (
     "none",
@@ -247,43 +247,6 @@ _MODULE_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "inpaint": ("InpaintPreprocessor",),
 }
 
-_MODULE_BOUNDED_HOST_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
-    # CRITICAL: generic OpenPose must not silently drift into Animal/DensePose lanes.
-    # Those outputs are semantically different enough to mislead users when they selected plain OpenPose.
-    "openpose": ("OpenposePreprocessor", "DWPreprocessor"),
-}
-
-_OPENPOSE_FAMILY_PREPROCESSORS: set[str] = {
-    "openpose",
-    "openpose_full",
-    "openpose_dw",
-    "openpose_animal",
-    "openpose_densepose",
-}
-
-_PREPROCESSOR_OPTION_SKIP_VISUAL_EMPTY_GATE: set[str] = set(_OPENPOSE_FAMILY_PREPROCESSORS)
-
-_PREPROCESSOR_OPTION_HOST_PARAMETER_OVERRIDES: dict[str, dict[str, object]] = {
-    # CRITICAL: Forge/Forge-Neo treat OpenPose-family selections as exact runtime choices.
-    # Keep detect flags aligned with the selected variant instead of letting generic schema defaults
-    # silently collapse all OpenPose-family variants into "full pose" execution.
-    "openpose": {
-        "detect_body": True,
-        "detect_hand": False,
-        "detect_face": False,
-    },
-    "openpose_full": {
-        "detect_body": True,
-        "detect_hand": True,
-        "detect_face": True,
-    },
-    "openpose_dw": {
-        "detect_body": True,
-        "detect_hand": True,
-        "detect_face": True,
-    },
-}
-
 _MODULE_AIO_PREPROCESSOR_CANDIDATES: dict[str, tuple[str, ...]] = {
     "blur": ("ImageIntensityDetector",),
     "canny": ("CannyEdgePreprocessor", "PyraCannyPreprocessor"),
@@ -346,13 +309,13 @@ _HOST_NODE_EXCLUDE_TOKENS = (
 
 _MODULE_DYNAMIC_NODE_EXCLUDE_TOKENS: dict[str, tuple[str, ...]] = {
     # IMPORTANT: keep heavyweight depth/normal candidates out of generic dynamic probing; these nodes may trigger
-    # large auxiliary model bootstrap/download flows when merely probed and are not the default Forge-like depth path.
+    # large auxiliary model bootstrap/download flows when merely probed and are not the default integrated depth path.
     "depth": ("metric3d", "meshgraphormer"),
     "normalmap": ("metric3d",),
 }
 
 _MODULE_HOST_PREPROCESSOR_PRIORITIES: dict[str, tuple[str, ...]] = {
-    # IMPORTANT: prefer deterministic Forge-like host nodes first so depth preview does not oscillate across preprocessor families.
+    # IMPORTANT: prefer deterministic host nodes first so depth preview does not oscillate across preprocessor families.
     "depth": (
         "DepthAnythingV2Preprocessor",
         "DepthAnythingPreprocessor",
@@ -371,13 +334,10 @@ _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS: dict[str, int] = {
     # IMPORTANT: keep explicit overrides sparse; default behavior is already single-attempt deterministic probing.
     "depth": 1,
     "normalmap": 1,
-    # IMPORTANT: generic OpenPose keeps a bounded same-family fallback lane for runtime/node-availability failures only.
-    "openpose": 2,
 }
 
 _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT = 1
 ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED"
-_RETRY_ON_NEAR_EMPTY_MODULES: set[str] = set()
 
 
 @dataclass(frozen=True)
@@ -420,16 +380,6 @@ def _resolve_module_dispatch(module_value: object) -> tuple[str, str, tuple[str,
     return option_key, module_key, preferred_candidates
 
 
-def _resolve_host_parameter_overrides(selected_preprocessor: str) -> dict[str, object]:
-    overrides = _PREPROCESSOR_OPTION_HOST_PARAMETER_OVERRIDES.get(selected_preprocessor, {})
-    return dict(overrides)
-
-
-def _should_skip_visual_empty_gate(selected_preprocessor: str, module_key: str) -> bool:
-    del module_key
-    return selected_preprocessor in _PREPROCESSOR_OPTION_SKIP_VISUAL_EMPTY_GATE
-
-
 def image_tensor_from_bytes(image_bytes: bytes) -> "torch.Tensor":
     _require_runtime_dependencies()
     image_obj = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -468,8 +418,6 @@ def preprocess_controlnet_tensor(
     mask_tensor: "torch.Tensor | np.ndarray | Image.Image | None" = None,
 ) -> ControlNetRuntimeResult:
     _require_runtime_dependencies()
-    # CRITICAL: keep the explicit preprocessor option alive through runtime dispatch.
-    # Collapsing too early to the base module let OpenPose-family variants drift into sibling annotators.
     selected_preprocessor, normalized_module, preferred_host_candidates = _resolve_module_dispatch(module)
     source = _coerce_image_tensor(image_tensor)
     normalized_mask = _coerce_mask_tensor(mask_tensor, image_tensor=source) if mask_tensor is not None else None
@@ -492,18 +440,20 @@ def preprocess_controlnet_tensor(
 
     try:
         host_candidates = _resolve_host_preprocessor_candidates(
-            selected_preprocessor,
             normalized_module,
             host_mappings,
             preferred_candidates=preferred_host_candidates,
         )
-        skip_visual_empty_gate = _should_skip_visual_empty_gate(selected_preprocessor, normalized_module)
+        # DEBUG HOTSPOT: selected preprocessor option -> host candidate binding seam.
+        # If UI selection appears ignored, inspect `selected_preprocessor` and first host candidate here.
         if selected_preprocessor != normalized_module:
             diagnostics.append(f"selected_preprocessor:{selected_preprocessor}")
         configured_probe_limit = _MODULE_HOST_PREPROCESSOR_PROBE_LIMITS.get(
             normalized_module,
             _DEFAULT_HOST_PREPROCESSOR_PROBE_LIMIT,
         )
+        # DEBUG HOTSPOT: enforce single-attempt deterministic probing across all modules to avoid cross-family
+        # annotator side effects (unexpected model bootstrap/download) when host preprocessor chains fan out.
         host_probe_limit = max(0, int(configured_probe_limit))
         host_probe_attempts = 0
         for node_name in host_candidates:
@@ -517,7 +467,6 @@ def preprocess_controlnet_tensor(
                 processed = _run_host_node_preprocessor(
                     node_name=node_name,
                     node_cls=host_mappings[node_name],
-                    selected_preprocessor=selected_preprocessor,
                     image_tensor=source,
                     mask_tensor=normalized_mask,
                     module_key=normalized_module,
@@ -526,12 +475,10 @@ def preprocess_controlnet_tensor(
                     threshold_b=threshold_b,
                     aio_preprocessor_name=None,
                 )
-                # IMPORTANT: exact OpenPose-family execution follows Forge-style success semantics.
-                # Sparse pose maps are valid outputs and must not be rejected by a generic pixel-density heuristic.
-                if not skip_visual_empty_gate and _is_visually_empty_image_tensor(processed):
+                # DEBUG HOTSPOT: host execution succeeded but visual result may still be effectively blank.
+                # Mark this seam explicitly so detect-layer warnings can distinguish "pipeline failure" vs "empty detection result".
+                if _is_visually_empty_image_tensor(processed):
                     diagnostics.append(f"{node_name}:output_near_empty")
-                    if normalized_module in _RETRY_ON_NEAR_EMPTY_MODULES:
-                        continue
                 return ControlNetRuntimeResult(
                     image=processed,
                     backend="comfy_host_preprocessor",
@@ -546,17 +493,12 @@ def preprocess_controlnet_tensor(
         if _is_aio_preprocessor_enabled():
             aio_cls = host_mappings.get("AIO_Preprocessor")
             if aio_cls is not None:
-                aio_name = _select_aio_preprocessor_name(
-                    aio_cls,
-                    normalized_module,
-                    selected_preprocessor=selected_preprocessor,
-                )
+                aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
                 if aio_name:
                     try:
                         processed = _run_host_node_preprocessor(
                             node_name="AIO_Preprocessor",
                             node_cls=aio_cls,
-                            selected_preprocessor=selected_preprocessor,
                             image_tensor=source,
                             mask_tensor=normalized_mask,
                             module_key=normalized_module,
@@ -565,31 +507,25 @@ def preprocess_controlnet_tensor(
                             threshold_b=threshold_b,
                             aio_preprocessor_name=aio_name,
                         )
-                        if not skip_visual_empty_gate and _is_visually_empty_image_tensor(processed):
+                        # DEBUG HOTSPOT: same near-empty visibility check for AIO branch; keep diagnostics symmetric with direct-host branch.
+                        if _is_visually_empty_image_tensor(processed):
                             diagnostics.append(f"AIO_Preprocessor({aio_name}):output_near_empty")
-                            if normalized_module not in _RETRY_ON_NEAR_EMPTY_MODULES:
-                                return ControlNetRuntimeResult(
-                                    image=processed,
-                                    backend="comfy_host_preprocessor_aio",
-                                    processor_name=aio_name,
-                                    used_fallback=False,
-                                    diagnostics=tuple(diagnostics),
-                                )
-                        else:
-                            return ControlNetRuntimeResult(
-                                image=processed,
-                                backend="comfy_host_preprocessor_aio",
-                                processor_name=aio_name,
-                                used_fallback=False,
-                                diagnostics=tuple(diagnostics),
-                            )
+                        return ControlNetRuntimeResult(
+                            image=processed,
+                            backend="comfy_host_preprocessor_aio",
+                            processor_name=aio_name,
+                            used_fallback=False,
+                            diagnostics=tuple(diagnostics),
+                        )
                     except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                         diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
         else:
-            # IMPORTANT: keep AIO gating explicit; probing AIO schemas may enumerate unrelated annotators.
+            # DEBUG HOTSPOT: keep AIO gating explicit; querying AIO INPUT_TYPES can trigger broad annotator enumeration.
             diagnostics.append("aio_preprocessor_disabled")
 
         if diagnostics:
+            # DEBUG HOTSPOT: if users report processor/model mismatch, this seam records the candidate chain that failed
+            # before fallback so we can pinpoint over-eager node probing without reproducing full host bootstrap logs.
             _LOGGER.warning(
                 "RookieUI ControlNet host preprocessor chain exhausted (module=%s): %s",
                 normalized_module,
@@ -606,9 +542,7 @@ def preprocess_controlnet_tensor(
         return ControlNetRuntimeResult(
             image=fallback,
             backend="rookieui_internal_fallback",
-            # IMPORTANT: preserve the selected variant token in fallback results.
-            # Collapsing to the base module hides which explicit annotator the user asked for.
-            processor_name=selected_preprocessor,
+            processor_name=normalized_module,
             used_fallback=True,
             diagnostics=tuple(diagnostics),
         )
@@ -657,8 +591,8 @@ def _ensure_prompt_server_last_prompt_id(server_instance: Any) -> tuple[bool, st
     if server_instance is None or hasattr(server_instance, "last_prompt_id"):
         return False, ""
     synthetic_prompt_id = f"rookieui-controlnet-detect-{int(time.time() * 1000)}"
-    # IMPORTANT: some host preprocessors read PromptServer.instance.last_prompt_id outside queued execution.
-    # Keep this shim scoped so detect routes stay host-compatible without leaking synthetic prompt ids.
+    # DEBUG HOTSPOT: some host preprocessors read PromptServer.instance.last_prompt_id even outside queued prompt
+    # execution. Provide a scoped compatibility shim to keep detect routes host-compatible.
     try:
         setattr(server_instance, "last_prompt_id", synthetic_prompt_id)
     except Exception:
@@ -727,8 +661,8 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
     if tensor.shape[-1] == 4:
         rgb = tensor[:, :, :, :3]
         alpha = tensor[:, :, :, 3:4]
-        # IMPORTANT: some host preprocessors emit alpha-only annotation strokes.
-        # Promote the matte to RGB so valid previews are not discarded as empty color payloads.
+        # DEBUG HOTSPOT: some host preprocessors emit annotation strokes via alpha-only RGBA payloads.
+        # Preserve visual content by promoting alpha matte to RGB when color channels are effectively empty.
         if float(rgb.abs().max().item()) <= 1e-6 and float(alpha.abs().max().item()) > 1e-6:
             tensor = alpha.repeat(1, 1, 1, 3)
         else:
@@ -739,8 +673,8 @@ def _coerce_image_tensor(image_value: Any) -> "torch.Tensor":
 
 
 def _is_visually_empty_image_tensor(image_tensor: "torch.Tensor", *, pixel_threshold: float = 0.01, ratio_threshold: float = 0.0005) -> bool:
-    # IMPORTANT: this heuristic is only safe for dense-map preprocessors.
-    # OpenPose-family outputs bypass it because sparse skeleton maps are valid non-empty results.
+    # DEBUG HOTSPOT: visual-emptiness heuristic seam for preprocess outputs.
+    # Tune thresholds here when users report "completed but black preview" cases with host preprocessors.
     normalized = _coerce_image_tensor(image_tensor)
     if normalized.shape[0] == 0:
         return True
@@ -847,8 +781,6 @@ def _resolve_node_function(instance: Any) -> Any:
 def _build_node_parameter_value(
     parameter_name: str,
     *,
-    schema_entry: object,
-    host_parameter_overrides: dict[str, object],
     image_tensor: "torch.Tensor",
     mask_tensor: "torch.Tensor | None",
     processor_res: int,
@@ -857,8 +789,6 @@ def _build_node_parameter_value(
     aio_preprocessor_name: str | None,
 ) -> object:
     key = str(parameter_name or "").strip()
-    if key in host_parameter_overrides:
-        return _coerce_value_for_schema(host_parameter_overrides[key], schema_entry)
     if key == "image":
         return image_tensor
     if key == "mask":
@@ -892,7 +822,7 @@ def _build_node_parameter_value(
     if key == "intensity_threshold":
         return int(round(max(0.0, min(255.0, threshold_b))))
     if key in {"detect_hand", "detect_body", "detect_face"}:
-        return _coerce_value_for_schema(True, schema_entry)
+        return True
     if key == "safe":
         return True
     if key == "coarse":
@@ -906,35 +836,10 @@ def _build_node_parameter_value(
     return _MISSING
 
 
-def _coerce_value_for_schema(value: object, schema_entry: object) -> object:
-    choices = _extract_schema_choices(schema_entry)
-    if choices:
-        normalized_choices = {str(choice).strip().lower(): choice for choice in choices}
-        # CRITICAL: Comfy host wrappers such as OpenPose/DWPose expose detect flags as combo strings
-        # (`enable` / `disable`), not Python booleans. Bypassing schema-aware coercion here turns every
-        # truthy/falsey flag into a disabled branch at the host wrapper boundary and yields black previews.
-        if isinstance(value, bool) and {"enable", "disable"}.issubset(normalized_choices):
-            return normalized_choices["enable"] if value else normalized_choices["disable"]
-        if isinstance(value, str):
-            normalized_value = value.strip().lower()
-            if normalized_value in normalized_choices:
-                return normalized_choices[normalized_value]
-    return value
-
-
-def _extract_schema_choices(schema_entry: object) -> list[object]:
-    if isinstance(schema_entry, (list, tuple)) and schema_entry:
-        choices = schema_entry[0]
-        if isinstance(choices, list):
-            return list(choices)
-    return []
-
-
 def _run_host_node_preprocessor(
     *,
     node_name: str,
     node_cls: type[Any],
-    selected_preprocessor: str,
     image_tensor: "torch.Tensor",
     mask_tensor: "torch.Tensor | None",
     module_key: str,
@@ -945,13 +850,10 @@ def _run_host_node_preprocessor(
 ) -> "torch.Tensor":
     required_schema, optional_schema = _extract_node_input_schema(node_cls)
     inputs: dict[str, object] = {}
-    host_parameter_overrides = _resolve_host_parameter_overrides(selected_preprocessor)
 
     for required_name, required_spec in required_schema.items():
         resolved = _build_node_parameter_value(
             str(required_name),
-            schema_entry=required_spec,
-            host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
             processor_res=processor_res,
@@ -970,8 +872,6 @@ def _run_host_node_preprocessor(
     for optional_name in optional_schema.keys():
         resolved = _build_node_parameter_value(
             str(optional_name),
-            schema_entry=optional_schema[optional_name],
-            host_parameter_overrides=host_parameter_overrides,
             image_tensor=image_tensor,
             mask_tensor=mask_tensor,
             processor_res=processor_res,
@@ -987,6 +887,7 @@ def _run_host_node_preprocessor(
     if function is None:
         raise RuntimeError(f"{node_name} does not expose an invokable function.")
 
+    # DEBUG HOTSPOT: this invocation is the exact seam where host-runtime preprocessor classes differ by signature.
     result = function(**inputs)
     primary = _extract_primary_node_output_payload(result)
     return _coerce_image_tensor(primary)
@@ -1015,23 +916,11 @@ def _extract_primary_node_output_payload(result: object) -> object:
     raise RuntimeError("Unable to resolve host preprocessor image payload.")
 
 
-def _select_aio_preprocessor_name(
-    aio_cls: type[Any],
-    module_key: str,
-    *,
-    selected_preprocessor: str | None = None,
-) -> str | None:
+def _select_aio_preprocessor_name(aio_cls: type[Any], module_key: str) -> str | None:
     required_schema, optional_schema = _extract_node_input_schema(aio_cls)
     _ = required_schema
     choices = _extract_aio_preprocessor_choices(optional_schema.get("preprocessor"))
     if not choices:
-        return None
-
-    normalized_selected = normalize_preprocessor_option_key(selected_preprocessor or module_key)
-    if normalized_selected != module_key:
-        for choice in choices:
-            if normalize_preprocessor_option_key(choice) == normalized_selected:
-                return choice
         return None
 
     for candidate in _MODULE_AIO_PREPROCESSOR_CANDIDATES.get(module_key, ()):
@@ -1042,26 +931,17 @@ def _select_aio_preprocessor_name(
 
     ranked = _rank_preprocessor_choices_by_keywords(choices, _MODULE_AIO_KEYWORDS.get(module_key, ()))
     if ranked:
+        # DEBUG HOTSPOT: if AIO choice differs from expected integrated defaults, inspect keyword ranking behavior at this seam.
         return ranked[0]
     return None
 
 
 def _resolve_host_preprocessor_candidates(
-    selected_preprocessor: str,
     module_key: str,
     host_mappings: dict[str, Any],
     *,
     preferred_candidates: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
-    if preferred_candidates and selected_preprocessor != module_key:
-        # CRITICAL: explicit preprocessor variants must stay variant-stable.
-        # If the selected annotator is unavailable or returns unusable output, fallback should be explicit rather than silently drifting into sibling variants.
-        return tuple(dict.fromkeys(preferred_candidates))
-
-    bounded_candidates = _MODULE_BOUNDED_HOST_PREPROCESSOR_CANDIDATES.get(module_key)
-    if bounded_candidates:
-        return tuple(dict.fromkeys(bounded_candidates))
-
     ordered: list[str] = []
     seen: set[str] = set()
 
@@ -1216,15 +1096,11 @@ def _apply_fallback_module_filter(
     del threshold_b
     if module_key in _PASSTHROUGH_MODULES or module_key in {"tile", "inpaint", "shuffle"}:
         return image_obj.convert("RGB")
-    if module_key in {"openpose"}:
-        # IMPORTANT: OpenPose-family host failure must not masquerade as a successful source-image preview.
-        # Return a blank control map instead of echoing the input image.
-        return Image.new("RGB", image_obj.size, color=(0, 0, 0))
     if module_key in {"depth", "normalmap", "segmentation"}:
         return image_obj.convert("L").convert("RGB")
     if module_key in {"blur"}:
         radius = max(0.1, min(float(threshold_a), 128.0) / 32.0)
         return image_obj.filter(ImageFilter.GaussianBlur(radius=radius)).convert("RGB")
-    if module_key in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch"}:
+    if module_key in {"canny", "lineart", "scribble", "softedge", "mlsd", "sketch", "openpose"}:
         return image_obj.convert("L").filter(ImageFilter.FIND_EDGES).convert("RGB")
     return image_obj.convert("RGB")
