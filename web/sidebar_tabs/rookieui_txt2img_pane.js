@@ -19,6 +19,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     installExplicitFormSubmitShortcuts,
     createActionButton,
     createIconActionButton,
+    createPreviewFullscreenViewer,
     buildQuicksettingCard,
     buildSelectionLibrary,
     buildSubtabShell,
@@ -38,7 +39,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     findPresetIdForProfile,
     setElementValue,
     syncBoundControls,
-  } = context;  const section = document.createElement("section");
+  } = context;
+  const section = document.createElement("section");
   section.className = "rookieui-shell__integrated-pane";
   parent.appendChild(section);
 
@@ -502,6 +504,15 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         const previewToolbar = document.createElement("div");
         previewToolbar.className = "rookieui-shell__preview-toolbar";
         previewSection.appendChild(previewToolbar);
+
+        createPreviewFullscreenViewer({
+          idPrefix: "rookieui-txt2img",
+          previewBox,
+          previewToolbar,
+          createIconActionButton,
+          statusNode,
+          labelText: "Preview",
+        });
 
         const previewActions = [
           {
