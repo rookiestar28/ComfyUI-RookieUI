@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import ntpath
 import os
 import threading
 import time
@@ -108,6 +109,13 @@ _NATIVE_ULTRALYTICS_MODEL_FOLDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
+def _join_models_dir_path(models_dir: str, *relative_parts: str) -> str:
+    # CRITICAL: folder_paths.models_dir may come from a Windows-style host snapshot even when tests run on Linux;
+    # do not use the runner OS path module blindly or native detector paths will pick mixed separators.
+    path_module = ntpath if "\\" in models_dir or (len(models_dir) >= 2 and models_dir[1] == ":") else os.path
+    return path_module.normpath(path_module.join(models_dir, *relative_parts))
+
+
 def ensure_native_ultralytics_model_paths(folder_paths_module: Any | None) -> Any | None:
     if folder_paths_module is None:
         return None
@@ -122,7 +130,7 @@ def ensure_native_ultralytics_model_paths(folder_paths_module: Any | None) -> An
     # IMPORTANT: register native detector model folders here so RookieUI does not require an external detector pack
     # just to make host `folder_paths` aware of Ultralytics bbox/segm model locations.
     for folder_name, relative_parts in _NATIVE_ULTRALYTICS_MODEL_FOLDERS:
-        full_path = os.path.join(models_dir, *relative_parts)
+        full_path = _join_models_dir_path(models_dir, *relative_parts)
         try:
             add_model_folder_path(folder_name, full_path, is_default=True)
         except TypeError:
