@@ -73,6 +73,10 @@ export function createPreviewFullscreenViewer(
   previewBox.parentNode?.insertBefore(surface, previewBox);
   surface.appendChild(previewBox);
 
+  const overlayToolbar = document.createElement("div");
+  overlayToolbar.className = "rookieui-shell__preview-overlay-toolbar";
+  surface.appendChild(overlayToolbar);
+
   const { zoomPanel, zoomLabel, zoomSlider } = buildFullscreenZoomControls(surface, idPrefix);
   let zoomValue = 1;
   let boundImage = null;
@@ -83,7 +87,8 @@ export function createPreviewFullscreenViewer(
     `Fullscreen ${labelText.toLowerCase()}`,
     "neutral",
   );
-  previewToolbar.appendChild(fullscreenButton);
+  // IMPORTANT: keep the fullscreen affordance inside the preview surface; a toolbar-only button is too easy to miss and does not match the inpaint/source canvas interaction model.
+  overlayToolbar.appendChild(fullscreenButton);
 
   const syncZoomLabel = () => {
     zoomLabel.textContent = `Zoom ${Math.round(zoomValue * 100)}%`;
@@ -110,6 +115,7 @@ export function createPreviewFullscreenViewer(
     const hasImage = Boolean(image);
     const fullscreenActive = deps.isCanvasElementFullscreen(surface);
     surface.dataset.fullscreen = fullscreenActive ? "true" : "false";
+    surface.dataset.hasImage = hasImage ? "true" : "false";
     fullscreenButton.disabled = !hasImage;
     zoomPanel.hidden = !fullscreenActive || !hasImage;
     const iconNode = fullscreenButton.querySelector(".rookieui-shell__mini-action-icon");
@@ -143,6 +149,30 @@ export function createPreviewFullscreenViewer(
   });
 
   fullscreenButton.addEventListener("click", async () => {
+    const fullscreenAction = await deps.toggleCanvasFullscreen(surface);
+    syncFullscreenUi();
+    if (!statusNode) {
+      return;
+    }
+    statusNode.textContent =
+      fullscreenAction === "entered"
+        ? `${labelText} entered fullscreen mode.`
+        : fullscreenAction === "exited"
+          ? `${labelText} exited fullscreen mode.`
+          : fullscreenAction === "unavailable"
+            ? "Fullscreen preview is unavailable in this browser."
+            : statusNode.textContent;
+  });
+
+  surface.addEventListener("click", async (event) => {
+    if (!previewBox.querySelector(".rookieui-shell__preview-image")) {
+      return;
+    }
+    const target = event.target;
+    if (target instanceof Element && target.closest("button, input, select, textarea, a")) {
+      return;
+    }
+    // IMPORTANT: generated preview itself must be clickable for fullscreen; users should not have to hunt for a secondary toolbar button.
     const fullscreenAction = await deps.toggleCanvasFullscreen(surface);
     syncFullscreenUi();
     if (!statusNode) {

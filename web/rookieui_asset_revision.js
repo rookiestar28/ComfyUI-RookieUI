@@ -1,4 +1,5 @@
-export const ROOKIEUI_ASSET_REVISION = "20260415-r63-r67-frontend-modules";
+// IMPORTANT: bump this token whenever shipped frontend module wiring changes; otherwise Comfy-host browser caches can mask live UI fixes.
+export const ROOKIEUI_ASSET_REVISION = "20260415-preview-fullscreen-hotfix";
 
 export function buildRevisionedModuleUrl(specifier, metaUrl = import.meta.url) {
   const moduleUrl = new URL(specifier, metaUrl);
