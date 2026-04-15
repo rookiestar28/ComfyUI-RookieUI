@@ -29,6 +29,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     installExplicitFormSubmitShortcuts,
     createActionButton,
     createIconActionButton,
+    createPreviewFullscreenViewer,
     buildQuicksettingCard,
     buildSelectionLibrary,
     buildSubtabShell,
@@ -1464,6 +1465,15 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         const assetPreviewToolbar = document.createElement("div");
         assetPreviewToolbar.className = "rookieui-shell__preview-toolbar";
         assetSection.appendChild(assetPreviewToolbar);
+
+        createPreviewFullscreenViewer({
+          idPrefix: "rookieui-img2img",
+          previewBox: assetPreview,
+          previewToolbar: assetPreviewToolbar,
+          createIconActionButton,
+          statusNode,
+          labelText: "Preview",
+        });
 
         const previewActions = [
           {

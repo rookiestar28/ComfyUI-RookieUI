@@ -40,6 +40,7 @@ import {
   resolveActiveClientId,
   createGenerationRuntimeState,
   createGenerationRuntimeHelpers,
+  createPreviewFullscreenViewer,
 } from "./rookieui_sidebar_shell_deps.js";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
@@ -1128,6 +1129,7 @@ function buildPaneModuleContext() {
     createActionButton,
     createIconActionButton,
     createMiniActionButton,
+    createPreviewFullscreenViewer,
     buildQuicksettingCard,
     buildSelectionLibrary,
     buildSubtabShell,
@@ -1208,6 +1210,7 @@ function setPreviewContent(previewBox, imageDataUrl, placeholderText) {
     if (image.src !== imageDataUrl) {
       image.src = imageDataUrl;
     }
+    previewBox.__previewFullscreenController?.syncImage?.();
     return;
   }
   if (currentImage) {
@@ -1218,6 +1221,7 @@ function setPreviewContent(previewBox, imageDataUrl, placeholderText) {
     return;
   }
   appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", placeholderText);
+  previewBox.__previewFullscreenController?.syncImage?.();
 }
 
 function updatePngInfoApplyButtons(state, buttons) {

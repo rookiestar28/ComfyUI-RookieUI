@@ -895,6 +895,8 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
     expect(document.getElementById("rookieui-styles").href).toContain(ROOKIEUI_ASSET_REVISION);
+    expect(document.getElementById("rookieui-txt2img-preview-fullscreen")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-preview-fullscreen")).not.toBeNull();
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(
       "diffusion_models",
     );
@@ -919,7 +921,7 @@ describe("registerRookieUIBootstrapExtension", () => {
       document.querySelectorAll(
         "#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon",
       ).length,
-    ).toBe(6);
+    ).toBe(7);
     expect(document.getElementById("mock-sidebar-tabs").textContent).not.toContain("Rookie Mode");
     expect(document.getElementById("mock-sidebar-tabs").textContent).not.toContain("Server capabilities");
     expect(document.getElementById("mock-sidebar-tabs").textContent).toContain("Txt2Img");
