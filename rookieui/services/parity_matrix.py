@@ -19,7 +19,7 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=True,
         notes=[
             "Primary A1111 baseline for classic Stable Diffusion checkpoints.",
-            "Default prompt execution uses the RookieUI A1111 parity text-encode node at the host CLIP boundary.",
+            "Uses standard CLIP text encoding and optional clip-skip projection.",
         ],
     ),
     A1111ParityProfile(
@@ -36,8 +36,8 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         default_clip_skip=1,
         supports_clip_skip=False,
         notes=[
-            "Default prompt execution uses the RookieUI A1111 SDXL dual-encoder parity node instead of plain CLIPTextEncodeSDXL ownership.",
-            "Acts as the baseline for SDXL-derived families in the exact SD-family prompt-parity scope.",
+            "Uses SDXL dual-text-encoder semantics through CLIPTextEncodeSDXL.",
+            "Acts as the baseline for SDXL-derived families in RookieUI parity lanes.",
         ],
     ),
     A1111ParityProfile(
@@ -54,7 +54,7 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         default_clip_skip=1,
         supports_clip_skip=False,
         notes=[
-            "SDXL-derived parity lane with community-oriented defaults preserved on the default SDXL parity-node route.",
+            "SDXL-derived parity lane with community-oriented defaults preserved as SDXL translation.",
         ],
     ),
     A1111ParityProfile(
@@ -71,7 +71,7 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         default_clip_skip=1,
         supports_clip_skip=False,
         notes=[
-            "SDXL-derived parity lane retained as an explicit profile on the default SDXL parity-node route.",
+            "SDXL-derived parity lane retained as an explicit profile for A1111-style UX.",
         ],
     ),
     A1111ParityProfile(
@@ -88,7 +88,7 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         default_clip_skip=1,
         supports_clip_skip=False,
         notes=[
-            "SDXL-derived parity lane retained as an explicit profile on the default SDXL parity-node route.",
+            "SDXL-derived parity lane retained as an explicit profile for rookie-safe defaults.",
         ],
     ),
     A1111ParityProfile(
@@ -106,7 +106,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane routed through current SDXL graph translation seam.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
     ),
@@ -127,7 +126,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane routed through current SDXL graph translation seam.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Uses non-Lightning baseline defaults; Lightning variants remain opt-in via explicit LoRA/model selection.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
@@ -147,7 +145,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane following the current Flux-style adapter defaults.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
     ),
@@ -166,7 +163,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
     ),
@@ -185,7 +181,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary turbo-family lane with low-step defaults for rapid iteration.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
     ),
@@ -205,7 +200,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Uses non-Lightning baseline defaults; acceleration LoRA remains explicit opt-in.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
@@ -225,7 +219,6 @@ _PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
         supports_clip_skip=False,
         notes=[
             "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Not part of the exact SD-family prompt-parity claim.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
         ],
     ),

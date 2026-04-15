@@ -441,6 +441,7 @@ async def txt2img(request: Any) -> Any:
         normalized = normalize_txt2img_request(request_payload)
         translation = translate_txt2img_request(normalized)
     except ValueError as exc:
+        _LOGGER.warning("RookieUI txt2img rejected invalid request: %s", str(exc))
         return _json_response(
             {
                 "service": normalize_metadata_text("rookieui"),
@@ -469,6 +470,7 @@ async def img2img(request: Any) -> Any:
         normalized = normalize_img2img_request(request_payload)
         translation = translate_img2img_request(normalized)
     except ValueError as exc:
+        _LOGGER.warning("RookieUI img2img rejected invalid request: %s", str(exc))
         return _json_response(
             {
                 "service": normalize_metadata_text("rookieui"),

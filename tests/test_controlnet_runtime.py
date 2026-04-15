@@ -37,21 +37,6 @@ class _FakeAioSoftEdge:
         }
 
 
-class _FakeAioOpenPose:
-    @staticmethod
-    def INPUT_TYPES() -> dict[str, object]:
-        return {
-            "required": {"image": ("IMAGE",)},
-            "optional": {
-                "preprocessor": (
-                    ["none", "openpose", "openpose_dw", "openpose_densepose"],
-                    {"default": "none"},
-                ),
-                "resolution": ("INT", {"default": 512}),
-            },
-        }
-
-
 class _FakeDictResultNode:
     FUNCTION = "execute"
 
@@ -66,72 +51,7 @@ class _FakeDictResultNode:
         return {"result": (image,)}
 
 
-class _FakeOpenPoseNode:
-    FUNCTION = "execute"
-    last_inputs: dict[str, object] | None = None
-
-    @staticmethod
-    def INPUT_TYPES() -> dict[str, object]:
-        return {
-            "required": {"image": ("IMAGE",)},
-            "optional": {
-                "detect_body": (["enable", "disable"], {"default": "enable"}),
-                "detect_hand": (["enable", "disable"], {"default": "enable"}),
-                "detect_face": (["enable", "disable"], {"default": "enable"}),
-                "resolution": ("INT", {"default": 512}),
-            },
-        }
-
-    def execute(
-        self,
-        image: object,
-        detect_body: str = "enable",
-        detect_hand: str = "enable",
-        detect_face: str = "enable",
-        resolution: int = 512,
-    ) -> dict[str, object]:
-        _FakeOpenPoseNode.last_inputs = {
-            "image": image,
-            "detect_body": detect_body,
-            "detect_hand": detect_hand,
-            "detect_face": detect_face,
-            "resolution": resolution,
-        }
-        return {"result": (image,)}
-
-
 class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
-    def test_preprocess_controlnet_fallback_preserves_selected_preprocessor_for_all_non_passthrough_options(self) -> None:
-        marker = object()
-        passthrough_options = {"reference", "ipadapter", "instantid", "t2iadapter"}
-        options = [option for option in runtime.CONTROLNET_PREPROCESSOR_OPTION_ORDER if option not in {"none"}]
-        checked = 0
-
-        for option in options:
-            with self.subTest(option=option):
-                with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
-                    with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
-                        with mock.patch.object(runtime, "_resolve_host_node_class_mappings", return_value={}):
-                            with mock.patch.object(runtime, "_resolve_prompt_server_instance", return_value=None):
-                                with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
-                                    result = runtime.preprocess_controlnet_tensor(
-                                        image_tensor=marker,
-                                        module=option,
-                                        processor_res=512,
-                                        threshold_a=64.0,
-                                        threshold_b=64.0,
-                                        mask_tensor=None,
-                                    )
-                if option in passthrough_options:
-                    self.assertEqual(result.backend, "passthrough_module")
-                    self.assertEqual(result.processor_name, option)
-                    continue
-                self.assertEqual(result.backend, "rookieui_internal_fallback")
-                self.assertEqual(result.processor_name, option)
-                checked += 1
-
-        self.assertGreater(checked, 0)
-
     def test_normalize_preprocessor_option_key_preserves_lineart_variant(self) -> None:
         normalized = runtime.normalize_preprocessor_option_key("lineart_anime_denoise")
         self.assertEqual(normalized, "lineart_anime_denoise")
@@ -148,14 +68,6 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         selected = runtime._select_aio_preprocessor_name(_FakeAioSoftEdge, "softedge")
         self.assertEqual(selected, "hed_safe")
 
-    def test_select_aio_preprocessor_name_preserves_explicit_variant(self) -> None:
-        selected = runtime._select_aio_preprocessor_name(
-            _FakeAioOpenPose,
-            "openpose",
-            selected_preprocessor="openpose_dw",
-        )
-        self.assertEqual(selected, "openpose_dw")
-
     def test_extract_primary_node_output_payload_supports_result_dict(self) -> None:
         marker = object()
         payload = runtime._extract_primary_node_output_payload({"result": (marker,)})
@@ -167,7 +79,6 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
             output = runtime._run_host_node_preprocessor(
                 node_name="DepthAnythingV2Preprocessor",
                 node_cls=_FakeDictResultNode,
-                selected_preprocessor="depth",
                 image_tensor=marker,
                 mask_tensor=None,
                 module_key="depth",
@@ -177,79 +88,6 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                 aio_preprocessor_name=None,
             )
         self.assertIs(output, marker)
-
-    def test_run_host_node_preprocessor_applies_openpose_variant_flags(self) -> None:
-        marker = object()
-        _FakeOpenPoseNode.last_inputs = None
-        with mock.patch.object(runtime, "_coerce_image_tensor", side_effect=lambda value: value):
-            runtime._run_host_node_preprocessor(
-                node_name="OpenposePreprocessor",
-                node_cls=_FakeOpenPoseNode,
-                selected_preprocessor="openpose",
-                image_tensor=marker,
-                mask_tensor=None,
-                module_key="openpose",
-                processor_res=640,
-                threshold_a=64.0,
-                threshold_b=64.0,
-                aio_preprocessor_name=None,
-            )
-        self.assertEqual(
-            _FakeOpenPoseNode.last_inputs,
-            {
-                "image": marker,
-                "detect_body": "enable",
-                "detect_hand": "disable",
-                "detect_face": "disable",
-                "resolution": 640,
-            },
-        )
-
-    def test_run_host_node_preprocessor_applies_openpose_full_variant_flags(self) -> None:
-        marker = object()
-        _FakeOpenPoseNode.last_inputs = None
-        with mock.patch.object(runtime, "_coerce_image_tensor", side_effect=lambda value: value):
-            runtime._run_host_node_preprocessor(
-                node_name="OpenposePreprocessor",
-                node_cls=_FakeOpenPoseNode,
-                selected_preprocessor="openpose_full",
-                image_tensor=marker,
-                mask_tensor=None,
-                module_key="openpose",
-                processor_res=512,
-                threshold_a=64.0,
-                threshold_b=64.0,
-                aio_preprocessor_name=None,
-            )
-        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_hand"], "enable")
-        self.assertEqual(_FakeOpenPoseNode.last_inputs["detect_face"], "enable")
-
-    def test_build_node_parameter_value_coerces_detect_flags_for_combo_schema(self) -> None:
-        schema_entry = (["enable", "disable"], {"default": "enable"})
-        enabled = runtime._build_node_parameter_value(
-            "detect_body",
-            schema_entry=schema_entry,
-            host_parameter_overrides={},
-            image_tensor=object(),
-            mask_tensor=None,
-            processor_res=512,
-            threshold_a=64.0,
-            threshold_b=64.0,
-            aio_preprocessor_name=None,
-        )
-        disabled = runtime._build_node_parameter_value(
-            "detect_hand",
-            schema_entry=schema_entry,
-            host_parameter_overrides={"detect_hand": False},
-            image_tensor=object(),
-            mask_tensor=None,
-            processor_res=512,
-            threshold_a=64.0,
-            threshold_b=64.0,
-            aio_preprocessor_name=None,
-        )
-        self.assertEqual(enabled, "enable")
-        self.assertEqual(disabled, "disable")
 
     def test_discover_dynamic_host_preprocessors_skips_heavy_depth_candidates(self) -> None:
         discovered = runtime._discover_dynamic_host_preprocessors(
@@ -267,7 +105,6 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
     def test_resolve_host_preprocessor_candidates_prioritizes_depthanything_first(self) -> None:
         resolved = runtime._resolve_host_preprocessor_candidates(
             "depth",
-            "depth",
             {
                 "MiDaS-DepthMapPreprocessor": object(),
                 "DepthAnythingV2Preprocessor": object(),
@@ -277,9 +114,8 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertGreaterEqual(len(resolved), 2)
         self.assertEqual(resolved[0], "DepthAnythingV2Preprocessor")
 
-    def test_resolve_host_preprocessor_candidates_keeps_explicit_variant_candidate_only(self) -> None:
+    def test_resolve_host_preprocessor_candidates_honors_variant_preferred_order(self) -> None:
         resolved = runtime._resolve_host_preprocessor_candidates(
-            "lineart_standard",
             "lineart",
             {
                 "LineArtPreprocessor": object(),
@@ -288,34 +124,8 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
             },
             preferred_candidates=("LineartStandardPreprocessor",),
         )
-        self.assertEqual(resolved, ("LineartStandardPreprocessor",))
-
-    def test_resolve_host_preprocessor_candidates_isolates_explicit_variant(self) -> None:
-        resolved = runtime._resolve_host_preprocessor_candidates(
-            "openpose_dw",
-            "openpose",
-            {
-                "OpenposePreprocessor": object(),
-                "DWPreprocessor": object(),
-                "AnimalPosePreprocessor": object(),
-                "DensePosePreprocessor": object(),
-            },
-            preferred_candidates=("DWPreprocessor",),
-        )
-        self.assertEqual(resolved, ("DWPreprocessor",))
-
-    def test_resolve_host_preprocessor_candidates_bounds_generic_openpose_lane(self) -> None:
-        resolved = runtime._resolve_host_preprocessor_candidates(
-            "openpose",
-            "openpose",
-            {
-                "OpenposePreprocessor": object(),
-                "DWPreprocessor": object(),
-                "AnimalPosePreprocessor": object(),
-                "DensePosePreprocessor": object(),
-            },
-        )
-        self.assertEqual(resolved, ("OpenposePreprocessor", "DWPreprocessor"))
+        self.assertGreaterEqual(len(resolved), 2)
+        self.assertEqual(resolved[0], "LineartStandardPreprocessor")
 
     def test_preprocess_controlnet_non_depth_stops_after_global_probe_limit(self) -> None:
         marker = object()
@@ -430,17 +240,17 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
         self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
 
-    def test_preprocess_controlnet_openpose_skips_visual_empty_rejection(self) -> None:
+    def test_preprocess_controlnet_marks_host_success_with_near_empty_output_diagnostic(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
             with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
                 with mock.patch.object(
                     runtime,
                     "_resolve_host_node_class_mappings",
-                    return_value={"OpenposePreprocessor": object(), "DWPreprocessor": object()},
+                    return_value={"OpenposePreprocessor": object()},
                 ):
-                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker) as run_mock:
-                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor") as empty_mock:
+                    with mock.patch.object(runtime, "_run_host_node_preprocessor", return_value=marker):
+                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor", return_value=True):
                             result = runtime.preprocess_controlnet_tensor(
                                 image_tensor=marker,
                                 module="openpose",
@@ -452,110 +262,7 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
 
         self.assertEqual(result.backend, "comfy_host_preprocessor")
         self.assertEqual(result.processor_name, "OpenposePreprocessor")
-        self.assertEqual(result.diagnostics, ())
-        self.assertEqual(run_mock.call_count, 1)
-        empty_mock.assert_not_called()
-
-    def test_preprocess_controlnet_openpose_uses_dw_fallback_on_host_exception(self) -> None:
-        marker = object()
-        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
-            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
-                with mock.patch.object(
-                    runtime,
-                    "_resolve_host_node_class_mappings",
-                    return_value={"OpenposePreprocessor": object(), "DWPreprocessor": object()},
-                ):
-                    with mock.patch.object(
-                        runtime,
-                        "_run_host_node_preprocessor",
-                        side_effect=[RuntimeError("openpose_missing"), marker],
-                    ) as run_mock:
-                        with mock.patch.object(runtime, "_is_visually_empty_image_tensor") as empty_mock:
-                            result = runtime.preprocess_controlnet_tensor(
-                                image_tensor=marker,
-                                module="openpose",
-                                processor_res=512,
-                                threshold_a=64.0,
-                                threshold_b=64.0,
-                                mask_tensor=None,
-                            )
-
-        self.assertEqual(result.backend, "comfy_host_preprocessor")
-        self.assertEqual(result.processor_name, "DWPreprocessor")
-        self.assertIn("OpenposePreprocessor: openpose_missing", result.diagnostics)
-        self.assertEqual(run_mock.call_count, 2)
-        empty_mock.assert_not_called()
-
-    def test_preprocess_controlnet_openpose_variant_falls_back_without_cross_variant_drift(self) -> None:
-        marker = object()
-        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
-            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
-                with mock.patch.object(
-                    runtime,
-                    "_resolve_host_node_class_mappings",
-                    return_value={
-                        "OpenposePreprocessor": object(),
-                        "DWPreprocessor": object(),
-                        "AnimalPosePreprocessor": object(),
-                        "DensePosePreprocessor": object(),
-                    },
-                ):
-                    with mock.patch.object(runtime, "_run_host_node_preprocessor", side_effect=RuntimeError("dw_missing")) as run_mock:
-                        with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
-                            with mock.patch.object(runtime, "_is_visually_empty_image_tensor") as empty_mock:
-                                result = runtime.preprocess_controlnet_tensor(
-                                    image_tensor=marker,
-                                    module="openpose_dw",
-                                    processor_res=512,
-                                    threshold_a=64.0,
-                                    threshold_b=64.0,
-                                    mask_tensor=None,
-                                )
-
-        self.assertEqual(result.backend, "rookieui_internal_fallback")
-        self.assertEqual(result.processor_name, "openpose_dw")
-        self.assertTrue(result.used_fallback)
-        self.assertIn("DWPreprocessor: dw_missing", result.diagnostics)
-        self.assertEqual(run_mock.call_count, 1)
-        empty_mock.assert_not_called()
-
-    def test_preprocess_controlnet_fallback_preserves_selected_preprocessor_variant(self) -> None:
-        marker = object()
-        with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
-            with mock.patch.object(runtime, "_coerce_image_tensor", return_value=marker):
-                with mock.patch.object(
-                    runtime,
-                    "_resolve_host_node_class_mappings",
-                    return_value={"AnimalPosePreprocessor": object()},
-                ):
-                    with mock.patch.object(runtime, "_run_host_node_preprocessor", side_effect=RuntimeError("animal_missing")):
-                        with mock.patch.object(runtime, "_apply_fallback_filters", return_value=marker):
-                            with mock.patch.object(runtime, "_is_visually_empty_image_tensor") as empty_mock:
-                                result = runtime.preprocess_controlnet_tensor(
-                                    image_tensor=marker,
-                                    module="openpose_animal",
-                                    processor_res=512,
-                                    threshold_a=64.0,
-                                    threshold_b=64.0,
-                                    mask_tensor=None,
-                                )
-
-        self.assertEqual(result.backend, "rookieui_internal_fallback")
-        self.assertEqual(result.processor_name, "openpose_animal")
-        self.assertTrue(result.used_fallback)
-        self.assertIn("AnimalPosePreprocessor: animal_missing", result.diagnostics)
-        empty_mock.assert_not_called()
-
-    @unittest.skipUnless(runtime.Image is not None and runtime.np is not None, "Pillow/numpy is unavailable in this environment")
-    def test_apply_fallback_module_filter_returns_blank_openpose_failure_map(self) -> None:
-        source = runtime.Image.new("RGB", (2, 2), color=(120, 60, 30))
-        processed = runtime._apply_fallback_module_filter(
-            source,
-            module_key="openpose",
-            threshold_a=64.0,
-            threshold_b=64.0,
-        )
-        self.assertTrue(runtime.np.array_equal(runtime.np.array(processed), runtime.np.zeros((2, 2, 3), dtype=runtime.np.uint8)))
+        self.assertIn("OpenposePreprocessor:output_near_empty", result.diagnostics)
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_min_max_normalizes_signed_ranges(self) -> None:

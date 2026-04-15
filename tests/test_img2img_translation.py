@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from rookieui.api import routes
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.workflow_translation import translate_img2img_request
 
@@ -77,6 +78,34 @@ class Img2ImgTranslationTests(unittest.TestCase):
         )
 
         self.assertEqual(request.hires_denoise, 1.0)
+
+    def test_normalize_img2img_request_normalizes_adetailer_block(self) -> None:
+        request = normalize_img2img_request(
+            {
+                "prompt": "city skyline",
+                "image_asset": "input-image",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "mediapipe_face_full",
+                            "controlnet": {
+                                "mode": "custom",
+                                "module": "none",
+                                "model": "",
+                            },
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(request.adetailer.enabled)
+        self.assertTrue(request.adetailer.skip_img2img)
+        self.assertEqual(request.adetailer.units[0].detector, "mediapipe_face_full")
+        self.assertEqual(request.adetailer.units[0].controlnet.mode, "custom")
 
     def test_normalize_img2img_request_does_not_require_hires_values_when_disabled(self) -> None:
         request = normalize_img2img_request(
@@ -177,42 +206,6 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 1)
 
-    def test_normalize_img2img_request_exposes_adetailer_controlnet_custom_block(self) -> None:
-        normalized = normalize_img2img_request(
-            {
-                "prompt": "portrait cleanup",
-                "image_asset": "portrait-input",
-                "adetailer": {
-                    "enabled": True,
-                    "skip_img2img": True,
-                    "units": [
-                        {
-                            "detector": "person_yolov8n-seg.pt",
-                            "use_checkpoint": True,
-                            "checkpoint_name": "__host_default__",
-                            "controlnet": {
-                                "mode": "custom",
-                                "model": "control_v11p_sd15_openpose.safetensors",
-                                "module": "none",
-                                "weight": 0.6,
-                                "guidance_start": 0.1,
-                                "guidance_end": 0.8,
-                            },
-                        }
-                    ],
-                },
-            }
-        )
-
-        self.assertTrue(normalized.adetailer.enabled)
-        self.assertTrue(normalized.adetailer.skip_img2img)
-        self.assertEqual(normalized.adetailer.units[0].detector, "person_yolov8n-seg.pt")
-        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "Use same checkpoint")
-        self.assertEqual(normalized.adetailer.units[0].controlnet.mode, "custom")
-        self.assertEqual(normalized.adetailer.units[0].controlnet.model, "control_v11p_sd15_openpose.safetensors")
-        self.assertEqual(normalized.adetailer.units[0].controlnet.module, "none")
-        self.assertEqual(normalized.adetailer.units[0].controlnet.weight, 0.6)
-
     def test_normalize_img2img_request_accepts_human_readable_inpaint_aliases(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -231,6 +224,114 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.inpaint_mask_mode, "inpaint_not_masked")
         self.assertEqual(normalized.inpaint_masked_content, "latent_noise")
         self.assertEqual(normalized.inpaint_area, "whole_picture")
+
+    def test_normalize_img2img_request_accepts_host_default_sentinels_on_live_inventory(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["SD15\\vae-ft-mse-840000.safetensors"],
+            text_encoders=["clip_l.safetensors"],
+            controlnet=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="SD15\\vae-ft-mse-840000.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "sd15",
+                    "checkpoint_name": "__host_default__",
+                    "vae_name": "Automatic",
+                    "text_encoder_name": "Automatic",
+                }
+            )
+
+        self.assertEqual(normalized.checkpoint_name, "SD15\\dreamshaper.safetensors")
+        self.assertEqual(normalized.vae_name, "SD15\\vae-ft-mse-840000.safetensors")
+        self.assertEqual(normalized.text_encoder_name, "")
+
+    def test_normalize_img2img_request_keeps_adetailer_same_checkpoint_sentinel_for_sdxl_host_inventory(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["flux\\flux1-dev.safetensors"],
+            vae=["sdxl_vae.safetensors"],
+            text_encoders=["clip_l.safetensors"],
+            controlnet=[],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="sdxl_vae.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+        with (
+            mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory),
+            mock.patch("rookieui.services.adetailer.discover_model_inventory", return_value=fake_inventory),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "sdxl",
+                    "checkpoint_name": "SDXL\\realvisxl.safetensors",
+                    "adetailer": {
+                        "enabled": True,
+                        "units": [
+                            {
+                                "enabled": True,
+                                "detector": "face_yolov8n.pt",
+                                "use_checkpoint": False,
+                                "checkpoint_name": "__host_default__",
+                            }
+                        ],
+                    },
+                }
+            )
+
+        self.assertFalse(normalized.adetailer.units[0].use_checkpoint)
+        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "Use same checkpoint")
+
+    def test_normalize_img2img_request_accepts_adetailer_diffusion_family_checkpoint_override(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["flux\\flux1-dev.safetensors", "lumina\\lumina2.safetensors"],
+            vae=["flux_vae.safetensors"],
+            text_encoders=["t5xxl.safetensors"],
+            controlnet=[],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="flux_vae.safetensors",
+            default_text_encoder="t5xxl.safetensors",
+        )
+
+        with (
+            mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory),
+            mock.patch("rookieui.services.adetailer.discover_model_inventory", return_value=fake_inventory),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                    "checkpoint_name": "flux\\flux1-dev.safetensors",
+                    "adetailer": {
+                        "enabled": True,
+                        "units": [
+                            {
+                                "enabled": True,
+                                "detector": "face_yolov8n.pt",
+                                "use_checkpoint": True,
+                                "checkpoint_name": "flux\\flux1-dev.safetensors",
+                            }
+                        ],
+                    },
+                }
+            )
+
+        self.assertTrue(normalized.adetailer.units[0].use_checkpoint)
+        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "flux\\flux1-dev.safetensors")
 
     def test_normalize_img2img_request_uses_batch_image_as_source_fallback(self) -> None:
         with mock.patch(
@@ -594,7 +695,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("VAEEncode", class_types)
         self.assertNotIn("RookieUILoadAssetMask", class_types)
 
-    def test_translate_img2img_request_uses_a1111_text_encode_node_for_sd15(self) -> None:
+    def test_translate_img2img_request_compiles_prompt_semantics_conditioning_chain(self) -> None:
         normalized = normalize_img2img_request(
             {
                 "prompt": "portrait AND cinematic BREAK [soft:sharp:0.5]",
@@ -604,9 +705,8 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         result = translate_img2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("RookieUIA1111TextEncode", class_types)
-        self.assertNotIn("ConditioningCombine", class_types)
-        self.assertNotIn("ConditioningSetTimestepRange", class_types)
+        self.assertIn("ConditioningCombine", class_types)
+        self.assertIn("ConditioningSetTimestepRange", class_types)
 
     def test_translate_img2img_request_uses_legacy_roll_back_switch(self) -> None:
         with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
@@ -619,41 +719,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             result = translate_img2img_request(normalized).to_payload()
 
         class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertNotIn("RookieUIA1111TextEncode", class_types)
         self.assertNotIn("ConditioningCombine", class_types)
-        self.assertNotIn("ConditioningSetTimestepRange", class_types)
-        self.assertIn("CLIPTextEncode", class_types)
-        self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
-
-    def test_translate_img2img_request_uses_a1111_text_encode_node_for_sdxl(self) -> None:
-        normalized = normalize_img2img_request(
-            {
-                "prompt": "fashion editorial [sunny:storm:0.5]",
-                "profile": "pony",
-                "image_asset": "pony-input",
-            }
-        )
-
-        result = translate_img2img_request(normalized).to_payload()
-        class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("RookieUIA1111TextEncodeSDXL", class_types)
-        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
-        self.assertNotIn("ConditioningSetTimestepRange", class_types)
-
-    def test_translate_img2img_request_uses_legacy_roll_back_switch_for_sdxl(self) -> None:
-        with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "fashion editorial [sunny:storm:0.5]",
-                    "profile": "pony",
-                    "image_asset": "pony-input",
-                }
-            )
-            result = translate_img2img_request(normalized).to_payload()
-
-        class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertNotIn("RookieUIA1111TextEncodeSDXL", class_types)
-        self.assertIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("ConditioningSetTimestepRange", class_types)
         self.assertIn("PROMPT_LEGACY_FALLBACK_ENABLED", result["normalized_request"]["prompt_warning_codes"])
 
@@ -669,40 +735,12 @@ class Img2ImgTranslationTests(unittest.TestCase):
         result = translate_img2img_request(normalized).to_payload()
 
         self.assertEqual(result["workflow_kind"], "img2img-sdxl")
-        self.assertEqual(result["workflow"]["2"]["class_type"], "RookieUIA1111TextEncodeSDXL")
+        self.assertEqual(result["workflow"]["2"]["class_type"], "CLIPTextEncodeSDXL")
         self.assertEqual(result["workflow"]["4"]["class_type"], "RookieUILoadAssetImage")
         sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
         self.assertEqual(len(sampler_nodes), 1)
         self.assertEqual(sampler_nodes[0]["inputs"]["denoise"], 0.75)
         self.assertEqual(sampler_nodes[0]["inputs"]["seed"], result["normalized_request"]["execution_seed"])
-
-    def test_translate_img2img_request_builds_sdxl_hires_workflow(self) -> None:
-        normalized = normalize_img2img_request(
-            {
-                "prompt": "fashion editorial",
-                "profile": "pony",
-                "image_asset": "pony-input",
-                "hires_enabled": True,
-                "hires_steps": 12,
-                "hires_scale": 1.8,
-                "hires_denoise": 0.4,
-            }
-        )
-
-        result = translate_img2img_request(normalized).to_payload()
-        class_types = {node["class_type"] for node in result["workflow"].values()}
-        sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
-        prompt_nodes = [
-            node for node in result["workflow"].values() if node["class_type"] == "RookieUIA1111TextEncodeSDXL"
-        ]
-
-        self.assertEqual(result["workflow_kind"], "img2img-sdxl-hires")
-        self.assertIn("RookieUIA1111TextEncodeSDXL", class_types)
-        self.assertIn("LatentUpscaleBy", class_types)
-        self.assertEqual(len(sampler_nodes), 2)
-        self.assertEqual(len(prompt_nodes), 4)
-        self.assertEqual(sorted(node["inputs"]["steps"] for node in prompt_nodes), [12, 12, 28, 28])
-        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
 
     def test_translate_img2img_request_applies_resize_mode_nodes(self) -> None:
         normalized = normalize_img2img_request(
@@ -808,11 +846,68 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("LatentUpscaleBy", class_types)
         self.assertEqual(result["normalized_request"]["hires_scale"], 1.8)
         self.assertEqual(result["normalized_request"]["hires_steps"], 12)
-        prompt_nodes = [
-            node for node in result["workflow"].values() if node["class_type"] == "RookieUIA1111TextEncode"
+
+    def test_translate_img2img_request_respects_adetailer_skip_img2img(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "image_asset": "portrait-input",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": True,
+                    "units": [{"enabled": True, "detector": "face_yolov8n.pt"}],
+                },
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertNotIn("RookieUIADetailerDetectMask", class_types)
+        self.assertEqual(
+            len([node for node in result["workflow"].values() if node["class_type"] == "KSampler"]),
+            1,
+        )
+
+    def test_translate_img2img_request_appends_adetailer_refinement_when_not_skipped(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "negative_prompt": "bad hands",
+                "image_asset": "portrait-input",
+                "adetailer": {
+                    "enabled": True,
+                    "skip_img2img": False,
+                    "units": [
+                        {
+                            "enabled": True,
+                            "detector": "hand_yolov8n.pt",
+                            "prompt": "repair hands",
+                            "denoising_strength": 0.35,
+                            "inpaint_padding": 48,
+                        }
+                    ],
+                },
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        mask_nodes = [node for node in workflow.values() if node["class_type"] == "RookieUIADetailerDetectMask"]
+        inpaint_encode_nodes = [
+            node for node in workflow.values() if node["class_type"] == "RookieUIVAEEncodeForInpaint"
         ]
-        self.assertEqual(len(prompt_nodes), 4)
-        self.assertEqual(sorted(node["inputs"]["steps"] for node in prompt_nodes), [12, 12, 28, 28])
+        sampler_nodes = [node for node in workflow.values() if node["class_type"] == "KSampler"]
+        save_node = [node for node in workflow.values() if node["class_type"] == "SaveImage"][0]
+        decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
+
+        self.assertEqual(len(mask_nodes), 1)
+        self.assertEqual(mask_nodes[0]["inputs"]["detector"], "hand_yolov8n.pt")
+        self.assertEqual(len(inpaint_encode_nodes), 1)
+        self.assertEqual(inpaint_encode_nodes[0]["inputs"]["grow_mask_by"], 48)
+        self.assertEqual(len(sampler_nodes), 2)
+        self.assertEqual(sampler_nodes[-1]["inputs"]["denoise"], 0.35)
+        self.assertEqual(save_node["inputs"]["images"], [decode_nodes[-1][0], 0])
 
     def test_img2img_route_returns_translation_payload(self) -> None:
         response = asyncio.run(

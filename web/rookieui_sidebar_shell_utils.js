@@ -121,7 +121,7 @@ export function preventSummaryToggleOnCheckbox(toggleInput) {
   toggleInput.addEventListener("keydown", stopToggle);
 }
 
-export function createHiresFixSection(parent, sectionId, hiresEnabledInput) {
+export function createHiresFixSection(parent, sectionId, hiresEnabledInput, titleText = "Hires. fix") {
   const section = document.createElement("details");
   section.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires";
   section.id = sectionId;
@@ -137,18 +137,58 @@ export function createHiresFixSection(parent, sectionId, hiresEnabledInput) {
 
   const toggle = document.createElement("label");
   toggle.className = "rookieui-shell__hires-toggle";
+  hiresEnabledInput.setAttribute("aria-label", "Enable Hires fix");
+  hiresEnabledInput.title = "Enable Hires fix";
   toggle.appendChild(hiresEnabledInput);
-  appendTextElement(toggle, "span", "rookieui-shell__field-label", "Enable Hires");
   header.appendChild(toggle);
   preventSummaryToggleOnCheckbox(hiresEnabledInput);
 
-  appendTextElement(header, "span", "rookieui-shell__hires-title", "Hires. fix");
+  appendTextElement(header, "span", "rookieui-shell__section-title", titleText);
   appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸", "");
 
   const grid = document.createElement("div");
   grid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
   section.appendChild(grid);
   return grid;
+}
+
+export function installExplicitFormSubmitShortcuts(form) {
+  if (!form) {
+    return;
+  }
+  form.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      const textarea = target.closest("textarea");
+      if (textarea) {
+        if (event.ctrlKey) {
+          // IMPORTANT: plain Enter must keep textarea editing semantics; only Ctrl+Enter is an explicit generate shortcut.
+          event.preventDefault();
+          form.requestSubmit?.();
+        }
+        return;
+      }
+      const submitCandidate = target.closest(
+        "input:not([type=\"checkbox\"]):not([type=\"radio\"]):not([type=\"range\"]):not([type=\"submit\"]), select",
+      );
+      if (!submitCandidate) {
+        return;
+      }
+      // CRITICAL: do not allow browser default Enter submit from parameter inputs/selects; it causes accidental generation while editing fields.
+      event.preventDefault();
+      if (event.ctrlKey) {
+        form.requestSubmit?.();
+      }
+    },
+    true,
+  );
 }
 
 export function createInput(type, id, value = "", options = {}) {

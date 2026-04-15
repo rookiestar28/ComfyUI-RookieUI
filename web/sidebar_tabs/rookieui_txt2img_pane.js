@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor } from "./rookieui_controlnet_units.js?v=20260413-f96-preprocessor-variants";
+import { createControlNetUnitEditor, createADetailerEditor } from "./rookieui_pane_deps.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -16,8 +16,10 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     createHiresFixSection,
     createSeedControlField,
     createPromptField,
+    installExplicitFormSubmitShortcuts,
     createActionButton,
     createIconActionButton,
+    createPreviewFullscreenViewer,
     buildQuicksettingCard,
     buildSelectionLibrary,
     buildSubtabShell,
@@ -33,19 +35,20 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     readFileAsDataUrl,
     bindSliderPair,
     installPaneStateLock,
-    installExplicitGenerationSubmitGuard,
     applyPayloadToElements,
     findPresetIdForProfile,
     setElementValue,
     syncBoundControls,
-  } = context;  const section = document.createElement("section");
-  section.className = "rookieui-shell__forge-pane";
+  } = context;
+  const section = document.createElement("section");
+  section.className = "rookieui-shell__integrated-pane";
   parent.appendChild(section);
 
   const form = document.createElement("form");
-  form.className = "rookieui-shell__form rookieui-shell__forge-form";
+  form.className = "rookieui-shell__form rookieui-shell__integrated-form";
   form.id = "rookieui-txt2img-form";
   section.appendChild(form);
+  installExplicitFormSubmitShortcuts(form);
 
   const profileLookup = buildProfileLookup(bootstrapState.capabilities);
   const presetLookup = buildPresetLookup(bootstrapState.presets?.presets ?? []);
@@ -61,10 +64,37 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     default_text_encoder: "Automatic",
   };
   const controlnetCatalog = bootstrapState.controlnetCatalog ?? {};
+  const adetailerCatalog = bootstrapState.adetailerCatalog ?? {};
   const controlnetModelValues =
     Array.isArray(controlnetCatalog.model_list) && controlnetCatalog.model_list.length > 0
       ? controlnetCatalog.model_list
       : inventory.controlnet ?? [];
+  const adetailerCheckpointChoices = Array.from(
+    new Set(
+      [
+        ...(Array.isArray(adetailerCatalog.checkpoint_choices) ? adetailerCatalog.checkpoint_choices : []),
+        ...(Array.isArray(inventory.checkpoints) ? inventory.checkpoints : []),
+        ...(Array.isArray(inventory.diffusion_models) ? inventory.diffusion_models : []),
+      ]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+  const mergedADetailerCatalog = {
+    ...adetailerCatalog,
+    // IMPORTANT: ADetailer-local ControlNet must fall back to the primary ControlNet catalog when the dedicated payload is stale or partial.
+    controlnet_model_list:
+      Array.isArray(adetailerCatalog.controlnet_model_list) && adetailerCatalog.controlnet_model_list.length > 0
+        ? adetailerCatalog.controlnet_model_list
+        : controlnetModelValues,
+    controlnet_module_list:
+      Array.isArray(adetailerCatalog.controlnet_module_list) && adetailerCatalog.controlnet_module_list.length > 0
+        ? adetailerCatalog.controlnet_module_list
+        : Array.isArray(controlnetCatalog.module_list) && controlnetCatalog.module_list.length > 0
+          ? controlnetCatalog.module_list
+          : ["none"],
+    checkpoint_choices: adetailerCheckpointChoices,
+  };
   const controlnetTypeCatalog =
     controlnetCatalog.control_types && typeof controlnetCatalog.control_types === "object"
       ? controlnetCatalog.control_types
@@ -97,6 +127,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   });
   let txt2imgPreviewBox = null;
   let txt2imgControlNetEditor = null;
+  let txt2imgADetailerEditor = null;
 
   const elements = {
     prompt: createTextarea("rookieui-prompt", "", 4, {
@@ -207,8 +238,10 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       ],
       "bislerp",
     ),
+    adetailer: createInput("hidden", "rookieui-adetailer", "{}"),
     controlnetUnits: createInput("hidden", "rookieui-controlnet-units", "[]"),
   };
+  form.appendChild(elements.adetailer);
   form.appendChild(elements.controlnetUnits);
   bindSliderPair(elements.width, elements.widthSlider);
   bindSliderPair(elements.height, elements.heightSlider);
@@ -428,6 +461,25 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
         txt2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
 
+        txt2imgADetailerEditor = createADetailerEditor({
+          idPrefix: "rookieui-txt2img-adetailer",
+          parent: samplingSection,
+          hiddenInput: elements.adetailer,
+          catalog: mergedADetailerCatalog,
+          surface: "txt2img",
+          createInput,
+          createRangeInput,
+          createSelect,
+          createTextarea,
+          createCheckbox,
+          createField,
+          createSliderField,
+          createInlineCheckboxField,
+          appendTextElement,
+          bindSliderPair,
+          syncBoundControls,
+        });
+
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";
         workspace.appendChild(rightColumn);
@@ -452,6 +504,15 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         const previewToolbar = document.createElement("div");
         previewToolbar.className = "rookieui-shell__preview-toolbar";
         previewSection.appendChild(previewToolbar);
+
+        createPreviewFullscreenViewer({
+          idPrefix: "rookieui-txt2img",
+          previewBox,
+          previewToolbar,
+          createIconActionButton,
+          statusNode,
+          labelText: "Preview",
+        });
 
         const previewActions = [
           {
@@ -609,7 +670,6 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     event.preventDefault();
     await submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, txt2imgPreviewBox);
   });
-  installExplicitGenerationSubmitGuard(form, submitButton);
 
   const txt2imgStateLock = installPaneStateLock(formRegistry, "txt2img", elements, () => {
     // IMPORTANT: tab restore must re-apply Clip Skip editability; otherwise old profile lock state can persist and look frozen.
@@ -656,6 +716,10 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       if (Array.isArray(payload.controlnet_units)) {
         elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);
         txt2imgControlNetEditor?.setUnits(payload.controlnet_units);
+      }
+      if (payload.adetailer && typeof payload.adetailer === "object") {
+        elements.adetailer.value = JSON.stringify(payload.adetailer);
+        txt2imgADetailerEditor?.setValue(payload.adetailer);
       }
       const resolvedPresetId = findPresetIdForProfile(allPresets, elements.profileState.value);
       if (resolvedPresetId) {

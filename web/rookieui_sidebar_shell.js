@@ -15,27 +15,33 @@ import {
   createSliderField,
   createTextarea,
   generateDeterministicSeed,
+  installExplicitFormSubmitShortcuts,
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
-} from "./rookieui_sidebar_shell_utils.js?v=20260411-r46-utils";
-import { rookieUIDebugWarn } from "./rookieui_debug.js?v=20260411-r48-debug";
-import { createTxt2ImgTabDefinition } from "./sidebar_tabs/rookieui_txt2img_tab.js?v=20260411-r47-tabs";
-import { createImg2ImgTabDefinition } from "./sidebar_tabs/rookieui_img2img_tab.js?v=20260411-r47-tabs";
-import { createExtrasTabDefinition } from "./sidebar_tabs/rookieui_extras_tab.js?v=20260411-r47-tabs";
-import { createPngInfoTabDefinition } from "./sidebar_tabs/rookieui_pnginfo_tab.js?v=20260411-r47-tabs";
-import { createQueueTabDefinition } from "./sidebar_tabs/rookieui_queue_tab.js?v=20260411-r47-tabs";
-import { buildTxt2ImgPane } from "./sidebar_tabs/rookieui_txt2img_pane.js?v=20260413-f96-preprocessor-variants";
-import { buildImg2ImgPane } from "./sidebar_tabs/rookieui_img2img_pane.js?v=20260413-f96-preprocessor-variants";
-import { buildPngInfoPane } from "./sidebar_tabs/rookieui_pnginfo_pane.js?v=20260411-f62-pane-split";
-import { buildExtrasPane } from "./sidebar_tabs/rookieui_extras_pane.js?v=20260411-f42-extras-hires";
-import { buildQueuePane } from "./sidebar_tabs/rookieui_queue_pane.js?v=20260411-f62-pane-split";
-import {
+  rookieUIDebugWarn,
+  createTxt2ImgTabDefinition,
+  createImg2ImgTabDefinition,
+  createExtrasTabDefinition,
+  createPngInfoTabDefinition,
+  createQueueTabDefinition,
+  buildTxt2ImgPane,
+  buildImg2ImgPane,
+  buildPngInfoPane,
+  buildExtrasPane,
+  buildQueuePane,
   assertTopLevelTabDefinitions,
-} from "./sidebar_tabs/rookieui_tab_contract.js?v=20260411-r51-tab-contract";
-import { createShellStateEventContract } from "./sidebar_tabs/rookieui_shell_state_contract.js?v=20260411-r52-shell-state";
-import { createImg2ImgMaskCanvasContract } from "./sidebar_tabs/rookieui_img2img_mask_canvas.js?v=20260411-r49-mask-contract";
-import { createImg2ImgMaskCanvasEditor } from "./sidebar_tabs/rookieui_img2img_mask_editor.js?v=20260411-f58-mask-editor";
-import { createImg2ImgModeRouter } from "./sidebar_tabs/rookieui_img2img_mode_router.js?v=20260411-r50-mode-router";
+  createShellStateEventContract,
+  createImg2ImgMaskCanvasContract,
+  createImg2ImgMaskCanvasEditor,
+  createImg2ImgModeRouter,
+  createActionButton,
+  createMiniActionButton,
+  createIconActionButton,
+  resolveActiveClientId,
+  createGenerationRuntimeState,
+  createGenerationRuntimeHelpers,
+  createPreviewFullscreenViewer,
+} from "./rookieui_sidebar_shell_deps.js";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -49,6 +55,14 @@ function emitFrontendDebugWarning(scope, message, error = null, metadata = null)
   }
   rookieUIDebugWarn(scope, message, Object.keys(detail).length ? detail : null);
 }
+
+// CRITICAL: keep runtime helper wiring centralized here; pane modules receive these stable wrappers through the explicit shell-context bridge.
+const { transferPreviewToImg2Img, trackGenerationRuntime } = createGenerationRuntimeHelpers({
+  emitFrontendDebugWarning,
+  setPreviewContent,
+  applyCrossPanePayload,
+  activateShellTab,
+});
 
 function createSeedControlField(parent, labelText, seedInput, seedExtraInput, id = "") {
   const field = document.createElement("div");
@@ -480,68 +494,6 @@ function applyPayloadToElements(elements, payload, fieldMap) {
   });
 }
 
-function createActionButton(id, text) {
-  const button = document.createElement("button");
-  button.id = id;
-  button.className = "rookieui-shell__button rookieui-shell__button--secondary";
-  button.type = "button";
-  button.textContent = text;
-  return button;
-}
-
-function installExplicitGenerationSubmitGuard(form, submitButton = null) {
-  if (!form) {
-    return;
-  }
-
-  const requestExplicitSubmit = () => {
-    if (typeof form.requestSubmit === "function") {
-      if (submitButton) {
-        form.requestSubmit(submitButton);
-        return;
-      }
-      form.requestSubmit();
-      return;
-    }
-    if (submitButton?.click) {
-      submitButton.click();
-      return;
-    }
-    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  };
-
-  form.addEventListener("keydown", (event) => {
-    if (event.defaultPrevented || event.isComposing || event.key !== "Enter") {
-      return;
-    }
-
-    const target = event.target;
-    const tagName = String(target?.tagName ?? "").toUpperCase();
-    const inputType = String(target?.type ?? "").toLowerCase();
-    const isTextarea = tagName === "TEXTAREA";
-    const isSelect = tagName === "SELECT";
-    const isButton = tagName === "BUTTON";
-    const isImplicitSubmitInput =
-      tagName === "INPUT" &&
-      !["checkbox", "radio", "button", "submit", "reset", "file", "range", "color", "hidden"].includes(inputType);
-
-    if (isTextarea) {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        requestExplicitSubmit();
-      }
-      return;
-    }
-
-    if (isButton || (!isImplicitSubmitInput && !isSelect)) {
-      return;
-    }
-
-    // CRITICAL: browser implicit Enter submit from single-line form controls can launch backend generation while the user is still editing parameters.
-    event.preventDefault();
-  });
-}
-
 function updateFormFromPreset(presetLookup, presetId, elements, profileLookup, modelsPayload = null) {
   const preset = presetLookup.get(presetId);
   if (!preset) {
@@ -664,501 +616,9 @@ function readTxt2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
-}
-
-function normalizeRuntimeClientId(rawClientId) {
-  if (typeof rawClientId !== "string") {
-    return "";
-  }
-  const normalized = rawClientId.trim();
-  if (!normalized || /\s/.test(normalized)) {
-    return "";
-  }
-  return normalized;
-}
-
-function resolveRuntimeApi(bootstrapState) {
-  const runtimeApi = bootstrapState?.runtimeApi ?? globalThis?.window?.app?.api ?? null;
-  if (bootstrapState && runtimeApi && bootstrapState.runtimeApi !== runtimeApi) {
-    bootstrapState.runtimeApi = runtimeApi;
-  }
-  return runtimeApi;
-}
-
-function resolveActiveClientId(bootstrapState) {
-  const runtimeApi = resolveRuntimeApi(bootstrapState);
-  const runtimeClientId = normalizeRuntimeClientId(runtimeApi?.clientId);
-  if (runtimeClientId) {
-    if (bootstrapState) {
-      bootstrapState.clientId = runtimeClientId;
-    }
-    return runtimeClientId;
-  }
-  const sessionClientId = normalizeRuntimeClientId(globalThis?.window?.sessionStorage?.getItem?.("clientId"));
-  if (sessionClientId) {
-    if (bootstrapState) {
-      bootstrapState.clientId = sessionClientId;
-    }
-    return sessionClientId;
-  }
-  return normalizeRuntimeClientId(bootstrapState?.clientId);
-}
-
-function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
-  return {
-    runToken: 0,
-    previewUrl: "",
-    previewPlaceholder,
-    lastPreviewRenderAt: 0,
-    progressValue: null,
-    progressMax: null,
-    progressSeen: false,
-    previewFrameSeen: false,
-  };
-}
-
-function setGenerationPreview(runtimeState, previewBox, imageUrl, fallbackText) {
-  if (!runtimeState || !previewBox) {
-    return;
-  }
-  const previousPreviewUrl = runtimeState.previewUrl;
-  runtimeState.previewUrl = imageUrl || "";
-  setPreviewContent(previewBox, runtimeState.previewUrl, fallbackText || runtimeState.previewPlaceholder);
-  if (
-    previousPreviewUrl &&
-    previousPreviewUrl !== runtimeState.previewUrl &&
-    previousPreviewUrl.startsWith("blob:")
-  ) {
-    // CRITICAL: delay blob URL revoke until after DOM source swap; immediate revoke can trigger visible sidebar-wide flicker on rapid preview frames.
-    requestAnimationFrame(() => URL.revokeObjectURL(previousPreviewUrl));
-  }
-}
-
-function formatGenerationProgress(status, progressValue, progressMax) {
-  const safeStatus = status || "pending";
-  if (
-    typeof progressValue === "number" &&
-    Number.isFinite(progressValue) &&
-    typeof progressMax === "number" &&
-    Number.isFinite(progressMax) &&
-    progressMax > 0
-  ) {
-    const percent = Math.max(0, Math.min(100, Math.round((progressValue / progressMax) * 100)));
-    return `${safeStatus.replace("_", " ")} (${percent}%)`;
-  }
-  return safeStatus.replace("_", " ");
-}
-
-function extractRuntimePromptId(detail) {
-  if (!detail || typeof detail !== "object") {
-    return "";
-  }
-  // CRITICAL: host preview/progress events can nest identifiers under metadata/payload wrappers; keep recursive prompt-id extraction to prevent cross-job frame leakage.
-  const queue = [detail];
-  const visited = new Set();
-  const idKeys = ["prompt_id", "promptId", "jobId", "id"];
-  const nestedKeys = ["metadata", "meta", "payload", "data", "event", "job"];
-  while (queue.length) {
-    const candidate = queue.shift();
-    if (!candidate || typeof candidate !== "object") {
-      continue;
-    }
-    if (visited.has(candidate)) {
-      continue;
-    }
-    visited.add(candidate);
-    for (const key of idKeys) {
-      const value = candidate[key];
-      if (typeof value === "string" && value.trim()) {
-        return value.trim();
-      }
-    }
-    for (const key of nestedKeys) {
-      const nested = candidate[key];
-      if (nested && typeof nested === "object") {
-        queue.push(nested);
-      }
-    }
-  }
-  return "";
-}
-
-function decodeDataUrlToBlob(dataUrl) {
-  if (typeof dataUrl !== "string") {
-    return null;
-  }
-  const trimmed = dataUrl.trim();
-  const match = /^data:(image\/[a-zA-Z0-9.+-]+)?;base64,(.+)$/i.exec(trimmed);
-  if (!match) {
-    return null;
-  }
-  try {
-    const mimeType = match[1] || "image/png";
-    const binary = atob(match[2]);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
-    }
-    return new Blob([bytes], { type: mimeType });
-  } catch (_error) {
-    return null;
-  }
-}
-
-function normalizeBinaryCandidate(candidate, fallbackMime = "image/png") {
-  if (candidate instanceof Blob) {
-    return candidate;
-  }
-  if (candidate instanceof ArrayBuffer) {
-    return new Blob([candidate], { type: fallbackMime });
-  }
-  if (ArrayBuffer.isView(candidate)) {
-    return new Blob([candidate], { type: fallbackMime });
-  }
-  if (Array.isArray(candidate) && candidate.length) {
-    const bytes = candidate.filter((value) => Number.isFinite(value)).map((value) => Number(value));
-    if (bytes.length) {
-      return new Blob([Uint8Array.from(bytes)], { type: fallbackMime });
-    }
-  }
-  if (typeof candidate === "string" && candidate.startsWith("data:image/")) {
-    return decodeDataUrlToBlob(candidate);
-  }
-  return null;
-}
-
-function extractPreviewBlob(payload) {
-  const directBlob = normalizeBinaryCandidate(payload, "image/png");
-  if (directBlob) {
-    return directBlob;
-  }
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-  // IMPORTANT: preview payloads differ by host/frontend bridge; probe nested wrappers before giving up so live preview remains stable across Comfy variants.
-  const queue = [payload];
-  const visited = new Set();
-  const nestedKeys = ["blob", "buffer", "data", "preview", "image", "frame", "payload", "detail", "bytes"];
-  while (queue.length) {
-    const candidate = queue.shift();
-    if (!candidate || typeof candidate !== "object") {
-      continue;
-    }
-    if (visited.has(candidate)) {
-      continue;
-    }
-    visited.add(candidate);
-    const mimeType =
-      (typeof candidate.mime === "string" && candidate.mime) ||
-      (typeof candidate.mimetype === "string" && candidate.mimetype) ||
-      (typeof candidate.content_type === "string" && candidate.content_type) ||
-      "image/png";
-    for (const key of nestedKeys) {
-      const value = candidate[key];
-      const normalized = normalizeBinaryCandidate(value, mimeType);
-      if (normalized) {
-        return normalized;
-      }
-      if (value && typeof value === "object") {
-        queue.push(value);
-      }
-    }
-  }
-  return null;
-}
-
-function extractPrimaryHistoryImage(historyPayload, promptId) {
-  const promptHistory = historyPayload?.[promptId];
-  if (!promptHistory || typeof promptHistory !== "object") {
-    return null;
-  }
-  const outputs = promptHistory.outputs;
-  if (!outputs || typeof outputs !== "object") {
-    return null;
-  }
-  for (const nodeOutput of Object.values(outputs)) {
-    if (!nodeOutput || typeof nodeOutput !== "object") {
-      continue;
-    }
-    const images = Array.isArray(nodeOutput.images) ? nodeOutput.images : [];
-    for (const image of images) {
-      if (!image || typeof image !== "object") {
-        continue;
-      }
-      const filename = typeof image.filename === "string" ? image.filename : "";
-      if (!filename) {
-        continue;
-      }
-      return {
-        filename,
-        subfolder: typeof image.subfolder === "string" ? image.subfolder : "",
-        type: typeof image.type === "string" ? image.type : "output",
-      };
-    }
-  }
-  return null;
-}
-
-function buildComfyViewUrl(imageDescriptor) {
-  if (!imageDescriptor?.filename) {
-    return "";
-  }
-  const params = new URLSearchParams({
-    filename: imageDescriptor.filename,
-    subfolder: imageDescriptor.subfolder || "",
-    type: imageDescriptor.type || "output",
-  });
-  return `/view?${params.toString()}`;
-}
-
-function readBlobAsDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to decode image blob."));
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function resolvePreviewUrlAsDataUrl(previewUrl) {
-  if (!previewUrl) {
-    return "";
-  }
-  if (previewUrl.startsWith("data:image/")) {
-    return previewUrl;
-  }
-  const response = await fetch(previewUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch preview image: ${response.status}`);
-  }
-  const blob = await response.blob();
-  return readBlobAsDataUrl(blob);
-}
-
-function extractComfyViewFilename(previewUrl) {
-  const raw = String(previewUrl ?? "").trim();
-  if (!raw) {
-    return "";
-  }
-  try {
-    const parsed = new URL(raw, globalThis?.window?.location?.origin ?? "http://127.0.0.1");
-    if (parsed.pathname !== "/view") {
-      return "";
-    }
-    return String(parsed.searchParams.get("filename") ?? "").trim();
-  } catch (_error) {
-    return "";
-  }
-}
-
-async function transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox = null) {
-  let previewUrl = runtimeState?.previewUrl ?? "";
-  if (!previewUrl && previewBox) {
-    const previewImage = previewBox.querySelector?.("img");
-    if (previewImage?.src) {
-      previewUrl = previewImage.src;
-    }
-  }
-  if (previewBox) {
-    const previewImage = previewBox.querySelector?.("img");
-    if (previewImage?.src?.startsWith("data:image/")) {
-      previewUrl = previewImage.src;
-    }
-  }
-  if (!previewUrl) {
-    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
-    return;
-  }
-  if (!formRegistry?.img2img?.applyPayload && !formRegistry?.__shellStateContract?.applyToForm) {
-    emitFrontendDebugWarning("shell.preview_transfer", "Img2Img applyPayload is unavailable; falling back to tab switch.");
-    if (statusNode) {
-      statusNode.textContent = "Img2Img form is unavailable.";
-    }
-    return;
-  }
-  const fallbackAsset = extractComfyViewFilename(previewUrl);
-  try {
-    const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
-    if (!imageDataUrl) {
-      throw new Error("Preview image is empty.");
-    }
-    const applied = applyCrossPanePayload(formRegistry, "img2img", {
-      mode: "img2img",
-      image_asset: "",
-      image_data: imageDataUrl,
-      mask_asset: "",
-      mask_data: "",
-      batch_images: [],
-    });
-    if (applied && statusNode) {
-      statusNode.textContent = "Sent preview image to Img2Img";
-    }
-  } catch (_error) {
-    emitFrontendDebugWarning(
-      "shell.preview_transfer",
-      "Preview transfer image decode failed; attempting asset-based fallback.",
-      _error,
-    );
-    if (fallbackAsset) {
-      // IMPORTANT: keep asset fallback for transfer flow so Send-to-Img2Img still works when preview blobs/data-url decoding fails.
-      const applied = applyCrossPanePayload(formRegistry, "img2img", {
-        mode: "img2img",
-        image_asset: fallbackAsset,
-        image_data: "",
-        mask_asset: "",
-        mask_data: "",
-        batch_images: [],
-      });
-      if (applied && statusNode) {
-        statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
-      }
-      return;
-    }
-    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
-  }
-}
-
-async function trackGenerationRuntime(bootstrapState, promptId, statusNode, runtimeState, previewBox) {
-  if (!runtimeState || !promptId) {
-    return;
-  }
-  const runToken = runtimeState.runToken + 1;
-  runtimeState.runToken = runToken;
-  runtimeState.progressValue = null;
-  runtimeState.progressMax = null;
-  runtimeState.progressSeen = false;
-  runtimeState.previewFrameSeen = false;
-  runtimeState.lastPreviewRenderAt = 0;
-
-  const runtimeApi = resolveRuntimeApi(bootstrapState);
-  const listeners = [];
-  const registerRuntimeListener = (eventName, handler) => {
-    if (!runtimeApi?.addEventListener) {
-      return;
-    }
-    runtimeApi.addEventListener(eventName, handler);
-    listeners.push([eventName, handler]);
-  };
-  const unregisterRuntimeListeners = () => {
-    if (!runtimeApi?.removeEventListener) {
-      return;
-    }
-    listeners.forEach(([eventName, handler]) => runtimeApi.removeEventListener(eventName, handler));
-  };
-
-  registerRuntimeListener("progress", (event) => {
-    if (runtimeState.runToken !== runToken) {
-      return;
-    }
-    const detail = event?.detail ?? {};
-    if (detail.prompt_id && detail.prompt_id !== promptId) {
-      return;
-    }
-    runtimeState.progressValue = typeof detail.value === "number" ? detail.value : runtimeState.progressValue;
-    runtimeState.progressMax = typeof detail.max === "number" ? detail.max : runtimeState.progressMax;
-    runtimeState.progressSeen = true;
-    statusNode.textContent = formatGenerationProgress("in_progress", runtimeState.progressValue, runtimeState.progressMax);
-  });
-  const applyPreviewEvent = (event) => {
-    if (runtimeState.runToken !== runToken) {
-      return;
-    }
-    const detail = event?.detail ?? {};
-    const eventPromptId = extractRuntimePromptId(detail);
-    if (eventPromptId && eventPromptId !== promptId) {
-      return;
-    }
-    const blob = extractPreviewBlob(detail);
-    if (!blob) {
-      return;
-    }
-    const now = Date.now();
-    if (now - (runtimeState.lastPreviewRenderAt || 0) < 120) {
-      return;
-    }
-    runtimeState.lastPreviewRenderAt = now;
-    runtimeState.previewFrameSeen = true;
-    const previewUrl = URL.createObjectURL(blob);
-    setGenerationPreview(runtimeState, previewBox, previewUrl, runtimeState.previewPlaceholder);
-  };
-  // IMPORTANT: host event names differ across Comfy surfaces; keep both listeners for stable in-sidebar preview updates.
-  registerRuntimeListener("b_preview_with_metadata", applyPreviewEvent);
-  registerRuntimeListener("b_preview", applyPreviewEvent);
-
-  const startTime = Date.now();
-  const maxDurationMs = 5 * 60 * 1000;
-  let lastHistoryPollAt = 0;
-  let finalStatus = "pending";
-  try {
-    while (runtimeState.runToken === runToken && Date.now() - startTime < maxDurationMs) {
-      const scopedClientId = resolveActiveClientId(bootstrapState);
-      const jobResult = await bootstrapState.fetchQueueJobRequest(promptId, scopedClientId);
-      if (!jobResult.ok) {
-        statusNode.textContent = "Waiting for queue sync...";
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        continue;
-      }
-      const queueJob = jobResult.data?.job ?? null;
-      if (!queueJob) {
-        statusNode.textContent = "Waiting for queue registration...";
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        continue;
-      }
-
-      finalStatus = String(queueJob.status ?? "pending");
-      statusNode.textContent = formatGenerationProgress(finalStatus, runtimeState.progressValue, runtimeState.progressMax);
-      if (runtimeState.progressSeen && !runtimeState.previewFrameSeen && Date.now() - startTime >= 4000) {
-        // CRITICAL: when host runs with --preview-method none, progress updates still arrive but live preview frames never do; keep an explicit diagnostic instead of silent placeholder stalling.
-        statusNode.textContent =
-          `${formatGenerationProgress(finalStatus, runtimeState.progressValue, runtimeState.progressMax)} | ` +
-          "Live preview frames unavailable (host preview may be disabled).";
-      }
-      if (["completed", "failed", "cancelled"].includes(finalStatus)) {
-        break;
-      }
-      if (Date.now() - lastHistoryPollAt >= 1500) {
-        const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
-        const previewImage = historyResult.ok ? extractPrimaryHistoryImage(historyResult.data, promptId) : null;
-        const previewUrl = buildComfyViewUrl(previewImage);
-        if (previewUrl) {
-          runtimeState.previewFrameSeen = true;
-          setGenerationPreview(runtimeState, previewBox, previewUrl, runtimeState.previewPlaceholder);
-        }
-        lastHistoryPollAt = Date.now();
-      }
-      await new Promise((resolve) => setTimeout(resolve, 800));
-    }
-  } finally {
-    unregisterRuntimeListeners();
-  }
-
-  if (runtimeState.runToken !== runToken) {
-    return;
-  }
-
-  if (finalStatus === "completed") {
-    const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
-    const outputImage = historyResult.ok ? extractPrimaryHistoryImage(historyResult.data, promptId) : null;
-    const finalImageUrl = buildComfyViewUrl(outputImage);
-    if (finalImageUrl) {
-      setGenerationPreview(runtimeState, previewBox, finalImageUrl, runtimeState.previewPlaceholder);
-      statusNode.textContent = `Completed: ${promptId}`;
-      return;
-    }
-    statusNode.textContent = `Completed: ${promptId} (no image output found)`;
-    return;
-  }
-  if (finalStatus === "failed") {
-    statusNode.textContent = `Generation failed: ${promptId}`;
-    return;
-  }
-  if (finalStatus === "cancelled") {
-    statusNode.textContent = `Generation cancelled: ${promptId}`;
-    return;
-  }
-  statusNode.textContent = `Runtime sync timed out: ${promptId}`;
 }
 
 async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, previewBox) {
@@ -1171,7 +631,10 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
   }
   const result = await bootstrapState.submitTxt2ImgRequest(payload);
   if (!result.ok) {
-    statusNode.textContent = `Request failed: ${result.data.status}`;
+    const detail = String(result?.data?.detail ?? "").trim();
+    statusNode.textContent = detail
+      ? `Request failed: ${result.data.status} (${detail})`
+      : `Request failed: ${result.data.status}`;
     return;
   }
 
@@ -1240,6 +703,7 @@ function readImg2ImgPayload(elements) {
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
+    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
@@ -1361,7 +825,10 @@ async function submitImg2Img(
   }
   const result = await bootstrapState.submitImg2ImgRequest(payload);
   if (!result.ok) {
-    statusNode.textContent = `Request failed: ${result.data.status}`;
+    const detail = String(result?.data?.detail ?? "").trim();
+    statusNode.textContent = detail
+      ? `Request failed: ${result.data.status} (${detail})`
+      : `Request failed: ${result.data.status}`;
     return;
   }
 
@@ -1379,56 +846,6 @@ async function submitImg2Img(
   }
 
   statusNode.textContent = `Preview ready: ${result.data.workflow_kind}`;
-}
-
-function createMiniActionButton(id, text) {
-  const button = document.createElement("button");
-  button.id = id;
-  button.className = "rookieui-shell__mini-action";
-  button.type = "button";
-  button.textContent = text;
-  return button;
-}
-
-const A1111_TOOL_EMOJI_MAP = Object.freeze({
-  "pi-check-square": "📂",
-  "pi-trash": "🗑️",
-  "pi-file": "📋",
-  "pi-pencil": "🖌️",
-  "pi-folder-open": "📂",
-  "pi-image": "🖼️",
-  "pi-star": "📐",
-  "pi-sliders-h": "♻️",
-  "pi-images": "🗃️",
-});
-
-function resolveToolEmoji(iconToken) {
-  if (typeof iconToken !== "string") {
-    return "🔹";
-  }
-  const normalized = iconToken.trim();
-  if (!normalized) {
-    return "🔹";
-  }
-  // IMPORTANT: keep A1111/Forge emoji semantics here; replacing this with icon-font classes breaks the target ToolButton parity.
-  return A1111_TOOL_EMOJI_MAP[normalized] ?? normalized;
-}
-
-function createIconActionButton(id, iconToken, labelText, tone = "neutral") {
-  const button = document.createElement("button");
-  const safeTone = typeof tone === "string" && tone.trim() ? tone.trim() : "neutral";
-  button.id = id;
-  button.className = `rookieui-shell__mini-action rookieui-shell__mini-action--icon rookieui-shell__mini-action--tone-${safeTone}`;
-  button.type = "button";
-  button.title = labelText;
-  button.setAttribute("aria-label", labelText);
-
-  const icon = document.createElement("span");
-  icon.className = "rookieui-shell__mini-action-icon";
-  icon.textContent = resolveToolEmoji(iconToken);
-  icon.setAttribute("aria-hidden", "true");
-  button.appendChild(icon);
-  return button;
 }
 
 function activateShellTab(formRegistry, tabId, statusNode, message = "") {
@@ -1674,6 +1091,23 @@ function parseJsonObjectArrayField(rawValue) {
   }
 }
 
+function parseJsonObjectField(rawValue) {
+  if (typeof rawValue !== "string" || !rawValue.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(rawValue);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    emitFrontendDebugWarning(
+      "shell.adetailer_parse",
+      "Failed to parse ADetailer JSON field; returning empty object.",
+      _error,
+    );
+    return {};
+  }
+}
+
 function buildPaneModuleContext() {
   // CRITICAL: extracted pane modules depend on this explicit injection map; removing keys here can trigger runtime ReferenceError regressions across tab render paths.
   return {
@@ -1691,9 +1125,11 @@ function buildPaneModuleContext() {
     createHiresFixSection,
     createSeedControlField,
     createPromptField,
+    installExplicitFormSubmitShortcuts,
     createActionButton,
     createIconActionButton,
     createMiniActionButton,
+    createPreviewFullscreenViewer,
     buildQuicksettingCard,
     buildSelectionLibrary,
     buildSubtabShell,
@@ -1722,7 +1158,6 @@ function buildPaneModuleContext() {
     readFileAsDataUrl,
     setPreviewContent,
     installPaneStateLock,
-    installExplicitGenerationSubmitGuard,
     findPresetIdForProfile,
     setElementValue,
     syncBoundControls,
@@ -1741,7 +1176,7 @@ function buildPaneModuleContext() {
     buildShellHeader,
     buildCompatibilitySection,
     buildCompatibilityList,
-    resolveForgeNeoTheme,
+    resolveIntegratedShellTheme,
   };
 }
 
@@ -1775,6 +1210,7 @@ function setPreviewContent(previewBox, imageDataUrl, placeholderText) {
     if (image.src !== imageDataUrl) {
       image.src = imageDataUrl;
     }
+    previewBox.__previewFullscreenController?.syncImage?.();
     return;
   }
   if (currentImage) {
@@ -1785,6 +1221,7 @@ function setPreviewContent(previewBox, imageDataUrl, placeholderText) {
     return;
   }
   appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", placeholderText);
+  previewBox.__previewFullscreenController?.syncImage?.();
 }
 
 function updatePngInfoApplyButtons(state, buttons) {
@@ -2010,7 +1447,7 @@ function buildShellHeader(container, bootstrapState) {
   actions.appendChild(githubLink);
 }
 
-function resolveForgeNeoTheme(documentRef, windowRef = documentRef?.defaultView) {
+function resolveIntegratedShellTheme(documentRef, windowRef = documentRef?.defaultView) {
   const classHints = [
     documentRef?.body?.className ?? "",
     documentRef?.documentElement?.className ?? "",
@@ -2119,7 +1556,7 @@ function buildShellFooter(container, bootstrapState) {
 export function renderRookieUISidebar(container, bootstrapState) {
   container.replaceChildren();
   container.className = "rookieui-shell";
-  container.dataset.theme = resolveForgeNeoTheme(container.ownerDocument);
+  container.dataset.theme = resolveIntegratedShellTheme(container.ownerDocument);
   const formRegistry = {};
   const shellStateContract = createShellStateEventContract(formRegistry);
   formRegistry.__shellStateContract = shellStateContract;

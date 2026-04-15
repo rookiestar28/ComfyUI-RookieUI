@@ -18,7 +18,7 @@ def _read_project_version_from_pyproject(pyproject_path: Path) -> str | None:
     except OSError:
         return None
 
-    # OpenClaw-aligned strategy: prefer stdlib TOML parse, then fallback regex.
+    # Compatibility strategy: prefer stdlib TOML parse, then fallback regex.
     try:
         from tomllib import loads as toml_loads  # type: ignore[attr-defined]
     except Exception:

@@ -1,7 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
+
+CONTROLNET_ADVANCED_WEIGHT_PRESETS = ("balanced", "soft", "strong")
+
+
+@dataclass(frozen=True)
+class NormalizedControlNetAdvancedRequest:
+    enabled: bool = False
+    weight_preset: str = "balanced"
+    layer_weights: list[float] = field(default_factory=list)
+    timestep_keyframes: list[dict[str, float]] = field(default_factory=list)
+    mask_aware_apply: bool = False
+
+    def to_payload(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -25,6 +39,7 @@ class NormalizedControlNetUnit:
     control_type: str = "All"
     use_mask: bool = False
     allow_preview: bool = False
+    advanced: NormalizedControlNetAdvancedRequest = field(default_factory=NormalizedControlNetAdvancedRequest)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

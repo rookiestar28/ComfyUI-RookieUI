@@ -1,5 +1,6 @@
 import {
   fetchRookieUICapabilities,
+  fetchRookieUIADetailerCatalog,
   fetchRookieUICompatibility,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
@@ -13,16 +14,14 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
-} from "./rookieui_api.js?v=20260412-controlnet-ui-parity-pass2";
-import {
   describeHostSurface,
   detectHostSurface,
   isHostSurfaceSupported,
-} from "./rookieui_host_surface.js?v=20260410-f46r27";
-import { renderRookieUISidebar } from "./rookieui_sidebar_shell.js?v=20260413-f96-preprocessor-variants";
+  renderRookieUISidebar,
+} from "./rookieui_extension_deps.js";
+import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
-const ROOKIEUI_ASSET_REVISION = "20260413-controlnet-zoom-sync";
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
@@ -74,7 +73,7 @@ function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
       modelResult?.data?.contract ??
       moduleResult?.data?.contract ?? {
         version: "r72-20260412",
-        ui_variant: "forge_neo_integrated",
+        ui_variant: "integrated_sidebar_controlnet",
         unit_count: 3,
       },
     model_list: modelList,
@@ -132,9 +131,8 @@ function ensureCssInjected(documentRef) {
   const link = documentRef.createElement("link");
   link.id = "rookieui-styles";
   link.rel = "stylesheet";
-  const stylesheetUrl = new URL("./rookieui.css", import.meta.url);
+  const stylesheetUrl = applyRevisionToUrl("./rookieui.css", import.meta.url);
   // IMPORTANT: build the cache-busting query via URL APIs; inline template strings are treated as static literals by some test/tooling paths.
-  stylesheetUrl.searchParams.set("v", ROOKIEUI_ASSET_REVISION);
   link.href = stylesheetUrl.href;
   documentRef.head.appendChild(link);
 }
@@ -187,6 +185,7 @@ export function registerRookieUIBootstrapExtension({
         controlNetModelResult,
         controlNetModuleResult,
         controlNetTypeResult,
+        adetailerCatalogResult,
       ] = await Promise.all([
         fetchRookieUICapabilities(fetchImpl),
         fetchRookieUICompatibility(fetchImpl),
@@ -195,6 +194,7 @@ export function registerRookieUIBootstrapExtension({
         fetchRookieUIControlNetModels(fetchImpl),
         fetchRookieUIControlNetModules(fetchImpl),
         fetchRookieUIControlNetTypes(fetchImpl),
+        fetchRookieUIADetailerCatalog(fetchImpl),
       ]);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
       if (clientId && windowRef?.sessionStorage?.setItem) {
@@ -225,6 +225,7 @@ export function registerRookieUIBootstrapExtension({
         models: modelResult.data,
         presets: presetResult.data,
         controlnetCatalog,
+        adetailerCatalog: adetailerCatalogResult.data,
         queue: queueResult.data,
         clientId,
         runtimeApi,
@@ -240,6 +241,7 @@ export function registerRookieUIBootstrapExtension({
         fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(fetchImpl),
         fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(fetchImpl),
         fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
+        fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(fetchImpl),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {
