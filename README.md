@@ -24,6 +24,28 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Native ADetailer and advanced ControlNet runtime upgrade (new functionality)</strong></summary>
+
+- Upgraded ADetailer to a RookieUI-owned detector/runtime path with packaged Ultralytics/OpenCV-backed dependency support instead of relying on an external A1111 script or third-party node pack.
+- Added native advanced ControlNet execution support for stage-aware weights, timestep scheduling, and mask-aware application in the shared RookieUI workflow translator.
+- Kept main-generation ControlNet and ADetailer-local ControlNet on the same native apply seam so advanced behavior stays consistent across base and refinement stages.
+- Improved runtime availability metadata so the UI can report the real detector/advanced-ControlNet capability surface instead of implying unsupported host features.
+
+</details>
+
+<details>
+
+<summary><strong>Preview fullscreen viewer and frontend regression hardening (new functionality/stability)</strong></summary>
+
+- Added a preview-only fullscreen viewer for generated images in `txt2img` and `img2img`, with direct surface activation and zoom-only inspection.
+- Improved preview discoverability with visible overlay controls and consistent fullscreen enter/exit feedback.
+- Hardened frontend regression coverage so fullscreen behavior is validated through real user actions instead of DOM-existence checks only.
+- Added a shipped-frontend asset revision fingerprint guard to reduce stale-browser-cache regressions after UI hotfixes.
+
+</details>
+
+<details>
+
 <summary><strong>ADetailer integrated parity rollout (new functionality)</strong></summary>
 
 - Added an integrated ADetailer editor in `txt2img` and `img2img` with four unit tabs, grouped controls, and A1111-style layout on top of RookieUI's native sidebar shell.
@@ -189,12 +211,14 @@ python -m pip install -r requirements.txt
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
 
+`ControlNet` and `ADetailer` support are built into RookieUI itself. You do not need to install separate external custom-node packs just to use RookieUI's integrated ControlNet or ADetailer surfaces.
+
 Required extra Python packages for RookieUI:
 
 - `opencv-python-headless>=4.10.0`
 - `ultralytics>=8.3.0`
 
-If your host or Manager install path does not automatically install custom-node dependencies, run `python -m pip install -r requirements.txt` manually in the same Python environment used by ComfyUI.
+If your host or Manager install path does not automatically install custom-node dependencies, run `python -m pip install -r requirements.txt` manually in the same Python environment used by ComfyUI. These packages power RookieUI's native ADetailer detector/runtime path and related image-processing helpers.
 
 ## Feature Overview
 
@@ -210,6 +234,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
 - Progress text and queue/history integration in sidebar flow
 - Live preview panel with runtime updates and flicker-mitigated rendering
+- Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
 
 ### Generation
 
@@ -237,6 +262,7 @@ If your host or Manager install path does not automatically install custom-node 
 - integrated multi-unit ADetailer surface in `txt2img` and `img2img`
 - four-unit editor with grouped controls and override gating
 - host-native detect-mask-refine runtime chain
+- RookieUI-native detector/runtime path backed by packaged Python dependencies instead of an external ADetailer node pack
 - ControlNet `none` / `passthrough` / `custom` support inside detailer refinement
 - explicit diagnostics and availability guidance for degraded detector/model states
 
@@ -299,14 +325,21 @@ Behavior and compatibility:
 
 - A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img`.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
+- RookieUI ships its own integrated ControlNet request/runtime layer, so the feature does not depend on installing a separate external ControlNet UI extension.
 - Selected preprocessor variants are dispatched to matching host annotator nodes when available, including exact OpenPose-family variant routing.
+- Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
-- When a host preprocessor is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
+- ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
 
 ## ADetailer Support
+
+<div align="left">
+  <img src="assets/adetailer.png" width="40%" />
+</div>
+<br>
 
 Simple usage:
 
@@ -320,8 +353,10 @@ Behavior and compatibility:
 
 - The ADetailer surface is integrated directly into RookieUI's generation panes instead of relying on an external A1111 script runner.
 - Runtime behavior follows a detect-mask-refine pipeline built from native ComfyUI/RookieUI workflow nodes.
+- Detector/runtime support is packaged with RookieUI's own dependency/runtime layer; no separate external ADetailer custom-node pack is required.
 - Up to four ADetailer units are supported in the integrated editor.
 - ControlNet coupling supports `none`, `passthrough`, and `custom` modes inside the refinement context.
+- Native detector runtime uses RookieUI's packaged Python dependencies together with host model inventory, so matching detector/model files must still exist in the host environment.
 - Availability guidance and warning diagnostics are exposed when detector/model/runtime dependencies are degraded.
 
 ## Support for Other Extensions

@@ -2,6 +2,23 @@ const { test, expect } = require("@playwright/test");
 
 test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.goto("test-harness.html");
+  await page.evaluate(() => {
+    let fullscreenElement = null;
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get() {
+        return fullscreenElement;
+      },
+    });
+    HTMLElement.prototype.requestFullscreen = async function requestFullscreenShim() {
+      fullscreenElement = this;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    document.exitFullscreen = async function exitFullscreenShim() {
+      fullscreenElement = null;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+  });
   await expect(page.locator("#rookieui-title")).toHaveText("RookieUI Bootstrap Harness");
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurface":"standalone-web"');
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true');
@@ -71,6 +88,39 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(
     page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen"),
   ).toBeVisible();
+  await page.evaluate(() => {
+    const previewBox = document.getElementById("rookieui-txt2img-preview");
+    previewBox.innerHTML = "";
+    const image = document.createElement("img");
+    image.className = "rookieui-shell__preview-image";
+    image.src =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZrY4AAAAASUVORK5CYII=";
+    previewBox.appendChild(image);
+    previewBox.__previewFullscreenController?.syncImage?.();
+  });
+  await page.locator("#rookieui-txt2img-preview").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() =>
+        document.fullscreenElement?.classList?.contains("rookieui-shell__preview-surface") ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("entered fullscreen mode");
+  await page.locator("#rookieui-txt2img-preview").click();
+  await expect
+    .poll(async () => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("exited fullscreen mode");
+  await page.evaluate(() => {
+    const previewBox = document.getElementById("rookieui-txt2img-preview");
+    previewBox.innerHTML = "";
+    const placeholder = document.createElement("span");
+    placeholder.className = "rookieui-shell__preview-placeholder";
+    placeholder.textContent = "Generation preview will update while the job is running.";
+    previewBox.appendChild(placeholder);
+    previewBox.__previewFullscreenController?.syncImage?.();
+  });
   await expect(page.locator("#rookieui-steps-slider")).toHaveCSS("accent-color", "rgb(78, 134, 235)");
   const sliderBackground = await page.locator("#rookieui-steps-slider").evaluate((node) => {
     return getComputedStyle(node).backgroundImage;
@@ -395,6 +445,22 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-img2img-source-brush-softness")).toHaveValue("0");
   await expect(page.locator("#rookieui-img2img-source-undo")).toBeDisabled();
   await expect(page.locator("#rookieui-img2img-source-redo")).toBeDisabled();
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
+  await page.locator("#rookieui-img2img-source-fullscreen").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() =>
+        document.fullscreenElement?.classList?.contains("rookieui-shell__canvas-upload-surface") ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator("#rookieui-img2img-status")).toContainText("entered fullscreen mode");
+  await page.locator("#rookieui-img2img-image-dropzone").hover();
+  await page.locator("#rookieui-img2img-source-fullscreen").click();
+  await expect
+    .poll(async () => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
+  await expect(page.locator("#rookieui-img2img-status")).toContainText("exited fullscreen mode");
   await page.locator("#rookieui-img2img-image-dropzone").hover();
   await page.locator("#rookieui-img2img-source-remove").click();
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
