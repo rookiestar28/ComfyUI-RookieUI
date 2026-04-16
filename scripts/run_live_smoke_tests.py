@@ -147,6 +147,29 @@ class LiveADetailerDryRunCase:
     expect_skip_img2img: bool = False
 
 
+@dataclass(frozen=True)
+class AuxiliaryPipelineContext:
+    checkpoint_name: str
+    workflow_family: str
+
+
+@dataclass(frozen=True)
+class LivePNGInfoCase:
+    case_id: str
+    image_data: str
+    expected_source_type: str
+    expected_target_form: str
+    expected_apply_targets: tuple[str, ...]
+    expected_prompt: str = ""
+    expected_negative_prompt: str = ""
+    expected_profile: str | None = None
+    expected_checkpoint_name: str | None = None
+    expected_missing_inputs: tuple[str, ...] = ()
+    expected_warning_fragment: str | None = None
+    apply_back_route: str | None = None
+    expected_workflow_kind: str | None = None
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -159,6 +182,8 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
         return ",".join(_CONTROLNET_VALIDATION_PROFILES)
     if validation_mode == "adetailer":
         return ",".join(_ADETAILER_VALIDATION_PROFILES)
+    if validation_mode == "auxiliary-pipelines":
+        return ""
     if validation_mode == "prompt-parity":
         return ",".join(_SD_PROMPT_PARITY_PROFILES)
     if validation_mode == "auxiliary-contracts":
@@ -177,7 +202,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity", "auxiliary-contracts", "controlnet", "adetailer"),
+        choices=("catalog", "prompt-parity", "auxiliary-contracts", "auxiliary-pipelines", "controlnet", "adetailer"),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -370,6 +395,94 @@ def _build_auxiliary_contract_probes() -> list[LiveRouteContractProbe]:
     ]
 
 
+def _build_auxiliary_pipeline_context(models_payload: dict[str, Any]) -> AuxiliaryPipelineContext:
+    checkpoints = _iter_string_list(models_payload, "checkpoints")
+    checkpoint_name = (
+        _select_checkpoint_by_keywords(checkpoints, prefix="SD15\\")
+        or _select_checkpoint_by_keywords(checkpoints, prefix="SDXL\\", keywords=("pony", "illustrious", "noob"))
+        or _select_checkpoint_by_keywords(checkpoints, prefix="SDXL\\")
+        or _read_nested_text(models_payload, "default_checkpoint")
+        or (checkpoints[0] if checkpoints else "__host_default__")
+    )
+    workflow_family = "sdxl" if checkpoint_name.lower().startswith("sdxl\\") else "sd15"
+    return AuxiliaryPipelineContext(
+        checkpoint_name=checkpoint_name,
+        workflow_family=workflow_family,
+    )
+
+
+def _build_extras_smoke_payload() -> dict[str, Any]:
+    return {
+        "mode": "single_image",
+        "image_data": _build_png_data_url(color="lightblue"),
+        "upscale_enabled": True,
+        "scale_mode": "scale_to",
+        "scale_by": 1.0,
+        "target_width": 128,
+        "target_height": 160,
+        "color_correction": True,
+        "face_restoration": "codeformer",
+        "codeformer_weight": 0.4,
+    }
+
+
+def _build_pnginfo_live_cases(context: AuxiliaryPipelineContext) -> list[LivePNGInfoCase]:
+    size = "1024x1024" if context.workflow_family == "sdxl" else "512x512"
+    txt2img_parameters = (
+        "harbor dusk\n"
+        "Negative prompt: blurry\n"
+        f"Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 5, Size: {size}, Model: {context.checkpoint_name}"
+    )
+    inpaint_parameters = (
+        "portrait cleanup\n"
+        "Negative prompt: bad hands\n"
+        "Steps: 24, Sampler: DPM++ 2M Karras, CFG scale: 7, Seed: 42, "
+        f"Size: {size}, Denoising strength: 0.42, Mask mode: Inpaint masked, Masked content: original, "
+        f"Inpaint area: Whole picture, Masked area padding: 16, Model: {context.checkpoint_name}"
+    )
+    return [
+        LivePNGInfoCase(
+            case_id="pnginfo_a1111_txt2img",
+            image_data=_build_png_data_url(metadata={"parameters": txt2img_parameters}),
+            expected_source_type="a1111",
+            expected_target_form="txt2img",
+            expected_apply_targets=("txt2img", "img2img"),
+            expected_prompt="harbor dusk",
+            expected_negative_prompt="blurry",
+            expected_profile=context.workflow_family,
+            expected_checkpoint_name=context.checkpoint_name,
+            apply_back_route="/rookieui/generate/txt2img",
+            expected_workflow_kind=f"txt2img-{context.workflow_family}",
+        ),
+        LivePNGInfoCase(
+            case_id="pnginfo_comfy_inspect_only",
+            image_data=_build_png_data_url(
+                metadata={
+                    "prompt": "{\"1\": {\"class_type\": \"KSampler\"}}",
+                    "workflow": "{\"nodes\": []}",
+                }
+            ),
+            expected_source_type="comfyui",
+            expected_target_form="inspect_only",
+            expected_apply_targets=(),
+            expected_warning_fragment="inspection only",
+        ),
+        LivePNGInfoCase(
+            case_id="pnginfo_a1111_inpaint",
+            image_data=_build_png_data_url(metadata={"parameters": inpaint_parameters}),
+            expected_source_type="a1111",
+            expected_target_form="inpaint",
+            expected_apply_targets=("txt2img", "img2img"),
+            expected_prompt="portrait cleanup",
+            expected_negative_prompt="bad hands",
+            expected_profile=context.workflow_family,
+            expected_checkpoint_name=context.checkpoint_name,
+            expected_missing_inputs=("mask_asset",),
+            expected_warning_fragment="Mask asset must be selected manually",
+        ),
+    ]
+
+
 def _validate_route_contract_payload(probe: LiveRouteContractProbe, payload: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if _read_nested_text(payload, "service") != "rookieui":
@@ -414,6 +527,355 @@ def _run_auxiliary_contract_smoke(base_url: str, *, request_timeout_seconds: flo
             errors.append(f"surface '{probe.surface}' request failed: {exc}")
             continue
         errors.extend(_validate_route_contract_payload(probe, response_payload))
+    return errors
+
+
+def _validate_extras_execution_response(response_payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="extras_run",
+        route_path="/rookieui/extras/run",
+        local_contract_version=EXTRAS_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, response_payload)
+    if response_payload.get("mode") != "single_image":
+        errors.append(f"extras: expected mode 'single_image' but got '{response_payload.get('mode')}'.")
+
+    normalized_request = response_payload.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        errors.append("extras: response missing normalized_request.")
+        return errors
+    if normalized_request.get("scale_mode") != "scale_to":
+        errors.append("extras: normalized_request.scale_mode did not stay 'scale_to'.")
+    if normalized_request.get("target_width") != 128 or normalized_request.get("target_height") != 160:
+        errors.append("extras: normalized_request target dimensions did not match the live smoke payload.")
+    if normalized_request.get("face_restoration") != "codeformer":
+        errors.append("extras: normalized_request.face_restoration did not retain 'codeformer'.")
+    if not bool(normalized_request.get("color_correction")):
+        errors.append("extras: normalized_request.color_correction was not true.")
+
+    warnings = response_payload.get("warnings")
+    if not isinstance(warnings, list) or not any("without face restoration" in str(warning).lower() for warning in warnings):
+        errors.append("extras: guarded face-restoration warning was missing.")
+
+    output_assets = response_payload.get("output_assets")
+    preview_asset = str(response_payload.get("preview_asset", "")).strip()
+    preview_data_url = str(response_payload.get("preview_data_url", "")).strip()
+    if not isinstance(output_assets, list) or not output_assets:
+        errors.append("extras: expected at least one output asset.")
+    if not preview_asset:
+        errors.append("extras: preview_asset was empty.")
+    elif isinstance(output_assets, list) and preview_asset not in output_assets:
+        errors.append("extras: preview_asset was not included in output_assets.")
+    if not preview_data_url.startswith("data:image/png;base64,"):
+        errors.append("extras: preview_data_url was missing an inline PNG preview.")
+    return errors
+
+
+def _validate_pnginfo_parse_response(case: LivePNGInfoCase, response_payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="pnginfo_parse_inspect",
+        route_path="/rookieui/pnginfo/parse",
+        local_contract_version=PNGINFO_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, response_payload)
+    if response_payload.get("source_type") != case.expected_source_type:
+        errors.append(
+            f"{case.case_id}: expected source_type '{case.expected_source_type}' but got "
+            f"'{response_payload.get('source_type')}'."
+        )
+    if response_payload.get("target_form") != case.expected_target_form:
+        errors.append(
+            f"{case.case_id}: expected target_form '{case.expected_target_form}' but got "
+            f"'{response_payload.get('target_form')}'."
+        )
+    apply_targets = response_payload.get("apply_targets")
+    if list(case.expected_apply_targets) != (apply_targets if isinstance(apply_targets, list) else []):
+        errors.append(
+            f"{case.case_id}: expected apply_targets {list(case.expected_apply_targets)} but got '{apply_targets}'."
+        )
+    if not str(response_payload.get("asset_handle", "")).strip():
+        errors.append(f"{case.case_id}: asset_handle was empty.")
+
+    warnings = response_payload.get("warnings")
+    if case.expected_warning_fragment:
+        if not isinstance(warnings, list) or not any(
+            case.expected_warning_fragment.lower() in str(warning).lower() for warning in warnings
+        ):
+            errors.append(
+                f"{case.case_id}: warning fragment '{case.expected_warning_fragment}' was missing."
+            )
+
+    payload = response_payload.get("payload")
+    if case.expected_target_form == "inspect_only":
+        if payload != {}:
+            errors.append(f"{case.case_id}: inspect-only payload was expected to stay empty.")
+        return errors
+
+    if not isinstance(payload, dict):
+        errors.append(f"{case.case_id}: parse response missing payload.")
+        return errors
+    if case.expected_prompt and payload.get("prompt") != case.expected_prompt:
+        errors.append(
+            f"{case.case_id}: expected payload.prompt '{case.expected_prompt}' but got '{payload.get('prompt')}'."
+        )
+    if case.expected_negative_prompt and payload.get("negative_prompt") != case.expected_negative_prompt:
+        errors.append(
+            f"{case.case_id}: expected payload.negative_prompt '{case.expected_negative_prompt}' but got '{payload.get('negative_prompt')}'."
+        )
+    if case.expected_profile and payload.get("profile") != case.expected_profile:
+        errors.append(
+            f"{case.case_id}: expected payload.profile '{case.expected_profile}' but got '{payload.get('profile')}'."
+        )
+    if case.expected_checkpoint_name and payload.get("checkpoint_name") != case.expected_checkpoint_name:
+        errors.append(
+            f"{case.case_id}: expected payload.checkpoint_name '{case.expected_checkpoint_name}' but got '{payload.get('checkpoint_name')}'."
+        )
+
+    missing_inputs = response_payload.get("missing_inputs")
+    if not isinstance(missing_inputs, list):
+        errors.append(f"{case.case_id}: response missing missing_inputs list.")
+        missing_inputs = []
+    for expected_field in case.expected_missing_inputs:
+        if expected_field not in missing_inputs:
+            errors.append(f"{case.case_id}: expected missing_inputs to include '{expected_field}'.")
+    return errors
+
+
+def _validate_pnginfo_apply_back_response(
+    case: LivePNGInfoCase,
+    response_payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    submission = response_payload.get("submission")
+    if not isinstance(submission, dict) or submission.get("mode") != "dry-run":
+        errors.append(f"{case.case_id}: apply-back expected dry-run submission payload.")
+    if case.expected_workflow_kind and response_payload.get("workflow_kind") != case.expected_workflow_kind:
+        errors.append(
+            f"{case.case_id}: expected workflow_kind '{case.expected_workflow_kind}' but got "
+            f"'{response_payload.get('workflow_kind')}'."
+        )
+    normalized_request = response_payload.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        errors.append(f"{case.case_id}: apply-back response missing normalized_request.")
+        return errors
+    if normalized_request.get("prompt") != case.expected_prompt:
+        errors.append(f"{case.case_id}: apply-back prompt did not match parsed PNG Info payload.")
+    if normalized_request.get("negative_prompt") != case.expected_negative_prompt:
+        errors.append(f"{case.case_id}: apply-back negative prompt did not match parsed PNG Info payload.")
+    if case.expected_checkpoint_name and normalized_request.get("checkpoint_name") != case.expected_checkpoint_name:
+        errors.append(f"{case.case_id}: apply-back checkpoint_name drifted from the parsed PNG Info payload.")
+    return errors
+
+
+def _validate_queue_snapshot_response(
+    response_payload: dict[str, Any],
+    *,
+    prompt_id: str,
+    allowed_statuses: tuple[str, ...],
+    require_visible_job: bool = True,
+    expected_queue_remaining: int | None = None,
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="queue_snapshot_and_job_lookup",
+        route_path="/rookieui/queue",
+        local_contract_version=QUEUE_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, response_payload)
+    if response_payload.get("source") != "host":
+        errors.append(f"queue snapshot: expected source 'host' but got '{response_payload.get('source')}'.")
+    queue_remaining = response_payload.get("queue_remaining")
+    if not isinstance(queue_remaining, int):
+        errors.append("queue snapshot: queue_remaining was not an integer.")
+    elif expected_queue_remaining is not None and queue_remaining != expected_queue_remaining:
+        errors.append(
+            f"queue snapshot: expected queue_remaining={expected_queue_remaining} but got {queue_remaining}."
+        )
+    jobs = response_payload.get("jobs")
+    if not isinstance(jobs, list):
+        errors.append("queue snapshot: jobs list missing.")
+        return errors
+    if not require_visible_job:
+        return errors
+    job = next((entry for entry in jobs if isinstance(entry, dict) and entry.get("id") == prompt_id), None)
+    if not isinstance(job, dict):
+        errors.append(f"queue snapshot: job '{prompt_id}' was not visible in the client-scoped snapshot.")
+        return errors
+    status = str(job.get("status", "")).strip().lower()
+    if status not in allowed_statuses:
+        errors.append(f"queue snapshot: job '{prompt_id}' had unexpected status '{status}'.")
+    return errors
+
+
+def _validate_queue_job_response(response_payload: dict[str, Any], *, prompt_id: str) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="queue_snapshot_and_job_lookup",
+        route_path=f"/rookieui/queue/{prompt_id}",
+        local_contract_version=QUEUE_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, response_payload)
+    if response_payload.get("source") != "host":
+        errors.append(f"queue job: expected source 'host' but got '{response_payload.get('source')}'.")
+    job = response_payload.get("job")
+    if not isinstance(job, dict):
+        errors.append(f"queue job: expected job payload for '{prompt_id}'.")
+        return errors
+    if job.get("id") != prompt_id:
+        errors.append(f"queue job: expected id '{prompt_id}' but got '{job.get('id')}'.")
+    if str(job.get("status", "")).strip().lower() != "completed":
+        errors.append(f"queue job: expected completed status but got '{job.get('status')}'.")
+    reusable_outputs = job.get("reusable_outputs")
+    if not isinstance(reusable_outputs, list) or not reusable_outputs:
+        errors.append("queue job: completed job did not expose reusable_outputs.")
+    queue_remaining = response_payload.get("queue_remaining")
+    if not isinstance(queue_remaining, int):
+        errors.append("queue job: queue_remaining was not an integer.")
+    return errors
+
+
+def _run_extras_execution_smoke(base_url: str, *, request_timeout_seconds: float) -> list[str]:
+    response_payload = _request_json(
+        "POST",
+        f"{base_url}/rookieui/extras/run",
+        payload=_build_extras_smoke_payload(),
+        timeout_seconds=request_timeout_seconds,
+    )
+    return _validate_extras_execution_response(response_payload)
+
+
+def _run_pnginfo_dry_run_smoke(
+    base_url: str,
+    context: AuxiliaryPipelineContext,
+    *,
+    request_timeout_seconds: float,
+) -> tuple[list[str], LivePNGInfoCase | None, dict[str, Any] | None]:
+    errors: list[str] = []
+    execute_case: LivePNGInfoCase | None = None
+    execute_payload: dict[str, Any] | None = None
+    for case in _build_pnginfo_live_cases(context):
+        response_payload = _request_json(
+            "POST",
+            f"{base_url}/rookieui/pnginfo/parse",
+            payload={"image_data": case.image_data},
+            timeout_seconds=request_timeout_seconds,
+        )
+        errors.extend(_validate_pnginfo_parse_response(case, response_payload))
+        if not case.apply_back_route:
+            continue
+        parsed_payload = response_payload.get("payload")
+        if not isinstance(parsed_payload, dict):
+            errors.append(f"{case.case_id}: parse response did not expose payload for apply-back.")
+            continue
+        apply_response = _request_json(
+            "POST",
+            f"{base_url}{case.apply_back_route}",
+            payload={**parsed_payload, "dry_run": True},
+            timeout_seconds=request_timeout_seconds,
+        )
+        errors.extend(_validate_pnginfo_apply_back_response(case, apply_response))
+        execute_case = case
+        execute_payload = dict(parsed_payload)
+    return errors, execute_case, execute_payload
+
+
+def _poll_queue_snapshot_until_job_visible(
+    base_url: str,
+    *,
+    prompt_id: str,
+    client_id: str,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> dict[str, Any]:
+    deadline = time.time() + poll_timeout_seconds
+    encoded_client_id = urllib.parse.quote(client_id, safe="")
+    queue_url = f"{base_url}/rookieui/queue?client_id={encoded_client_id}"
+    last_payload: dict[str, Any] = {}
+    while time.time() < deadline:
+        payload = _request_json("GET", queue_url, timeout_seconds=request_timeout_seconds)
+        last_payload = payload
+        jobs = payload.get("jobs")
+        if isinstance(jobs, list):
+            matched = next((entry for entry in jobs if isinstance(entry, dict) and entry.get("id") == prompt_id), None)
+            if isinstance(matched, dict):
+                return payload
+        time.sleep(max(poll_interval_seconds, 0.1))
+    raise RuntimeError(
+        f"Queue snapshot did not expose prompt '{prompt_id}' for client '{client_id}' within {poll_timeout_seconds:.1f}s."
+    )
+
+
+def _run_auxiliary_queue_execute_smoke(
+    base_url: str,
+    *,
+    case: LivePNGInfoCase,
+    parsed_payload: dict[str, Any],
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> list[str]:
+    if not case.apply_back_route:
+        return [f"{case.case_id}: execute requested without an apply-back route."]
+    client_id = f"rookieui-live-auxiliary-{int(time.time() * 1000)}"
+    submit_result = _request_json(
+        "POST",
+        f"{base_url}{case.apply_back_route}",
+        payload={**parsed_payload, "client_id": client_id},
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors: list[str] = []
+    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
+    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
+        return [f"{case.case_id}: auxiliary execute submit failed, expected accepted submission payload."]
+    prompt_id = str(submission.get("prompt_id", "")).strip()
+    if not prompt_id:
+        return [f"{case.case_id}: auxiliary execute submit missing prompt_id."]
+
+    snapshot_payload = _poll_queue_snapshot_until_job_visible(
+        base_url,
+        prompt_id=prompt_id,
+        client_id=client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    errors.extend(
+        _validate_queue_snapshot_response(
+            snapshot_payload,
+            prompt_id=prompt_id,
+            allowed_statuses=("pending", "in_progress", "completed"),
+        )
+    )
+
+    _poll_queue_job_until_terminal(
+        base_url,
+        prompt_id,
+        client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    encoded_prompt_id = urllib.parse.quote(prompt_id, safe="")
+    encoded_client_id = urllib.parse.quote(client_id, safe="")
+    job_payload = _request_json(
+        "GET",
+        f"{base_url}/rookieui/queue/{encoded_prompt_id}?client_id={encoded_client_id}",
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors.extend(_validate_queue_job_response(job_payload, prompt_id=prompt_id))
+    final_snapshot = _request_json(
+        "GET",
+        f"{base_url}/rookieui/queue?client_id={encoded_client_id}",
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors.extend(
+        _validate_queue_snapshot_response(
+            final_snapshot,
+            prompt_id=prompt_id,
+            allowed_statuses=("completed",),
+            require_visible_job=False,
+            expected_queue_remaining=0,
+        )
+    )
     return errors
 
 
@@ -2088,7 +2550,7 @@ def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
-    if args.validation_mode != "auxiliary-contracts" and not profiles:
+    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
@@ -2121,6 +2583,64 @@ def main() -> int:
     except Exception as exc:
         print(f"[live-smoke] ERROR: failed to load /models or /presets: {exc}", file=sys.stderr)
         return 1
+
+    if args.validation_mode == "auxiliary-pipelines":
+        context = _build_auxiliary_pipeline_context(models_payload)
+        try:
+            extras_errors = _run_extras_execution_smoke(
+                base_url,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+            pnginfo_errors, execute_case, execute_payload = _run_pnginfo_dry_run_smoke(
+                base_url,
+                context,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: auxiliary pipeline validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        combined_errors = extras_errors + pnginfo_errors
+        if combined_errors:
+            print("[live-smoke] WARNING: auxiliary pipeline validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] auxiliary pipeline extras + pnginfo checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because auxiliary dry-run checks were not green.")
+            elif execute_case is None or not isinstance(execute_payload, dict):
+                print("[live-smoke] ERROR: auxiliary pipeline execute lane had no parsed apply-back payload.", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                try:
+                    execution_errors = _run_auxiliary_queue_execute_smoke(
+                        base_url,
+                        case=execute_case,
+                        parsed_payload=execute_payload,
+                        request_timeout_seconds=args.request_timeout_seconds,
+                        poll_timeout_seconds=args.poll_timeout_seconds,
+                        poll_interval_seconds=args.poll_interval_seconds,
+                    )
+                except Exception as exc:
+                    print(f"[live-smoke] ERROR: auxiliary execute lane failed unexpectedly: {exc}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                if execution_errors:
+                    print("[live-smoke] ERROR: auxiliary execute lane failed:", file=sys.stderr)
+                    for error in execution_errors:
+                        print(f"  - {error}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                print("[live-smoke] auxiliary queue/apply-back execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
 
     if args.validation_mode == "controlnet":
         try:
