@@ -3,6 +3,20 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+EXTRAS_CONTRACT_VERSION = "r119-20260417"
+EXTRAS_CONTRACT_SURFACE = "extras_run"
+
+
+def build_extras_contract_meta() -> dict[str, object]:
+    return {
+        "version": EXTRAS_CONTRACT_VERSION,
+        "surface": EXTRAS_CONTRACT_SURFACE,
+        "execution_mode": "synchronous_postprocess",
+        "supported_modes": ["single_image", "batch"],
+        "supports_color_correction": True,
+        "face_restoration_behavior": "guarded_warning_skip",
+    }
+
 
 @dataclass(frozen=True)
 class ExtrasRequest:

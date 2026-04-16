@@ -26,6 +26,9 @@ def _build_semantic_payload(
 
 
 class LiveSmokePromptParityTests(unittest.TestCase):
+    def test_default_profiles_for_auxiliary_contracts_is_empty(self) -> None:
+        self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-contracts"), "")
+
     def test_default_profiles_for_prompt_parity_use_sd_family_order(self) -> None:
         self.assertEqual(
             live_smoke._default_profiles_for_mode("prompt-parity"),
@@ -242,6 +245,118 @@ class LiveSmokePromptParityTests(unittest.TestCase):
                 live_smoke,
                 "_load_server_payloads",
                 return_value=({"diffusion_models": [], "text_encoders": [], "catalog": {}}, {"presets": []}),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+
+class LiveSmokeAuxiliaryContractTests(unittest.TestCase):
+    def test_validate_route_contract_payload_reports_contract_drift(self) -> None:
+        probe = live_smoke.LiveRouteContractProbe(
+            surface="extras_run",
+            route_path="/rookieui/extras/run",
+            local_contract_version="r119-20260417",
+        )
+
+        errors = live_smoke._validate_route_contract_payload(
+            probe,
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "extras_run",
+                    "version": "r118-20260416",
+                },
+            },
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("host='r118-20260416'", errors[0])
+
+    def test_validate_route_contract_payload_accepts_matching_payload(self) -> None:
+        probe = live_smoke.LiveRouteContractProbe(
+            surface="queue_snapshot_and_job_lookup",
+            route_path="/rookieui/queue",
+            local_contract_version="r119-20260417",
+        )
+
+        errors = live_smoke._validate_route_contract_payload(
+            probe,
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "queue_snapshot_and_job_lookup",
+                    "version": "r119-20260417",
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_run_auxiliary_contract_smoke_validates_all_probe_responses(self) -> None:
+        probes = [
+            live_smoke.LiveRouteContractProbe(
+                surface="queue_snapshot_and_job_lookup",
+                route_path="/rookieui/queue",
+                local_contract_version="r119-20260417",
+            ),
+            live_smoke.LiveRouteContractProbe(
+                surface="pnginfo_parse_inspect",
+                route_path="/rookieui/pnginfo/parse",
+                local_contract_version="r119-20260417",
+                method="POST",
+                payload={"image_data": "data:image/png;base64,abc"},
+            ),
+        ]
+
+        with (
+            mock.patch.object(live_smoke, "_build_auxiliary_contract_probes", return_value=probes),
+            mock.patch.object(
+                live_smoke,
+                "_request_json",
+                side_effect=[
+                    {
+                        "service": "rookieui",
+                        "status": "ok",
+                        "contract": {
+                            "surface": "queue_snapshot_and_job_lookup",
+                            "version": "r119-20260417",
+                        },
+                    },
+                    {
+                        "service": "rookieui",
+                        "status": "ok",
+                        "contract": {
+                            "surface": "pnginfo_parse_inspect",
+                            "version": "r119-20260417",
+                        },
+                    },
+                ],
+            ),
+        ):
+            errors = live_smoke._run_auxiliary_contract_smoke(
+                "http://127.0.0.1:8188",
+                request_timeout_seconds=30.0,
+            )
+
+        self.assertEqual(errors, [])
+
+    def test_main_auxiliary_contracts_report_only_returns_zero_on_contract_errors(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "auxiliary-contracts", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_auxiliary_contract_smoke",
+                return_value=["surface 'queue_snapshot_and_job_lookup' contract mismatch"],
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
