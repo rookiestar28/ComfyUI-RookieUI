@@ -280,6 +280,7 @@ def _build_prompt_parity_host_context(
 
 def _build_prompt_parity_cases(context: PromptParityHostContext) -> list[LivePromptParityCase]:
     sd15_attention = _get_fixture("sd15_attention_brackets")
+    sd15_long_comma_chunk = _get_fixture("sd15_long_comma_chunk")
     sd15_break_schedule = _get_fixture("sd15_break_schedule")
     sd15_alternate_schedule = _get_fixture("sd15_alternate_schedule")
     sd15_and_multi_cond = _get_fixture("sd15_and_multi_cond")
@@ -287,6 +288,7 @@ def _build_prompt_parity_cases(context: PromptParityHostContext) -> list[LivePro
 
     cases = [
         LivePromptParityCase(sd15_attention, checkpoint_name=context.sd15_checkpoint, execute=True),
+        LivePromptParityCase(sd15_long_comma_chunk, checkpoint_name=context.sd15_checkpoint, execute=True),
         LivePromptParityCase(sd15_break_schedule, checkpoint_name=context.sd15_checkpoint),
         LivePromptParityCase(sd15_alternate_schedule, checkpoint_name=context.sd15_checkpoint),
         LivePromptParityCase(sd15_and_multi_cond, checkpoint_name=context.sd15_checkpoint),
@@ -312,6 +314,7 @@ def _build_prompt_parity_cases(context: PromptParityHostContext) -> list[LivePro
             LivePromptParityCase(
                 embedding_fixture,
                 checkpoint_name=context.sd15_checkpoint,
+                execute=True,
             )
         )
 
@@ -464,6 +467,11 @@ def _build_txt2img_payload(profile_id: str, preset: dict[str, Any], client_id: s
 
 def _build_prompt_parity_request_payload(case: LivePromptParityCase) -> dict[str, Any]:
     profile = get_parity_profile(case.fixture.profile)
+    requested_steps = (
+        max(4, profile.default_steps)
+        if case.fixture.expect_conditioning_combine or case.fixture.expect_timestep_range
+        else 1
+    )
     return {
         "prompt": case.fixture.prompt,
         "negative_prompt": case.fixture.negative_prompt,
@@ -473,7 +481,7 @@ def _build_prompt_parity_request_payload(case: LivePromptParityCase) -> dict[str
         "text_encoder_name": "Automatic",
         "width": profile.default_width,
         "height": profile.default_height,
-        "steps": 1,
+        "steps": requested_steps,
         "cfg_scale": profile.default_cfg_scale,
         "sampler_name": profile.default_sampler,
         "scheduler_name": profile.default_scheduler,

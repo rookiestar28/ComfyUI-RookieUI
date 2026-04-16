@@ -88,6 +88,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
         cases = live_smoke._build_prompt_parity_cases(context)
         embedding_case = next(case for case in cases if case.fixture.case_id == "sd15_embedding_bare")
         alternate_case = next(case for case in cases if case.fixture.case_id == "sd15_alternate_schedule")
+        long_comma_case = next(case for case in cases if case.fixture.case_id == "sd15_long_comma_chunk")
         sdxl_case = next(
             case
             for case in cases
@@ -103,6 +104,8 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             embedding_case.fixture.expected_prompt_embeddings[0].canonical_token,
             "embedding:EasyNegativeV2.safetensors",
         )
+        self.assertTrue(long_comma_case.execute)
+        self.assertEqual(long_comma_case.fixture.expected_prompt_features, ())
         self.assertIn("alternate_prompt_scheduling", alternate_case.fixture.expected_prompt_features)
         self.assertEqual(sdxl_case.fixture.profile, "pony")
         self.assertIn("embedding:EasyNegativeV2.safetensors", sdxl_case.fixture.expected_cleaned_prompt)
@@ -163,6 +166,22 @@ class LiveSmokePromptParityTests(unittest.TestCase):
         errors = live_smoke._validate_prompt_parity_case_response(case, response_payload)
 
         self.assertEqual(errors, [])
+
+    def test_build_prompt_parity_request_payload_uses_multi_step_for_compiled_cases(self) -> None:
+        compiled_case = live_smoke.LivePromptParityCase(
+            fixture=live_smoke._get_fixture("sd15_alternate_schedule"),
+            checkpoint_name="SD15\\BravNew.safetensors",
+        )
+        simple_case = live_smoke.LivePromptParityCase(
+            fixture=live_smoke._get_fixture("sd15_attention_brackets"),
+            checkpoint_name="SD15\\BravNew.safetensors",
+        )
+
+        compiled_payload = live_smoke._build_prompt_parity_request_payload(compiled_case)
+        simple_payload = live_smoke._build_prompt_parity_request_payload(simple_case)
+
+        self.assertGreaterEqual(compiled_payload["steps"], 4)
+        self.assertEqual(simple_payload["steps"], 1)
 
     def test_main_prompt_parity_report_only_returns_zero_on_contract_drift(self) -> None:
         context = live_smoke.PromptParityHostContext(
