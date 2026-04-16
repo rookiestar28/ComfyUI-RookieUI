@@ -1,0 +1,152 @@
+import {
+  fetchRookieUIADetailerCatalog,
+  fetchRookieUICapabilities,
+  fetchRookieUICompatibility,
+  fetchRookieUIControlNetModels,
+  fetchRookieUIControlNetModules,
+  fetchRookieUIControlNetTypes,
+  fetchRookieUIModels,
+  fetchRookieUIPresets,
+  fetchRookieUIQueue,
+} from "./rookieui_extension_deps.js";
+
+function toStringArray(rawValue) {
+  return Array.isArray(rawValue)
+    ? rawValue.map((value) => String(value ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+export function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
+  const modelList = toStringArray(modelResult?.data?.model_list);
+  const moduleList = toStringArray(moduleResult?.data?.module_list);
+  const controlTypeOrder = toStringArray(typeResult?.data?.control_type_order);
+  const controlTypes =
+    typeResult?.data?.control_types && typeof typeResult.data.control_types === "object"
+      ? typeResult.data.control_types
+      : {};
+
+  return {
+    source: String(typeResult?.data?.source ?? modelResult?.data?.source ?? moduleResult?.data?.source ?? "fallback"),
+    contract:
+      typeResult?.data?.contract ??
+      modelResult?.data?.contract ??
+      moduleResult?.data?.contract ?? {
+        version: "r72-20260412",
+        ui_variant: "integrated_sidebar_controlnet",
+        unit_count: 3,
+      },
+    model_list: modelList,
+    module_list: moduleList,
+    control_type_order: controlTypeOrder,
+    default_type: String(typeResult?.data?.default_type ?? "All"),
+    default_module: String(moduleResult?.data?.default_module ?? "none"),
+    default_model: String(modelResult?.data?.default_model ?? ""),
+    control_types: controlTypes,
+  };
+}
+
+function buildDefaultBootstrapLoaders() {
+  return {
+    capabilities: (fetchImpl) => fetchRookieUICapabilities(fetchImpl),
+    compatibility: (fetchImpl) => fetchRookieUICompatibility(fetchImpl),
+    models: (fetchImpl) => fetchRookieUIModels(fetchImpl),
+    presets: (fetchImpl) => fetchRookieUIPresets(fetchImpl),
+    controlnetModels: (fetchImpl) => fetchRookieUIControlNetModels(fetchImpl),
+    controlnetModules: (fetchImpl) => fetchRookieUIControlNetModules(fetchImpl),
+    controlnetTypes: (fetchImpl) => fetchRookieUIControlNetTypes(fetchImpl),
+    adetailerCatalog: (fetchImpl) => fetchRookieUIADetailerCatalog(fetchImpl),
+    queue: (fetchImpl, { clientId }) => fetchRookieUIQueue(fetchImpl, { clientId }),
+  };
+}
+
+export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBootstrapLoaders()) {
+  return [
+    {
+      featureId: "capabilities",
+      bootstrapKey: "capabilities",
+      sourceKey: "capabilitySource",
+      load: (fetchImpl) => loaders.capabilities(fetchImpl),
+    },
+    {
+      featureId: "compatibility",
+      bootstrapKey: "compatibility",
+      load: (fetchImpl) => loaders.compatibility(fetchImpl),
+    },
+    {
+      featureId: "models",
+      bootstrapKey: "models",
+      load: (fetchImpl) => loaders.models(fetchImpl),
+    },
+    {
+      featureId: "presets",
+      bootstrapKey: "presets",
+      load: (fetchImpl) => loaders.presets(fetchImpl),
+    },
+    {
+      featureId: "controlnet_models",
+      bootstrapKey: "__controlnetModels",
+      load: (fetchImpl) => loaders.controlnetModels(fetchImpl),
+    },
+    {
+      featureId: "controlnet_modules",
+      bootstrapKey: "__controlnetModules",
+      load: (fetchImpl) => loaders.controlnetModules(fetchImpl),
+    },
+    {
+      featureId: "controlnet_types",
+      bootstrapKey: "__controlnetTypes",
+      load: (fetchImpl) => loaders.controlnetTypes(fetchImpl),
+    },
+    {
+      featureId: "adetailer_catalog",
+      bootstrapKey: "adetailerCatalog",
+      load: (fetchImpl) => loaders.adetailerCatalog(fetchImpl),
+    },
+    {
+      featureId: "queue",
+      bootstrapKey: "queue",
+      load: (fetchImpl, context) => loaders.queue(fetchImpl, context),
+    },
+    {
+      featureId: "controlnet_catalog",
+      bootstrapKey: "controlnetCatalog",
+      compose: (loadedState) =>
+        buildControlNetCatalog(
+          loadedState.__controlnetModels,
+          loadedState.__controlnetModules,
+          loadedState.__controlnetTypes,
+        ),
+    },
+  ];
+}
+
+export async function loadRookieUIBootstrapData(
+  fetchImpl,
+  { clientId = "", loaders = buildDefaultBootstrapLoaders() } = {},
+) {
+  const registry = buildRookieUIFeatureBootstrapRegistry(loaders);
+  const directEntries = registry.filter((entry) => typeof entry.load === "function");
+  const loadedState = {};
+  const results = await Promise.all(
+    directEntries.map((entry) => entry.load(fetchImpl, { clientId })),
+  );
+
+  results.forEach((result, index) => {
+    const entry = directEntries[index];
+    loadedState[entry.bootstrapKey] = entry.bootstrapKey.startsWith("__") ? result : result?.data;
+    if (entry.sourceKey) {
+      loadedState[entry.sourceKey] = result?.source;
+    }
+  });
+
+  registry
+    .filter((entry) => typeof entry.compose === "function")
+    .forEach((entry) => {
+      loadedState[entry.bootstrapKey] = entry.compose(loadedState);
+    });
+
+  delete loadedState.__controlnetModels;
+  delete loadedState.__controlnetModules;
+  delete loadedState.__controlnetTypes;
+  return loadedState;
+}
