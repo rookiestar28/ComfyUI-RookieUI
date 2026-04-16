@@ -163,6 +163,32 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 2)
 
+    def test_normalize_txt2img_request_canonicalizes_inventory_backed_embedding_tokens(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["Automatic"],
+            text_encoders=["Automatic"],
+            embeddings=["badhandv4.pt"],
+            loras=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="Automatic",
+            default_text_encoder="Automatic",
+        )
+
+        with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "portrait badhandv4 dramatic light",
+                }
+            )
+
+        self.assertEqual(normalized.prompt, "portrait embedding:badhandv4.pt dramatic light")
+        self.assertIn("PROMPT_EMBEDDING_DETECTED", normalized.prompt_warning_codes)
+        self.assertTrue(normalized.prompt_semantics["features"]["embeddings_textual_inversion"])
+        self.assertEqual(normalized.prompt_semantics["embeddings"][0]["canonical_token"], "embedding:badhandv4.pt")
+        self.assertTrue(normalized.prompt_semantics["embeddings"][0]["exists"])
+
     def test_normalize_txt2img_request_clears_text_encoder_for_sd15(self) -> None:
         normalized = normalize_txt2img_request(
             {
@@ -439,6 +465,38 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in result["workflow"].values()}
         self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
+
+    def test_translate_txt2img_request_passes_canonical_embedding_tokens_to_sd_family_encoder(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["Automatic"],
+            text_encoders=["Automatic"],
+            embeddings=["badhandv4.pt"],
+            loras=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="Automatic",
+            default_text_encoder="Automatic",
+        )
+
+        with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "portrait badhandv4 dramatic light",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        encoder_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUIA1111CLIPTextEncode"
+        ]
+
+        self.assertTrue(encoder_nodes)
+        self.assertTrue(
+            any(node["inputs"]["text"] == "portrait embedding:badhandv4.pt dramatic light" for node in encoder_nodes)
+        )
 
     def test_translate_txt2img_request_uses_legacy_roll_back_switch(self) -> None:
         with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):

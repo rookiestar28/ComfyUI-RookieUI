@@ -43,9 +43,9 @@ _PROMPT_CAPABILITIES = (
         "id": "embeddings_textual_inversion",
         "title": "Embeddings / Textual Inversion",
         "a1111_semantics": "Prompt-native textual inversion / embedding references resolved at tokenizer or encode time.",
-        "rookieui_contract": "Contract and payload shape frozen; runtime delivery remains staged until the prompt-path implementation lands.",
-        "status": "guarded",
-        "translation": "inventory_diagnostics_staged",
+        "rookieui_contract": "Inventory-aware prompt detection, canonical host token normalization, and missing-reference diagnostics on the shipped SD-family prompt path.",
+        "status": "supported",
+        "translation": "prompt_native_embedding_tokens",
         "reference": "a1111_textual_inversion",
     },
     {
@@ -71,7 +71,7 @@ _PROMPT_CAPABILITIES = (
 
 def build_prompt_capability_matrix_payload() -> dict[str, Any]:
     return {
-        "contract_version": "r113-20260416",
+        "contract_version": "f103-20260416",
         "contract_scope": "sd-family-first",
         "rollout": {
             "default_mode": "semantic_v2",

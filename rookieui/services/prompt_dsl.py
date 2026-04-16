@@ -6,19 +6,26 @@ import re
 from rookieui.contracts.prompt_dsl import (
     PromptAttentionMarker,
     PromptBranchSemantic,
+    PromptEmbeddingReference,
     PromptChunkSemantic,
     PromptLoraActivation,
     PromptPreprocessResult,
     PromptScheduleSlice,
     PromptSemanticPlan,
 )
-from rookieui.security.request_guard import normalize_prompt_text, resolve_inventory_selector
+from rookieui.security.request_guard import (
+    build_host_selector_key,
+    normalize_prompt_text,
+    resolve_inventory_selector,
+)
 from rookieui.services.coercion import coerce_float, coerce_int
 
 PROMPT_WARNING_AND_DETECTED = "PROMPT_AND_DETECTED"
 PROMPT_WARNING_BREAK_DETECTED = "PROMPT_BREAK_DETECTED"
 PROMPT_WARNING_SCHEDULE_DETECTED = "PROMPT_SCHEDULE_DETECTED"
 PROMPT_WARNING_ATTENTION_DETECTED = "PROMPT_ATTENTION_DETECTED"
+PROMPT_WARNING_EMBEDDING_DETECTED = "PROMPT_EMBEDDING_DETECTED"
+PROMPT_WARNING_EMBEDDING_MISSING = "PROMPT_EMBEDDING_MISSING"
 PROMPT_WARNING_GUARD_AND_BRANCH_LIMIT = "PROMPT_GUARD_AND_BRANCH_LIMIT"
 PROMPT_WARNING_GUARD_BREAK_CHUNK_LIMIT = "PROMPT_GUARD_BREAK_CHUNK_LIMIT"
 PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT = "PROMPT_GUARD_SCHEDULE_SLICE_LIMIT"
@@ -33,6 +40,7 @@ _SCHEDULE_TOKEN_RE = re.compile(r"\[([^:\[\]]*):([^:\[\]]*):([^\[\]]+?)\]")
 _EXPLICIT_ATTENTION_RE = re.compile(r"\(([^()]+):\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))\)")
 _PAREN_ATTENTION_RE = re.compile(r"\(([^():][^()]*)\)")
 _BRACKET_ATTENTION_RE = re.compile(r"\[([^\[\]:]+)\]")
+_EXPLICIT_EMBEDDING_RE = re.compile(r"(?<![\w./\\!$-])embedding:(?P<name>[\w.\-!$/\\]+)(?![\w./\\!$-])", re.IGNORECASE)
 _BRANCH_WEIGHT_RE = re.compile(r"^(.*?)(?:\s*:\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+)))\s*$")
 _A1111_DEEMPHASIS_WEIGHT = round(1.0 / 1.1, 4)
 _ESCAPED_ATTENTION_MARKERS = {
@@ -52,6 +60,8 @@ _WARNING_MESSAGES = {
     PROMPT_WARNING_BREAK_DETECTED: "A1111 BREAK token was detected and parsed into chunk semantics.",
     PROMPT_WARNING_SCHEDULE_DETECTED: "A1111 prompt scheduling syntax was detected and parsed into timestep slices.",
     PROMPT_WARNING_ATTENTION_DETECTED: "A1111 attention weighting syntax was detected and captured for semantic parity.",
+    PROMPT_WARNING_EMBEDDING_DETECTED: "Textual inversion / embedding references were detected and normalized for the SD-family prompt path.",
+    PROMPT_WARNING_EMBEDDING_MISSING: "A textual inversion / embedding reference did not match the host inventory and fell back to plain prompt text.",
     PROMPT_WARNING_GUARD_AND_BRANCH_LIMIT: "Prompt AND branch count exceeded guardrail; extra branches were truncated.",
     PROMPT_WARNING_GUARD_BREAK_CHUNK_LIMIT: "Prompt BREAK chunk count exceeded guardrail; extra chunks were truncated.",
     PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT: "Prompt scheduling expansion exceeded guardrail; slices were truncated.",
@@ -250,6 +260,152 @@ def _extract_attention_markers(prompt_text: str) -> list[PromptAttentionMarker]:
     return markers
 
 
+def _normalize_embedding_lookup_key(value: str) -> str:
+    return build_host_selector_key(str(value or "")).strip().lower()
+
+
+def _strip_selector_extension(selector: str) -> str:
+    root, extension = os.path.splitext(selector)
+    if not extension:
+        return selector
+    if extension.lower() not in {".pt", ".bin", ".safetensors"}:
+        return selector
+    return root
+
+
+def _iter_embedding_alias_variants(selector: str) -> set[str]:
+    canonical = str(selector or "").strip()
+    if not canonical:
+        return set()
+
+    normalized = build_host_selector_key(canonical)
+    normalized_no_ext = _strip_selector_extension(normalized)
+    basename = normalized.rsplit("/", 1)[-1]
+    basename_no_ext = _strip_selector_extension(basename)
+
+    variants = {
+        canonical,
+        normalized,
+        normalized.replace("/", "\\"),
+        normalized_no_ext,
+        normalized_no_ext.replace("/", "\\"),
+        basename,
+        basename_no_ext,
+    }
+    return {variant for variant in variants if variant}
+
+
+def _build_embedding_alias_lookup(
+    inventory_selectors: list[str] | None,
+) -> tuple[dict[str, str], re.Pattern[str] | None]:
+    selector_values = (
+        inventory_selectors
+        if isinstance(inventory_selectors, (list, tuple, set))
+        else []
+    )
+    alias_lookup: dict[str, str] = {}
+    alias_variants: set[str] = set()
+    for selector in selector_values:
+        canonical = str(selector or "").strip()
+        if not canonical:
+            continue
+        for alias in _iter_embedding_alias_variants(canonical):
+            alias_lookup.setdefault(_normalize_embedding_lookup_key(alias), canonical)
+            alias_variants.add(alias)
+
+    if not alias_variants:
+        return alias_lookup, None
+
+    joined_aliases = "|".join(
+        re.escape(alias)
+        for alias in sorted(alias_variants, key=lambda value: len(_normalize_embedding_lookup_key(value)), reverse=True)
+    )
+    pattern = re.compile(
+        rf"(?<!embedding:)(?<![\w./\\!$-])(?P<name>{joined_aliases})(?![\w./\\!$-])",
+        re.IGNORECASE,
+    )
+    return alias_lookup, pattern
+
+
+def _resolve_embedding_selector(alias_lookup: dict[str, str], token_name: str) -> str:
+    return alias_lookup.get(_normalize_embedding_lookup_key(token_name), "")
+
+
+def _extract_prompt_embeddings(
+    prompt_text: str,
+    *,
+    inventory_selectors: list[str] | None,
+) -> tuple[str, list[PromptEmbeddingReference], list[str], list[str]]:
+    alias_lookup, bare_pattern = _build_embedding_alias_lookup(inventory_selectors)
+    references: list[PromptEmbeddingReference] = []
+    warning_messages: list[str] = []
+    warning_codes: list[str] = []
+    has_missing = False
+
+    def _replace_explicit(match: re.Match[str]) -> str:
+        nonlocal has_missing
+        token = match.group(0)
+        name = match.group("name")
+        canonical_name = _resolve_embedding_selector(alias_lookup, name)
+        if canonical_name:
+            canonical_token = f"embedding:{canonical_name}"
+            references.append(
+                PromptEmbeddingReference(
+                    token=token,
+                    canonical_token=canonical_token,
+                    name=canonical_name,
+                    exists=True,
+                    syntax="explicit",
+                )
+            )
+            return canonical_token
+
+        has_missing = True
+        references.append(
+            PromptEmbeddingReference(
+                token=token,
+                canonical_token=name,
+                name=name,
+                exists=False,
+                syntax="explicit",
+            )
+        )
+        warning_messages.append(
+            f"Textual inversion embedding was not found in the host inventory and fell back to plain text: {token}"
+        )
+        return name
+
+    normalized_prompt = _EXPLICIT_EMBEDDING_RE.sub(_replace_explicit, prompt_text)
+
+    if bare_pattern is not None:
+        def _replace_bare(match: re.Match[str]) -> str:
+            token = match.group("name")
+            canonical_name = _resolve_embedding_selector(alias_lookup, token)
+            if not canonical_name:
+                return token
+            canonical_token = f"embedding:{canonical_name}"
+            references.append(
+                PromptEmbeddingReference(
+                    token=token,
+                    canonical_token=canonical_token,
+                    name=canonical_name,
+                    exists=True,
+                    syntax="bare",
+                )
+            )
+            return canonical_token
+
+        normalized_prompt = bare_pattern.sub(_replace_bare, normalized_prompt)
+
+    if references:
+        warning_codes.append(PROMPT_WARNING_EMBEDDING_DETECTED)
+    if has_missing:
+        warning_codes.append(PROMPT_WARNING_EMBEDDING_MISSING)
+
+    normalized_prompt = normalize_prompt_text(normalized_prompt, "prompt", required=False)
+    return normalized_prompt, references, warning_messages, warning_codes
+
+
 def _protect_escaped_attention_markers(text: str) -> str:
     protected = text
     for raw_marker, placeholder in _ESCAPED_ATTENTION_MARKERS.items():
@@ -367,8 +523,13 @@ def normalize_prompt_attention_for_weighted_encode(prompt_text: str) -> str:
     return _restore_escaped_attention_markers(rewritten)
 
 
-def _build_prompt_semantic_plan(prompt_text: str) -> tuple[PromptSemanticPlan, list[str]]:
+def _build_prompt_semantic_plan(
+    prompt_text: str,
+    *,
+    embeddings: list[PromptEmbeddingReference] | None = None,
+) -> tuple[PromptSemanticPlan, list[str]]:
     warnings: list[str] = []
+    normalized_embeddings = list(embeddings or [])
     branches_raw = _split_top_level_keyword(prompt_text, "AND")
     if len(branches_raw) > _MAX_AND_BRANCHES:
         warnings.append(PROMPT_WARNING_GUARD_AND_BRANCH_LIMIT)
@@ -424,9 +585,11 @@ def _build_prompt_semantic_plan(prompt_text: str) -> tuple[PromptSemanticPlan, l
             "break_chunks": has_break,
             "prompt_scheduling": has_schedule,
             "attention_weighting": bool(attention),
+            "embeddings_textual_inversion": bool(normalized_embeddings),
         },
         branches=branch_semantics,
         attention=attention,
+        embeddings=normalized_embeddings,
         guardrail_hits=[
             code
             for code in warnings
@@ -565,6 +728,7 @@ def preprocess_prompt_bundle(
     negative_prompt: str,
     *,
     inventory_loras: list[str] | None = None,
+    inventory_embeddings: list[str] | None = None,
     strict_match: bool = False,
 ) -> PromptPreprocessResult:
     cleaned_prompt, prompt_loras, prompt_warning_messages, prompt_warning_codes = _extract_inline_activations(
@@ -582,6 +746,24 @@ def preprocess_prompt_bundle(
         inventory_selectors=inventory_loras,
         strict_match=strict_match,
     )
+    (
+        cleaned_prompt,
+        prompt_embeddings,
+        prompt_embedding_messages,
+        prompt_embedding_codes,
+    ) = _extract_prompt_embeddings(
+        cleaned_prompt,
+        inventory_selectors=inventory_embeddings,
+    )
+    (
+        cleaned_negative_prompt,
+        negative_embeddings,
+        negative_embedding_messages,
+        negative_embedding_codes,
+    ) = _extract_prompt_embeddings(
+        cleaned_negative_prompt,
+        inventory_selectors=inventory_embeddings,
+    )
 
     if _is_legacy_prompt_dsl_enabled():
         # CRITICAL: keep this environment switch as a deterministic parser/compiler rollback path for host/runtime incidents; removing it blocks emergency parity fallback.
@@ -591,6 +773,8 @@ def preprocess_prompt_bundle(
                     PROMPT_WARNING_LEGACY_FALLBACK_ENABLED,
                     *prompt_warning_codes,
                     *negative_warning_codes,
+                    *prompt_embedding_codes,
+                    *negative_embedding_codes,
                 ]
             )
         )
@@ -600,6 +784,8 @@ def preprocess_prompt_bundle(
                     *_warning_messages_from_codes(warning_codes),
                     *prompt_warning_messages,
                     *negative_warning_messages,
+                    *prompt_embedding_messages,
+                    *negative_embedding_messages,
                 ]
             )
         )
@@ -609,12 +795,32 @@ def preprocess_prompt_bundle(
             lora_activations=[*prompt_loras, *negative_loras],
             prompt_warnings=warnings,
             warning_codes=warning_codes,
-            prompt_semantics=PromptSemanticPlan.empty(cleaned_prompt),
-            negative_prompt_semantics=PromptSemanticPlan.empty(cleaned_negative_prompt),
+            prompt_semantics=PromptSemanticPlan(
+                normalized_text=cleaned_prompt,
+                features={
+                    **PromptSemanticPlan.empty(cleaned_prompt).features,
+                    "embeddings_textual_inversion": bool(prompt_embeddings),
+                },
+                embeddings=prompt_embeddings,
+            ),
+            negative_prompt_semantics=PromptSemanticPlan(
+                normalized_text=cleaned_negative_prompt,
+                features={
+                    **PromptSemanticPlan.empty(cleaned_negative_prompt).features,
+                    "embeddings_textual_inversion": bool(negative_embeddings),
+                },
+                embeddings=negative_embeddings,
+            ),
         )
 
-    prompt_semantics, prompt_semantic_codes = _build_prompt_semantic_plan(cleaned_prompt)
-    negative_prompt_semantics, negative_semantic_codes = _build_prompt_semantic_plan(cleaned_negative_prompt)
+    prompt_semantics, prompt_semantic_codes = _build_prompt_semantic_plan(
+        cleaned_prompt,
+        embeddings=prompt_embeddings,
+    )
+    negative_prompt_semantics, negative_semantic_codes = _build_prompt_semantic_plan(
+        cleaned_negative_prompt,
+        embeddings=negative_embeddings,
+    )
     warning_codes = list(
         dict.fromkeys(
             [
@@ -622,6 +828,8 @@ def preprocess_prompt_bundle(
                 *negative_semantic_codes,
                 *prompt_warning_codes,
                 *negative_warning_codes,
+                *prompt_embedding_codes,
+                *negative_embedding_codes,
             ]
         )
     )
@@ -631,6 +839,8 @@ def preprocess_prompt_bundle(
                 *_warning_messages_from_codes(warning_codes),
                 *prompt_warning_messages,
                 *negative_warning_messages,
+                *prompt_embedding_messages,
+                *negative_embedding_messages,
             ]
         )
     )
