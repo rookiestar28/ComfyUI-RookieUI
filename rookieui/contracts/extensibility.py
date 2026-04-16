@@ -86,3 +86,17 @@ def boundary_target_paths(repo_root: Path | None = None) -> list[Path]:
             continue
         resolved.append((root / Path(*facade_module.split("."))).with_suffix(".py"))
     return resolved
+
+
+def boundary_target_module_paths(repo_root: Path | None = None) -> list[Path]:
+    root = repo_root or Path(__file__).resolve().parents[2]
+    manifest = build_extensibility_refactor_manifest()
+    resolved: list[Path] = []
+    for boundary in manifest["boundaries"]:
+        for target_module in boundary["target_modules"]:
+            target = str(target_module)
+            if target.endswith(".js"):
+                resolved.append(root / target)
+                continue
+            resolved.append((root / Path(*target.split("."))).with_suffix(".py"))
+    return resolved

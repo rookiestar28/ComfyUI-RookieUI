@@ -75,6 +75,13 @@ describe("frontend architecture guardrails", () => {
     expect(countLines("web/rookieui_sidebar_shell.js")).toBeLessThanOrEqual(1700);
   });
 
+  test("keeps the bootstrap entrypoint and feature registry within phase-59 size budgets", () => {
+    // IMPORTANT: these budgets protect the phase-59 bootstrap split; if either file grows past budget,
+    // extract another registry/helper seam instead of rebuilding a bootstrap monolith.
+    expect(countLines("web/rookieui_extension.js")).toBeLessThanOrEqual(220);
+    expect(countLines("web/rookieui_feature_registry.js")).toBeLessThanOrEqual(180);
+  });
+
   test("pins asset revision token to the shipped frontend fingerprint", () => {
     // IMPORTANT: this is the cache-busting tripwire; if shipped frontend modules change without a new revision suffix, live hosts can silently keep serving stale code.
     const expectedFingerprint = computeShippedFrontendFingerprint();
