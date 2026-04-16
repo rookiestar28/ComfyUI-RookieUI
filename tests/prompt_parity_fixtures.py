@@ -13,6 +13,21 @@ ALL_PROMPT_FEATURES = (
     "embeddings_textual_inversion",
 )
 SDXL_PROMPT_PROFILES = {"sdxl", "pony", "illustrious", "noob"}
+_LONG_COMMA_SD15_PROMPT = ", ".join(
+    [
+        "portrait",
+        "alley",
+        "lantern",
+        "rain",
+        "neon",
+        "steam",
+        "rooftop",
+        "city",
+        "midnight",
+        "thunder",
+    ]
+    * 9
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +68,13 @@ PROMPT_PARITY_GOLDEN_CASES = (
         expected_cleaned_prompt="portrait [soft light]",
         expected_warning_codes=("PROMPT_ATTENTION_DETECTED",),
         expected_prompt_features=("attention_weighting",),
+        expected_encoder_class="RookieUIA1111CLIPTextEncode",
+    ),
+    PromptParityGoldenCase(
+        case_id="sd15_long_comma_chunk",
+        profile="sd15",
+        prompt=_LONG_COMMA_SD15_PROMPT,
+        expected_cleaned_prompt=_LONG_COMMA_SD15_PROMPT,
         expected_encoder_class="RookieUIA1111CLIPTextEncode",
     ),
     PromptParityGoldenCase(
