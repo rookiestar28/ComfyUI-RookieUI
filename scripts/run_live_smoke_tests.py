@@ -22,6 +22,7 @@ if str(_REPO_ROOT) not in sys.path:
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
+from rookieui.contracts.controlnet_integrated import CONTROLNET_INTEGRATED_CONTRACT_VERSION
 from rookieui.services.parity_matrix import get_parity_profile
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from tests.prompt_parity_fixtures import (
@@ -41,9 +42,24 @@ _NON_SD_DIFFUSION_PROFILES: tuple[str, ...] = (
     "wan",
     "anima",
 )
+_CONTROLNET_VALIDATION_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _SD_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _SDXL_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("pony", "illustrious", "noob", "sdxl")
+_LOCAL_CONTROLNET_CONTRACT_VERSION = CONTROLNET_INTEGRATED_CONTRACT_VERSION
 _LOCAL_PROMPT_CONTRACT_VERSION = str(build_prompt_capability_matrix_payload().get("contract_version", "")).strip()
+_CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
+_CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
+_CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
+_CONTROLNET_SD15_MODEL_MARKERS = ("sd15", "sd1.5", "sd-15", "sd_15")
+_CONTROLNET_SDXL_MODEL_MARKERS = ("sdxl", "pony", "illustrious", "noob")
+_CONTROLNET_ALLOWED_DETECT_BACKENDS = {
+    "comfy_host_preprocessor",
+    "comfy_host_preprocessor_aio",
+    "rookieui_internal_fallback",
+    "rookieui_internal_mixed",
+    "rookieui_internal_disabled",
+    "rookieui_internal_unavailable",
+}
 
 
 @dataclass(frozen=True)
@@ -72,6 +88,28 @@ class LiveRouteContractProbe:
     payload: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class ControlNetHostContext:
+    profile_id: str
+    checkpoint_name: str
+    base_family: str
+    control_type: str
+    module_name: str
+    model_name: str
+    host_contract_version: str
+    local_contract_version: str
+
+
+@dataclass(frozen=True)
+class LiveControlNetDryRunCase:
+    case_id: str
+    route_path: str
+    request_payload: dict[str, Any]
+    expected_workflow_kind: str
+    expected_apply_nodes: int
+    expect_main_source_fallback: bool = False
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -80,6 +118,8 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
 
 
 def _default_profiles_for_mode(validation_mode: str) -> str:
+    if validation_mode == "controlnet":
+        return ",".join(_CONTROLNET_VALIDATION_PROFILES)
     if validation_mode == "prompt-parity":
         return ",".join(_SD_PROMPT_PARITY_PROFILES)
     if validation_mode == "auxiliary-contracts":
@@ -98,7 +138,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity", "auxiliary-contracts"),
+        choices=("catalog", "prompt-parity", "auxiliary-contracts", "controlnet"),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -193,6 +233,17 @@ def _load_capabilities_payload(base_url: str, timeout_seconds: float) -> dict[st
         "GET",
         f"{base_url}/rookieui/capabilities",
         timeout_seconds=timeout_seconds,
+    )
+
+
+def _load_controlnet_payloads(
+    base_url: str,
+    timeout_seconds: float,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return (
+        _request_json("GET", f"{base_url}/rookieui/controlnet/model_list", timeout_seconds=timeout_seconds),
+        _request_json("GET", f"{base_url}/rookieui/controlnet/module_list", timeout_seconds=timeout_seconds),
+        _request_json("GET", f"{base_url}/rookieui/controlnet/control_types", timeout_seconds=timeout_seconds),
     )
 
 
@@ -349,6 +400,311 @@ def _select_checkpoint_by_keywords(
                 if lowered_keyword in selector.lower():
                     return selector
     return candidates[0]
+
+
+def _first_non_empty_contract_version(*payloads: dict[str, Any]) -> str:
+    for payload in payloads:
+        version = _read_nested_text(payload, "contract", "version")
+        if version:
+            return version
+    return ""
+
+
+def _iter_controlnet_type_models(entry: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    raw_models = entry.get("model_list")
+    if isinstance(raw_models, list):
+        for candidate in raw_models:
+            normalized = str(candidate).strip()
+            if normalized and normalized not in candidates:
+                candidates.append(normalized)
+    default_model = str(entry.get("default_model", "")).strip()
+    if default_model and default_model not in candidates:
+        candidates.insert(0, default_model)
+    return candidates
+
+
+def _controlnet_asset_tokens(asset_name: str) -> set[str]:
+    stem = Path(str(asset_name).strip()).stem.lower()
+    for separator in ("\\", "/", "-", "_", ".", "(", ")", "[", "]"):
+        stem = stem.replace(separator, " ")
+    return {token for token in stem.split() if token}
+
+
+def _is_sd15_control_model_name(model_name: str) -> bool:
+    lowered = str(model_name).strip().lower()
+    return any(marker in lowered for marker in _CONTROLNET_SD15_MODEL_MARKERS)
+
+
+def _is_sdxl_control_model_name(model_name: str) -> bool:
+    lowered = str(model_name).strip().lower()
+    if any(marker in lowered for marker in _CONTROLNET_SDXL_MODEL_MARKERS):
+        return True
+    tokens = _controlnet_asset_tokens(lowered)
+    return "sdxl" in tokens or "xl" in tokens
+
+
+def _prefer_controlnet_model(candidates: list[str]) -> str:
+    if not candidates:
+        return ""
+    return candidates[0]
+
+
+def _select_controlnet_checkpoint(
+    checkpoints: list[str],
+    preferred_profiles: list[str],
+) -> tuple[str, str, str] | None:
+    profile_keywords = {
+        "pony": ("pony",),
+        "illustrious": ("illustrious", "illu"),
+        "noob": ("noob",),
+        "sdxl": (),
+    }
+    for profile_id in preferred_profiles:
+        if profile_id == "sd15":
+            checkpoint_name = _select_checkpoint_by_keywords(checkpoints, prefix="SD15\\")
+            if checkpoint_name:
+                return profile_id, checkpoint_name, "sd15"
+            continue
+        if profile_id in _SDXL_PROMPT_PARITY_PROFILES:
+            checkpoint_name = _select_checkpoint_by_keywords(
+                checkpoints,
+                prefix="SDXL\\",
+                keywords=profile_keywords.get(profile_id, ()),
+            )
+            if checkpoint_name:
+                return profile_id, checkpoint_name, "sdxl"
+    return None
+
+
+def _select_controlnet_model(
+    entry: dict[str, Any],
+    global_model_list: list[str],
+    *,
+    base_family: str,
+) -> str:
+    candidates = _iter_controlnet_type_models(entry)
+    if global_model_list:
+        known_models = set(global_model_list)
+        candidates = [candidate for candidate in candidates if candidate in known_models]
+    if not candidates:
+        return ""
+
+    if base_family == "sd15":
+        explicit_sd15_models = [candidate for candidate in candidates if _is_sd15_control_model_name(candidate)]
+        if explicit_sd15_models:
+            return _prefer_controlnet_model(explicit_sd15_models)
+        return ""
+
+    explicit_sdxl_models = [candidate for candidate in candidates if _is_sdxl_control_model_name(candidate)]
+    if explicit_sdxl_models:
+        return _prefer_controlnet_model(explicit_sdxl_models)
+
+    non_sd15_models = [candidate for candidate in candidates if not _is_sd15_control_model_name(candidate)]
+    if non_sd15_models:
+        return _prefer_controlnet_model(non_sd15_models)
+    return ""
+
+
+def _build_controlnet_host_context(
+    models_payload: dict[str, Any],
+    model_list_payload: dict[str, Any],
+    module_list_payload: dict[str, Any],
+    control_types_payload: dict[str, Any],
+    preferred_profiles: list[str],
+) -> tuple[ControlNetHostContext | None, list[str]]:
+    errors: list[str] = []
+    checkpoints = _iter_string_list(models_payload, "checkpoints")
+
+    model_list = _iter_string_list(model_list_payload, "model_list")
+    module_list = _iter_string_list(module_list_payload, "module_list")
+    control_types = control_types_payload.get("control_types")
+    if not isinstance(control_types, dict):
+        errors.append("live host /rookieui/controlnet/control_types payload did not expose a control_types mapping.")
+        control_types = {}
+
+    host_versions = {
+        label: _read_nested_text(payload, "contract", "version")
+        for label, payload in (
+            ("model_list", model_list_payload),
+            ("module_list", module_list_payload),
+            ("control_types", control_types_payload),
+        )
+    }
+    if not all(host_versions.values()):
+        errors.append("live host ControlNet payloads did not expose integrated contract.version across model/module/type routes.")
+    unique_versions = {version for version in host_versions.values() if version}
+    if len(unique_versions) > 1:
+        errors.append(
+            "live host ControlNet routes reported drifted contract versions: "
+            + ", ".join(f"{label}={version}" for label, version in host_versions.items())
+            + "."
+        )
+
+    preferred_types = ("Canny", "Depth", "Lineart", "SoftEdge", "OpenPose", "Scribble", "Tile")
+    candidate: tuple[str, str, str, str, str, str] | None = None
+    ordered_types = list(preferred_types) + [
+        key for key in control_types.keys() if isinstance(key, str) and key not in preferred_types
+    ]
+    resolved_profiles = [profile_id for profile_id in preferred_profiles if profile_id in _CONTROLNET_VALIDATION_PROFILES]
+    checkpoint_missing = True
+    for profile_id in resolved_profiles:
+        checkpoint_selection = _select_controlnet_checkpoint(checkpoints, [profile_id])
+        if checkpoint_selection is None:
+            continue
+        checkpoint_missing = False
+        _, checkpoint_name, base_family = checkpoint_selection
+        for control_type in ordered_types:
+            entry = control_types.get(control_type)
+            if not isinstance(entry, dict):
+                continue
+            default_module = str(entry.get("default_option", "")).strip()
+            if not default_module or default_module == "none":
+                continue
+            if module_list and default_module not in module_list:
+                continue
+            selected_model = _select_controlnet_model(entry, model_list, base_family=base_family)
+            if not selected_model:
+                continue
+            candidate = (profile_id, checkpoint_name, base_family, control_type, default_module, selected_model)
+            break
+        if candidate is not None:
+            break
+
+    if checkpoint_missing:
+        errors.append(
+            "live host did not expose any checkpoint selectors for the requested ControlNet validation profiles: "
+            f"{', '.join(resolved_profiles)}."
+        )
+
+    if candidate is None:
+        errors.append(
+            "live host did not expose any usable non-'none' ControlNet control type with a profile-compatible model."
+        )
+
+    context = None
+    if not errors and candidate is not None:
+        profile_id, checkpoint_name, base_family, control_type, module_name, model_name = candidate
+        context = ControlNetHostContext(
+            profile_id=profile_id,
+            checkpoint_name=checkpoint_name,
+            base_family=base_family,
+            control_type=control_type,
+            module_name=module_name,
+            model_name=model_name,
+            host_contract_version=_first_non_empty_contract_version(
+                model_list_payload,
+                module_list_payload,
+                control_types_payload,
+            ),
+            local_contract_version=_LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+    return context, errors
+
+
+def _build_controlnet_txt2img_defaults(profile_id: str, checkpoint_name: str) -> dict[str, Any]:
+    profile = get_parity_profile(profile_id)
+    return {
+        "prompt": "city skyline",
+        "negative_prompt": "",
+        "profile": profile_id,
+        "checkpoint_name": checkpoint_name,
+        "vae_name": "Automatic",
+        "text_encoder_name": "Automatic",
+        "width": profile.default_width,
+        "height": profile.default_height,
+        "steps": max(8, profile.default_steps),
+        "cfg_scale": profile.default_cfg_scale,
+        "sampler_name": profile.default_sampler,
+        "scheduler_name": profile.default_scheduler,
+        "batch_count": 1,
+        "seed": 1,
+        "hires_enabled": False,
+    }
+
+
+def _build_controlnet_img2img_defaults(profile_id: str, checkpoint_name: str) -> dict[str, Any]:
+    profile = get_parity_profile(profile_id)
+    return {
+        "prompt": "portrait cleanup",
+        "negative_prompt": "",
+        "profile": profile_id,
+        "checkpoint_name": checkpoint_name,
+        "vae_name": "Automatic",
+        "text_encoder_name": "Automatic",
+        "steps": max(8, profile.default_steps),
+        "cfg_scale": profile.default_cfg_scale,
+        "sampler_name": profile.default_sampler,
+        "scheduler_name": profile.default_scheduler,
+        "batch_size": 1,
+        "seed": 1,
+        "denoise_strength": 0.35,
+    }
+
+
+def _build_controlnet_dry_run_cases(context: ControlNetHostContext) -> list[LiveControlNetDryRunCase]:
+    workflow_suffix = context.base_family
+    advanced_txt2img_payload = _build_controlnet_txt2img_defaults(context.profile_id, context.checkpoint_name)
+    advanced_txt2img_payload.update(
+        {
+            "dry_run": True,
+            "controlnet_units": [
+                {
+                    "enabled": True,
+                    "control_type": context.control_type,
+                    "module": context.module_name,
+                    "model": context.model_name,
+                    "image_data": _build_png_data_url(),
+                    "weight": 0.75,
+                    "guidance_start": 0.1,
+                    "guidance_end": 0.9,
+                    "advanced": {
+                        "enabled": True,
+                        "weight_preset": "soft",
+                        "layer_weights": [0.2, 0.4, 0.8],
+                        "timestep_keyframes": [
+                            {"start_percent": 0.0, "end_percent": 0.5, "strength_scale": 0.5},
+                            {"start_percent": 0.5, "end_percent": 1.0, "strength_scale": 1.25},
+                        ],
+                    },
+                }
+            ],
+        }
+    )
+
+    img2img_payload = _build_controlnet_img2img_defaults(context.profile_id, context.checkpoint_name)
+    img2img_payload.update(
+        {
+            "dry_run": True,
+            "image_data": _build_png_data_url(color="pink"),
+            "controlnet_units": [
+                {
+                    "enabled": True,
+                    "control_type": context.control_type,
+                    "module": context.module_name,
+                    "model": context.model_name,
+                }
+            ],
+        }
+    )
+
+    return [
+        LiveControlNetDryRunCase(
+            case_id="txt2img_controlnet_advanced",
+            route_path="/rookieui/generate/txt2img",
+            request_payload=advanced_txt2img_payload,
+            expected_workflow_kind=f"txt2img-{workflow_suffix}",
+            expected_apply_nodes=2,
+        ),
+        LiveControlNetDryRunCase(
+            case_id="img2img_controlnet_main_source_fallback",
+            route_path="/rookieui/generate/img2img",
+            request_payload=img2img_payload,
+            expected_workflow_kind=f"img2img-{workflow_suffix}",
+            expected_apply_nodes=1,
+            expect_main_source_fallback=True,
+        ),
+    ]
 
 
 def _build_prompt_parity_host_context(
@@ -699,6 +1055,127 @@ def _append_embedding_mismatch_errors(
                 )
 
 
+def _validate_controlnet_detect_response(
+    context: ControlNetHostContext,
+    response_payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    if _read_nested_text(response_payload, "service") != "rookieui":
+        errors.append("controlnet detect: expected top-level service='rookieui'.")
+    if _read_nested_text(response_payload, "status") != "ok":
+        errors.append("controlnet detect: expected top-level status='ok'.")
+    host_contract_version = _read_nested_text(response_payload, "contract", "version")
+    if host_contract_version != context.local_contract_version:
+        errors.append(
+            "controlnet detect: integrated contract mismatch: "
+            f"host='{host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    if str(response_payload.get("module", "")).strip() != context.module_name:
+        errors.append(
+            f"controlnet detect: expected module '{context.module_name}' but got '{response_payload.get('module')}'."
+        )
+    if str(response_payload.get("requested_controlnet_model", "")).strip() != context.model_name:
+        errors.append(
+            "controlnet detect: expected requested_controlnet_model "
+            f"'{context.model_name}' but got '{response_payload.get('requested_controlnet_model')}'."
+        )
+    images = response_payload.get("images")
+    if not isinstance(images, list) or not images:
+        errors.append("controlnet detect: expected at least one output image.")
+    backend = str(response_payload.get("detect_backend", "")).strip()
+    if backend not in _CONTROLNET_ALLOWED_DETECT_BACKENDS:
+        errors.append(f"controlnet detect: unexpected detect_backend '{backend}'.")
+    warning_codes = response_payload.get("warning_codes")
+    if not isinstance(warning_codes, list):
+        errors.append("controlnet detect: warning_codes missing.")
+        warning_codes = []
+    if backend == "rookieui_internal_disabled" and _CONTROLNET_WARNING_PREPROCESSOR_DISABLED not in warning_codes:
+        errors.append("controlnet detect: disabled backend missing CONTROLNET_PREPROCESSOR_DISABLED warning.")
+    if backend == "rookieui_internal_unavailable" and _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE not in warning_codes:
+        errors.append("controlnet detect: unavailable backend missing CONTROLNET_PREPROCESSOR_UNAVAILABLE warning.")
+    if backend == "rookieui_internal_fallback" and _CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK not in warning_codes:
+        errors.append("controlnet detect: fallback backend missing CONTROLNET_PREPROCESSOR_HOST_FALLBACK warning.")
+    return errors
+
+
+def _validate_controlnet_dry_run_case_response(
+    context: ControlNetHostContext,
+    case: LiveControlNetDryRunCase,
+    response_payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    submission = response_payload.get("submission")
+    if not isinstance(submission, dict) or submission.get("mode") != "dry-run":
+        errors.append(f"{case.case_id}: expected dry-run submission payload.")
+    if response_payload.get("workflow_kind") != case.expected_workflow_kind:
+        errors.append(
+            f"{case.case_id}: expected workflow_kind '{case.expected_workflow_kind}' but got "
+            f"'{response_payload.get('workflow_kind')}'."
+        )
+
+    normalized_request = response_payload.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        errors.append(f"{case.case_id}: response missing normalized_request.")
+        return errors
+    controlnet_units = normalized_request.get("controlnet_units")
+    if not isinstance(controlnet_units, list) or len(controlnet_units) != 1 or not isinstance(controlnet_units[0], dict):
+        errors.append(f"{case.case_id}: expected exactly one normalized ControlNet unit.")
+        return errors
+
+    unit = controlnet_units[0]
+    if unit.get("module") != context.module_name:
+        errors.append(
+            f"{case.case_id}: expected normalized module '{context.module_name}' but got '{unit.get('module')}'."
+        )
+    if unit.get("model") != context.model_name:
+        errors.append(
+            f"{case.case_id}: expected normalized model '{context.model_name}' but got '{unit.get('model')}'."
+        )
+    if unit.get("control_type") != context.control_type:
+        errors.append(
+            f"{case.case_id}: expected normalized control_type '{context.control_type}' but got '{unit.get('control_type')}'."
+        )
+    if not str(unit.get("image_asset", "")).strip():
+        errors.append(f"{case.case_id}: normalized ControlNet unit missing image_asset.")
+    if case.expect_main_source_fallback and normalized_request.get("image_asset") != unit.get("image_asset"):
+        errors.append(f"{case.case_id}: ControlNet unit did not inherit the main img2img image_asset.")
+
+    workflow = response_payload.get("workflow")
+    if not isinstance(workflow, dict):
+        errors.append(f"{case.case_id}: response missing workflow payload.")
+        return errors
+
+    preprocess_nodes = [
+        node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "RookieUIControlNetPreprocess"
+    ]
+    if not preprocess_nodes:
+        errors.append(f"{case.case_id}: workflow missing RookieUIControlNetPreprocess.")
+    else:
+        if preprocess_nodes[0].get("inputs", {}).get("module") != context.module_name:
+            errors.append(f"{case.case_id}: preprocess node module did not match selected host context.")
+
+    class_types = {node.get("class_type") for node in workflow.values() if isinstance(node, dict)}
+    if "DiffControlNetLoader" not in class_types:
+        errors.append(f"{case.case_id}: workflow missing DiffControlNetLoader.")
+    apply_nodes = [
+        node
+        for node in workflow.values()
+        if isinstance(node, dict) and node.get("class_type") == "RookieUIControlNetApplyNativeAdvanced"
+    ]
+    if len(apply_nodes) != case.expected_apply_nodes:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_apply_nodes} RookieUIControlNetApplyNativeAdvanced nodes but got {len(apply_nodes)}."
+        )
+    if case.expected_apply_nodes > 1:
+        for apply_node in apply_nodes:
+            inputs = apply_node.get("inputs", {})
+            if inputs.get("weight_preset") != "soft":
+                errors.append(f"{case.case_id}: advanced apply node missing weight_preset='soft'.")
+            if inputs.get("layer_weights_json") != "[0.2, 0.4, 0.8]":
+                errors.append(f"{case.case_id}: advanced apply node missing expected layer_weights_json.")
+    return errors
+
+
 def _validate_prompt_parity_case_response(case: LivePromptParityCase, response_payload: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     fixture = case.fixture
@@ -841,10 +1318,65 @@ def _run_prompt_parity_dry_run_smoke(
     return errors
 
 
+def _run_controlnet_detect_smoke(
+    base_url: str,
+    context: ControlNetHostContext,
+    *,
+    request_timeout_seconds: float,
+) -> list[str]:
+    response_payload = _request_json(
+        "POST",
+        f"{base_url}/rookieui/controlnet/detect",
+        payload={
+            "controlnet_module": context.module_name,
+            "controlnet_model": context.model_name,
+            "controlnet_input_images": [_build_png_data_url()],
+        },
+        timeout_seconds=request_timeout_seconds,
+    )
+    return _validate_controlnet_detect_response(context, response_payload)
+
+
+def _run_controlnet_dry_run_smoke(
+    base_url: str,
+    context: ControlNetHostContext,
+    cases: list[LiveControlNetDryRunCase],
+    *,
+    request_timeout_seconds: float,
+) -> list[str]:
+    errors: list[str] = []
+    for case in cases:
+        response_payload = _request_json(
+            "POST",
+            f"{base_url}{case.route_path}",
+            payload=case.request_payload,
+            timeout_seconds=request_timeout_seconds,
+        )
+        errors.extend(_validate_controlnet_dry_run_case_response(context, case, response_payload))
+    return errors
+
+
 def _build_prompt_parity_execute_payload(case: LivePromptParityCase, client_id: str) -> dict[str, Any]:
     payload = _build_prompt_parity_request_payload(case)
     payload.pop("dry_run", None)
     payload["client_id"] = client_id
+    return payload
+
+
+def _build_controlnet_execute_payload(context: ControlNetHostContext, client_id: str) -> dict[str, Any]:
+    payload = _build_controlnet_txt2img_defaults(context.profile_id, context.checkpoint_name)
+    payload["client_id"] = client_id
+    payload["controlnet_units"] = [
+        {
+            "enabled": True,
+            "control_type": context.control_type,
+            "module": context.module_name,
+            "model": context.model_name,
+            "image_data": _build_png_data_url(color="lightgray"),
+            "guidance_start": 0.0,
+            "guidance_end": 1.0,
+        }
+    ]
     return payload
 
 
@@ -888,6 +1420,46 @@ def _run_prompt_parity_execute_smoke(
             errors.append(
                 f"{case.fixture.case_id}: execute lane ended in status '{terminal_status}'."
             )
+    return errors
+
+
+def _run_controlnet_execute_smoke(
+    base_url: str,
+    context: ControlNetHostContext,
+    *,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> list[str]:
+    client_id = f"rookieui-live-controlnet-{context.profile_id}"
+    submit_result = _request_json(
+        "POST",
+        f"{base_url}/rookieui/generate/txt2img",
+        payload=_build_controlnet_execute_payload(context, client_id),
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors: list[str] = []
+    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
+    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
+        return ["controlnet execute: submit failed, expected accepted submission payload."]
+    prompt_id = str(submission.get("prompt_id", "")).strip()
+    if not prompt_id:
+        return ["controlnet execute: submit missing prompt_id."]
+
+    job = _poll_queue_job_until_terminal(
+        base_url,
+        prompt_id,
+        client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    terminal_status = str(job.get("status", "")).strip().lower()
+    if terminal_status != "completed":
+        errors.append(f"controlnet execute: terminal status was '{terminal_status}'.")
+    reusable_outputs = job.get("reusable_outputs")
+    if not isinstance(reusable_outputs, list) or not reusable_outputs:
+        errors.append("controlnet execute: completed job did not expose reusable_outputs.")
     return errors
 def _poll_queue_job_until_terminal(
     base_url: str,
@@ -976,6 +1548,18 @@ def _validate_prompt_parity_host_sync(context: PromptParityHostContext) -> list[
     return errors
 
 
+def _validate_controlnet_host_sync(context: ControlNetHostContext) -> list[str]:
+    errors: list[str] = []
+    if not context.host_contract_version:
+        errors.append("live host ControlNet routes did not expose contract.version.")
+    elif context.host_contract_version != context.local_contract_version:
+        errors.append(
+            "live host ControlNet contract mismatch: "
+            f"host='{context.host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    return errors
+
+
 def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
@@ -1013,6 +1597,91 @@ def main() -> int:
     except Exception as exc:
         print(f"[live-smoke] ERROR: failed to load /models or /presets: {exc}", file=sys.stderr)
         return 1
+
+    if args.validation_mode == "controlnet":
+        try:
+            model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+                base_url,
+                args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: failed to load ControlNet route payloads: {exc}", file=sys.stderr)
+            return 1
+
+        context, context_errors = _build_controlnet_host_context(
+            models_payload,
+            model_list_payload,
+            module_list_payload,
+            control_types_payload,
+            profiles,
+        )
+        if context_errors:
+            print("[live-smoke] ERROR: controlnet host context validation failed:", file=sys.stderr)
+            for error in context_errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        assert context is not None
+
+        sync_errors = _validate_controlnet_host_sync(context)
+        if sync_errors:
+            print("[live-smoke] WARNING: controlnet host/workspace sync mismatch detected:", file=sys.stderr)
+            for error in sync_errors:
+                print(f"  - {error}", file=sys.stderr)
+
+        dry_run_cases = _build_controlnet_dry_run_cases(context)
+        try:
+            detect_errors = _run_controlnet_detect_smoke(
+                base_url,
+                context,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+            dry_run_errors = _run_controlnet_dry_run_smoke(
+                base_url,
+                context,
+                dry_run_cases,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: controlnet validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        combined_errors = sync_errors + detect_errors + dry_run_errors
+        if combined_errors:
+            print("[live-smoke] WARNING: controlnet validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] controlnet detect + dry-run checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because controlnet detect/dry-run was not green.")
+            else:
+                try:
+                    execution_errors = _run_controlnet_execute_smoke(
+                        base_url,
+                        context,
+                        request_timeout_seconds=args.request_timeout_seconds,
+                        poll_timeout_seconds=args.poll_timeout_seconds,
+                        poll_interval_seconds=args.poll_interval_seconds,
+                    )
+                except Exception as exc:
+                    print(f"[live-smoke] ERROR: controlnet execute lane failed unexpectedly: {exc}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                if execution_errors:
+                    print("[live-smoke] ERROR: controlnet execute lane failed:", file=sys.stderr)
+                    for error in execution_errors:
+                        print(f"  - {error}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                print("[live-smoke] controlnet execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
 
     if args.validation_mode == "prompt-parity":
         try:
