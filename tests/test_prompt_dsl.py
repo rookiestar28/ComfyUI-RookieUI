@@ -6,6 +6,7 @@ from unittest import mock
 from rookieui.contracts.prompt_dsl import PromptSemanticPlan
 from rookieui.services.prompt_dsl import (
     PROMPT_WARNING_AND_DETECTED,
+    PROMPT_WARNING_ALTERNATE_DETECTED,
     PROMPT_WARNING_ATTENTION_DETECTED,
     PROMPT_WARNING_BREAK_DETECTED,
     PROMPT_WARNING_EMBEDDING_DETECTED,
@@ -23,7 +24,9 @@ class PromptDslTests(unittest.TestCase):
         empty = PromptSemanticPlan.empty("hero")
 
         self.assertIn("embeddings_textual_inversion", empty.features)
+        self.assertIn("alternate_prompt_scheduling", empty.features)
         self.assertFalse(empty.features["embeddings_textual_inversion"])
+        self.assertFalse(empty.features["alternate_prompt_scheduling"])
         self.assertEqual(empty.embeddings, [])
         payload = empty.to_payload()
         self.assertEqual(payload["embeddings"], [])
@@ -133,6 +136,34 @@ class PromptDslTests(unittest.TestCase):
         self.assertEqual(len(semantics["branches"]), 1)
         self.assertEqual(len(semantics["branches"][0]["chunks"]), 2)
 
+    def test_preprocess_prompt_bundle_expands_alternate_prompt_scheduling(self) -> None:
+        result = preprocess_prompt_bundle(
+            "portrait [warm|cool] light",
+            "",
+            step_count=4,
+            inventory_loras=[],
+            strict_match=False,
+        )
+
+        semantics = result.prompt_semantics.to_payload()
+        self.assertTrue(semantics["features"]["alternate_prompt_scheduling"])
+        self.assertFalse(semantics["features"]["prompt_scheduling"])
+        self.assertIn(PROMPT_WARNING_ALTERNATE_DETECTED, result.warning_codes)
+        slices = semantics["branches"][0]["chunks"][0]["slices"]
+        self.assertEqual(
+            [slice_item["text"] for slice_item in slices],
+            [
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+            ],
+        )
+        self.assertEqual(
+            [(slice_item["start"], slice_item["end"]) for slice_item in slices],
+            [(0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0)],
+        )
+
     def test_preprocess_prompt_bundle_honors_legacy_env_fallback_switch(self) -> None:
         with mock.patch.dict("os.environ", {"ROOKIEUI_PROMPT_DSL_LEGACY": "1"}, clear=False):
             result = preprocess_prompt_bundle(
@@ -186,6 +217,11 @@ class PromptDslTests(unittest.TestCase):
         normalized = normalize_prompt_attention_for_weighted_encode("[calm:chaos:0.4]")
 
         self.assertEqual(normalized, "[calm:chaos:0.4]")
+
+    def test_normalize_prompt_attention_for_weighted_encode_preserves_alternate_groups(self) -> None:
+        normalized = normalize_prompt_attention_for_weighted_encode("[warm|cool]")
+
+        self.assertEqual(normalized, "[warm|cool]")
 
     def test_normalize_prompt_attention_for_weighted_encode_preserves_escaped_markers(self) -> None:
         normalized = normalize_prompt_attention_for_weighted_encode(r"literal \[brackets\] and \(parens\)")

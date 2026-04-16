@@ -281,12 +281,14 @@ def _build_prompt_parity_host_context(
 def _build_prompt_parity_cases(context: PromptParityHostContext) -> list[LivePromptParityCase]:
     sd15_attention = _get_fixture("sd15_attention_brackets")
     sd15_break_schedule = _get_fixture("sd15_break_schedule")
+    sd15_alternate_schedule = _get_fixture("sd15_alternate_schedule")
     sd15_and_multi_cond = _get_fixture("sd15_and_multi_cond")
     sd15_missing_explicit_embedding = _get_fixture("sd15_missing_explicit_embedding")
 
     cases = [
         LivePromptParityCase(sd15_attention, checkpoint_name=context.sd15_checkpoint, execute=True),
         LivePromptParityCase(sd15_break_schedule, checkpoint_name=context.sd15_checkpoint),
+        LivePromptParityCase(sd15_alternate_schedule, checkpoint_name=context.sd15_checkpoint),
         LivePromptParityCase(sd15_and_multi_cond, checkpoint_name=context.sd15_checkpoint),
         LivePromptParityCase(sd15_missing_explicit_embedding, checkpoint_name=context.sd15_checkpoint),
     ]

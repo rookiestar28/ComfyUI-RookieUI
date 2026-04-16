@@ -31,6 +31,15 @@ _PROMPT_CAPABILITIES = (
         "reference": "a1111_prompt_parser",
     },
     {
+        "id": "alternate_prompt_scheduling",
+        "title": "Alternate Prompt Scheduling",
+        "a1111_semantics": "Alternate syntax [a|b] cycles prompt text across sampling steps.",
+        "rookieui_contract": "Parsed into per-step alternate slices and compiled with timestep range conditioning on SD-family prompt paths.",
+        "status": "supported",
+        "translation": "conditioning_set_timestep_range_cycle",
+        "reference": "a1111_prompt_parser",
+    },
+    {
         "id": "attention_weighting",
         "title": "Attention Weighting",
         "a1111_semantics": "Parenthesis/bracket prompt attention and explicit (text:weight) weighting.",
@@ -71,7 +80,7 @@ _PROMPT_CAPABILITIES = (
 
 def build_prompt_capability_matrix_payload() -> dict[str, Any]:
     return {
-        "contract_version": "f103-20260416",
+        "contract_version": "f105-20260416",
         "contract_scope": "sd-family-first",
         "rollout": {
             "default_mode": "semantic_v2",

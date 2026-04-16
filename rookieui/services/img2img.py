@@ -159,9 +159,11 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     )
     lora_strength_model = _coerce_lora_strength(request.lora_strength_model, "lora_strength_model")
     lora_strength_clip = _coerce_lora_strength(request.lora_strength_clip, "lora_strength_clip")
+    steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
     prompt_preprocess = preprocess_prompt_bundle(
         prompt,
         negative_prompt,
+        step_count=steps,
         inventory_loras=inventory.loras,
         inventory_embeddings=inventory.embeddings,
         strict_match=inventory_is_host,
@@ -236,7 +238,6 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         applied_defaults,
     )
 
-    steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
     cfg_scale = _coerce_cfg_scale(request.cfg_scale, profile.default_cfg_scale, applied_defaults)
 
     sampler_input = normalize_option_label(request.sampler_name, "sampler_name")

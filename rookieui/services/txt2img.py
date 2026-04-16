@@ -182,9 +182,11 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     )
     lora_strength_model = _coerce_lora_strength(request.lora_strength_model, "lora_strength_model")
     lora_strength_clip = _coerce_lora_strength(request.lora_strength_clip, "lora_strength_clip")
+    steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
     prompt_preprocess = preprocess_prompt_bundle(
         prompt,
         negative_prompt,
+        step_count=steps,
         inventory_loras=inventory.loras,
         inventory_embeddings=inventory.embeddings,
         strict_match=inventory_is_host,
@@ -210,7 +212,6 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         field_name="height",
         applied_defaults=applied_defaults,
     )
-    steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
     cfg_scale = _coerce_cfg_scale(
         request.cfg_scale,
         profile.default_cfg_scale,

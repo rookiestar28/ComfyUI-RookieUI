@@ -163,6 +163,20 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 2)
 
+    def test_normalize_txt2img_request_exposes_alternate_prompt_scheduling_semantics(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait [warm|cool] light",
+                "steps": 4,
+            }
+        )
+
+        self.assertIn("PROMPT_ALTERNATE_DETECTED", normalized.prompt_warning_codes)
+        self.assertTrue(normalized.prompt_semantics["features"]["alternate_prompt_scheduling"])
+        slices = normalized.prompt_semantics["branches"][0]["chunks"][0]["slices"]
+        self.assertEqual([slice_item["text"] for slice_item in slices[:2]], ["portrait warm light", "portrait cool light"])
+        self.assertEqual(len(slices), 4)
+
     def test_normalize_txt2img_request_canonicalizes_inventory_backed_embedding_tokens(self) -> None:
         fake_inventory = ModelInventorySnapshot(
             source="host",
@@ -464,6 +478,20 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         result = translate_txt2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
         self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", class_types)
+        self.assertIn("ConditioningSetTimestepRange", class_types)
+
+    def test_translate_txt2img_request_compiles_alternate_prompt_scheduling(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait [warm|cool] light",
+                "steps": 4,
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertIn("ConditioningCombine", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
     def test_translate_txt2img_request_passes_canonical_embedding_tokens_to_sd_family_encoder(self) -> None:
