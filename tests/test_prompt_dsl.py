@@ -8,6 +8,8 @@ from rookieui.services.prompt_dsl import (
     PROMPT_WARNING_AND_DETECTED,
     PROMPT_WARNING_ATTENTION_DETECTED,
     PROMPT_WARNING_BREAK_DETECTED,
+    PROMPT_WARNING_EMBEDDING_DETECTED,
+    PROMPT_WARNING_EMBEDDING_MISSING,
     PROMPT_WARNING_LEGACY_FALLBACK_ENABLED,
     PROMPT_WARNING_SCHEDULE_DETECTED,
     merge_lora_activations,
@@ -82,6 +84,40 @@ class PromptDslTests(unittest.TestCase):
         self.assertIn(PROMPT_WARNING_BREAK_DETECTED, result.warning_codes)
         self.assertIn(PROMPT_WARNING_SCHEDULE_DETECTED, result.warning_codes)
         self.assertIn(PROMPT_WARNING_ATTENTION_DETECTED, result.warning_codes)
+
+    def test_preprocess_prompt_bundle_canonicalizes_inventory_backed_bare_embedding_tokens(self) -> None:
+        result = preprocess_prompt_bundle(
+            "portrait badhandv4 masterpiece",
+            "",
+            inventory_loras=[],
+            inventory_embeddings=["badhandv4.pt"],
+            strict_match=False,
+        )
+
+        self.assertEqual(result.cleaned_prompt, "portrait embedding:badhandv4.pt masterpiece")
+        self.assertIn(PROMPT_WARNING_EMBEDDING_DETECTED, result.warning_codes)
+        self.assertTrue(result.prompt_semantics.features["embeddings_textual_inversion"])
+        self.assertEqual(len(result.prompt_semantics.embeddings), 1)
+        self.assertEqual(result.prompt_semantics.embeddings[0].syntax, "bare")
+        self.assertTrue(result.prompt_semantics.embeddings[0].exists)
+        self.assertEqual(result.prompt_semantics.embeddings[0].canonical_token, "embedding:badhandv4.pt")
+
+    def test_preprocess_prompt_bundle_preserves_missing_explicit_embedding_as_plain_text(self) -> None:
+        result = preprocess_prompt_bundle(
+            "portrait embedding:missing_style dramatic light",
+            "",
+            inventory_loras=[],
+            inventory_embeddings=["badhandv4.pt"],
+            strict_match=False,
+        )
+
+        self.assertEqual(result.cleaned_prompt, "portrait missing_style dramatic light")
+        self.assertIn(PROMPT_WARNING_EMBEDDING_DETECTED, result.warning_codes)
+        self.assertIn(PROMPT_WARNING_EMBEDDING_MISSING, result.warning_codes)
+        self.assertEqual(len(result.prompt_semantics.embeddings), 1)
+        self.assertFalse(result.prompt_semantics.embeddings[0].exists)
+        self.assertEqual(result.prompt_semantics.embeddings[0].syntax, "explicit")
+        self.assertTrue(any("embedding:missing_style" in warning for warning in result.prompt_warnings))
 
     def test_preprocess_prompt_bundle_keeps_negative_prompt_semantics_payload(self) -> None:
         result = preprocess_prompt_bundle(

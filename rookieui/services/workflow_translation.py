@@ -20,6 +20,7 @@ from rookieui.services.parity_matrix import (
     normalize_sampler_name,
     normalize_scheduler_name,
 )
+from rookieui.services.model_inventory import discover_model_inventory
 from rookieui.services.prompt_dsl import preprocess_prompt_bundle
 from rookieui.services.controlnet_advanced_runtime import build_controlnet_apply_segments
 
@@ -638,7 +639,14 @@ def _append_adetailer_unit_conditioning(
 ) -> tuple[str, str]:
     prompt_text = _resolve_adetailer_prompt_text(unit.prompt, request.prompt)
     negative_text = _resolve_adetailer_prompt_text(unit.negative_prompt, request.negative_prompt)
-    prompt_bundle = preprocess_prompt_bundle(prompt_text, negative_text, strict_match=False)
+    inventory = discover_model_inventory()
+    prompt_bundle = preprocess_prompt_bundle(
+        prompt_text,
+        negative_text,
+        inventory_loras=inventory.loras,
+        inventory_embeddings=inventory.embeddings,
+        strict_match=False,
+    )
     use_rookieui_prompt_encoder = _uses_sd_family_prompt_parity(request)
     positive_id = _compile_prompt_semantic_conditioning(
         workflow,

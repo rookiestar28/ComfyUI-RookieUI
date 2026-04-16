@@ -206,6 +206,32 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertTrue(normalized.prompt_semantics["features"]["prompt_scheduling"])
         self.assertEqual(len(normalized.prompt_semantics["branches"]), 1)
 
+    def test_normalize_img2img_request_canonicalizes_inventory_backed_embedding_tokens(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["Automatic"],
+            text_encoders=["Automatic"],
+            embeddings=["badhandv4.pt"],
+            loras=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="Automatic",
+            default_text_encoder="Automatic",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait badhandv4 cleanup",
+                    "image_asset": "portrait-input",
+                }
+            )
+
+        self.assertEqual(normalized.prompt, "portrait embedding:badhandv4.pt cleanup")
+        self.assertIn("PROMPT_EMBEDDING_DETECTED", normalized.prompt_warning_codes)
+        self.assertTrue(normalized.prompt_semantics["features"]["embeddings_textual_inversion"])
+        self.assertEqual(normalized.prompt_semantics["embeddings"][0]["canonical_token"], "embedding:badhandv4.pt")
+
     def test_normalize_img2img_request_accepts_human_readable_inpaint_aliases(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -755,6 +781,37 @@ class Img2ImgTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in result["workflow"].values()}
 
         self.assertIn("RookieUIA1111CLIPTextEncode", class_types)
+
+    def test_translate_img2img_request_passes_canonical_embedding_tokens_to_sd_family_encoder(self) -> None:
+        fake_inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SD15\\dreamshaper.safetensors"],
+            vae=["Automatic"],
+            text_encoders=["Automatic"],
+            embeddings=["badhandv4.pt"],
+            loras=[],
+            default_checkpoint="SD15\\dreamshaper.safetensors",
+            default_vae="Automatic",
+            default_text_encoder="Automatic",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "portrait badhandv4 cleanup",
+                    "image_asset": "portrait-input",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        encoder_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUIA1111CLIPTextEncode"
+        ]
+
+        self.assertTrue(encoder_nodes)
+        self.assertTrue(any(node["inputs"]["text"] == "portrait embedding:badhandv4.pt cleanup" for node in encoder_nodes))
 
     def test_translate_img2img_request_applies_resize_mode_nodes(self) -> None:
         normalized = normalize_img2img_request(

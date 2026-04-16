@@ -186,6 +186,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         prompt,
         negative_prompt,
         inventory_loras=inventory.loras,
+        inventory_embeddings=inventory.embeddings,
         strict_match=inventory_is_host,
     )
     prompt = prompt_preprocess.cleaned_prompt
