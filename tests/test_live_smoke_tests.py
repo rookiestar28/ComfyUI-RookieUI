@@ -87,6 +87,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
 
         cases = live_smoke._build_prompt_parity_cases(context)
         embedding_case = next(case for case in cases if case.fixture.case_id == "sd15_embedding_bare")
+        alternate_case = next(case for case in cases if case.fixture.case_id == "sd15_alternate_schedule")
         sdxl_case = next(
             case
             for case in cases
@@ -102,6 +103,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             embedding_case.fixture.expected_prompt_embeddings[0].canonical_token,
             "embedding:EasyNegativeV2.safetensors",
         )
+        self.assertIn("alternate_prompt_scheduling", alternate_case.fixture.expected_prompt_features)
         self.assertEqual(sdxl_case.fixture.profile, "pony")
         self.assertIn("embedding:EasyNegativeV2.safetensors", sdxl_case.fixture.expected_cleaned_prompt)
         self.assertTrue(sdxl_case.execute)

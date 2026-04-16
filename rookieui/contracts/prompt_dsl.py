@@ -88,6 +88,7 @@ class PromptSemanticPlan:
                 "and_composition": False,
                 "break_chunks": False,
                 "prompt_scheduling": False,
+                "alternate_prompt_scheduling": False,
                 "attention_weighting": False,
                 "embeddings_textual_inversion": False,
             },

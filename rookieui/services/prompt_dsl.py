@@ -23,6 +23,7 @@ from rookieui.services.coercion import coerce_float, coerce_int
 PROMPT_WARNING_AND_DETECTED = "PROMPT_AND_DETECTED"
 PROMPT_WARNING_BREAK_DETECTED = "PROMPT_BREAK_DETECTED"
 PROMPT_WARNING_SCHEDULE_DETECTED = "PROMPT_SCHEDULE_DETECTED"
+PROMPT_WARNING_ALTERNATE_DETECTED = "PROMPT_ALTERNATE_DETECTED"
 PROMPT_WARNING_ATTENTION_DETECTED = "PROMPT_ATTENTION_DETECTED"
 PROMPT_WARNING_EMBEDDING_DETECTED = "PROMPT_EMBEDDING_DETECTED"
 PROMPT_WARNING_EMBEDDING_MISSING = "PROMPT_EMBEDDING_MISSING"
@@ -36,12 +37,12 @@ PROMPT_WARNING_LEGACY_FALLBACK_ENABLED = "PROMPT_LEGACY_FALLBACK_ENABLED"
 PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
 _EXTRA_NETWORK_RE = re.compile(r"<(\w+):([^>]+)>")
-_SCHEDULE_TOKEN_RE = re.compile(r"\[([^:\[\]]*):([^:\[\]]*):([^\[\]]+?)\]")
 _EXPLICIT_ATTENTION_RE = re.compile(r"\(([^()]+):\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+))\)")
 _PAREN_ATTENTION_RE = re.compile(r"\(([^():][^()]*)\)")
-_BRACKET_ATTENTION_RE = re.compile(r"\[([^\[\]:]+)\]")
+_BRACKET_ATTENTION_RE = re.compile(r"\[([^\[\]:|]+)\]")
 _EXPLICIT_EMBEDDING_RE = re.compile(r"(?<![\w./\\!$-])embedding:(?P<name>[\w.\-!$/\\]+)(?![\w./\\!$-])", re.IGNORECASE)
 _BRANCH_WEIGHT_RE = re.compile(r"^(.*?)(?:\s*:\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+)))\s*$")
+_TOP_LEVEL_NUMERIC_RE = re.compile(r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)")
 _A1111_DEEMPHASIS_WEIGHT = round(1.0 / 1.1, 4)
 _ESCAPED_ATTENTION_MARKERS = {
     r"\(": "\0rookieui_paren_open\0",
@@ -52,13 +53,15 @@ _ESCAPED_ATTENTION_MARKERS = {
 
 _MAX_AND_BRANCHES = 8
 _MAX_BREAK_CHUNKS = 16
-_MAX_SCHEDULE_SLICES = 24
-_MAX_SCHEDULE_EXPANSIONS = 8
+_MAX_SCHEDULE_SLICES = 128
+_MAX_SCHEDULE_EXPANSIONS = 16
+_DEFAULT_PROMPT_STEP_COUNT = 10
 
 _WARNING_MESSAGES = {
     PROMPT_WARNING_AND_DETECTED: "A1111 AND composition was detected and parsed into branch semantics.",
     PROMPT_WARNING_BREAK_DETECTED: "A1111 BREAK token was detected and parsed into chunk semantics.",
     PROMPT_WARNING_SCHEDULE_DETECTED: "A1111 prompt scheduling syntax was detected and parsed into timestep slices.",
+    PROMPT_WARNING_ALTERNATE_DETECTED: "A1111 alternate prompt scheduling syntax was detected and parsed into per-step timestep slices.",
     PROMPT_WARNING_ATTENTION_DETECTED: "A1111 attention weighting syntax was detected and captured for semantic parity.",
     PROMPT_WARNING_EMBEDDING_DETECTED: "Textual inversion / embedding references were detected and normalized for the SD-family prompt path.",
     PROMPT_WARNING_EMBEDDING_MISSING: "A textual inversion / embedding reference did not match the host inventory and fell back to plain prompt text.",
@@ -149,23 +152,88 @@ def _parse_branch_weight(branch_text: str) -> tuple[str, float]:
     return base_text, round(_coerce_float(raw_weight, "prompt_branch_weight"), 4)
 
 
-def _normalize_schedule_threshold(raw_threshold: str) -> tuple[float | None, str | None]:
+def _is_escaped_character(text: str, index: int) -> bool:
+    backslash_count = 0
+    cursor = index - 1
+    while cursor >= 0 and text[cursor] == "\\":
+        backslash_count += 1
+        cursor -= 1
+    return backslash_count % 2 == 1
+
+
+def _split_top_level_delimiter(text: str, delimiter: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth_round = 0
+    depth_square = 0
+    for index, char in enumerate(text):
+        if _is_escaped_character(text, index):
+            continue
+        if char == "(":
+            depth_round += 1
+        elif char == ")":
+            depth_round = max(depth_round - 1, 0)
+        elif char == "[":
+            depth_square += 1
+        elif char == "]":
+            depth_square = max(depth_square - 1, 0)
+        elif char == delimiter and depth_round == 0 and depth_square == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return parts
+
+
+def _looks_like_alternate_prompt_group(content: str) -> bool:
+    parts = _split_top_level_delimiter(content, "|")
+    return len(parts) > 1
+
+
+def _parse_prompt_schedule_group(content: str) -> tuple[str, str, str] | None:
+    parts = _split_top_level_delimiter(content, ":")
+    if len(parts) == 2:
+        after_text, raw_threshold = parts
+        before_text = ""
+    elif len(parts) == 3:
+        before_text, after_text, raw_threshold = parts
+    else:
+        return None
+    if not _TOP_LEVEL_NUMERIC_RE.fullmatch(raw_threshold.strip()):
+        return None
+    return before_text, after_text, raw_threshold.strip()
+
+
+def _looks_like_prompt_schedule_group(content: str) -> bool:
+    return _parse_prompt_schedule_group(content) is not None
+
+
+def _resolve_schedule_cutoff(
+    raw_threshold: str,
+    *,
+    step_count: int,
+) -> tuple[int | None, str | None]:
     try:
         threshold = _coerce_float(raw_threshold, "prompt_schedule_threshold")
     except ValueError:
         return None, PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD
     if threshold < 0:
-        return 0.0, PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD
-    if threshold <= 1:
-        return threshold, None
-    if threshold <= 100:
-        return threshold / 100.0, None
-    return 1.0, PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD
+        return 0, PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD
+    if "." in raw_threshold:
+        cutoff = int(float(threshold) * step_count)
+    else:
+        cutoff = int(float(threshold))
+    return max(0, min(step_count, cutoff)), None
 
 
-def _build_schedule_variant(source_text: str, match: re.Match[str], replacement: str) -> str:
+def _build_prompt_variant(
+    source_text: str,
+    *,
+    start_index: int,
+    end_index: int,
+    replacement: str,
+) -> str:
     return normalize_prompt_text(
-        f"{source_text[: match.start()]}{replacement}{source_text[match.end() :]}",
+        f"{source_text[:start_index]}{replacement}{source_text[end_index:]}",
         "prompt",
         required=False,
     )
@@ -187,57 +255,160 @@ def _dedupe_slices(slices: list[PromptScheduleSlice]) -> list[PromptScheduleSlic
     return deduped
 
 
-def _expand_schedule_slices(chunk_text: str) -> tuple[list[PromptScheduleSlice], bool, list[str]]:
+def _merge_prompt_segments(
+    segments: list[tuple[str, int, int]],
+) -> list[tuple[str, int, int]]:
+    if not segments:
+        return []
+    merged: list[tuple[str, int, int]] = []
+    for text, start, end in segments:
+        if end < start:
+            continue
+        if merged and merged[-1][0] == text and merged[-1][2] + 1 == start:
+            previous_text, previous_start, _previous_end = merged[-1]
+            merged[-1] = (previous_text, previous_start, end)
+            continue
+        merged.append((text, start, end))
+    return merged
+
+
+def _segments_to_slices(
+    segments: list[tuple[str, int, int]],
+    *,
+    step_count: int,
+) -> list[PromptScheduleSlice]:
+    slices = [
+        PromptScheduleSlice(
+            text=text,
+            start=round((start - 1) / step_count, 4),
+            end=round(end / step_count, 4),
+        )
+        for text, start, end in _merge_prompt_segments(segments)
+        if text or start <= end
+    ]
+    return _dedupe_slices(slices)
+
+
+def _find_first_dynamic_prompt_group(
+    text: str,
+) -> tuple[str, int, int, tuple[str, ...]] | None:
+    index = 0
+    while index < len(text):
+        if text[index] != "[" or _is_escaped_character(text, index):
+            index += 1
+            continue
+        group_content, next_index = _extract_balanced_attention_group(text, index, "[", "]")
+        if group_content is None:
+            index += 1
+            continue
+        schedule_group = _parse_prompt_schedule_group(group_content)
+        if schedule_group is not None:
+            return ("schedule", index, next_index, schedule_group)
+        alternate_parts = tuple(_split_top_level_delimiter(group_content, "|"))
+        if len(alternate_parts) > 1:
+            return ("alternate", index, next_index, alternate_parts)
+        index = next_index
+    return None
+
+
+def _expand_schedule_slices(
+    chunk_text: str,
+    *,
+    step_count: int | None = None,
+) -> tuple[list[PromptScheduleSlice], bool, bool, list[str]]:
     initial_text = normalize_prompt_text(chunk_text, "prompt", required=False)
-    current_slices = [PromptScheduleSlice(text=initial_text, start=0.0, end=1.0)]
+    effective_steps = max(1, int(step_count or _DEFAULT_PROMPT_STEP_COUNT))
+    current_segments: list[tuple[str, int, int]] = [(initial_text, 1, effective_steps)]
     warning_codes: list[str] = []
     has_schedule = False
+    has_alternate = False
 
     for _ in range(_MAX_SCHEDULE_EXPANSIONS):
         expanded = False
-        next_slices: list[PromptScheduleSlice] = []
-        for slice_item in current_slices:
-            match = _SCHEDULE_TOKEN_RE.search(slice_item.text)
-            if not match:
-                next_slices.append(slice_item)
+        next_segments: list[tuple[str, int, int]] = []
+        for slice_text, start_step, end_step in current_segments:
+            dynamic_group = _find_first_dynamic_prompt_group(slice_text)
+            if dynamic_group is None:
+                next_segments.append((slice_text, start_step, end_step))
                 continue
 
             expanded = True
-            has_schedule = True
-            before_text = _build_schedule_variant(slice_item.text, match, match.group(1).strip())
-            after_text = _build_schedule_variant(slice_item.text, match, match.group(2).strip())
-            threshold, threshold_warning = _normalize_schedule_threshold(match.group(3).strip())
-            if threshold_warning:
-                warning_codes.append(threshold_warning)
-            if threshold is None:
-                next_slices.append(PromptScheduleSlice(text=after_text or before_text, start=slice_item.start, end=slice_item.end))
+            group_kind, group_start, group_end, group_parts = dynamic_group
+            if group_kind == "schedule":
+                has_schedule = True
+                before_text, after_text, raw_threshold = group_parts
+                resolved_before = _build_prompt_variant(
+                    slice_text,
+                    start_index=group_start,
+                    end_index=group_end,
+                    replacement=before_text.strip(),
+                )
+                resolved_after = _build_prompt_variant(
+                    slice_text,
+                    start_index=group_start,
+                    end_index=group_end,
+                    replacement=after_text.strip(),
+                )
+                cutoff_step, threshold_warning = _resolve_schedule_cutoff(
+                    raw_threshold,
+                    step_count=effective_steps,
+                )
+                if threshold_warning:
+                    warning_codes.append(threshold_warning)
+                if cutoff_step is None:
+                    next_segments.append((resolved_after or resolved_before, start_step, end_step))
+                    continue
+                if start_step <= cutoff_step:
+                    next_segments.append((resolved_before, start_step, min(end_step, cutoff_step)))
+                if end_step > cutoff_step:
+                    next_segments.append((resolved_after, max(start_step, cutoff_step + 1), end_step))
                 continue
 
-            start = float(slice_item.start)
-            end = float(slice_item.end)
-            cutoff = max(0.0, min(1.0, threshold))
-            if cutoff > start:
-                next_slices.append(PromptScheduleSlice(text=before_text, start=start, end=min(cutoff, end)))
-            if cutoff < end:
-                next_slices.append(PromptScheduleSlice(text=after_text, start=max(cutoff, start), end=end))
-            if cutoff <= start and cutoff >= end:
-                next_slices.append(PromptScheduleSlice(text=after_text or before_text, start=start, end=end))
+            has_alternate = True
+            alternate_parts = list(group_parts)
+            if not alternate_parts:
+                next_segments.append((slice_text, start_step, end_step))
+                continue
+            current_step = start_step
+            while current_step <= end_step:
+                active_option = alternate_parts[(current_step - 1) % len(alternate_parts)]
+                run_end = current_step
+                while run_end < end_step and alternate_parts[run_end % len(alternate_parts)] == active_option:
+                    run_end += 1
+                next_segments.append(
+                    (
+                        _build_prompt_variant(
+                            slice_text,
+                            start_index=group_start,
+                            end_index=group_end,
+                            replacement=active_option.strip(),
+                        ),
+                        current_step,
+                        run_end,
+                    )
+                )
+                current_step = run_end + 1
 
         if not expanded:
             break
-        current_slices = _dedupe_slices(next_slices)
-        if len(current_slices) > _MAX_SCHEDULE_SLICES:
+        current_segments = _merge_prompt_segments(next_segments)
+        if len(current_segments) > _MAX_SCHEDULE_SLICES:
             warning_codes.append(PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT)
-            current_slices = current_slices[:_MAX_SCHEDULE_SLICES]
+            current_segments = current_segments[:_MAX_SCHEDULE_SLICES]
             break
 
-    if not current_slices:
-        current_slices = [PromptScheduleSlice(text=initial_text, start=0.0, end=1.0)]
-    return current_slices, has_schedule, warning_codes
+    if not current_segments:
+        current_segments = [(initial_text, 1, effective_steps)]
+    return (
+        _segments_to_slices(current_segments, step_count=effective_steps),
+        has_schedule,
+        has_alternate,
+        warning_codes,
+    )
 
 
 def _extract_attention_markers(prompt_text: str) -> list[PromptAttentionMarker]:
-    scan_text = _SCHEDULE_TOKEN_RE.sub("", prompt_text)
+    scan_text = prompt_text
     markers: list[PromptAttentionMarker] = []
     for match in _EXPLICIT_ATTENTION_RE.finditer(scan_text):
         markers.append(
@@ -254,8 +425,6 @@ def _extract_attention_markers(prompt_text: str) -> list[PromptAttentionMarker]:
         markers.append(PromptAttentionMarker(token=token, weight=1.1, syntax="paren"))
     for match in _BRACKET_ATTENTION_RE.finditer(scan_text):
         token = match.group(0)
-        if _SCHEDULE_TOKEN_RE.match(token):
-            continue
         markers.append(PromptAttentionMarker(token=token, weight=0.9, syntax="bracket"))
     return markers
 
@@ -456,26 +625,6 @@ def _split_top_level_explicit_attention(content: str) -> tuple[str, str | None]:
             if re.fullmatch(r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)", suffix or ""):
                 return content[:index], suffix
     return content, None
-
-
-def _looks_like_prompt_schedule_group(content: str) -> bool:
-    depth_round = 0
-    depth_square = 0
-    colon_count = 0
-    for char in content:
-        if char == "(":
-            depth_round += 1
-        elif char == ")":
-            depth_round = max(depth_round - 1, 0)
-        elif char == "[":
-            depth_square += 1
-        elif char == "]":
-            depth_square = max(depth_square - 1, 0)
-        elif char == ":" and depth_round == 0 and depth_square == 0:
-            colon_count += 1
-    return colon_count >= 2
-
-
 def _rewrite_a1111_attention_groups(text: str) -> str:
     parts: list[str] = []
     index = 0
@@ -487,7 +636,7 @@ def _rewrite_a1111_attention_groups(text: str) -> str:
                 parts.append(char)
                 index += 1
                 continue
-            if _looks_like_prompt_schedule_group(group_content):
+            if _looks_like_prompt_schedule_group(group_content) or _looks_like_alternate_prompt_group(group_content):
                 rewritten_inner = _rewrite_a1111_attention_groups(group_content)
                 parts.append(f"[{rewritten_inner}]")
             else:
@@ -527,6 +676,7 @@ def _build_prompt_semantic_plan(
     prompt_text: str,
     *,
     embeddings: list[PromptEmbeddingReference] | None = None,
+    step_count: int | None = None,
 ) -> tuple[PromptSemanticPlan, list[str]]:
     warnings: list[str] = []
     normalized_embeddings = list(embeddings or [])
@@ -540,6 +690,7 @@ def _build_prompt_semantic_plan(
     branch_semantics: list[PromptBranchSemantic] = []
     has_break = False
     has_schedule = False
+    has_alternate = False
     for raw_branch in branches_raw:
         branch_text, branch_weight = _parse_branch_weight(raw_branch)
         chunk_raw = _split_top_level_keyword(branch_text, "BREAK")
@@ -552,8 +703,12 @@ def _build_prompt_semantic_plan(
         chunks: list[PromptChunkSemantic] = []
         for raw_chunk in chunk_raw:
             normalized_chunk = normalize_prompt_text(raw_chunk, "prompt", required=False)
-            slices, chunk_has_schedule, chunk_warnings = _expand_schedule_slices(normalized_chunk)
+            slices, chunk_has_schedule, chunk_has_alternate, chunk_warnings = _expand_schedule_slices(
+                normalized_chunk,
+                step_count=step_count,
+            )
             has_schedule = has_schedule or chunk_has_schedule
+            has_alternate = has_alternate or chunk_has_alternate
             warnings.extend(chunk_warnings)
             chunks.append(
                 PromptChunkSemantic(
@@ -575,6 +730,8 @@ def _build_prompt_semantic_plan(
         warnings.append(PROMPT_WARNING_BREAK_DETECTED)
     if has_schedule:
         warnings.append(PROMPT_WARNING_SCHEDULE_DETECTED)
+    if has_alternate:
+        warnings.append(PROMPT_WARNING_ALTERNATE_DETECTED)
     if attention:
         warnings.append(PROMPT_WARNING_ATTENTION_DETECTED)
 
@@ -584,6 +741,7 @@ def _build_prompt_semantic_plan(
             "and_composition": len(branch_semantics) > 1,
             "break_chunks": has_break,
             "prompt_scheduling": has_schedule,
+            "alternate_prompt_scheduling": has_alternate,
             "attention_weighting": bool(attention),
             "embeddings_textual_inversion": bool(normalized_embeddings),
         },
@@ -727,6 +885,7 @@ def preprocess_prompt_bundle(
     prompt: str,
     negative_prompt: str,
     *,
+    step_count: int | None = None,
     inventory_loras: list[str] | None = None,
     inventory_embeddings: list[str] | None = None,
     strict_match: bool = False,
@@ -816,10 +975,12 @@ def preprocess_prompt_bundle(
     prompt_semantics, prompt_semantic_codes = _build_prompt_semantic_plan(
         cleaned_prompt,
         embeddings=prompt_embeddings,
+        step_count=step_count,
     )
     negative_prompt_semantics, negative_semantic_codes = _build_prompt_semantic_plan(
         cleaned_negative_prompt,
         embeddings=negative_embeddings,
+        step_count=step_count,
     )
     warning_codes = list(
         dict.fromkeys(

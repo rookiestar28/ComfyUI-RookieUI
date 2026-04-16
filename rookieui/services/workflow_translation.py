@@ -170,7 +170,7 @@ def _requires_conditioning_compiler(semantic_payload: dict[str, object]) -> bool
         return False
     return any(
         _coerce_semantic_feature(semantic_payload, feature_name)
-        for feature_name in ("and_composition", "break_chunks", "prompt_scheduling")
+        for feature_name in ("and_composition", "break_chunks", "prompt_scheduling", "alternate_prompt_scheduling")
     )
 
 

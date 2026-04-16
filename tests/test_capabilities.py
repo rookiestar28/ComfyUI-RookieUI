@@ -56,11 +56,12 @@ class CapabilitySnapshotTests(unittest.TestCase):
         payload = build_capabilities_snapshot()
 
         prompt_semantics = payload["prompt_semantics"]
-        self.assertEqual(prompt_semantics["contract_version"], "f103-20260416")
+        self.assertEqual(prompt_semantics["contract_version"], "f105-20260416")
         capability_ids = [entry["id"] for entry in prompt_semantics["capabilities"]]
         self.assertIn("and_composition", capability_ids)
         self.assertIn("break_chunks", capability_ids)
         self.assertIn("prompt_scheduling", capability_ids)
+        self.assertIn("alternate_prompt_scheduling", capability_ids)
         self.assertIn("attention_weighting", capability_ids)
         self.assertIn("embeddings_textual_inversion", capability_ids)
         embeddings_entry = next(
