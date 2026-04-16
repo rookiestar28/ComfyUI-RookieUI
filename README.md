@@ -6,21 +6,31 @@
 </div>
 
 <br>
-<br>
 
-ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style **workflow semantics** for Stable Diffusion in a ComfyUI host:
+ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-style sidebar workflow while keeping inference inside native ComfyUI execution. **The project target is not only visual similarity.** RookieUI aims to reproduce A1111-style workflow semantics for Stable Diffusion in a ComfyUI host:
 
-- **prompt and negative prompt handling**
-- **sampler/scheduler/seed/CFG behavior mapping**
-- **img2img and extras postprocessing flows**
+- **prompt / negative prompt parsing and conditioning behavior**
+- **sampler / scheduler / seed / CFG mapping**
+- **img2img, inpaint, and extras postprocessing flows**
+- **integrated ControlNet and ADetailer behavior**
 - **PNG metadata round-trip and apply workflow**
-- **queue/progress/result UX that feels close to A1111 usage**
-
+- **queue / progress / result UX and host-embedded validation coverage**
 <br>
 
-The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Newer model families remain available in the same RookieUI surface, but they continue to use their native ComfyUI execution semantics instead of claiming exact A1111 prompt parity.
+The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Even so, RookieUI supports more than just the Stable Diffusion family.
 
 <details><summary><h2>Last Update - Click to expand</h2></summary>
+
+<details>
+
+<summary><strong>Live-host validation expansion and full-pipeline closure (stability/tooling)</strong></summary>
+
+- Added dedicated live-host validation lanes for shipped `ControlNet` and `ADetailer`, covering host-context truthfulness, dry-run workflow checks, and execute-level completion on the current ComfyUI host.
+- Added an auxiliary live-host validation lane for synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back behavior, and explicit queue/history assertions tied to real RookieUI-origin jobs.
+- Added shared queue/post-state closure with explicit `/rookieui/queue` and `/rookieui/queue/{prompt_id}` validation plus reusable-output checks across the phase-58 auxiliary execute lanes.
+- Added an aggregate `full-pipeline` live-host mode that replays the accepted `ControlNet`, `ADetailer`, and auxiliary validation lanes end-to-end against the restarted host.
+
+</details>
 
 <details>
 
@@ -185,6 +195,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
 - [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
+- [Live-Host Validation Coverage](#live-host-validation-coverage)
 - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [ControlNet Support](#controlnet-support)
 - [ADetailer Support](#adetailer-support)
@@ -263,11 +274,13 @@ If your host or Manager install path does not automatically install custom-node 
 - A1111 metadata parsing path
 - automatic positive/negative prompt extraction
 - apply parsed parameters into `txt2img` or `img2img`
+- ComfyUI metadata remains inspect-only, while A1111 inpaint metadata surfaces explicit `missing_inputs` diagnostics until the required mask/source assets are selected manually
 
 ### Extras
 
 - single-image/batch postprocessing surface
 - dedicated extras contract and execution path
+- truthful guarded warning behavior for face-restoration requests that are not yet executed inside RookieUI's workspace-local pipeline
 
 ### ADetailer
 
@@ -320,6 +333,18 @@ Runtime and validation notes:
 - The shipped parity surface is backed by golden parser/translator fixtures plus local live-host smoke validation (`dry-run` and `execute`) against the current ComfyUI host.
 - Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
 
+## Live-Host Validation Coverage
+
+RookieUI now ships internal live-host smoke lanes in [`scripts/run_live_smoke_tests.py`](scripts/run_live_smoke_tests.py) for acceptance against a restarted ComfyUI host. These lanes are developer/acceptance tooling rather than end-user UI toggles, but they document the current level of host-embedded proof behind the shipped surfaces.
+
+Current live-host coverage:
+
+- `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
+- `controlnet`: validates host-context compatibility, detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure.
+- `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
+- `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
+- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, and auxiliary lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
+
 ## Default Model Read Paths (Host ComfyUI)
 
 RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under standard ComfyUI defaults, paths are:
@@ -365,6 +390,7 @@ Behavior and compatibility:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
 - ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
+- The shipped live-host smoke lane now validates detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure against the current host.
 
 ## ADetailer Support
 
@@ -390,6 +416,7 @@ Behavior and compatibility:
 - ControlNet coupling supports `none`, `passthrough`, and `custom` modes inside the refinement context.
 - Native detector runtime uses RookieUI's packaged Python dependencies together with host model inventory, so matching detector/model files must still exist in the host environment.
 - Availability guidance and warning diagnostics are exposed when detector/model/runtime dependencies are degraded.
+- The shipped live-host smoke lane now validates catalog/runtime truthfulness, refinement-topology dry-run behavior, and fallback-safe execute completion against the current host.
 
 ## Support for Other Extensions
 
