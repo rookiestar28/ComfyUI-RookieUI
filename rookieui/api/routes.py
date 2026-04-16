@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from rookieui.contracts.extras import build_extras_contract_meta
+from rookieui.contracts.pnginfo import build_pnginfo_contract_meta
+from rookieui.contracts.queue import build_queue_contract_meta
 from rookieui.services.model_inventory import discover_model_inventory
 from rookieui.services.extras import execute_extras_request, normalize_extras_request
 from rookieui.services.parity_matrix import build_parity_payload
@@ -95,10 +98,14 @@ def build_adetailer_snapshot() -> dict[str, object]:
 
 
 def build_queue_snapshot_payload(*, client_id: str | None = None) -> dict[str, object]:
-    return build_queue_snapshot(
+    payload = build_queue_snapshot(
         _get_prompt_server_for_submission(),
         client_id=client_id,
     )
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    payload["contract"] = build_queue_contract_meta()
+    return payload
 
 
 def build_queue_job_snapshot_payload(
@@ -107,11 +114,15 @@ def build_queue_job_snapshot_payload(
     client_id: str | None = None,
 ) -> dict[str, object]:
     normalized_prompt_id = normalize_option_label(prompt_id, "prompt_id", max_length=96)
-    return build_queue_job_snapshot(
+    payload = build_queue_job_snapshot(
         _get_prompt_server_for_submission(),
         normalized_prompt_id,
         client_id=client_id,
     )
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    payload["contract"] = build_queue_contract_meta()
+    return payload
 
 
 def _get_prompt_server_for_submission() -> Any | None:
@@ -313,6 +324,7 @@ async def pnginfo_parse(request: Any) -> Any:
     response_payload = result.to_payload()
     response_payload["service"] = normalize_metadata_text("rookieui")
     response_payload["status"] = normalize_metadata_text("ok")
+    response_payload["contract"] = build_pnginfo_contract_meta()
     return _json_response(response_payload, request=request)
 
 
@@ -509,6 +521,7 @@ async def extras_run(request: Any) -> Any:
     response_payload = result.to_payload()
     response_payload["service"] = normalize_metadata_text("rookieui")
     response_payload["status"] = normalize_metadata_text("ok")
+    response_payload["contract"] = build_extras_contract_meta()
     return _json_response(response_payload, request=request)
 
 

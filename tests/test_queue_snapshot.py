@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from rookieui.api import routes
+from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.services.queue_snapshot import build_queue_snapshot
 
 
@@ -141,6 +142,7 @@ class QueueSnapshotTests(unittest.TestCase):
 
         self.assertEqual(payload["source"], "fallback")
         self.assertEqual(payload["queue_remaining"], 0)
+        self.assertEqual(payload["contract"]["version"], QUEUE_CONTRACT_VERSION)
         self.assertEqual(payload["jobs"], [])
 
     def test_build_queue_snapshot_normalizes_running_pending_and_history(self) -> None:
@@ -177,6 +179,8 @@ class QueueSnapshotTests(unittest.TestCase):
             response = asyncio.run(routes.queue(_FakeJsonRequest()))
 
         self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["contract"]["version"], QUEUE_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["queue_remaining"], 3)
         history_job = next(job for job in response["payload"]["jobs"] if job["id"] == "prompt-history")
         self.assertEqual(history_job["output_filenames"], ["history-image.png"])
@@ -190,6 +194,8 @@ class QueueSnapshotTests(unittest.TestCase):
             response = asyncio.run(routes.queue(_FakeJsonRequest(query={"client_id": "browser-1"})))
 
         self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["contract"]["version"], QUEUE_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["queue_remaining"], 2)
         job_ids = [job["id"] for job in response["payload"]["jobs"]]
         self.assertNotIn("other-client-pending", job_ids)
@@ -210,4 +216,6 @@ class QueueSnapshotTests(unittest.TestCase):
             )
 
         self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["contract"]["version"], QUEUE_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["job"]["id"], "prompt-history")

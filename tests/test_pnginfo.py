@@ -9,6 +9,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from rookieui.api import routes
+from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.security.request_guard import MAX_INFOTEXT_LENGTH
 from rookieui.services.pnginfo import parse_pnginfo_payload
 
@@ -174,6 +175,7 @@ class PNGInfoParsingTests(unittest.TestCase):
 
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["contract"]["version"], PNGINFO_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["target_form"], "txt2img")
 
     def test_pnginfo_inspect_route_returns_round_trip_payload(self) -> None:
@@ -195,6 +197,7 @@ class PNGInfoParsingTests(unittest.TestCase):
 
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["contract"]["version"], PNGINFO_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["source_type"], "a1111")
 
     def test_pnginfo_route_rejects_missing_image_data(self) -> None:

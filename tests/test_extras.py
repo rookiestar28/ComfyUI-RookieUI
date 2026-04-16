@@ -11,6 +11,7 @@ from unittest import mock
 from PIL import Image
 
 from rookieui.api import routes
+from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.services import asset_store
 from rookieui.services.extras import execute_extras_request, normalize_extras_request
 
@@ -108,6 +109,7 @@ class ExtrasTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["status"], "ok")
         self.assertEqual(response["payload"]["mode"], "single_image")
+        self.assertEqual(response["payload"]["contract"]["version"], EXTRAS_CONTRACT_VERSION)
         self.assertEqual(len(response["payload"]["output_assets"]), 1)
 
     def test_extras_route_rejects_missing_image(self) -> None:

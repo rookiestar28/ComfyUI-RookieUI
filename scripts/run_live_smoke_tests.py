@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import io
 import json
 import os
 import sys
@@ -17,6 +19,9 @@ if str(_REPO_ROOT) not in sys.path:
     # CRITICAL: keep repo root on sys.path when running `python scripts/run_live_smoke_tests.py`; otherwise the smoke lane cannot import the local RookieUI package or golden fixtures outside editable-install contexts.
     sys.path.insert(0, str(_REPO_ROOT))
 
+from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
+from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
+from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.services.parity_matrix import get_parity_profile
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from tests.prompt_parity_fixtures import (
@@ -58,6 +63,15 @@ class LivePromptParityCase:
     execute: bool = False
 
 
+@dataclass(frozen=True)
+class LiveRouteContractProbe:
+    surface: str
+    route_path: str
+    local_contract_version: str
+    method: str = "GET"
+    payload: dict[str, Any] | None = None
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -68,6 +82,8 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
 def _default_profiles_for_mode(validation_mode: str) -> str:
     if validation_mode == "prompt-parity":
         return ",".join(_SD_PROMPT_PARITY_PROFILES)
+    if validation_mode == "auxiliary-contracts":
+        return ""
     return ",".join(_NON_SD_DIFFUSION_PROFILES)
 
 
@@ -76,12 +92,13 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Run optional live RookieUI smoke checks against a real ComfyUI host. "
             "This lane validates profile-to-model/text-encoder alignment and can optionally "
-            "submit/poll lightweight txt2img runs for non-SD diffusion profiles."
+            "submit/poll lightweight txt2img runs for non-SD diffusion profiles while also "
+            "supporting auxiliary route contract checks."
         )
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity"),
+        choices=("catalog", "prompt-parity", "auxiliary-contracts"),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -179,6 +196,30 @@ def _load_capabilities_payload(base_url: str, timeout_seconds: float) -> dict[st
     )
 
 
+def _build_png_data_url(*, color: str = "white", metadata: dict[str, str] | None = None) -> str:
+    try:
+        # CRITICAL: keep the Pillow import lazy; catalog-only smoke and prompt-parity dry-run checks must remain import-safe even if a shell env is missing optional image helpers.
+        from PIL import Image
+        from PIL.PngImagePlugin import PngInfo
+    except ImportError as exc:  # pragma: no cover - depends on local runtime packaging.
+        raise RuntimeError("Pillow is required for auxiliary live-smoke PNG payload generation.") from exc
+
+    image = Image.new("RGB", (32, 32), color=color)
+    pnginfo = None
+    if metadata:
+        pnginfo = PngInfo()
+        for key, value in metadata.items():
+            pnginfo.add_text(key, value)
+
+    buffer = io.BytesIO()
+    save_kwargs: dict[str, Any] = {"format": "PNG"}
+    if pnginfo is not None:
+        save_kwargs["pnginfo"] = pnginfo
+    image.save(buffer, **save_kwargs)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def _parse_profiles(raw_profiles: str) -> list[str]:
     profiles = [segment.strip() for segment in raw_profiles.split(",") if segment.strip()]
     return list(dict.fromkeys(profiles))
@@ -189,6 +230,97 @@ def _get_fixture(case_id: str) -> PromptParityGoldenCase:
         if fixture.case_id == case_id:
             return fixture
     raise KeyError(f"Unknown prompt parity fixture: {case_id}")
+
+
+def _read_nested_text(payload: object, *path: str) -> str:
+    current = payload
+    for key in path:
+        if not isinstance(current, dict):
+            return ""
+        current = current.get(key)
+    if current is None:
+        return ""
+    return str(current).strip()
+
+
+def _build_auxiliary_contract_probes() -> list[LiveRouteContractProbe]:
+    pnginfo_infotext = (
+        "masterpiece, harbor dusk\n"
+        "Negative prompt: blurry\n"
+        "Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 5, Size: 512x512"
+    )
+    return [
+        LiveRouteContractProbe(
+            surface="queue_snapshot_and_job_lookup",
+            route_path="/rookieui/queue",
+            local_contract_version=QUEUE_CONTRACT_VERSION,
+        ),
+        LiveRouteContractProbe(
+            surface="pnginfo_parse_inspect",
+            route_path="/rookieui/pnginfo/parse",
+            local_contract_version=PNGINFO_CONTRACT_VERSION,
+            method="POST",
+            payload={"image_data": _build_png_data_url(metadata={"parameters": pnginfo_infotext})},
+        ),
+        LiveRouteContractProbe(
+            surface="extras_run",
+            route_path="/rookieui/extras/run",
+            local_contract_version=EXTRAS_CONTRACT_VERSION,
+            method="POST",
+            payload={
+                "mode": "single_image",
+                "image_data": _build_png_data_url(color="lightblue"),
+                "scale_by": 1.0,
+            },
+        ),
+    ]
+
+
+def _validate_route_contract_payload(probe: LiveRouteContractProbe, payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if _read_nested_text(payload, "service") != "rookieui":
+        errors.append(
+            f"surface '{probe.surface}' expected top-level service='rookieui' but got "
+            f"'{_read_nested_text(payload, 'service')}'."
+        )
+    if _read_nested_text(payload, "status") != "ok":
+        errors.append(
+            f"surface '{probe.surface}' expected top-level status='ok' but got "
+            f"'{_read_nested_text(payload, 'status')}'."
+        )
+
+    host_surface = _read_nested_text(payload, "contract", "surface")
+    if host_surface != probe.surface:
+        errors.append(
+            f"surface '{probe.surface}' expected contract.surface='{probe.surface}' but got '{host_surface}'."
+        )
+
+    host_contract_version = _read_nested_text(payload, "contract", "version")
+    if not host_contract_version:
+        errors.append(f"surface '{probe.surface}' did not expose contract.version.")
+    elif host_contract_version != probe.local_contract_version:
+        errors.append(
+            f"surface '{probe.surface}' contract mismatch: "
+            f"host='{host_contract_version}' workspace='{probe.local_contract_version}'."
+        )
+    return errors
+
+
+def _run_auxiliary_contract_smoke(base_url: str, *, request_timeout_seconds: float) -> list[str]:
+    errors: list[str] = []
+    for probe in _build_auxiliary_contract_probes():
+        try:
+            response_payload = _request_json(
+                probe.method,
+                f"{base_url}{probe.route_path}",
+                payload=probe.payload,
+                timeout_seconds=request_timeout_seconds,
+            )
+        except Exception as exc:
+            errors.append(f"surface '{probe.surface}' request failed: {exc}")
+            continue
+        errors.extend(_validate_route_contract_payload(probe, response_payload))
+    return errors
 
 
 def _iter_string_list(payload: object, key: str) -> list[str]:
@@ -848,15 +980,33 @@ def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
-    if not profiles:
+    if args.validation_mode != "auxiliary-contracts" and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
     print(f"[live-smoke] base_url={base_url}")
-    print(f"[live-smoke] profiles={','.join(profiles)}")
+    print(f"[live-smoke] profiles={','.join(profiles) if profiles else '<none>'}")
     print(f"[live-smoke] validation_mode={args.validation_mode}")
     print(f"[live-smoke] execute={'on' if args.execute else 'off'}")
     print(f"[live-smoke] report_only={'on' if args.report_only else 'off'}")
+
+    if args.validation_mode == "auxiliary-contracts":
+        try:
+            auxiliary_errors = _run_auxiliary_contract_smoke(
+                base_url,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: auxiliary contract checks failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if auxiliary_errors:
+            print("[live-smoke] ERROR: auxiliary contract validation failed:", file=sys.stderr)
+            for error in auxiliary_errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        print("[live-smoke] auxiliary contract checks passed.")
+        print("[live-smoke] PASS")
+        return 0
 
     try:
         models_payload, presets_payload = _load_server_payloads(base_url, args.request_timeout_seconds)

@@ -3,6 +3,9 @@ from __future__ import annotations
 import unittest
 
 from rookieui.api import routes
+from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
+from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
+from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 
 
 class RoutePayloadTests(unittest.TestCase):
@@ -100,3 +103,29 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(preset_lookup["qwen_image"]["profile"], "qwen_image")
         self.assertEqual(preset_lookup["klein"]["profile"], "klein")
         self.assertEqual(preset_lookup["zit"]["profile"], "zit")
+
+    def test_queue_snapshot_payload_exposes_contract_envelope(self) -> None:
+        payload = routes.build_queue_snapshot_payload()
+
+        self.assertEqual(payload["service"], "rookieui")
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["contract"]["version"], QUEUE_CONTRACT_VERSION)
+
+    def test_queue_job_snapshot_payload_exposes_contract_envelope(self) -> None:
+        payload = routes.build_queue_job_snapshot_payload("prompt-1")
+
+        self.assertEqual(payload["service"], "rookieui")
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["contract"]["version"], QUEUE_CONTRACT_VERSION)
+
+    def test_pnginfo_contract_builder_matches_route_surface(self) -> None:
+        contract = routes.build_pnginfo_contract_meta()
+
+        self.assertEqual(contract["version"], PNGINFO_CONTRACT_VERSION)
+        self.assertEqual(contract["surface"], "pnginfo_parse_inspect")
+
+    def test_extras_contract_builder_matches_route_surface(self) -> None:
+        contract = routes.build_extras_contract_meta()
+
+        self.assertEqual(contract["version"], EXTRAS_CONTRACT_VERSION)
+        self.assertEqual(contract["surface"], "extras_run")
