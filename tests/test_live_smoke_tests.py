@@ -41,6 +41,9 @@ class LiveSmokePromptParityTests(unittest.TestCase):
     def test_default_profiles_for_auxiliary_contracts_is_empty(self) -> None:
         self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-contracts"), "")
 
+    def test_default_profiles_for_auxiliary_pipelines_is_empty(self) -> None:
+        self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-pipelines"), "")
+
     def test_default_profiles_for_prompt_parity_use_sd_family_order(self) -> None:
         self.assertEqual(
             live_smoke._default_profiles_for_mode("prompt-parity"),
@@ -238,6 +241,219 @@ class LiveSmokePromptParityTests(unittest.TestCase):
                 live_smoke,
                 "_run_prompt_parity_dry_run_smoke",
                 return_value=[],
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+
+class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
+    def test_build_auxiliary_pipeline_context_prefers_sd_family_checkpoint_over_non_sd_default(self) -> None:
+        context = live_smoke._build_auxiliary_pipeline_context(
+            {
+                "default_checkpoint": "F5-TTS\\model_1250000.safetensors",
+                "checkpoints": [
+                    "F5-TTS\\model_1250000.safetensors",
+                    "SD15\\BravNew.safetensors",
+                ],
+            }
+        )
+
+        self.assertEqual(context.checkpoint_name, "SD15\\BravNew.safetensors")
+        self.assertEqual(context.workflow_family, "sd15")
+
+    def test_validate_extras_execution_response_accepts_valid_payload(self) -> None:
+        errors = live_smoke._validate_extras_execution_response(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "extras_run",
+                    "version": live_smoke.EXTRAS_CONTRACT_VERSION,
+                },
+                "mode": "single_image",
+                "normalized_request": {
+                    "scale_mode": "scale_to",
+                    "target_width": 128,
+                    "target_height": 160,
+                    "face_restoration": "codeformer",
+                    "color_correction": True,
+                },
+                "warnings": [
+                    "codeformer is not available inside the RookieUI workspace pipeline yet; the request will continue without face restoration."
+                ],
+                "output_assets": ["rookieui_extras_1.png"],
+                "preview_asset": "rookieui_extras_1.png",
+                "preview_data_url": "data:image/png;base64,abc",
+            }
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_pnginfo_parse_response_accepts_txt2img_case(self) -> None:
+        context = live_smoke._build_auxiliary_pipeline_context({"default_checkpoint": "SD15\\BravNew.safetensors"})
+        case = live_smoke._build_pnginfo_live_cases(context)[0]
+
+        errors = live_smoke._validate_pnginfo_parse_response(
+            case,
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "pnginfo_parse_inspect",
+                    "version": live_smoke.PNGINFO_CONTRACT_VERSION,
+                },
+                "source_type": "a1111",
+                "target_form": "txt2img",
+                "apply_targets": ["txt2img", "img2img"],
+                "asset_handle": "pnginfo_input_1.png",
+                "warnings": [],
+                "missing_inputs": [],
+                "payload": {
+                    "prompt": "harbor dusk",
+                    "negative_prompt": "blurry",
+                    "profile": "sd15",
+                    "checkpoint_name": "SD15\\BravNew.safetensors",
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_pnginfo_parse_response_accepts_inspect_only_case(self) -> None:
+        context = live_smoke._build_auxiliary_pipeline_context({"default_checkpoint": "SD15\\BravNew.safetensors"})
+        case = live_smoke._build_pnginfo_live_cases(context)[1]
+
+        errors = live_smoke._validate_pnginfo_parse_response(
+            case,
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "pnginfo_parse_inspect",
+                    "version": live_smoke.PNGINFO_CONTRACT_VERSION,
+                },
+                "source_type": "comfyui",
+                "target_form": "inspect_only",
+                "apply_targets": [],
+                "asset_handle": "pnginfo_input_2.png",
+                "warnings": ["ComfyUI metadata is available for inspection only in RookieUI."],
+                "payload": {},
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_pnginfo_apply_back_response_accepts_matching_dry_run_payload(self) -> None:
+        context = live_smoke._build_auxiliary_pipeline_context({"default_checkpoint": "SD15\\BravNew.safetensors"})
+        case = live_smoke._build_pnginfo_live_cases(context)[0]
+
+        errors = live_smoke._validate_pnginfo_apply_back_response(
+            case,
+            {
+                "submission": {"accepted": False, "mode": "dry-run"},
+                "workflow_kind": "txt2img-sd15",
+                "normalized_request": {
+                    "prompt": "harbor dusk",
+                    "negative_prompt": "blurry",
+                    "checkpoint_name": "SD15\\BravNew.safetensors",
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_queue_snapshot_response_accepts_visible_job(self) -> None:
+        errors = live_smoke._validate_queue_snapshot_response(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "source": "host",
+                "queue_remaining": 1,
+                "contract": {
+                    "surface": "queue_snapshot_and_job_lookup",
+                    "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                },
+                "jobs": [
+                    {
+                        "id": "prompt-1",
+                        "status": "in_progress",
+                    }
+                ],
+            },
+            prompt_id="prompt-1",
+            allowed_statuses=("pending", "in_progress", "completed"),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_queue_snapshot_response_accepts_empty_completed_snapshot_when_visibility_is_optional(self) -> None:
+        errors = live_smoke._validate_queue_snapshot_response(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "source": "host",
+                "queue_remaining": 0,
+                "contract": {
+                    "surface": "queue_snapshot_and_job_lookup",
+                    "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                },
+                "jobs": [],
+            },
+            prompt_id="prompt-1",
+            allowed_statuses=("completed",),
+            require_visible_job=False,
+            expected_queue_remaining=0,
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_queue_job_response_accepts_completed_job(self) -> None:
+        errors = live_smoke._validate_queue_job_response(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "source": "host",
+                "queue_remaining": 0,
+                "contract": {
+                    "surface": "queue_snapshot_and_job_lookup",
+                    "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                },
+                "job": {
+                    "id": "prompt-1",
+                    "status": "completed",
+                    "reusable_outputs": ["history-image.png"],
+                },
+            },
+            prompt_id="prompt-1",
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_main_auxiliary_pipelines_report_only_returns_zero_on_validation_errors(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "auxiliary-pipelines", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"default_checkpoint": "SD15\\BravNew.safetensors"}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_extras_execution_smoke",
+                return_value=["extras error"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_pnginfo_dry_run_smoke",
+                return_value=([], None, None),
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
