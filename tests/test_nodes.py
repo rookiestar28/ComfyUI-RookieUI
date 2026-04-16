@@ -104,6 +104,76 @@ class RookieUINodesTests(unittest.TestCase):
         self.assertEqual(clip.tokenized, ["portrait [warm|cool] light"])
         self.assertEqual(conditioning["tokens"], ["portrait [warm|cool] light"])
 
+    def test_a1111_clip_text_encode_rebatches_recent_comma_boundary_when_supported(self) -> None:
+        class _FakeTokenizerChannel:
+            max_length = 7
+            start_token = 100
+            end_token = 101
+            pad_token = 101
+            max_word_length = 8
+            comma_token = 99
+
+        class _FakeTokenizer:
+            def __init__(self) -> None:
+                self.clip_l = _FakeTokenizerChannel()
+
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.tokenizer = _FakeTokenizer()
+                self.tokenize_calls: list[tuple[str, bool]] = []
+
+            def tokenize(self, text, return_word_ids=False):
+                self.tokenize_calls.append((text, bool(return_word_ids)))
+                if return_word_ids:
+                    return {
+                        "l": [
+                            [
+                                (100, 1.0, 0),
+                                (1, 1.0, 1),
+                                (2, 1.0, 2),
+                                (99, 1.0, 3),
+                                (3, 1.0, 4),
+                                (4, 1.0, 5),
+                                (101, 1.0, 0),
+                            ],
+                            [
+                                (100, 1.0, 0),
+                                (5, 1.0, 6),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                            ],
+                        ]
+                    }
+                return {
+                    "l": [
+                        [(100, 1.0), (1, 1.0), (2, 1.0), (99, 1.0), (3, 1.0), (4, 1.0), (101, 1.0)],
+                        [(100, 1.0), (5, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)],
+                    ]
+                }
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                return {"tokens": tokens, "add_dict": add_dict or {}}
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "hero, detail shot")
+
+        self.assertEqual(
+            conditioning["tokens"]["l"],
+            [
+                [(100, 1.0), (1, 1.0), (2, 1.0), (99, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)],
+                [(100, 1.0), (3, 1.0), (4, 1.0), (5, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)],
+            ],
+        )
+        self.assertEqual(
+            clip.tokenize_calls,
+            [("hero, detail shot", False), ("hero, detail shot", True)],
+        )
+
     def test_a1111_clip_text_encode_sdxl_rewrites_both_channels(self) -> None:
         class _FakeClip:
             def __init__(self) -> None:
@@ -138,6 +208,125 @@ class RookieUINodesTests(unittest.TestCase):
         self.assertEqual(conditioning["tokens"]["g"], ["g::hero (soft:0.9091)"])
         self.assertEqual(conditioning["tokens"]["l"], ["l::avoid (harsh:0.9091)"])
         self.assertEqual(conditioning["add_dict"]["target_width"], 1024)
+
+    def test_a1111_clip_text_encode_sdxl_rebatches_named_channels_when_supported(self) -> None:
+        class _FakeTokenizerChannel:
+            def __init__(self, comma_token) -> None:
+                self.max_length = 7
+                self.start_token = 100
+                self.end_token = 101
+                self.pad_token = 101
+                self.max_word_length = 8
+                self.comma_token = comma_token
+
+        class _FakeTokenizer:
+            def __init__(self) -> None:
+                self.clip_g = _FakeTokenizerChannel(77)
+                self.clip_l = _FakeTokenizerChannel(88)
+
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.tokenizer = _FakeTokenizer()
+                self.tokenize_calls: list[tuple[str, bool]] = []
+
+            def tokenize(self, text, return_word_ids=False):
+                self.tokenize_calls.append((text, bool(return_word_ids)))
+                if text == "":
+                    return {
+                        "g": [[(100, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)]],
+                        "l": [[(100, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)]],
+                    }
+                if return_word_ids:
+                    if text == "hero, scenic lighting":
+                        return {
+                            "g": [
+                                [
+                                    (100, 1.0, 0),
+                                    (11, 1.0, 1),
+                                    (77, 1.0, 2),
+                                    (12, 1.0, 3),
+                                    (13, 1.0, 4),
+                                    (14, 1.0, 5),
+                                    (101, 1.0, 0),
+                                ],
+                                [
+                                    (100, 1.0, 0),
+                                    (15, 1.0, 6),
+                                    (101, 1.0, 0),
+                                    (101, 1.0, 0),
+                                    (101, 1.0, 0),
+                                    (101, 1.0, 0),
+                                    (101, 1.0, 0),
+                                ],
+                            ],
+                            "l": [[(100, 1.0, 0), (999, 1.0, 1), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0)]],
+                        }
+                    return {
+                        "g": [[(100, 1.0, 0), (999, 1.0, 1), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0), (101, 1.0, 0)]],
+                        "l": [
+                            [
+                                (100, 1.0, 0),
+                                (21, 1.0, 1),
+                                (88, 1.0, 2),
+                                (22, 1.0, 3),
+                                (23, 1.0, 4),
+                                (24, 1.0, 5),
+                                (101, 1.0, 0),
+                            ],
+                            [
+                                (100, 1.0, 0),
+                                (25, 1.0, 6),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                                (101, 1.0, 0),
+                            ],
+                        ],
+                    }
+                if text == "hero, scenic lighting":
+                    return {
+                        "g": [[(100, 1.0), (11, 1.0), (77, 1.0), (12, 1.0), (13, 1.0), (14, 1.0), (101, 1.0)]],
+                        "l": [[(100, 1.0), (901, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)]],
+                    }
+                return {
+                    "g": [[(100, 1.0), (902, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)]],
+                    "l": [[(100, 1.0), (21, 1.0), (88, 1.0), (22, 1.0), (23, 1.0), (24, 1.0), (101, 1.0)]],
+                }
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                return {"tokens": tokens, "add_dict": add_dict or {}}
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncodeSDXL()
+
+        conditioning, = node.encode(
+            clip,
+            1024,
+            1024,
+            0,
+            0,
+            1024,
+            1024,
+            "hero, scenic lighting",
+            "avoid, harsh lighting",
+        )
+
+        self.assertEqual(
+            conditioning["tokens"]["g"],
+            [
+                [(100, 1.0), (11, 1.0), (77, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)],
+                [(100, 1.0), (12, 1.0), (13, 1.0), (14, 1.0), (15, 1.0), (101, 1.0), (101, 1.0)],
+            ],
+        )
+        self.assertEqual(
+            conditioning["tokens"]["l"],
+            [
+                [(100, 1.0), (21, 1.0), (88, 1.0), (101, 1.0), (101, 1.0), (101, 1.0), (101, 1.0)],
+                [(100, 1.0), (22, 1.0), (23, 1.0), (24, 1.0), (25, 1.0), (101, 1.0), (101, 1.0)],
+            ],
+        )
+        self.assertEqual(conditioning["add_dict"]["width"], 1024)
 
     def test_adetailer_detect_mask_node_is_registered(self) -> None:
         self.assertIn("RookieUIADetailerDetectMask", nodes.NODE_CLASS_MAPPINGS)

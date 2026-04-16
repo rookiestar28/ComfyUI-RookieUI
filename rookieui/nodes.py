@@ -34,6 +34,10 @@ from rookieui.services.controlnet_advanced_runtime import (
     build_controlnet_stage_weights,
 )
 from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted_encode
+from rookieui.services.prompt_token_rebatch import (
+    tokenize_channel_with_rookieui_rebatch,
+    tokenize_with_rookieui_rebatch,
+)
 
 try:
     from comfy import model_management
@@ -104,7 +108,7 @@ class RookieUIA1111CLIPTextEncode:
     def encode(self, clip, text):
         _require_clip_input(clip)
         normalized_text = normalize_prompt_attention_for_weighted_encode(text)
-        tokens = clip.tokenize(normalized_text)
+        tokens = tokenize_with_rookieui_rebatch(clip, normalized_text)
         return (clip.encode_from_tokens_scheduled(tokens),)
 
 
@@ -133,13 +137,11 @@ class RookieUIA1111CLIPTextEncodeSDXL:
         _require_clip_input(clip)
         normalized_text_g = normalize_prompt_attention_for_weighted_encode(text_g)
         normalized_text_l = normalize_prompt_attention_for_weighted_encode(text_l)
-        tokens = clip.tokenize(normalized_text_g)
-        tokens_l = clip.tokenize(normalized_text_l)
-        if not isinstance(tokens, dict) or not isinstance(tokens_l, dict):
+        tokens_g = tokenize_channel_with_rookieui_rebatch(clip, normalized_text_g, channel_key="g")
+        tokens_l = tokenize_channel_with_rookieui_rebatch(clip, normalized_text_l, channel_key="l")
+        if not isinstance(tokens_g, list) or not isinstance(tokens_l, list):
             raise RuntimeError("RookieUI SDXL prompt encode requires a dual-token CLIP payload.")
-        if "l" not in tokens_l:
-            raise RuntimeError("RookieUI SDXL prompt encode requires the CLIP payload to expose an 'l' token channel.")
-        tokens["l"] = tokens_l["l"]
+        tokens = {"g": tokens_g, "l": tokens_l}
         if "g" in tokens and "l" in tokens:
             empty = clip.tokenize("")
             while len(tokens["l"]) < len(tokens["g"]):
