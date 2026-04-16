@@ -22,7 +22,14 @@ if str(_REPO_ROOT) not in sys.path:
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
+from rookieui.contracts.adetailer import ADETAILER_INTEGRATED_CONTRACT_VERSION
 from rookieui.contracts.controlnet_integrated import CONTROLNET_INTEGRATED_CONTRACT_VERSION
+from rookieui.services.adetailer import (
+    ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING,
+    ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY,
+    ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK,
+)
+from rookieui.services.adetailer_runtime import ADETAILER_RUNTIME_READY
 from rookieui.services.parity_matrix import get_parity_profile
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from tests.prompt_parity_fixtures import (
@@ -43,9 +50,11 @@ _NON_SD_DIFFUSION_PROFILES: tuple[str, ...] = (
     "anima",
 )
 _CONTROLNET_VALIDATION_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
+_ADETAILER_VALIDATION_PROFILES: tuple[str, ...] = _CONTROLNET_VALIDATION_PROFILES
 _SD_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _SDXL_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("pony", "illustrious", "noob", "sdxl")
 _LOCAL_CONTROLNET_CONTRACT_VERSION = CONTROLNET_INTEGRATED_CONTRACT_VERSION
+_LOCAL_ADETAILER_CONTRACT_VERSION = ADETAILER_INTEGRATED_CONTRACT_VERSION
 _LOCAL_PROMPT_CONTRACT_VERSION = str(build_prompt_capability_matrix_payload().get("contract_version", "")).strip()
 _CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
@@ -110,6 +119,34 @@ class LiveControlNetDryRunCase:
     expect_main_source_fallback: bool = False
 
 
+@dataclass(frozen=True)
+class ADetailerHostContext:
+    profile_id: str
+    checkpoint_name: str
+    base_family: str
+    detector_name: str
+    detector_family: str
+    detector_runtime_state: str
+    controlnet_control_type: str
+    controlnet_module: str
+    controlnet_model: str
+    host_contract_version: str
+    local_contract_version: str
+
+
+@dataclass(frozen=True)
+class LiveADetailerDryRunCase:
+    case_id: str
+    route_path: str
+    request_payload: dict[str, Any]
+    expected_workflow_kind: str
+    expected_sampler_nodes: int
+    expected_apply_nodes: int
+    expect_refinement_nodes: bool
+    expect_primary_controlnet_count: int
+    expect_skip_img2img: bool = False
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -120,6 +157,8 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
 def _default_profiles_for_mode(validation_mode: str) -> str:
     if validation_mode == "controlnet":
         return ",".join(_CONTROLNET_VALIDATION_PROFILES)
+    if validation_mode == "adetailer":
+        return ",".join(_ADETAILER_VALIDATION_PROFILES)
     if validation_mode == "prompt-parity":
         return ",".join(_SD_PROMPT_PARITY_PROFILES)
     if validation_mode == "auxiliary-contracts":
@@ -138,7 +177,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity", "auxiliary-contracts", "controlnet"),
+        choices=("catalog", "prompt-parity", "auxiliary-contracts", "controlnet", "adetailer"),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -245,6 +284,10 @@ def _load_controlnet_payloads(
         _request_json("GET", f"{base_url}/rookieui/controlnet/module_list", timeout_seconds=timeout_seconds),
         _request_json("GET", f"{base_url}/rookieui/controlnet/control_types", timeout_seconds=timeout_seconds),
     )
+
+
+def _load_adetailer_catalog_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+    return _request_json("GET", f"{base_url}/rookieui/adetailer/catalog", timeout_seconds=timeout_seconds)
 
 
 def _build_png_data_url(*, color: str = "white", metadata: dict[str, str] | None = None) -> str:
@@ -703,6 +746,240 @@ def _build_controlnet_dry_run_cases(context: ControlNetHostContext) -> list[Live
             expected_workflow_kind=f"img2img-{workflow_suffix}",
             expected_apply_nodes=1,
             expect_main_source_fallback=True,
+        ),
+    ]
+
+
+def _select_adetailer_detector(catalog_payload: dict[str, Any]) -> tuple[str, str, str] | None:
+    detectors = catalog_payload.get("detectors")
+    availability = catalog_payload.get("availability")
+    runtime_by_family = availability.get("detector_runtime") if isinstance(availability, dict) else {}
+    if not isinstance(detectors, list) or not isinstance(runtime_by_family, dict):
+        return None
+
+    family_priority = {"mediapipe_face": 0, "ultralytics_bbox": 1, "ultralytics_segm": 2}
+    detector_priority = {
+        "mediapipe_face_full": 0,
+        "mediapipe_face_short": 1,
+        "mediapipe_face_mesh": 2,
+        "mediapipe_face_mesh_eyes_only": 3,
+    }
+    candidates: list[tuple[tuple[int, int, int, int], tuple[str, str, str]]] = []
+    for index, raw_entry in enumerate(detectors):
+        if not isinstance(raw_entry, dict):
+            continue
+        detector_name = str(raw_entry.get("id", "")).strip()
+        detector_family = str(raw_entry.get("provider_family") or raw_entry.get("family") or "").strip().lower()
+        if not detector_name or detector_name == "None" or detector_family in {"", "none"}:
+            continue
+        runtime_state = str(runtime_by_family.get(detector_family, "")).strip()
+        sort_key = (
+            0 if runtime_state == ADETAILER_RUNTIME_READY else 1,
+            family_priority.get(detector_family, 99),
+            detector_priority.get(detector_name, 99),
+            index,
+        )
+        candidates.append((sort_key, (detector_name, detector_family, runtime_state)))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0])
+    return candidates[0][1]
+
+
+def _build_adetailer_host_context(
+    catalog_payload: dict[str, Any],
+    controlnet_context: ControlNetHostContext,
+) -> tuple[ADetailerHostContext | None, list[str]]:
+    errors: list[str] = []
+    host_contract_version = _read_nested_text(catalog_payload, "contract", "version")
+    if not host_contract_version:
+        errors.append("live host /rookieui/adetailer/catalog payload did not expose contract.version.")
+
+    controlnet_modes = _iter_string_list(catalog_payload, "controlnet_modes")
+    for expected_mode in ("passthrough", "custom"):
+        if controlnet_modes and expected_mode not in controlnet_modes:
+            errors.append(
+                f"live host /rookieui/adetailer/catalog payload did not expose controlnet mode '{expected_mode}'."
+            )
+
+    controlnet_models = _iter_string_list(catalog_payload, "controlnet_model_list")
+    if controlnet_models and controlnet_context.model_name not in controlnet_models:
+        errors.append(
+            "live host /rookieui/adetailer/catalog controlnet_model_list did not include "
+            f"'{controlnet_context.model_name}'."
+        )
+    controlnet_modules = _iter_string_list(catalog_payload, "controlnet_module_list")
+    if controlnet_modules and controlnet_context.module_name not in controlnet_modules:
+        errors.append(
+            "live host /rookieui/adetailer/catalog controlnet_module_list did not include "
+            f"'{controlnet_context.module_name}'."
+        )
+
+    selected_detector = _select_adetailer_detector(catalog_payload)
+    if selected_detector is None:
+        errors.append(
+            "live host /rookieui/adetailer/catalog did not expose any usable non-'None' detector entries."
+        )
+        return None, errors
+
+    detector_name, detector_family, detector_runtime_state = selected_detector
+    if detector_runtime_state == "disabled":
+        errors.append(
+            f"selected ADetailer detector '{detector_name}' resolved to disabled runtime state."
+        )
+
+    context = None
+    if not errors:
+        context = ADetailerHostContext(
+            profile_id=controlnet_context.profile_id,
+            checkpoint_name=controlnet_context.checkpoint_name,
+            base_family=controlnet_context.base_family,
+            detector_name=detector_name,
+            detector_family=detector_family,
+            detector_runtime_state=detector_runtime_state,
+            controlnet_control_type=controlnet_context.control_type,
+            controlnet_module=controlnet_context.module_name,
+            controlnet_model=controlnet_context.model_name,
+            host_contract_version=host_contract_version,
+            local_contract_version=_LOCAL_ADETAILER_CONTRACT_VERSION,
+        )
+    return context, errors
+
+
+def _build_adetailer_dry_run_cases(context: ADetailerHostContext) -> list[LiveADetailerDryRunCase]:
+    workflow_suffix = context.base_family
+
+    passthrough_payload = _build_controlnet_txt2img_defaults(context.profile_id, context.checkpoint_name)
+    passthrough_payload.update(
+        {
+            "dry_run": True,
+            "controlnet_units": [
+                {
+                    "enabled": True,
+                    "control_type": context.controlnet_control_type,
+                    "module": context.controlnet_module,
+                    "model": context.controlnet_model,
+                    "image_data": _build_png_data_url(color="lightyellow"),
+                }
+            ],
+            "adetailer": {
+                "enabled": True,
+                "units": [
+                    {
+                        "enabled": True,
+                        "detector": context.detector_name,
+                        "prompt": "detail [PROMPT]",
+                        "controlnet": {"mode": "passthrough"},
+                    }
+                ],
+            },
+        }
+    )
+
+    custom_payload = _build_controlnet_txt2img_defaults(context.profile_id, context.checkpoint_name)
+    custom_payload.update(
+        {
+            "dry_run": True,
+            "adetailer": {
+                "enabled": True,
+                "units": [
+                    {
+                        "enabled": True,
+                        "detector": context.detector_name,
+                        "prompt": "detail [PROMPT]",
+                        "controlnet": {
+                            "mode": "custom",
+                            "module": context.controlnet_module,
+                            "model": context.controlnet_model,
+                            "weight": 0.65,
+                            "guidance_start": 0.1,
+                            "guidance_end": 0.85,
+                        },
+                    }
+                ],
+            },
+        }
+    )
+
+    img2img_refinement_payload = _build_controlnet_img2img_defaults(context.profile_id, context.checkpoint_name)
+    img2img_refinement_payload.update(
+        {
+            "dry_run": True,
+            "image_data": _build_png_data_url(color="pink"),
+            "adetailer": {
+                "enabled": True,
+                "skip_img2img": False,
+                "units": [
+                    {
+                        "enabled": True,
+                        "detector": context.detector_name,
+                        "prompt": "repair [PROMPT]",
+                    }
+                ],
+            },
+        }
+    )
+
+    img2img_skip_payload = _build_controlnet_img2img_defaults(context.profile_id, context.checkpoint_name)
+    img2img_skip_payload.update(
+        {
+            "dry_run": True,
+            "image_data": _build_png_data_url(color="lightgreen"),
+            "adetailer": {
+                "enabled": True,
+                "skip_img2img": True,
+                "units": [
+                    {
+                        "enabled": True,
+                        "detector": context.detector_name,
+                    }
+                ],
+            },
+        }
+    )
+
+    return [
+        LiveADetailerDryRunCase(
+            case_id="txt2img_adetailer_passthrough_controlnet",
+            route_path="/rookieui/generate/txt2img",
+            request_payload=passthrough_payload,
+            expected_workflow_kind=f"txt2img-{workflow_suffix}",
+            expected_sampler_nodes=2,
+            expected_apply_nodes=2,
+            expect_refinement_nodes=True,
+            expect_primary_controlnet_count=1,
+        ),
+        LiveADetailerDryRunCase(
+            case_id="txt2img_adetailer_custom_controlnet",
+            route_path="/rookieui/generate/txt2img",
+            request_payload=custom_payload,
+            expected_workflow_kind=f"txt2img-{workflow_suffix}",
+            expected_sampler_nodes=2,
+            expected_apply_nodes=1,
+            expect_refinement_nodes=True,
+            expect_primary_controlnet_count=0,
+        ),
+        LiveADetailerDryRunCase(
+            case_id="img2img_adetailer_refinement",
+            route_path="/rookieui/generate/img2img",
+            request_payload=img2img_refinement_payload,
+            expected_workflow_kind=f"img2img-{workflow_suffix}",
+            expected_sampler_nodes=2,
+            expected_apply_nodes=0,
+            expect_refinement_nodes=True,
+            expect_primary_controlnet_count=0,
+        ),
+        LiveADetailerDryRunCase(
+            case_id="img2img_adetailer_skip",
+            route_path="/rookieui/generate/img2img",
+            request_payload=img2img_skip_payload,
+            expected_workflow_kind=f"img2img-{workflow_suffix}",
+            expected_sampler_nodes=1,
+            expected_apply_nodes=0,
+            expect_refinement_nodes=False,
+            expect_primary_controlnet_count=0,
+            expect_skip_img2img=True,
         ),
     ]
 
@@ -1176,6 +1453,149 @@ def _validate_controlnet_dry_run_case_response(
     return errors
 
 
+def _validate_adetailer_dry_run_case_response(
+    context: ADetailerHostContext,
+    case: LiveADetailerDryRunCase,
+    response_payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    submission = response_payload.get("submission")
+    if not isinstance(submission, dict) or submission.get("mode") != "dry-run":
+        errors.append(f"{case.case_id}: expected dry-run submission payload.")
+    if response_payload.get("workflow_kind") != case.expected_workflow_kind:
+        errors.append(
+            f"{case.case_id}: expected workflow_kind '{case.expected_workflow_kind}' but got "
+            f"'{response_payload.get('workflow_kind')}'."
+        )
+
+    normalized_request = response_payload.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        errors.append(f"{case.case_id}: response missing normalized_request.")
+        return errors
+
+    controlnet_units = normalized_request.get("controlnet_units")
+    if case.expect_primary_controlnet_count > 0:
+        if (
+            not isinstance(controlnet_units, list)
+            or len(controlnet_units) != case.expect_primary_controlnet_count
+            or not isinstance(controlnet_units[0], dict)
+        ):
+            errors.append(
+                f"{case.case_id}: expected {case.expect_primary_controlnet_count} primary ControlNet unit(s)."
+            )
+        elif controlnet_units[0].get("model") != context.controlnet_model:
+            errors.append(
+                f"{case.case_id}: primary ControlNet unit did not retain model '{context.controlnet_model}'."
+            )
+    elif isinstance(controlnet_units, list) and controlnet_units:
+        errors.append(f"{case.case_id}: expected no primary ControlNet units.")
+
+    adetailer = normalized_request.get("adetailer")
+    if not isinstance(adetailer, dict):
+        errors.append(f"{case.case_id}: normalized_request missing adetailer block.")
+        return errors
+
+    if not bool(adetailer.get("enabled")):
+        errors.append(f"{case.case_id}: normalized_request.adetailer.enabled was not true.")
+    if bool(adetailer.get("skip_img2img")) != case.expect_skip_img2img:
+        errors.append(
+            f"{case.case_id}: expected skip_img2img={case.expect_skip_img2img} but got "
+            f"{bool(adetailer.get('skip_img2img'))}."
+        )
+
+    units = adetailer.get("units")
+    if not isinstance(units, list) or not units or not isinstance(units[0], dict):
+        errors.append(f"{case.case_id}: normalized_request.adetailer.units missing first unit.")
+        return errors
+    unit = units[0]
+    if unit.get("detector") != context.detector_name:
+        errors.append(
+            f"{case.case_id}: expected detector '{context.detector_name}' but got '{unit.get('detector')}'."
+        )
+    if unit.get("detector_family") != context.detector_family:
+        errors.append(
+            f"{case.case_id}: expected detector_family '{context.detector_family}' but got '{unit.get('detector_family')}'."
+        )
+
+    warning_codes = adetailer.get("warning_codes")
+    if not isinstance(warning_codes, list):
+        errors.append(f"{case.case_id}: normalized_request.adetailer.warning_codes missing.")
+        warning_codes = []
+    if context.detector_runtime_state != ADETAILER_RUNTIME_READY:
+        if ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK not in warning_codes:
+            errors.append(f"{case.case_id}: expected fallback-mask warning for degraded detector runtime.")
+    elif ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK in warning_codes:
+        errors.append(f"{case.case_id}: unexpected fallback-mask warning for ready detector runtime.")
+    if (
+        case.case_id == "txt2img_adetailer_passthrough_controlnet"
+        and ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY in warning_codes
+    ):
+        errors.append(f"{case.case_id}: unexpected passthrough-empty warning.")
+    if case.case_id == "txt2img_adetailer_custom_controlnet" and ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING in warning_codes:
+        errors.append(f"{case.case_id}: unexpected custom-model-missing warning.")
+
+    diagnostics = adetailer.get("diagnostics")
+    if not isinstance(diagnostics, dict):
+        errors.append(f"{case.case_id}: normalized_request.adetailer.diagnostics missing.")
+    elif diagnostics.get("primary_controlnet_unit_count") != case.expect_primary_controlnet_count:
+        errors.append(
+            f"{case.case_id}: expected primary_controlnet_unit_count={case.expect_primary_controlnet_count} but got "
+            f"{diagnostics.get('primary_controlnet_unit_count')}."
+        )
+
+    workflow = response_payload.get("workflow")
+    if not isinstance(workflow, dict):
+        errors.append(f"{case.case_id}: response missing workflow payload.")
+        return errors
+
+    detect_nodes = [
+        node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "RookieUIADetailerDetectMask"
+    ]
+    inpaint_nodes = [
+        node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "RookieUIVAEEncodeForInpaint"
+    ]
+    sampler_nodes = [node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "KSampler"]
+    apply_nodes = [
+        node
+        for node in workflow.values()
+        if isinstance(node, dict) and node.get("class_type") == "RookieUIControlNetApplyNativeAdvanced"
+    ]
+    decode_nodes = [(node_id, node) for node_id, node in workflow.items() if isinstance(node, dict) and node.get("class_type") == "VAEDecode"]
+    save_nodes = [node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "SaveImage"]
+
+    if len(sampler_nodes) != case.expected_sampler_nodes:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_sampler_nodes} KSampler nodes but got {len(sampler_nodes)}."
+        )
+    if len(apply_nodes) != case.expected_apply_nodes:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_apply_nodes} RookieUIControlNetApplyNativeAdvanced nodes but got {len(apply_nodes)}."
+        )
+
+    if case.expect_refinement_nodes:
+        if len(detect_nodes) != 1:
+            errors.append(f"{case.case_id}: expected exactly one RookieUIADetailerDetectMask node.")
+        else:
+            inputs = detect_nodes[0].get("inputs", {})
+            if inputs.get("detector") != context.detector_name:
+                errors.append(f"{case.case_id}: detect-mask node detector did not match selected host detector.")
+            if inputs.get("detector_family") != context.detector_family:
+                errors.append(f"{case.case_id}: detect-mask node detector_family did not match selected host detector family.")
+        if len(inpaint_nodes) != 1:
+            errors.append(f"{case.case_id}: expected exactly one RookieUIVAEEncodeForInpaint node.")
+        if not decode_nodes or not save_nodes:
+            errors.append(f"{case.case_id}: workflow missing decode/save nodes for refinement chain.")
+        elif save_nodes[0].get("inputs", {}).get("images") != [decode_nodes[-1][0], 0]:
+            errors.append(f"{case.case_id}: SaveImage was not wired to the final decode node.")
+    else:
+        if detect_nodes:
+            errors.append(f"{case.case_id}: workflow unexpectedly emitted RookieUIADetailerDetectMask.")
+        if inpaint_nodes:
+            errors.append(f"{case.case_id}: workflow unexpectedly emitted RookieUIVAEEncodeForInpaint.")
+
+    return errors
+
+
 def _validate_prompt_parity_case_response(case: LivePromptParityCase, response_payload: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     fixture = case.fixture
@@ -1356,6 +1776,25 @@ def _run_controlnet_dry_run_smoke(
     return errors
 
 
+def _run_adetailer_dry_run_smoke(
+    base_url: str,
+    context: ADetailerHostContext,
+    cases: list[LiveADetailerDryRunCase],
+    *,
+    request_timeout_seconds: float,
+) -> list[str]:
+    errors: list[str] = []
+    for case in cases:
+        response_payload = _request_json(
+            "POST",
+            f"{base_url}{case.route_path}",
+            payload=case.request_payload,
+            timeout_seconds=request_timeout_seconds,
+        )
+        errors.extend(_validate_adetailer_dry_run_case_response(context, case, response_payload))
+    return errors
+
+
 def _build_prompt_parity_execute_payload(case: LivePromptParityCase, client_id: str) -> dict[str, Any]:
     payload = _build_prompt_parity_request_payload(case)
     payload.pop("dry_run", None)
@@ -1377,6 +1816,22 @@ def _build_controlnet_execute_payload(context: ControlNetHostContext, client_id:
             "guidance_end": 1.0,
         }
     ]
+    return payload
+
+
+def _build_adetailer_execute_payload(context: ADetailerHostContext, client_id: str) -> dict[str, Any]:
+    payload = _build_controlnet_txt2img_defaults(context.profile_id, context.checkpoint_name)
+    payload["client_id"] = client_id
+    payload["adetailer"] = {
+        "enabled": True,
+        "units": [
+            {
+                "enabled": True,
+                "detector": context.detector_name,
+                "prompt": "detail [PROMPT]",
+            }
+        ],
+    }
     return payload
 
 
@@ -1461,6 +1916,75 @@ def _run_controlnet_execute_smoke(
     if not isinstance(reusable_outputs, list) or not reusable_outputs:
         errors.append("controlnet execute: completed job did not expose reusable_outputs.")
     return errors
+
+
+def _run_adetailer_execute_smoke(
+    base_url: str,
+    context: ADetailerHostContext,
+    *,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> list[str]:
+    client_id = f"rookieui-live-adetailer-{context.profile_id}"
+    submit_result = _request_json(
+        "POST",
+        f"{base_url}/rookieui/generate/txt2img",
+        payload=_build_adetailer_execute_payload(context, client_id),
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors: list[str] = []
+    normalized_request = submit_result.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        return ["adetailer execute: submit payload missing normalized_request."]
+    adetailer = normalized_request.get("adetailer")
+    if not isinstance(adetailer, dict):
+        return ["adetailer execute: submit payload missing normalized_request.adetailer."]
+    warning_codes = adetailer.get("warning_codes")
+    if not isinstance(warning_codes, list):
+        return ["adetailer execute: normalized_request.adetailer.warning_codes missing."]
+    if context.detector_runtime_state != ADETAILER_RUNTIME_READY:
+        if ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK not in warning_codes:
+            errors.append("adetailer execute: degraded detector runtime was missing fallback-mask warning.")
+    elif ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK in warning_codes:
+        errors.append("adetailer execute: ready detector runtime unexpectedly emitted fallback-mask warning.")
+
+    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
+    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
+        errors.append("adetailer execute: submit failed, expected accepted submission payload.")
+        return errors
+    prompt_id = str(submission.get("prompt_id", "")).strip()
+    if not prompt_id:
+        errors.append("adetailer execute: submit missing prompt_id.")
+        return errors
+
+    job = _poll_queue_job_until_terminal(
+        base_url,
+        prompt_id,
+        client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    terminal_status = str(job.get("status", "")).strip().lower()
+    if terminal_status != "completed":
+        errors.append(f"adetailer execute: terminal status was '{terminal_status}'.")
+    reusable_outputs = job.get("reusable_outputs")
+    if not isinstance(reusable_outputs, list) or not reusable_outputs:
+        errors.append("adetailer execute: completed job did not expose reusable_outputs.")
+    return errors
+
+
+def _validate_adetailer_host_sync(context: ADetailerHostContext) -> list[str]:
+    errors: list[str] = []
+    if context.host_contract_version != context.local_contract_version:
+        errors.append(
+            "adetailer contract mismatch: "
+            f"host='{context.host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    return errors
+
+
 def _poll_queue_job_until_terminal(
     base_url: str,
     prompt_id: str,
@@ -1676,6 +2200,95 @@ def main() -> int:
                         print(f"  - {error}", file=sys.stderr)
                     return 0 if args.report_only else 1
                 print("[live-smoke] controlnet execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
+
+    if args.validation_mode == "adetailer":
+        try:
+            model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+                base_url,
+                args.request_timeout_seconds,
+            )
+            catalog_payload = _load_adetailer_catalog_payload(base_url, args.request_timeout_seconds)
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: failed to load ADetailer route payloads: {exc}", file=sys.stderr)
+            return 1
+
+        controlnet_context, controlnet_context_errors = _build_controlnet_host_context(
+            models_payload,
+            model_list_payload,
+            module_list_payload,
+            control_types_payload,
+            profiles,
+        )
+        if controlnet_context_errors:
+            print("[live-smoke] ERROR: adetailer dependency ControlNet host context validation failed:", file=sys.stderr)
+            for error in controlnet_context_errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        assert controlnet_context is not None
+
+        context, context_errors = _build_adetailer_host_context(catalog_payload, controlnet_context)
+        if context_errors:
+            print("[live-smoke] ERROR: adetailer host context validation failed:", file=sys.stderr)
+            for error in context_errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        assert context is not None
+
+        sync_errors = _validate_controlnet_host_sync(controlnet_context) + _validate_adetailer_host_sync(context)
+        if sync_errors:
+            print("[live-smoke] WARNING: adetailer host/workspace sync mismatch detected:", file=sys.stderr)
+            for error in sync_errors:
+                print(f"  - {error}", file=sys.stderr)
+
+        dry_run_cases = _build_adetailer_dry_run_cases(context)
+        try:
+            dry_run_errors = _run_adetailer_dry_run_smoke(
+                base_url,
+                context,
+                dry_run_cases,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: adetailer validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        combined_errors = sync_errors + dry_run_errors
+        if combined_errors:
+            print("[live-smoke] WARNING: adetailer validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] adetailer dry-run checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because adetailer dry-run was not green.")
+            else:
+                try:
+                    execution_errors = _run_adetailer_execute_smoke(
+                        base_url,
+                        context,
+                        request_timeout_seconds=args.request_timeout_seconds,
+                        poll_timeout_seconds=args.poll_timeout_seconds,
+                        poll_interval_seconds=args.poll_interval_seconds,
+                    )
+                except Exception as exc:
+                    print(f"[live-smoke] ERROR: adetailer execute lane failed unexpectedly: {exc}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                if execution_errors:
+                    print("[live-smoke] ERROR: adetailer execute lane failed:", file=sys.stderr)
+                    for error in execution_errors:
+                        print(f"  - {error}", file=sys.stderr)
+                    return 0 if args.report_only else 1
+                print("[live-smoke] adetailer execute checks passed.")
 
         if combined_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")
