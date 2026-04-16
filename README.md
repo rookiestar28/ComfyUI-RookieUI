@@ -24,6 +24,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>SD-family prompt parity maximal continuation and host validation (new functionality/stability)</strong></summary>
+
+- Added inventory-aware embeddings / textual inversion handling on the shipped SD-family prompt path, with canonical host-compatible `embedding:<name>` tokens and explicit missing-reference diagnostics.
+- Added A1111-style alternate prompt scheduling for forms such as `[a|b]`, while keeping `BREAK`, `AND`, scheduling slices, and attention markers on RookieUI-owned SD-family encoder seams.
+- Hardened SD-family token chunk behavior with recent comma backtrack and grouped textual-inversion boundary preservation when the active host tokenizer exposes word-id metadata, with safe fallback on hosts that do not.
+- Added shared golden fixtures, reference-backed token differential coverage, and local live-host prompt-parity smoke validation (`dry-run` plus `execute`) for the shipped SD-family parity surface.
+
+</details>
+
+<details>
+
 <summary><strong>Native ADetailer and advanced ControlNet runtime upgrade (new functionality)</strong></summary>
 
 - Upgraded ADetailer to a RookieUI-owned detector/runtime path with packaged Ultralytics/OpenCV-backed dependency support instead of relying on an external A1111 script or third-party node pack.
@@ -173,6 +184,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Architecture Snapshot](#architecture-snapshot)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
+- [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
 - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [ControlNet Support](#controlnet-support)
 - [ADetailer Support](#adetailer-support)
@@ -242,7 +254,7 @@ If your host or Manager install path does not automatically install custom-node 
 - `img2img` request normalization with guarded asset-handle path
 - `img2img` mode surface: `img2img`, `sketch`, `inpaint`, `inpaint_sketch`, `inpaint_upload`, `batch`
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
-- Stable Diffusion family prompt semantics parity for `BREAK`, `AND`, scheduling slices, and attention markers
+- Stable Diffusion family prompt semantics parity for `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, and embeddings / textual inversion tokens
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
 ### PNG Info
@@ -268,7 +280,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Model Controls
 
-- SD1.5/SDXL use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics
+- SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics and inventory-aware embeddings / textual inversion handling
 - Flux and Qwen-Image expose selectable text encoder controls
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
@@ -287,6 +299,26 @@ Prompt semantics note:
 
 - Exact A1111-style prompt parsing and conditioning parity is currently targeted at the Stable Diffusion family.
 - Newer/non-SD families continue to use their native ComfyUI execution semantics even when exposed in the same RookieUI interface.
+
+## Stable Diffusion Prompt Parity
+
+RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough.
+
+Current shipped SD-family parity surface:
+
+- `BREAK`
+- `AND` / weighted multi-condition composition
+- scheduling slices such as `[from:to:at]`
+- alternate prompt scheduling such as `[a|b]`
+- attention markers such as `(text:1.2)`, `(text)`, and `[text]`
+- inventory-aware embeddings / textual inversion tokens on the shipped prompt path
+
+Runtime and validation notes:
+
+- `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
+- Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
+- The shipped parity surface is backed by golden parser/translator fixtures plus local live-host smoke validation (`dry-run` and `execute`) against the current ComfyUI host.
+- Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
 
 ## Default Model Read Paths (Host ComfyUI)
 
