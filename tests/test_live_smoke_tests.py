@@ -32,6 +32,12 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             "sd15,pony,illustrious,noob,sdxl",
         )
 
+    def test_default_profiles_for_adetailer_use_sd_family_order(self) -> None:
+        self.assertEqual(
+            live_smoke._default_profiles_for_mode("adetailer"),
+            "sd15,pony,illustrious,noob,sdxl",
+        )
+
     def test_default_profiles_for_auxiliary_contracts_is_empty(self) -> None:
         self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-contracts"), "")
 
@@ -603,6 +609,251 @@ class LiveSmokeControlNetTests(unittest.TestCase):
             mock.patch.object(
                 live_smoke,
                 "_run_controlnet_dry_run_smoke",
+                return_value=[],
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+
+class LiveSmokeADetailerTests(unittest.TestCase):
+    def test_build_adetailer_host_context_selects_ready_detector_and_inherits_controlnet_profile(self) -> None:
+        controlnet_context = live_smoke.ControlNetHostContext(
+            profile_id="pony",
+            checkpoint_name="SDXL\\Cutie_Slutty_Pony_v20.safetensors",
+            base_family="sdxl",
+            control_type="Canny",
+            module_name="canny",
+            model_name="Xinsir-Controlnet-Canny-sdxl_V2.safetensors",
+            host_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+
+        context, errors = live_smoke._build_adetailer_host_context(
+            {
+                "contract": {"version": live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION},
+                "controlnet_modes": ["none", "passthrough", "custom"],
+                "controlnet_model_list": ["Xinsir-Controlnet-Canny-sdxl_V2.safetensors"],
+                "controlnet_module_list": ["None", "canny"],
+                "detectors": [
+                    {"id": "None", "family": "none"},
+                    {"id": "face_yolov8n.pt", "family": "ultralytics_bbox"},
+                    {"id": "mediapipe_face_full", "family": "mediapipe_face"},
+                ],
+                "availability": {
+                    "detector_runtime": {
+                        "none": "disabled",
+                        "ultralytics_bbox": "native_runtime_model_unavailable",
+                        "mediapipe_face": "native_runtime_ready",
+                    }
+                },
+            },
+            controlnet_context,
+        )
+
+        self.assertEqual(errors, [])
+        assert context is not None
+        self.assertEqual(context.profile_id, "pony")
+        self.assertEqual(context.base_family, "sdxl")
+        self.assertEqual(context.checkpoint_name, "SDXL\\Cutie_Slutty_Pony_v20.safetensors")
+        self.assertEqual(context.detector_name, "mediapipe_face_full")
+        self.assertEqual(context.detector_family, "mediapipe_face")
+        self.assertEqual(context.detector_runtime_state, "native_runtime_ready")
+        self.assertEqual(context.controlnet_model, "Xinsir-Controlnet-Canny-sdxl_V2.safetensors")
+
+    def test_validate_adetailer_host_sync_reports_contract_drift(self) -> None:
+        errors = live_smoke._validate_adetailer_host_sync(
+            live_smoke.ADetailerHostContext(
+                profile_id="sd15",
+                checkpoint_name="SD15\\BravNew.safetensors",
+                base_family="sd15",
+                detector_name="face_yolov8n.pt",
+                detector_family="ultralytics_bbox",
+                detector_runtime_state="native_runtime_model_unavailable",
+                controlnet_control_type="Canny",
+                controlnet_module="canny",
+                controlnet_model="control_v11p_sd15_canny.safetensors",
+                host_contract_version="r73-20260413",
+                local_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+            )
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("host='r73-20260413'", errors[0])
+
+    def test_validate_adetailer_dry_run_case_response_accepts_refinement_topology(self) -> None:
+        context = live_smoke.ADetailerHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            detector_name="mediapipe_face_full",
+            detector_family="mediapipe_face",
+            detector_runtime_state="native_runtime_ready",
+            controlnet_control_type="Canny",
+            controlnet_module="canny",
+            controlnet_model="control_v11p_sd15_canny.safetensors",
+            host_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+        )
+        case = live_smoke._build_adetailer_dry_run_cases(context)[0]
+
+        errors = live_smoke._validate_adetailer_dry_run_case_response(
+            context,
+            case,
+            {
+                "workflow_kind": "txt2img-sd15",
+                "submission": {"accepted": False, "mode": "dry-run"},
+                "normalized_request": {
+                    "controlnet_units": [{"model": "control_v11p_sd15_canny.safetensors"}],
+                    "adetailer": {
+                        "enabled": True,
+                        "skip_img2img": False,
+                        "warning_codes": [],
+                        "units": [
+                            {
+                                "detector": "mediapipe_face_full",
+                                "detector_family": "mediapipe_face",
+                            }
+                        ],
+                        "diagnostics": {
+                            "primary_controlnet_unit_count": 1,
+                        },
+                    },
+                },
+                "workflow": {
+                    "1": {"class_type": "VAEDecode", "inputs": {}},
+                    "2": {
+                        "class_type": "RookieUIADetailerDetectMask",
+                        "inputs": {"detector": "mediapipe_face_full", "detector_family": "mediapipe_face"},
+                    },
+                    "3": {"class_type": "RookieUIVAEEncodeForInpaint", "inputs": {}},
+                    "4": {"class_type": "KSampler", "inputs": {}},
+                    "5": {"class_type": "KSampler", "inputs": {}},
+                    "6": {"class_type": "RookieUIControlNetApplyNativeAdvanced", "inputs": {}},
+                    "7": {"class_type": "RookieUIControlNetApplyNativeAdvanced", "inputs": {}},
+                    "8": {"class_type": "VAEDecode", "inputs": {}},
+                    "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0]}},
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_adetailer_dry_run_case_response_accepts_skip_img2img_topology(self) -> None:
+        context = live_smoke.ADetailerHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            detector_name="mediapipe_face_full",
+            detector_family="mediapipe_face",
+            detector_runtime_state="native_runtime_ready",
+            controlnet_control_type="Canny",
+            controlnet_module="canny",
+            controlnet_model="control_v11p_sd15_canny.safetensors",
+            host_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+        )
+        case = live_smoke._build_adetailer_dry_run_cases(context)[-1]
+
+        errors = live_smoke._validate_adetailer_dry_run_case_response(
+            context,
+            case,
+            {
+                "workflow_kind": "img2img-sd15",
+                "submission": {"accepted": False, "mode": "dry-run"},
+                "normalized_request": {
+                    "adetailer": {
+                        "enabled": True,
+                        "skip_img2img": True,
+                        "warning_codes": [],
+                        "units": [
+                            {
+                                "detector": "mediapipe_face_full",
+                                "detector_family": "mediapipe_face",
+                            }
+                        ],
+                        "diagnostics": {
+                            "primary_controlnet_unit_count": 0,
+                        },
+                    },
+                },
+                "workflow": {
+                    "1": {"class_type": "VAEDecode", "inputs": {}},
+                    "2": {"class_type": "KSampler", "inputs": {}},
+                    "3": {"class_type": "SaveImage", "inputs": {"images": ["1", 0]}},
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_main_adetailer_report_only_returns_zero_on_contract_drift(self) -> None:
+        controlnet_context = live_smoke.ControlNetHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            control_type="Canny",
+            module_name="canny",
+            model_name="control_v11p_sd15_canny.safetensors",
+            host_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+        adetailer_context = live_smoke.ADetailerHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            detector_name="face_yolov8n.pt",
+            detector_family="ultralytics_bbox",
+            detector_runtime_state="native_runtime_model_unavailable",
+            controlnet_control_type="Canny",
+            controlnet_module="canny",
+            controlnet_model="control_v11p_sd15_canny.safetensors",
+            host_contract_version="r73-20260413",
+            local_contract_version=live_smoke._LOCAL_ADETAILER_CONTRACT_VERSION,
+        )
+
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "adetailer", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"checkpoints": []}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_controlnet_payloads",
+                return_value=({}, {}, {}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_adetailer_catalog_payload",
+                return_value={},
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_build_controlnet_host_context",
+                return_value=(controlnet_context, []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_build_adetailer_host_context",
+                return_value=(adetailer_context, []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_build_adetailer_dry_run_cases",
+                return_value=[],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_adetailer_dry_run_smoke",
                 return_value=[],
             ),
             contextlib.redirect_stdout(io.StringIO()),
