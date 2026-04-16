@@ -35,12 +35,89 @@ class RookieUINodesTests(unittest.TestCase):
         mock_changed.assert_called_once_with("mask_asset.png")
 
     def test_controlnet_preprocess_node_is_registered(self) -> None:
+        self.assertIn("RookieUIA1111CLIPTextEncode", nodes.NODE_CLASS_MAPPINGS)
+        self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", nodes.NODE_CLASS_MAPPINGS)
         self.assertIn("RookieUIControlNetPreprocess", nodes.NODE_CLASS_MAPPINGS)
         self.assertIn("RookieUIControlNetApplyNativeAdvanced", nodes.NODE_CLASS_MAPPINGS)
         self.assertEqual(
             nodes.NODE_DISPLAY_NAME_MAPPINGS["RookieUIControlNetApplyNativeAdvanced"],
             "RookieUI ControlNet Apply (Advanced)",
         )
+
+    def test_a1111_clip_text_encode_rewrites_square_bracket_deemphasis(self) -> None:
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.tokenized: list[str] = []
+
+            def tokenize(self, text):
+                self.tokenized.append(text)
+                return [text]
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                return {"tokens": tokens, "add_dict": add_dict or {}}
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "portrait [soft light]")
+
+        self.assertEqual(clip.tokenized, ["portrait (soft light:0.9091)"])
+        self.assertEqual(conditioning["tokens"], ["portrait (soft light:0.9091)"])
+
+    def test_a1111_clip_text_encode_preserves_explicit_weighting(self) -> None:
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.tokenized: list[str] = []
+
+            def tokenize(self, text):
+                self.tokenized.append(text)
+                return [text]
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                return {"tokens": tokens, "add_dict": add_dict or {}}
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "portrait (eyes:1.3)")
+
+        self.assertEqual(clip.tokenized, ["portrait (eyes:1.3)"])
+        self.assertEqual(conditioning["tokens"], ["portrait (eyes:1.3)"])
+
+    def test_a1111_clip_text_encode_sdxl_rewrites_both_channels(self) -> None:
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.tokenized: list[str] = []
+
+            def tokenize(self, text):
+                self.tokenized.append(text)
+                return {"g": [f"g::{text}"], "l": [f"l::{text}"]}
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                return {"tokens": tokens, "add_dict": add_dict or {}}
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncodeSDXL()
+
+        conditioning, = node.encode(
+            clip,
+            1024,
+            1024,
+            0,
+            0,
+            1024,
+            1024,
+            "hero [soft]",
+            "avoid [harsh]",
+        )
+
+        self.assertEqual(
+            clip.tokenized,
+            ["hero (soft:0.9091)", "avoid (harsh:0.9091)", ""],
+        )
+        self.assertEqual(conditioning["tokens"]["g"], ["g::hero (soft:0.9091)"])
+        self.assertEqual(conditioning["tokens"]["l"], ["l::avoid (harsh:0.9091)"])
+        self.assertEqual(conditioning["add_dict"]["target_width"], 1024)
 
     def test_adetailer_detect_mask_node_is_registered(self) -> None:
         self.assertIn("RookieUIADetailerDetectMask", nodes.NODE_CLASS_MAPPINGS)

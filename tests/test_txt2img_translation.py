@@ -437,7 +437,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         result = translate_txt2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("CLIPTextEncodeSDXL", class_types)
+        self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
     def test_translate_txt2img_request_uses_legacy_roll_back_switch(self) -> None:
@@ -589,6 +589,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("CLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
         self.assertIn("CLIPTextEncode", class_types)
+        self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
@@ -671,7 +672,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         result = translate_txt2img_request(normalized).to_payload()
 
         self.assertEqual(result["workflow_kind"], "txt2img-sdxl")
-        self.assertEqual(result["workflow"]["2"]["class_type"], "CLIPTextEncodeSDXL")
+        self.assertEqual(result["workflow"]["2"]["class_type"], "RookieUIA1111CLIPTextEncodeSDXL")
         self.assertEqual(result["workflow"]["5"]["inputs"]["scheduler"], "karras")
 
     def test_translate_txt2img_request_builds_hires_workflow(self) -> None:
@@ -743,7 +744,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         encode_texts = [
             node["inputs"]["text"]
             for node in workflow.values()
-            if node["class_type"] == "CLIPTextEncode" and "text" in node["inputs"]
+            if node["class_type"] == "RookieUIA1111CLIPTextEncode" and "text" in node["inputs"]
         ]
 
         self.assertEqual(len(mask_nodes), 1)
@@ -759,6 +760,18 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("face master portrait", encode_texts)
         self.assertIn("blur", encode_texts)
         self.assertEqual(save_nodes[0]["inputs"]["images"], [decode_nodes[-1][0], 0])
+
+    def test_translate_txt2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "portrait [soft light]",
+            }
+        )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertIn("RookieUIA1111CLIPTextEncode", class_types)
 
     def test_translate_txt2img_request_ignores_adetailer_none_detector_units(self) -> None:
         normalized = normalize_txt2img_request(

@@ -10,6 +10,7 @@ from rookieui.services.prompt_dsl import (
     PROMPT_WARNING_LEGACY_FALLBACK_ENABLED,
     PROMPT_WARNING_SCHEDULE_DETECTED,
     merge_lora_activations,
+    normalize_prompt_attention_for_weighted_encode,
     preprocess_prompt_bundle,
 )
 
@@ -129,3 +130,18 @@ class PromptDslTests(unittest.TestCase):
                 inventory_loras=["detail_tweaker.safetensors"],
                 strict_match=True,
             )
+
+    def test_normalize_prompt_attention_for_weighted_encode_rewrites_square_brackets(self) -> None:
+        normalized = normalize_prompt_attention_for_weighted_encode("portrait [soft light]")
+
+        self.assertEqual(normalized, "portrait (soft light:0.9091)")
+
+    def test_normalize_prompt_attention_for_weighted_encode_preserves_schedule_groups(self) -> None:
+        normalized = normalize_prompt_attention_for_weighted_encode("[calm:chaos:0.4]")
+
+        self.assertEqual(normalized, "[calm:chaos:0.4]")
+
+    def test_normalize_prompt_attention_for_weighted_encode_preserves_escaped_markers(self) -> None:
+        normalized = normalize_prompt_attention_for_weighted_encode(r"literal \[brackets\] and \(parens\)")
+
+        self.assertEqual(normalized, r"literal [brackets] and (parens)")
