@@ -182,6 +182,8 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
         return ",".join(_CONTROLNET_VALIDATION_PROFILES)
     if validation_mode == "adetailer":
         return ",".join(_ADETAILER_VALIDATION_PROFILES)
+    if validation_mode == "full-pipeline":
+        return ""
     if validation_mode == "auxiliary-pipelines":
         return ""
     if validation_mode == "prompt-parity":
@@ -202,7 +204,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity", "auxiliary-contracts", "auxiliary-pipelines", "controlnet", "adetailer"),
+        choices=("catalog", "prompt-parity", "auxiliary-contracts", "auxiliary-pipelines", "controlnet", "adetailer", "full-pipeline"),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -732,6 +734,87 @@ def _validate_queue_job_response(response_payload: dict[str, Any], *, prompt_id:
     return errors
 
 
+def _prefix_errors(prefix: str, errors: list[str]) -> list[str]:
+    return [f"{prefix}: {error}" for error in errors]
+
+
+def _run_shared_queue_post_state_smoke(
+    base_url: str,
+    *,
+    lane_label: str,
+    submit_result: dict[str, Any],
+    client_id: str,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> list[str]:
+    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
+    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
+        return [f"{lane_label}: submit failed, expected accepted submission payload."]
+    prompt_id = str(submission.get("prompt_id", "")).strip()
+    if not prompt_id:
+        return [f"{lane_label}: submit missing prompt_id."]
+
+    errors: list[str] = []
+    snapshot_payload = _poll_queue_snapshot_until_job_visible(
+        base_url,
+        prompt_id=prompt_id,
+        client_id=client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    errors.extend(
+        _prefix_errors(
+            lane_label,
+            _validate_queue_snapshot_response(
+                snapshot_payload,
+                prompt_id=prompt_id,
+                allowed_statuses=("pending", "in_progress", "completed"),
+            ),
+        )
+    )
+
+    job = _poll_queue_job_until_terminal(
+        base_url,
+        prompt_id,
+        client_id,
+        request_timeout_seconds=request_timeout_seconds,
+        poll_timeout_seconds=poll_timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )
+    terminal_status = str(job.get("status", "")).strip().lower()
+    if terminal_status != "completed":
+        errors.append(f"{lane_label}: terminal status was '{terminal_status}'.")
+
+    encoded_prompt_id = urllib.parse.quote(prompt_id, safe="")
+    encoded_client_id = urllib.parse.quote(client_id, safe="")
+    job_payload = _request_json(
+        "GET",
+        f"{base_url}/rookieui/queue/{encoded_prompt_id}?client_id={encoded_client_id}",
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors.extend(_prefix_errors(lane_label, _validate_queue_job_response(job_payload, prompt_id=prompt_id)))
+    final_snapshot = _request_json(
+        "GET",
+        f"{base_url}/rookieui/queue?client_id={encoded_client_id}",
+        timeout_seconds=request_timeout_seconds,
+    )
+    errors.extend(
+        _prefix_errors(
+            lane_label,
+            _validate_queue_snapshot_response(
+                final_snapshot,
+                prompt_id=prompt_id,
+                allowed_statuses=("completed",),
+                require_visible_job=False,
+                expected_queue_remaining=0,
+            ),
+        )
+    )
+    return errors
+
+
 def _run_extras_execution_smoke(base_url: str, *, request_timeout_seconds: float) -> list[str]:
     response_payload = _request_json(
         "POST",
@@ -822,61 +905,15 @@ def _run_auxiliary_queue_execute_smoke(
         payload={**parsed_payload, "client_id": client_id},
         timeout_seconds=request_timeout_seconds,
     )
-    errors: list[str] = []
-    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
-    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
-        return [f"{case.case_id}: auxiliary execute submit failed, expected accepted submission payload."]
-    prompt_id = str(submission.get("prompt_id", "")).strip()
-    if not prompt_id:
-        return [f"{case.case_id}: auxiliary execute submit missing prompt_id."]
-
-    snapshot_payload = _poll_queue_snapshot_until_job_visible(
+    return _run_shared_queue_post_state_smoke(
         base_url,
-        prompt_id=prompt_id,
+        lane_label=f"{case.case_id}: auxiliary execute",
+        submit_result=submit_result,
         client_id=client_id,
         request_timeout_seconds=request_timeout_seconds,
         poll_timeout_seconds=poll_timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
     )
-    errors.extend(
-        _validate_queue_snapshot_response(
-            snapshot_payload,
-            prompt_id=prompt_id,
-            allowed_statuses=("pending", "in_progress", "completed"),
-        )
-    )
-
-    _poll_queue_job_until_terminal(
-        base_url,
-        prompt_id,
-        client_id,
-        request_timeout_seconds=request_timeout_seconds,
-        poll_timeout_seconds=poll_timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
-    )
-    encoded_prompt_id = urllib.parse.quote(prompt_id, safe="")
-    encoded_client_id = urllib.parse.quote(client_id, safe="")
-    job_payload = _request_json(
-        "GET",
-        f"{base_url}/rookieui/queue/{encoded_prompt_id}?client_id={encoded_client_id}",
-        timeout_seconds=request_timeout_seconds,
-    )
-    errors.extend(_validate_queue_job_response(job_payload, prompt_id=prompt_id))
-    final_snapshot = _request_json(
-        "GET",
-        f"{base_url}/rookieui/queue?client_id={encoded_client_id}",
-        timeout_seconds=request_timeout_seconds,
-    )
-    errors.extend(
-        _validate_queue_snapshot_response(
-            final_snapshot,
-            prompt_id=prompt_id,
-            allowed_statuses=("completed",),
-            require_visible_job=False,
-            expected_queue_remaining=0,
-        )
-    )
-    return errors
 
 
 def _iter_string_list(payload: object, key: str) -> list[str]:
@@ -2348,36 +2385,22 @@ def _run_controlnet_execute_smoke(
     poll_timeout_seconds: float,
     poll_interval_seconds: float,
 ) -> list[str]:
-    client_id = f"rookieui-live-controlnet-{context.profile_id}"
+    client_id = f"rookieui-live-controlnet-{context.profile_id}-{int(time.time() * 1000)}"
     submit_result = _request_json(
         "POST",
         f"{base_url}/rookieui/generate/txt2img",
         payload=_build_controlnet_execute_payload(context, client_id),
         timeout_seconds=request_timeout_seconds,
     )
-    errors: list[str] = []
-    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
-    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
-        return ["controlnet execute: submit failed, expected accepted submission payload."]
-    prompt_id = str(submission.get("prompt_id", "")).strip()
-    if not prompt_id:
-        return ["controlnet execute: submit missing prompt_id."]
-
-    job = _poll_queue_job_until_terminal(
+    return _run_shared_queue_post_state_smoke(
         base_url,
-        prompt_id,
-        client_id,
+        lane_label="controlnet execute",
+        submit_result=submit_result,
+        client_id=client_id,
         request_timeout_seconds=request_timeout_seconds,
         poll_timeout_seconds=poll_timeout_seconds,
         poll_interval_seconds=poll_interval_seconds,
     )
-    terminal_status = str(job.get("status", "")).strip().lower()
-    if terminal_status != "completed":
-        errors.append(f"controlnet execute: terminal status was '{terminal_status}'.")
-    reusable_outputs = job.get("reusable_outputs")
-    if not isinstance(reusable_outputs, list) or not reusable_outputs:
-        errors.append("controlnet execute: completed job did not expose reusable_outputs.")
-    return errors
 
 
 def _run_adetailer_execute_smoke(
@@ -2388,7 +2411,7 @@ def _run_adetailer_execute_smoke(
     poll_timeout_seconds: float,
     poll_interval_seconds: float,
 ) -> list[str]:
-    client_id = f"rookieui-live-adetailer-{context.profile_id}"
+    client_id = f"rookieui-live-adetailer-{context.profile_id}-{int(time.time() * 1000)}"
     submit_result = _request_json(
         "POST",
         f"{base_url}/rookieui/generate/txt2img",
@@ -2410,30 +2433,17 @@ def _run_adetailer_execute_smoke(
             errors.append("adetailer execute: degraded detector runtime was missing fallback-mask warning.")
     elif ADETAILER_WARNING_DETECTOR_RUNTIME_FALLBACK_MASK in warning_codes:
         errors.append("adetailer execute: ready detector runtime unexpectedly emitted fallback-mask warning.")
-
-    submission = submit_result.get("submission") if isinstance(submit_result, dict) else None
-    if not isinstance(submission, dict) or not bool(submission.get("accepted")):
-        errors.append("adetailer execute: submit failed, expected accepted submission payload.")
-        return errors
-    prompt_id = str(submission.get("prompt_id", "")).strip()
-    if not prompt_id:
-        errors.append("adetailer execute: submit missing prompt_id.")
-        return errors
-
-    job = _poll_queue_job_until_terminal(
-        base_url,
-        prompt_id,
-        client_id,
-        request_timeout_seconds=request_timeout_seconds,
-        poll_timeout_seconds=poll_timeout_seconds,
-        poll_interval_seconds=poll_interval_seconds,
+    errors.extend(
+        _run_shared_queue_post_state_smoke(
+            base_url,
+            lane_label="adetailer execute",
+            submit_result=submit_result,
+            client_id=client_id,
+            request_timeout_seconds=request_timeout_seconds,
+            poll_timeout_seconds=poll_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
     )
-    terminal_status = str(job.get("status", "")).strip().lower()
-    if terminal_status != "completed":
-        errors.append(f"adetailer execute: terminal status was '{terminal_status}'.")
-    reusable_outputs = job.get("reusable_outputs")
-    if not isinstance(reusable_outputs, list) or not reusable_outputs:
-        errors.append("adetailer execute: completed job did not expose reusable_outputs.")
     return errors
 
 
@@ -2546,11 +2556,150 @@ def _validate_controlnet_host_sync(context: ControlNetHostContext) -> list[str]:
     return errors
 
 
+def _run_auxiliary_pipeline_validation_lane(
+    base_url: str,
+    models_payload: dict[str, Any],
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[list[str], list[str]]:
+    context = _build_auxiliary_pipeline_context(models_payload)
+    extras_errors = _run_extras_execution_smoke(
+        base_url,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    pnginfo_errors, execute_case, execute_payload = _run_pnginfo_dry_run_smoke(
+        base_url,
+        context,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors = extras_errors + pnginfo_errors
+    execution_errors: list[str] = []
+    if execute:
+        if execute_case is None or not isinstance(execute_payload, dict):
+            execution_errors.append("auxiliary execute lane had no parsed apply-back payload.")
+        elif not combined_errors:
+            execution_errors = _run_auxiliary_queue_execute_smoke(
+                base_url,
+                case=execute_case,
+                parsed_payload=execute_payload,
+                request_timeout_seconds=request_timeout_seconds,
+                poll_timeout_seconds=poll_timeout_seconds,
+                poll_interval_seconds=poll_interval_seconds,
+            )
+    return combined_errors, execution_errors
+
+
+def _run_controlnet_validation_lane(
+    base_url: str,
+    models_payload: dict[str, Any],
+    profiles: list[str],
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[list[str], list[str]]:
+    model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+        base_url,
+        request_timeout_seconds,
+    )
+    context, context_errors = _build_controlnet_host_context(
+        models_payload,
+        model_list_payload,
+        module_list_payload,
+        control_types_payload,
+        profiles,
+    )
+    if context_errors:
+        return context_errors, []
+    assert context is not None
+
+    sync_errors = _validate_controlnet_host_sync(context)
+    dry_run_cases = _build_controlnet_dry_run_cases(context)
+    detect_errors = _run_controlnet_detect_smoke(
+        base_url,
+        context,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    dry_run_errors = _run_controlnet_dry_run_smoke(
+        base_url,
+        context,
+        dry_run_cases,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors = sync_errors + detect_errors + dry_run_errors
+    execution_errors: list[str] = []
+    if execute and not combined_errors:
+        execution_errors = _run_controlnet_execute_smoke(
+            base_url,
+            context,
+            request_timeout_seconds=request_timeout_seconds,
+            poll_timeout_seconds=poll_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+    return combined_errors, execution_errors
+
+
+def _run_adetailer_validation_lane(
+    base_url: str,
+    models_payload: dict[str, Any],
+    profiles: list[str],
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[list[str], list[str]]:
+    model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+        base_url,
+        request_timeout_seconds,
+    )
+    catalog_payload = _load_adetailer_catalog_payload(base_url, request_timeout_seconds)
+    controlnet_context, controlnet_context_errors = _build_controlnet_host_context(
+        models_payload,
+        model_list_payload,
+        module_list_payload,
+        control_types_payload,
+        profiles,
+    )
+    if controlnet_context_errors:
+        return controlnet_context_errors, []
+    assert controlnet_context is not None
+
+    context, context_errors = _build_adetailer_host_context(catalog_payload, controlnet_context)
+    if context_errors:
+        return context_errors, []
+    assert context is not None
+
+    sync_errors = _validate_controlnet_host_sync(controlnet_context) + _validate_adetailer_host_sync(context)
+    dry_run_cases = _build_adetailer_dry_run_cases(context)
+    dry_run_errors = _run_adetailer_dry_run_smoke(
+        base_url,
+        context,
+        dry_run_cases,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors = sync_errors + dry_run_errors
+    execution_errors: list[str] = []
+    if execute and not combined_errors:
+        execution_errors = _run_adetailer_execute_smoke(
+            base_url,
+            context,
+            request_timeout_seconds=request_timeout_seconds,
+            poll_timeout_seconds=poll_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+    return combined_errors, execution_errors
+
+
 def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
-    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines"} and not profiles:
+    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "full-pipeline"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
@@ -2585,22 +2734,19 @@ def main() -> int:
         return 1
 
     if args.validation_mode == "auxiliary-pipelines":
-        context = _build_auxiliary_pipeline_context(models_payload)
         try:
-            extras_errors = _run_extras_execution_smoke(
+            combined_errors, execution_errors = _run_auxiliary_pipeline_validation_lane(
                 base_url,
+                models_payload,
+                execute=args.execute,
                 request_timeout_seconds=args.request_timeout_seconds,
-            )
-            pnginfo_errors, execute_case, execute_payload = _run_pnginfo_dry_run_smoke(
-                base_url,
-                context,
-                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
             )
         except Exception as exc:
             print(f"[live-smoke] ERROR: auxiliary pipeline validation failed unexpectedly: {exc}", file=sys.stderr)
             return 0 if args.report_only else 1
 
-        combined_errors = extras_errors + pnginfo_errors
         if combined_errors:
             print("[live-smoke] WARNING: auxiliary pipeline validation reported issues:", file=sys.stderr)
             for error in combined_errors:
@@ -2613,22 +2759,7 @@ def main() -> int:
         if args.execute:
             if combined_errors:
                 print("[live-smoke] execute lane skipped because auxiliary dry-run checks were not green.")
-            elif execute_case is None or not isinstance(execute_payload, dict):
-                print("[live-smoke] ERROR: auxiliary pipeline execute lane had no parsed apply-back payload.", file=sys.stderr)
-                return 0 if args.report_only else 1
             else:
-                try:
-                    execution_errors = _run_auxiliary_queue_execute_smoke(
-                        base_url,
-                        case=execute_case,
-                        parsed_payload=execute_payload,
-                        request_timeout_seconds=args.request_timeout_seconds,
-                        poll_timeout_seconds=args.poll_timeout_seconds,
-                        poll_interval_seconds=args.poll_interval_seconds,
-                    )
-                except Exception as exc:
-                    print(f"[live-smoke] ERROR: auxiliary execute lane failed unexpectedly: {exc}", file=sys.stderr)
-                    return 0 if args.report_only else 1
                 if execution_errors:
                     print("[live-smoke] ERROR: auxiliary execute lane failed:", file=sys.stderr)
                     for error in execution_errors:
@@ -2644,52 +2775,18 @@ def main() -> int:
 
     if args.validation_mode == "controlnet":
         try:
-            model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+            combined_errors, execution_errors = _run_controlnet_validation_lane(
                 base_url,
-                args.request_timeout_seconds,
-            )
-        except Exception as exc:
-            print(f"[live-smoke] ERROR: failed to load ControlNet route payloads: {exc}", file=sys.stderr)
-            return 1
-
-        context, context_errors = _build_controlnet_host_context(
-            models_payload,
-            model_list_payload,
-            module_list_payload,
-            control_types_payload,
-            profiles,
-        )
-        if context_errors:
-            print("[live-smoke] ERROR: controlnet host context validation failed:", file=sys.stderr)
-            for error in context_errors:
-                print(f"  - {error}", file=sys.stderr)
-            return 0 if args.report_only else 1
-        assert context is not None
-
-        sync_errors = _validate_controlnet_host_sync(context)
-        if sync_errors:
-            print("[live-smoke] WARNING: controlnet host/workspace sync mismatch detected:", file=sys.stderr)
-            for error in sync_errors:
-                print(f"  - {error}", file=sys.stderr)
-
-        dry_run_cases = _build_controlnet_dry_run_cases(context)
-        try:
-            detect_errors = _run_controlnet_detect_smoke(
-                base_url,
-                context,
+                models_payload,
+                profiles,
+                execute=args.execute,
                 request_timeout_seconds=args.request_timeout_seconds,
-            )
-            dry_run_errors = _run_controlnet_dry_run_smoke(
-                base_url,
-                context,
-                dry_run_cases,
-                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
             )
         except Exception as exc:
             print(f"[live-smoke] ERROR: controlnet validation failed unexpectedly: {exc}", file=sys.stderr)
             return 0 if args.report_only else 1
-
-        combined_errors = sync_errors + detect_errors + dry_run_errors
         if combined_errors:
             print("[live-smoke] WARNING: controlnet validation reported issues:", file=sys.stderr)
             for error in combined_errors:
@@ -2703,17 +2800,6 @@ def main() -> int:
             if combined_errors:
                 print("[live-smoke] execute lane skipped because controlnet detect/dry-run was not green.")
             else:
-                try:
-                    execution_errors = _run_controlnet_execute_smoke(
-                        base_url,
-                        context,
-                        request_timeout_seconds=args.request_timeout_seconds,
-                        poll_timeout_seconds=args.poll_timeout_seconds,
-                        poll_interval_seconds=args.poll_interval_seconds,
-                    )
-                except Exception as exc:
-                    print(f"[live-smoke] ERROR: controlnet execute lane failed unexpectedly: {exc}", file=sys.stderr)
-                    return 0 if args.report_only else 1
                 if execution_errors:
                     print("[live-smoke] ERROR: controlnet execute lane failed:", file=sys.stderr)
                     for error in execution_errors:
@@ -2729,56 +2815,18 @@ def main() -> int:
 
     if args.validation_mode == "adetailer":
         try:
-            model_list_payload, module_list_payload, control_types_payload = _load_controlnet_payloads(
+            combined_errors, execution_errors = _run_adetailer_validation_lane(
                 base_url,
-                args.request_timeout_seconds,
-            )
-            catalog_payload = _load_adetailer_catalog_payload(base_url, args.request_timeout_seconds)
-        except Exception as exc:
-            print(f"[live-smoke] ERROR: failed to load ADetailer route payloads: {exc}", file=sys.stderr)
-            return 1
-
-        controlnet_context, controlnet_context_errors = _build_controlnet_host_context(
-            models_payload,
-            model_list_payload,
-            module_list_payload,
-            control_types_payload,
-            profiles,
-        )
-        if controlnet_context_errors:
-            print("[live-smoke] ERROR: adetailer dependency ControlNet host context validation failed:", file=sys.stderr)
-            for error in controlnet_context_errors:
-                print(f"  - {error}", file=sys.stderr)
-            return 0 if args.report_only else 1
-        assert controlnet_context is not None
-
-        context, context_errors = _build_adetailer_host_context(catalog_payload, controlnet_context)
-        if context_errors:
-            print("[live-smoke] ERROR: adetailer host context validation failed:", file=sys.stderr)
-            for error in context_errors:
-                print(f"  - {error}", file=sys.stderr)
-            return 0 if args.report_only else 1
-        assert context is not None
-
-        sync_errors = _validate_controlnet_host_sync(controlnet_context) + _validate_adetailer_host_sync(context)
-        if sync_errors:
-            print("[live-smoke] WARNING: adetailer host/workspace sync mismatch detected:", file=sys.stderr)
-            for error in sync_errors:
-                print(f"  - {error}", file=sys.stderr)
-
-        dry_run_cases = _build_adetailer_dry_run_cases(context)
-        try:
-            dry_run_errors = _run_adetailer_dry_run_smoke(
-                base_url,
-                context,
-                dry_run_cases,
+                models_payload,
+                profiles,
+                execute=args.execute,
                 request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
             )
         except Exception as exc:
             print(f"[live-smoke] ERROR: adetailer validation failed unexpectedly: {exc}", file=sys.stderr)
             return 0 if args.report_only else 1
-
-        combined_errors = sync_errors + dry_run_errors
         if combined_errors:
             print("[live-smoke] WARNING: adetailer validation reported issues:", file=sys.stderr)
             for error in combined_errors:
@@ -2792,17 +2840,6 @@ def main() -> int:
             if combined_errors:
                 print("[live-smoke] execute lane skipped because adetailer dry-run was not green.")
             else:
-                try:
-                    execution_errors = _run_adetailer_execute_smoke(
-                        base_url,
-                        context,
-                        request_timeout_seconds=args.request_timeout_seconds,
-                        poll_timeout_seconds=args.poll_timeout_seconds,
-                        poll_interval_seconds=args.poll_interval_seconds,
-                    )
-                except Exception as exc:
-                    print(f"[live-smoke] ERROR: adetailer execute lane failed unexpectedly: {exc}", file=sys.stderr)
-                    return 0 if args.report_only else 1
                 if execution_errors:
                     print("[live-smoke] ERROR: adetailer execute lane failed:", file=sys.stderr)
                     for error in execution_errors:
@@ -2811,6 +2848,115 @@ def main() -> int:
                 print("[live-smoke] adetailer execute checks passed.")
 
         if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
+
+    if args.validation_mode == "full-pipeline":
+        controlnet_profiles = _parse_profiles(_default_profiles_for_mode("controlnet"))
+        adetailer_profiles = _parse_profiles(_default_profiles_for_mode("adetailer"))
+        pipeline_errors = False
+
+        try:
+            controlnet_errors, controlnet_execute_errors = _run_controlnet_validation_lane(
+                base_url,
+                models_payload,
+                controlnet_profiles,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline ControlNet lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if controlnet_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline controlnet lane reported issues:", file=sys.stderr)
+            for error in controlnet_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline controlnet dry-run checks passed.")
+        if args.execute:
+            if controlnet_errors:
+                print("[live-smoke] full-pipeline controlnet execute skipped because dry-run was not green.")
+            elif controlnet_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline controlnet execute lane failed:", file=sys.stderr)
+                for error in controlnet_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline controlnet execute checks passed.")
+
+        try:
+            adetailer_errors, adetailer_execute_errors = _run_adetailer_validation_lane(
+                base_url,
+                models_payload,
+                adetailer_profiles,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline ADetailer lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if adetailer_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline adetailer lane reported issues:", file=sys.stderr)
+            for error in adetailer_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline adetailer dry-run checks passed.")
+        if args.execute:
+            if adetailer_errors:
+                print("[live-smoke] full-pipeline adetailer execute skipped because dry-run was not green.")
+            elif adetailer_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline adetailer execute lane failed:", file=sys.stderr)
+                for error in adetailer_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline adetailer execute checks passed.")
+
+        try:
+            auxiliary_errors, auxiliary_execute_errors = _run_auxiliary_pipeline_validation_lane(
+                base_url,
+                models_payload,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline auxiliary lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if auxiliary_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline auxiliary lane reported issues:", file=sys.stderr)
+            for error in auxiliary_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline auxiliary dry-run checks passed.")
+        if args.execute:
+            if auxiliary_errors:
+                print("[live-smoke] full-pipeline auxiliary execute skipped because dry-run was not green.")
+            elif auxiliary_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline auxiliary execute lane failed:", file=sys.stderr)
+                for error in auxiliary_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline auxiliary execute checks passed.")
+
+        if pipeline_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")
         else:
             print("[live-smoke] PASS")
