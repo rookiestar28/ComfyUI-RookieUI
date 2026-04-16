@@ -658,6 +658,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("CLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
         self.assertIn("CLIPTextEncode", class_types)
+        self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
@@ -735,12 +736,25 @@ class Img2ImgTranslationTests(unittest.TestCase):
         result = translate_img2img_request(normalized).to_payload()
 
         self.assertEqual(result["workflow_kind"], "img2img-sdxl")
-        self.assertEqual(result["workflow"]["2"]["class_type"], "CLIPTextEncodeSDXL")
+        self.assertEqual(result["workflow"]["2"]["class_type"], "RookieUIA1111CLIPTextEncodeSDXL")
         self.assertEqual(result["workflow"]["4"]["class_type"], "RookieUILoadAssetImage")
         sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
         self.assertEqual(len(sampler_nodes), 1)
         self.assertEqual(sampler_nodes[0]["inputs"]["denoise"], 0.75)
         self.assertEqual(sampler_nodes[0]["inputs"]["seed"], result["normalized_request"]["execution_seed"])
+
+    def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait [soft light]",
+                "image_asset": "portrait-input",
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertIn("RookieUIA1111CLIPTextEncode", class_types)
 
     def test_translate_img2img_request_applies_resize_mode_nodes(self) -> None:
         normalized = normalize_img2img_request(

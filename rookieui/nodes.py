@@ -33,6 +33,7 @@ from rookieui.services.controlnet_runtime import (
 from rookieui.services.controlnet_advanced_runtime import (
     build_controlnet_stage_weights,
 )
+from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted_encode
 
 try:
     from comfy import model_management
@@ -76,6 +77,88 @@ def _require_runtime_dependencies() -> None:
 def _require_tensor_dependency() -> None:
     if torch is None:
         raise RuntimeError("RookieUI tensor nodes require torch to be installed in the active environment.")
+
+
+def _require_clip_input(clip) -> None:
+    if clip is None:
+        raise RuntimeError(
+            "RookieUI prompt encode received an invalid clip input. "
+            "If the clip comes from a checkpoint loader, the active host model may not expose a valid text encoder."
+        )
+
+
+class RookieUIA1111CLIPTextEncode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "clip": ("CLIP",),
+            }
+        }
+
+    CATEGORY = "RookieUI/conditioning"
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "encode"
+
+    def encode(self, clip, text):
+        _require_clip_input(clip)
+        normalized_text = normalize_prompt_attention_for_weighted_encode(text)
+        tokens = clip.tokenize(normalized_text)
+        return (clip.encode_from_tokens_scheduled(tokens),)
+
+
+class RookieUIA1111CLIPTextEncodeSDXL:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "clip": ("CLIP",),
+                "width": ("INT", {"default": 1024, "min": 0, "max": 16384}),
+                "height": ("INT", {"default": 1024, "min": 0, "max": 16384}),
+                "crop_w": ("INT", {"default": 0, "min": 0, "max": 16384}),
+                "crop_h": ("INT", {"default": 0, "min": 0, "max": 16384}),
+                "target_width": ("INT", {"default": 1024, "min": 0, "max": 16384}),
+                "target_height": ("INT", {"default": 1024, "min": 0, "max": 16384}),
+                "text_g": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+                "text_l": ("STRING", {"multiline": True, "dynamicPrompts": True}),
+            }
+        }
+
+    CATEGORY = "RookieUI/conditioning"
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "encode"
+
+    def encode(self, clip, width, height, crop_w, crop_h, target_width, target_height, text_g, text_l):
+        _require_clip_input(clip)
+        normalized_text_g = normalize_prompt_attention_for_weighted_encode(text_g)
+        normalized_text_l = normalize_prompt_attention_for_weighted_encode(text_l)
+        tokens = clip.tokenize(normalized_text_g)
+        tokens_l = clip.tokenize(normalized_text_l)
+        if not isinstance(tokens, dict) or not isinstance(tokens_l, dict):
+            raise RuntimeError("RookieUI SDXL prompt encode requires a dual-token CLIP payload.")
+        if "l" not in tokens_l:
+            raise RuntimeError("RookieUI SDXL prompt encode requires the CLIP payload to expose an 'l' token channel.")
+        tokens["l"] = tokens_l["l"]
+        if "g" in tokens and "l" in tokens:
+            empty = clip.tokenize("")
+            while len(tokens["l"]) < len(tokens["g"]):
+                tokens["l"] += empty["l"]
+            while len(tokens["l"]) > len(tokens["g"]):
+                tokens["g"] += empty["g"]
+        return (
+            clip.encode_from_tokens_scheduled(
+                tokens,
+                add_dict={
+                    "width": width,
+                    "height": height,
+                    "crop_w": crop_w,
+                    "crop_h": crop_h,
+                    "target_width": target_width,
+                    "target_height": target_height,
+                },
+            ),
+        )
 
 
 def _load_image_with_alpha(path):
@@ -815,6 +898,8 @@ class RookieUIVAEEncodeForInpaint:
 
 
 NODE_CLASS_MAPPINGS = {
+    "RookieUIA1111CLIPTextEncode": RookieUIA1111CLIPTextEncode,
+    "RookieUIA1111CLIPTextEncodeSDXL": RookieUIA1111CLIPTextEncodeSDXL,
     "RookieUILoadAssetImage": RookieUILoadAssetImage,
     "RookieUILoadAssetMask": RookieUILoadAssetMask,
     "RookieUIControlNetPreprocess": RookieUIControlNetPreprocess,
@@ -824,6 +909,8 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "RookieUIA1111CLIPTextEncode": "RookieUI A1111 CLIP Text Encode",
+    "RookieUIA1111CLIPTextEncodeSDXL": "RookieUI A1111 CLIP Text Encode SDXL",
     "RookieUILoadAssetImage": "RookieUI Load Asset Image",
     "RookieUILoadAssetMask": "RookieUI Load Asset Mask",
     "RookieUIControlNetPreprocess": "RookieUI ControlNet Preprocess",

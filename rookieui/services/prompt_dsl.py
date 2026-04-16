@@ -34,6 +34,13 @@ _EXPLICIT_ATTENTION_RE = re.compile(r"\(([^()]+):\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+
 _PAREN_ATTENTION_RE = re.compile(r"\(([^():][^()]*)\)")
 _BRACKET_ATTENTION_RE = re.compile(r"\[([^\[\]:]+)\]")
 _BRANCH_WEIGHT_RE = re.compile(r"^(.*?)(?:\s*:\s*([-+]?(?:\d+(?:\.\d+)?|\.\d+)))\s*$")
+_A1111_DEEMPHASIS_WEIGHT = round(1.0 / 1.1, 4)
+_ESCAPED_ATTENTION_MARKERS = {
+    r"\(": "\0rookieui_paren_open\0",
+    r"\)": "\0rookieui_paren_close\0",
+    r"\[": "\0rookieui_bracket_open\0",
+    r"\]": "\0rookieui_bracket_close\0",
+}
 
 _MAX_AND_BRANCHES = 8
 _MAX_BREAK_CHUNKS = 16
@@ -241,6 +248,123 @@ def _extract_attention_markers(prompt_text: str) -> list[PromptAttentionMarker]:
             continue
         markers.append(PromptAttentionMarker(token=token, weight=0.9, syntax="bracket"))
     return markers
+
+
+def _protect_escaped_attention_markers(text: str) -> str:
+    protected = text
+    for raw_marker, placeholder in _ESCAPED_ATTENTION_MARKERS.items():
+        protected = protected.replace(raw_marker, placeholder)
+    return protected
+
+
+def _restore_escaped_attention_markers(text: str) -> str:
+    restored = text
+    for raw_marker, placeholder in _ESCAPED_ATTENTION_MARKERS.items():
+        restored = restored.replace(placeholder, raw_marker[1:])
+    return restored
+
+
+def _extract_balanced_attention_group(
+    text: str,
+    start_index: int,
+    opener: str,
+    closer: str,
+) -> tuple[str | None, int]:
+    depth = 0
+    for index in range(start_index, len(text)):
+        char = text[index]
+        if char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start_index + 1 : index], index + 1
+    return None, start_index + 1
+
+
+def _split_top_level_explicit_attention(content: str) -> tuple[str, str | None]:
+    depth_round = 0
+    depth_square = 0
+    for index in range(len(content) - 1, -1, -1):
+        char = content[index]
+        if char == ")":
+            depth_round += 1
+        elif char == "(":
+            depth_round = max(depth_round - 1, 0)
+        elif char == "]":
+            depth_square += 1
+        elif char == "[":
+            depth_square = max(depth_square - 1, 0)
+        elif char == ":" and depth_round == 0 and depth_square == 0:
+            suffix = content[index + 1 :].strip()
+            if re.fullmatch(r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)", suffix or ""):
+                return content[:index], suffix
+    return content, None
+
+
+def _looks_like_prompt_schedule_group(content: str) -> bool:
+    depth_round = 0
+    depth_square = 0
+    colon_count = 0
+    for char in content:
+        if char == "(":
+            depth_round += 1
+        elif char == ")":
+            depth_round = max(depth_round - 1, 0)
+        elif char == "[":
+            depth_square += 1
+        elif char == "]":
+            depth_square = max(depth_square - 1, 0)
+        elif char == ":" and depth_round == 0 and depth_square == 0:
+            colon_count += 1
+    return colon_count >= 2
+
+
+def _rewrite_a1111_attention_groups(text: str) -> str:
+    parts: list[str] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "[":
+            group_content, next_index = _extract_balanced_attention_group(text, index, "[", "]")
+            if group_content is None:
+                parts.append(char)
+                index += 1
+                continue
+            if _looks_like_prompt_schedule_group(group_content):
+                rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+                parts.append(f"[{rewritten_inner}]")
+            else:
+                rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+                parts.append(f"({rewritten_inner}:{_A1111_DEEMPHASIS_WEIGHT})")
+            index = next_index
+            continue
+        if char == "(":
+            group_content, next_index = _extract_balanced_attention_group(text, index, "(", ")")
+            if group_content is None:
+                parts.append(char)
+                index += 1
+                continue
+            rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+            base_text, explicit_weight = _split_top_level_explicit_attention(rewritten_inner)
+            if explicit_weight is None:
+                parts.append(f"({rewritten_inner})")
+            else:
+                parts.append(f"({base_text}:{explicit_weight})")
+            index = next_index
+            continue
+        parts.append(char)
+        index += 1
+    return "".join(parts)
+
+
+def normalize_prompt_attention_for_weighted_encode(prompt_text: str) -> str:
+    normalized = normalize_prompt_text(prompt_text, "prompt", required=False)
+    if not normalized:
+        return normalized
+    protected = _protect_escaped_attention_markers(normalized)
+    rewritten = _rewrite_a1111_attention_groups(protected)
+    return _restore_escaped_attention_markers(rewritten)
 
 
 def _build_prompt_semantic_plan(prompt_text: str) -> tuple[PromptSemanticPlan, list[str]]:
