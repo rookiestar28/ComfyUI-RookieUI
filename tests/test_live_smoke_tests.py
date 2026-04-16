@@ -26,6 +26,12 @@ def _build_semantic_payload(
 
 
 class LiveSmokePromptParityTests(unittest.TestCase):
+    def test_default_profiles_for_controlnet_use_sd_family_order(self) -> None:
+        self.assertEqual(
+            live_smoke._default_profiles_for_mode("controlnet"),
+            "sd15,pony,illustrious,noob,sdxl",
+        )
+
     def test_default_profiles_for_auxiliary_contracts_is_empty(self) -> None:
         self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-contracts"), "")
 
@@ -357,6 +363,247 @@ class LiveSmokeAuxiliaryContractTests(unittest.TestCase):
                 live_smoke,
                 "_run_auxiliary_contract_smoke",
                 return_value=["surface 'queue_snapshot_and_job_lookup' contract mismatch"],
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+
+class LiveSmokeControlNetTests(unittest.TestCase):
+    def test_build_controlnet_host_context_selects_sd15_and_canny_defaults(self) -> None:
+        context, errors = live_smoke._build_controlnet_host_context(
+            {"checkpoints": ["SD15\\BravNew.safetensors"]},
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "model_list": ["control_v11p_sd15_canny.safetensors"],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "module_list": ["none", "canny"],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "control_types": {
+                    "Canny": {
+                        "default_option": "canny",
+                        "default_model": "control_v11p_sd15_canny.safetensors",
+                    }
+                },
+            },
+            ["sd15", "sdxl"],
+        )
+
+        self.assertEqual(errors, [])
+        assert context is not None
+        self.assertEqual(context.profile_id, "sd15")
+        self.assertEqual(context.checkpoint_name, "SD15\\BravNew.safetensors")
+        self.assertEqual(context.base_family, "sd15")
+        self.assertEqual(context.control_type, "Canny")
+        self.assertEqual(context.module_name, "canny")
+        self.assertEqual(context.model_name, "control_v11p_sd15_canny.safetensors")
+
+    def test_build_controlnet_host_context_prefers_sd15_model_over_sdxl_default(self) -> None:
+        context, errors = live_smoke._build_controlnet_host_context(
+            {"checkpoints": ["SD15\\BravNew.safetensors"]},
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "model_list": [
+                    "Xinsir-Controlnet-Canny-sdxl_V2.safetensors",
+                    "control_v11p_sd15_canny.safetensors",
+                ],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "module_list": ["none", "canny"],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "control_types": {
+                    "Canny": {
+                        "default_option": "canny",
+                        "default_model": "Xinsir-Controlnet-Canny-sdxl_V2.safetensors",
+                        "model_list": [
+                            "Xinsir-Controlnet-Canny-sdxl_V2.safetensors",
+                            "control_v11p_sd15_canny.safetensors",
+                        ],
+                    }
+                },
+            },
+            ["sd15", "sdxl"],
+        )
+
+        self.assertEqual(errors, [])
+        assert context is not None
+        self.assertEqual(context.profile_id, "sd15")
+        self.assertEqual(context.model_name, "control_v11p_sd15_canny.safetensors")
+
+    def test_build_controlnet_host_context_falls_back_to_sdxl_when_sd15_model_missing(self) -> None:
+        context, errors = live_smoke._build_controlnet_host_context(
+            {"checkpoints": ["SD15\\BravNew.safetensors", "SDXL\\Cutie_Slutty_Pony_v20.safetensors"]},
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "model_list": ["Xinsir-Controlnet-Canny-sdxl_V2.safetensors"],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "module_list": ["none", "canny"],
+            },
+            {
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "control_types": {
+                    "Canny": {
+                        "default_option": "canny",
+                        "default_model": "Xinsir-Controlnet-Canny-sdxl_V2.safetensors",
+                        "model_list": ["Xinsir-Controlnet-Canny-sdxl_V2.safetensors"],
+                    }
+                },
+            },
+            ["sd15", "pony", "sdxl"],
+        )
+
+        self.assertEqual(errors, [])
+        assert context is not None
+        self.assertEqual(context.profile_id, "pony")
+        self.assertEqual(context.checkpoint_name, "SDXL\\Cutie_Slutty_Pony_v20.safetensors")
+        self.assertEqual(context.base_family, "sdxl")
+        self.assertEqual(context.model_name, "Xinsir-Controlnet-Canny-sdxl_V2.safetensors")
+
+    def test_validate_controlnet_host_sync_reports_contract_drift(self) -> None:
+        errors = live_smoke._validate_controlnet_host_sync(
+            live_smoke.ControlNetHostContext(
+                profile_id="sd15",
+                checkpoint_name="SD15\\BravNew.safetensors",
+                base_family="sd15",
+                control_type="Canny",
+                module_name="canny",
+                model_name="control_v11p_sd15_canny.safetensors",
+                host_contract_version="r72-20260412",
+                local_contract_version="r119-20260417",
+            )
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("host='r72-20260412'", errors[0])
+
+    def test_validate_controlnet_detect_response_accepts_fallback_backend(self) -> None:
+        context = live_smoke.ControlNetHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            control_type="Canny",
+            module_name="canny",
+            model_name="control_v11p_sd15_canny.safetensors",
+            host_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+
+        errors = live_smoke._validate_controlnet_detect_response(
+            context,
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {"version": live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION},
+                "module": "canny",
+                "requested_controlnet_model": "control_v11p_sd15_canny.safetensors",
+                "detect_backend": "rookieui_internal_fallback",
+                "warning_codes": ["CONTROLNET_PREPROCESSOR_HOST_FALLBACK"],
+                "images": ["data:image/png;base64,abc"],
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_controlnet_dry_run_case_response_accepts_expected_topology(self) -> None:
+        context = live_smoke.ControlNetHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            control_type="Canny",
+            module_name="canny",
+            model_name="control_v11p_sd15_canny.safetensors",
+            host_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+            local_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+        case = live_smoke._build_controlnet_dry_run_cases(context)[0]
+
+        errors = live_smoke._validate_controlnet_dry_run_case_response(
+            context,
+            case,
+            {
+                "workflow_kind": "txt2img-sd15",
+                "submission": {"accepted": False, "mode": "dry-run"},
+                "normalized_request": {
+                    "controlnet_units": [
+                        {
+                            "module": "canny",
+                            "model": "control_v11p_sd15_canny.safetensors",
+                            "control_type": "Canny",
+                            "image_asset": "rookieui_controlnet_input_1.png",
+                        }
+                    ]
+                },
+                "workflow": {
+                    "5": {"class_type": "RookieUIControlNetPreprocess", "inputs": {"module": "canny"}},
+                    "6": {"class_type": "DiffControlNetLoader", "inputs": {}},
+                    "7": {
+                        "class_type": "RookieUIControlNetApplyNativeAdvanced",
+                        "inputs": {"weight_preset": "soft", "layer_weights_json": "[0.2, 0.4, 0.8]"},
+                    },
+                    "8": {
+                        "class_type": "RookieUIControlNetApplyNativeAdvanced",
+                        "inputs": {"weight_preset": "soft", "layer_weights_json": "[0.2, 0.4, 0.8]"},
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_main_controlnet_report_only_returns_zero_on_contract_drift(self) -> None:
+        context = live_smoke.ControlNetHostContext(
+            profile_id="sd15",
+            checkpoint_name="SD15\\BravNew.safetensors",
+            base_family="sd15",
+            control_type="Canny",
+            module_name="canny",
+            model_name="control_v11p_sd15_canny.safetensors",
+            host_contract_version="r72-20260412",
+            local_contract_version=live_smoke._LOCAL_CONTROLNET_CONTRACT_VERSION,
+        )
+
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "controlnet", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"checkpoints": []}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_controlnet_payloads",
+                return_value=({}, {}, {}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_build_controlnet_host_context",
+                return_value=(context, []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_controlnet_detect_smoke",
+                return_value=[],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_controlnet_dry_run_smoke",
+                return_value=[],
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
