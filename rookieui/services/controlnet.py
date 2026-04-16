@@ -32,6 +32,9 @@ from rookieui.services.controlnet_runtime import (
 )
 from rookieui.services.model_inventory import discover_model_inventory
 
+# IMPORTANT: phase-59 refactor keeps this module as the stable ControlNet facade.
+# Route handlers and existing tests should continue importing from here while catalog/normalization/detect ownership is split behind it.
+
 ROOKIEUI_CONTROLNET_ENABLED_ENV = "ROOKIEUI_CONTROLNET_ENABLED"
 ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED_ENV = "ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED"
 ROOKIEUI_CONTROLNET_PREPROCESSOR_ENABLED_ENV = "ROOKIEUI_CONTROLNET_PREPROCESSOR_ENABLED"

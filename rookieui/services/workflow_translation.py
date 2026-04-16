@@ -26,6 +26,9 @@ from rookieui.services.controlnet_advanced_runtime import build_controlnet_apply
 
 _PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
+# IMPORTANT: phase-59 refactor keeps this module as the stable workflow-translation facade.
+# New builder ownership must move behind this file, not around it, so routes/tests keep one import surface.
+
 
 def _is_legacy_prompt_dsl_enabled() -> bool:
     raw_value = str(os.getenv(_PROMPT_DSL_LEGACY_ENV, "")).strip().lower()

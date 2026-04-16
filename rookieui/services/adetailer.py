@@ -32,6 +32,9 @@ from rookieui.services.adetailer_runtime import (
 )
 from rookieui.services.model_inventory import discover_model_inventory
 
+# IMPORTANT: phase-59 refactor keeps this module as the stable ADetailer facade.
+# Route/catalog consumers should continue importing from here while catalog/normalization/refinement ownership is split behind it.
+
 ADETAILER_WARNING_UNIT_LIMIT_TRUNCATED = "ADETAILER_UNIT_LIMIT_TRUNCATED"
 ADETAILER_WARNING_SKIP_IMG2IMG_IGNORED = "ADETAILER_SKIP_IMG2IMG_IGNORED"
 ADETAILER_WARNING_NO_ACTIVE_UNITS = "ADETAILER_NO_ACTIVE_UNITS"
