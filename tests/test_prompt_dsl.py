@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest import mock
 
+from rookieui.contracts.prompt_dsl import PromptSemanticPlan
 from rookieui.services.prompt_dsl import (
     PROMPT_WARNING_AND_DETECTED,
     PROMPT_WARNING_ATTENTION_DETECTED,
@@ -16,6 +17,15 @@ from rookieui.services.prompt_dsl import (
 
 
 class PromptDslTests(unittest.TestCase):
+    def test_prompt_semantic_plan_empty_exposes_embeddings_contract_shape(self) -> None:
+        empty = PromptSemanticPlan.empty("hero")
+
+        self.assertIn("embeddings_textual_inversion", empty.features)
+        self.assertFalse(empty.features["embeddings_textual_inversion"])
+        self.assertEqual(empty.embeddings, [])
+        payload = empty.to_payload()
+        self.assertEqual(payload["embeddings"], [])
+
     def test_preprocess_prompt_bundle_extracts_inline_lora_and_cleans_prompt_text(self) -> None:
         result = preprocess_prompt_bundle(
             "cinematic skyline <lora:detail_tweaker.safetensors:0.8>",

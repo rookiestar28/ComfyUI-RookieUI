@@ -40,6 +40,15 @@ _PROMPT_CAPABILITIES = (
         "reference": "a1111_prompt_parser",
     },
     {
+        "id": "embeddings_textual_inversion",
+        "title": "Embeddings / Textual Inversion",
+        "a1111_semantics": "Prompt-native textual inversion / embedding references resolved at tokenizer or encode time.",
+        "rookieui_contract": "Contract and payload shape frozen; runtime delivery remains staged until the prompt-path implementation lands.",
+        "status": "guarded",
+        "translation": "inventory_diagnostics_staged",
+        "reference": "a1111_textual_inversion",
+    },
+    {
         "id": "extra_network_lora",
         "title": "Extra Network (LoRA/LyCORIS)",
         "a1111_semantics": "Inline extra-network token <lora:...> / <lyco:...> merges into model graph.",
@@ -62,7 +71,7 @@ _PROMPT_CAPABILITIES = (
 
 def build_prompt_capability_matrix_payload() -> dict[str, Any]:
     return {
-        "contract_version": "r55-20260411",
+        "contract_version": "r113-20260416",
         "contract_scope": "sd-family-first",
         "rollout": {
             "default_mode": "semantic_v2",
