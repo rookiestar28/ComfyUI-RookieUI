@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from rookieui.contracts.queue import RookieUIQueueJob, RookieUIQueueSnapshot
+from rookieui.contracts.queue import RookieUIQueueJob, RookieUIQueueSnapshot, build_queue_contract_meta
 from rookieui.security.asset_guard import normalize_metadata_text, validate_asset_identifier
 
 
@@ -120,7 +120,9 @@ def build_queue_snapshot(
     client_id: str | None = None,
 ) -> dict[str, object]:
     if prompt_server is None or not hasattr(prompt_server, "prompt_queue"):
-        return RookieUIQueueSnapshot(source="fallback", queue_remaining=0).to_payload()
+        payload = RookieUIQueueSnapshot(source="fallback", queue_remaining=0).to_payload()
+        payload["contract"] = build_queue_contract_meta()
+        return payload
 
     prompt_queue = prompt_server.prompt_queue
     running: list[tuple[object, ...]] = []
@@ -175,11 +177,13 @@ def build_queue_snapshot(
             -(job.create_time or 0),
         )
     )
-    return RookieUIQueueSnapshot(
+    payload = RookieUIQueueSnapshot(
         source="host",
         queue_remaining=queue_remaining,
         jobs=jobs[: max(history_limit + len(running) + len(queued), 5)],
     ).to_payload()
+    payload["contract"] = build_queue_contract_meta()
+    return payload
 
 
 def build_queue_job_snapshot(
@@ -202,4 +206,5 @@ def build_queue_job_snapshot(
         "source": snapshot.get("source", "fallback"),
         "queue_remaining": snapshot.get("queue_remaining", 0),
         "job": matched_job,
+        "contract": build_queue_contract_meta(),
     }

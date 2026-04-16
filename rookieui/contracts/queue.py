@@ -3,6 +3,19 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+QUEUE_CONTRACT_VERSION = "r119-20260417"
+QUEUE_CONTRACT_SURFACE = "queue_snapshot_and_job_lookup"
+
+
+def build_queue_contract_meta() -> dict[str, object]:
+    return {
+        "version": QUEUE_CONTRACT_VERSION,
+        "surface": QUEUE_CONTRACT_SURFACE,
+        "visibility": "rookieui_origin_filtered",
+        "supports_client_filter": True,
+        "history_result_mode": "reusable_outputs_from_history",
+    }
+
 
 @dataclass(frozen=True)
 class RookieUIQueueJob:
