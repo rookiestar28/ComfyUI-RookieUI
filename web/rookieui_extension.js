@@ -1,13 +1,9 @@
 import {
-  fetchRookieUICapabilities,
   fetchRookieUIADetailerCatalog,
-  fetchRookieUICompatibility,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
-  fetchRookieUIModels,
-  fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
   inspectRookieUIPngInfo,
@@ -20,6 +16,7 @@ import {
   renderRookieUISidebar,
 } from "./rookieui_extension_deps.js";
 import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
+import { loadRookieUIBootstrapData } from "./rookieui_feature_registry.js";
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
 
@@ -49,41 +46,6 @@ function createRookieUIClientId(windowRef, runtimeApi = null) {
   }
   const suffix = Math.random().toString(36).slice(2, 12);
   return `rookieui-${Date.now().toString(36)}-${suffix}`;
-}
-
-function toStringArray(rawValue) {
-  return Array.isArray(rawValue)
-    ? rawValue.map((value) => String(value ?? "").trim()).filter(Boolean)
-    : [];
-}
-
-function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
-  const modelList = toStringArray(modelResult?.data?.model_list);
-  const moduleList = toStringArray(moduleResult?.data?.module_list);
-  const controlTypeOrder = toStringArray(typeResult?.data?.control_type_order);
-  const controlTypes =
-    typeResult?.data?.control_types && typeof typeResult.data.control_types === "object"
-      ? typeResult.data.control_types
-      : {};
-
-  return {
-    source: String(typeResult?.data?.source ?? modelResult?.data?.source ?? moduleResult?.data?.source ?? "fallback"),
-    contract:
-      typeResult?.data?.contract ??
-      modelResult?.data?.contract ??
-      moduleResult?.data?.contract ?? {
-        version: "r72-20260412",
-        ui_variant: "integrated_sidebar_controlnet",
-        unit_count: 3,
-      },
-    model_list: modelList,
-    module_list: moduleList,
-    control_type_order: controlTypeOrder,
-    default_type: String(typeResult?.data?.default_type ?? "All"),
-    default_module: String(moduleResult?.data?.default_module ?? "none"),
-    default_model: String(modelResult?.data?.default_model ?? ""),
-    control_types: controlTypes,
-  };
 }
 
 function enforceSidebarMinWidth(container) {
@@ -177,26 +139,8 @@ export function registerRookieUIBootstrapExtension({
     async setup() {
       const runtimeApi = app?.api ?? windowRef?.app?.api ?? null;
       const hostSurface = detectHostSurface(windowRef);
-      const [
-        capabilityResult,
-        compatibilityResult,
-        modelResult,
-        presetResult,
-        controlNetModelResult,
-        controlNetModuleResult,
-        controlNetTypeResult,
-        adetailerCatalogResult,
-      ] = await Promise.all([
-        fetchRookieUICapabilities(fetchImpl),
-        fetchRookieUICompatibility(fetchImpl),
-        fetchRookieUIModels(fetchImpl),
-        fetchRookieUIPresets(fetchImpl),
-        fetchRookieUIControlNetModels(fetchImpl),
-        fetchRookieUIControlNetModules(fetchImpl),
-        fetchRookieUIControlNetTypes(fetchImpl),
-        fetchRookieUIADetailerCatalog(fetchImpl),
-      ]);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
+      const bootstrapData = await loadRookieUIBootstrapData(fetchImpl, { clientId });
       if (clientId && windowRef?.sessionStorage?.setItem) {
         try {
           // IMPORTANT: persist the active host client id so queue polling and runtime events stay on the same session boundary after host reconnects.
@@ -205,28 +149,15 @@ export function registerRookieUIBootstrapExtension({
           // Ignore storage failures (e.g., private mode restrictions).
         }
       }
-      const queueResult = await fetchRookieUIQueue(fetchImpl, { clientId });
       ensureCssInjected(documentRef);
-      const hostSurfaceSupported = isHostSurfaceSupported(hostSurface, capabilityResult.data);
-      const controlnetCatalog = buildControlNetCatalog(
-        controlNetModelResult,
-        controlNetModuleResult,
-        controlNetTypeResult,
-      );
+      const hostSurfaceSupported = isHostSurfaceSupported(hostSurface, bootstrapData.capabilities);
 
       const bootstrapState = {
         hostSurface,
         hostDescription: describeHostSurface(hostSurface),
         hostSurfaceSupported,
         extensionName: "ComfyUI-RookieUI",
-        capabilitySource: capabilityResult.source,
-        capabilities: capabilityResult.data,
-        compatibility: compatibilityResult.data,
-        models: modelResult.data,
-        presets: presetResult.data,
-        controlnetCatalog,
-        adetailerCatalog: adetailerCatalogResult.data,
-        queue: queueResult.data,
+        ...bootstrapData,
         clientId,
         runtimeApi,
         fetchQueueRequest: (scopeClientId = clientId) => fetchRookieUIQueue(fetchImpl, { clientId: scopeClientId }),
