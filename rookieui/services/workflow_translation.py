@@ -5,10 +5,7 @@ from rookieui.contracts.generation import (
     NormalizedTxt2ImgRequest,
     WorkflowTranslationResult,
 )
-from rookieui.services.parity_matrix import (
-    get_parity_profile,
-    get_sampler_alias_payload,
-)
+from rookieui.services import parity_matrix
 from rookieui.services.workflow_builders.adetailer import _append_decode_adetailer_and_save
 from rookieui.services.workflow_builders.controlnet import _apply_controlnet_units
 from rookieui.services.workflow_builders.core import (
@@ -18,10 +15,7 @@ from rookieui.services.workflow_builders.core import (
     _build_sampler_node,
     _resolve_model_sources,
 )
-from rookieui.services.workflow_builders.prompt_conditioning import (
-    _build_sd15_conditioning,
-    _build_sdxl_conditioning,
-)
+from rookieui.services.workflow_builders import prompt_conditioning
 
 # IMPORTANT: phase-59 refactor keeps this module as the stable workflow-translation facade.
 # New builder ownership must move behind this file, not around it, so routes/tests keep one import surface.
@@ -34,7 +28,7 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sd15_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sd15_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -123,7 +117,7 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sdxl_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sdxl_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -213,7 +207,7 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sd15_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sd15_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -323,7 +317,7 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sdxl_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sdxl_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -435,7 +429,7 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sd15_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sd15_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -571,7 +565,7 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         request,
         allocator=allocator,
     )
-    positive_id, negative_id = _build_sdxl_conditioning(
+    positive_id, negative_id = prompt_conditioning._build_sdxl_conditioning(
         workflow,
         request,
         allocator=allocator,
@@ -725,7 +719,7 @@ def build_img2img_workflow(request: NormalizedImg2ImgRequest) -> dict[str, objec
 
 
 def translate_txt2img_request(request: NormalizedTxt2ImgRequest) -> WorkflowTranslationResult:
-    parity_profile = get_parity_profile(request.profile)
+    parity_profile = parity_matrix.get_parity_profile(request.profile)
     workflow_kind = f"txt2img-{request.base_family}"
     if request.hires_enabled:
         workflow_kind = f"{workflow_kind}-hires"
@@ -735,13 +729,13 @@ def translate_txt2img_request(request: NormalizedTxt2ImgRequest) -> WorkflowTran
         profile=request.profile,
         normalized_request=request.to_payload(),
         parity_profile=parity_profile.to_payload(),
-        sampler_aliases=get_sampler_alias_payload(),
+        sampler_aliases=parity_matrix.get_sampler_alias_payload(),
         workflow=build_txt2img_workflow(request),
     )
 
 
 def translate_img2img_request(request: NormalizedImg2ImgRequest) -> WorkflowTranslationResult:
-    parity_profile = get_parity_profile(request.profile)
+    parity_profile = parity_matrix.get_parity_profile(request.profile)
     workflow_kind = f"{request.mode}-{request.base_family}"
     if request.hires_enabled:
         workflow_kind = f"{workflow_kind}-hires"
@@ -751,6 +745,6 @@ def translate_img2img_request(request: NormalizedImg2ImgRequest) -> WorkflowTran
         profile=request.profile,
         normalized_request=request.to_payload(),
         parity_profile=parity_profile.to_payload(),
-        sampler_aliases=get_sampler_alias_payload(),
+        sampler_aliases=parity_matrix.get_sampler_alias_payload(),
         workflow=build_img2img_workflow(request),
     )

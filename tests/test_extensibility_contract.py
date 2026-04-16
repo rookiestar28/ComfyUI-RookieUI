@@ -5,6 +5,7 @@ import unittest
 
 from rookieui.contracts.extensibility import (
     EXTENSIBILITY_REFACTOR_CONTRACT_VERSION,
+    boundary_target_module_paths,
     boundary_target_paths,
     build_extensibility_refactor_manifest,
 )
@@ -43,4 +44,14 @@ class ExtensibilityContractTests(unittest.TestCase):
             self.assertTrue(
                 resolved_path.exists(),
                 msg=f"Expected extensibility facade path '{resolved_path.relative_to(repo_root)}' to exist.",
+            )
+
+    def test_manifest_target_modules_resolve_to_existing_files(self) -> None:
+        resolved_paths = boundary_target_module_paths()
+        repo_root = Path(__file__).resolve().parents[1]
+
+        for resolved_path in resolved_paths:
+            self.assertTrue(
+                resolved_path.exists(),
+                msg=f"Expected extensibility target path '{resolved_path.relative_to(repo_root)}' to exist.",
             )
