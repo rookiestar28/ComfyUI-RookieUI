@@ -44,6 +44,9 @@ class LiveSmokePromptParityTests(unittest.TestCase):
     def test_default_profiles_for_auxiliary_pipelines_is_empty(self) -> None:
         self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-pipelines"), "")
 
+    def test_default_profiles_for_full_pipeline_is_empty(self) -> None:
+        self.assertEqual(live_smoke._default_profiles_for_mode("full-pipeline"), "")
+
     def test_default_profiles_for_prompt_parity_use_sd_family_order(self) -> None:
         self.assertEqual(
             live_smoke._default_profiles_for_mode("prompt-parity"),
@@ -433,6 +436,73 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_run_shared_queue_post_state_smoke_accepts_completed_job_closure(self) -> None:
+        with (
+            mock.patch.object(
+                live_smoke,
+                "_poll_queue_snapshot_until_job_visible",
+                return_value={
+                    "service": "rookieui",
+                    "status": "ok",
+                    "source": "host",
+                    "queue_remaining": 1,
+                    "contract": {
+                        "surface": "queue_snapshot_and_job_lookup",
+                        "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                    },
+                    "jobs": [{"id": "prompt-1", "status": "in_progress"}],
+                },
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_poll_queue_job_until_terminal",
+                return_value={"id": "prompt-1", "status": "completed", "reusable_outputs": ["image.png"]},
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_request_json",
+                side_effect=[
+                    {
+                        "service": "rookieui",
+                        "status": "ok",
+                        "source": "host",
+                        "queue_remaining": 0,
+                        "contract": {
+                            "surface": "queue_snapshot_and_job_lookup",
+                            "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                        },
+                        "job": {
+                            "id": "prompt-1",
+                            "status": "completed",
+                            "reusable_outputs": ["image.png"],
+                        },
+                    },
+                    {
+                        "service": "rookieui",
+                        "status": "ok",
+                        "source": "host",
+                        "queue_remaining": 0,
+                        "contract": {
+                            "surface": "queue_snapshot_and_job_lookup",
+                            "version": live_smoke.QUEUE_CONTRACT_VERSION,
+                        },
+                        "jobs": [],
+                    },
+                ],
+            ),
+        ):
+            errors = live_smoke._run_shared_queue_post_state_smoke(
+                "http://127.0.0.1:8188",
+                lane_label="controlnet execute",
+                submit_result={"submission": {"accepted": True, "prompt_id": "prompt-1"}},
+                client_id="rookieui-live-controlnet-sd15-1",
+                request_timeout_seconds=5.0,
+                poll_timeout_seconds=5.0,
+                poll_interval_seconds=0.1,
+            )
+
+        self.assertEqual(errors, [])
+
     def test_main_auxiliary_pipelines_report_only_returns_zero_on_validation_errors(self) -> None:
         with (
             mock.patch.object(
@@ -454,6 +524,40 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
                 live_smoke,
                 "_run_pnginfo_dry_run_smoke",
                 return_value=([], None, None),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+    def test_main_full_pipeline_report_only_returns_zero_on_lane_errors(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "full-pipeline", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"default_checkpoint": "SD15\\BravNew.safetensors", "checkpoints": []}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_controlnet_validation_lane",
+                return_value=(["controlnet error"], []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_adetailer_validation_lane",
+                return_value=(["adetailer error"], []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_auxiliary_pipeline_validation_lane",
+                return_value=(["auxiliary error"], []),
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
