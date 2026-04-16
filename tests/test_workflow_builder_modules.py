@@ -26,4 +26,3 @@ class WorkflowBuilderModuleTests(unittest.TestCase):
         self.assertTrue(callable(workflow_translation.build_img2img_workflow))
         self.assertTrue(callable(workflow_translation.translate_txt2img_request))
         self.assertTrue(callable(workflow_translation.translate_img2img_request))
-
