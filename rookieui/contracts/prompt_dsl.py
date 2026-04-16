@@ -27,6 +27,18 @@ class PromptAttentionMarker:
 
 
 @dataclass(frozen=True)
+class PromptEmbeddingReference:
+    token: str
+    canonical_token: str
+    name: str
+    exists: bool
+    syntax: str
+
+    def to_payload(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class PromptScheduleSlice:
     text: str
     start: float = 0.0
@@ -65,6 +77,7 @@ class PromptSemanticPlan:
     features: dict[str, bool] = field(default_factory=dict)
     branches: list[PromptBranchSemantic] = field(default_factory=list)
     attention: list[PromptAttentionMarker] = field(default_factory=list)
+    embeddings: list[PromptEmbeddingReference] = field(default_factory=list)
     guardrail_hits: list[str] = field(default_factory=list)
 
     @staticmethod
@@ -76,9 +89,11 @@ class PromptSemanticPlan:
                 "break_chunks": False,
                 "prompt_scheduling": False,
                 "attention_weighting": False,
+                "embeddings_textual_inversion": False,
             },
             branches=[],
             attention=[],
+            embeddings=[],
             guardrail_hits=[],
         )
 
@@ -86,6 +101,7 @@ class PromptSemanticPlan:
         payload = asdict(self)
         payload["branches"] = [branch.to_payload() for branch in self.branches]
         payload["attention"] = [marker.to_payload() for marker in self.attention]
+        payload["embeddings"] = [reference.to_payload() for reference in self.embeddings]
         return payload
 
 
