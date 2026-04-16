@@ -294,6 +294,7 @@ def _build_prompt_parity_cases(context: PromptParityHostContext) -> list[LivePro
     if context.embedding_name:
         embedding_fixture = replace(
             _get_fixture("sd15_embedding_bare"),
+            prompt=f"portrait {context.embedding_name} dramatic light",
             inventory_embeddings=(context.embedding_name,),
             expected_cleaned_prompt=f"portrait embedding:{context.embedding_name} dramatic light",
             expected_prompt_embeddings=(

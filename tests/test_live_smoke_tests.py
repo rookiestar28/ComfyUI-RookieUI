@@ -95,6 +95,10 @@ class LiveSmokePromptParityTests(unittest.TestCase):
 
         self.assertIn("embedding:EasyNegativeV2.safetensors", embedding_case.fixture.expected_cleaned_prompt)
         self.assertEqual(
+            embedding_case.fixture.prompt,
+            "portrait EasyNegativeV2.safetensors dramatic light",
+        )
+        self.assertEqual(
             embedding_case.fixture.expected_prompt_embeddings[0].canonical_token,
             "embedding:EasyNegativeV2.safetensors",
         )
