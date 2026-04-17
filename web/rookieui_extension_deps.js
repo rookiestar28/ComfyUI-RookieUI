@@ -15,7 +15,12 @@ export const {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchCatalog,
   fetchRookieUIPromptWorkbenchConfig,
+  fetchRookieUIPromptWorkbenchFavorites,
+  fetchRookieUIPromptWorkbenchHistory,
+  fetchRookieUIPromptWorkbenchProviders,
+  fetchRookieUIPromptWorkbenchState,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
@@ -23,6 +28,7 @@ export const {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  updateRookieUIPromptWorkbenchState,
 } = apiModule;
 
 export const {

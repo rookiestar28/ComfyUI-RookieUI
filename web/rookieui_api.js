@@ -906,7 +906,7 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
 
 export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.fetch) {
   return fetchRookieUIResource(
-        "/rookieui/prompt-tools/config",
+    "/rookieui/prompt-tools/config",
     {
       contract: {
         version: "r123f114f115f116-20260417",
@@ -939,6 +939,165 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
         enabled: false,
         entries: [],
       },
+    },
+    fetchImpl,
+  );
+}
+
+function buildPromptWorkbenchNamespacePath(basePath, namespace) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  if (!normalizedNamespace) {
+    return basePath;
+  }
+  const params = new URLSearchParams({ namespace: normalizedNamespace });
+  return `${basePath}?${params.toString()}`;
+}
+
+async function postRookieUIJson(path, payload, fallbackData, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.resource_post", "Using fallback payload because fetch() is unavailable.", { path });
+    return { ok: false, status: 0, data: fallbackData };
+  }
+
+  try {
+    const response = await fetchImpl(path, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload ?? {}),
+    });
+    const data = await response.json();
+    return {
+      ok: response.ok,
+      status: response.status,
+      data,
+    };
+  } catch (_error) {
+    rookieUIDebugWarn("api.resource_post", "POST request failed; returning fallback payload.", {
+      path,
+      error: toErrorDetail(_error),
+    });
+    return { ok: false, status: 0, data: fallbackData };
+  }
+}
+
+export async function fetchRookieUIPromptWorkbenchState(namespace, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  return fetchRookieUIResource(
+    buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/state", normalizedNamespace),
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_state",
+      },
+      namespace: normalizedNamespace,
+      state: {
+        namespace: normalizedNamespace,
+        workbench_open: false,
+        active_panel: "editor",
+        draft_prompt: "",
+        selected_entry_id: "",
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function updateRookieUIPromptWorkbenchState(namespace, state, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/state",
+    {
+      namespace: normalizedNamespace,
+      state: state ?? {},
+    },
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_state",
+      },
+      namespace: normalizedNamespace,
+      state: {
+        namespace: normalizedNamespace,
+        workbench_open: Boolean(state?.workbench_open),
+        active_panel: String(state?.active_panel ?? "editor"),
+        draft_prompt: String(state?.draft_prompt ?? ""),
+        selected_entry_id: String(state?.selected_entry_id ?? ""),
+      },
+      saved: false,
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIPromptWorkbenchHistory(namespace, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  return fetchRookieUIResource(
+    buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/history", normalizedNamespace),
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_history",
+      },
+      namespace: normalizedNamespace,
+      items: [],
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIPromptWorkbenchFavorites(namespace, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  return fetchRookieUIResource(
+    buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/favorites", normalizedNamespace),
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_favorites",
+      },
+      namespace: normalizedNamespace,
+      items: [],
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIPromptWorkbenchProviders(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/prompt-tools/providers",
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_providers",
+      },
+      surfaces: {
+        translation: { providers: [], shipped_provider_ids: [], deferred_provider_ids: [], reference_only_provider_ids: [] },
+        ai_assist: { providers: [], shipped_provider_ids: [], deferred_provider_ids: [], reference_only_provider_ids: [] },
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetchImpl = globalThis.fetch) {
+  const params = new URLSearchParams();
+  const normalizedLanguage = String(language ?? "").trim();
+  if (normalizedLanguage) {
+    params.set("language", normalizedLanguage);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return fetchRookieUIResource(
+    `/rookieui/prompt-tools/catalog${suffix}`,
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_catalog",
+      },
+      group_tags: { language: normalizedLanguage || "en", source: "fallback", groups: [] },
+      prompt_library: { source: "fallback", sections: [] },
+      extra_networks: { embeddings: [], loras: [] },
     },
     fetchImpl,
   );

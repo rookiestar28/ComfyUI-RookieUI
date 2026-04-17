@@ -1,4 +1,4 @@
-import { createControlNetUnitEditor, createADetailerEditor } from "./rookieui_pane_deps.js";
+import { createControlNetUnitEditor, createADetailerEditor, createPromptWorkbenchShell } from "./rookieui_pane_deps.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -286,6 +286,22 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   promptBand.appendChild(promptStack);
   createPromptField(promptStack, "Prompt", elements.prompt, "rookieui-prompt-counter");
   createPromptField(promptStack, "Negative Prompt", elements.negativePrompt, "rookieui-negative-prompt-counter");
+  createPromptWorkbenchShell({
+    idPrefix: "rookieui-txt2img-workbench",
+    parent: promptStack,
+    bootstrapState,
+    promptInput: elements.prompt,
+    negativePromptInput: elements.negativePrompt,
+    namespaces: {
+      prompt: "txt2img_prompt",
+      negative: "txt2img_negative",
+    },
+    appendTextElement,
+    createActionButton,
+    onStatusMessage: (message) => {
+      statusNode.textContent = message;
+    },
+  });
 
   const actionRail = document.createElement("div");
   actionRail.className = "rookieui-shell__action-rail";
