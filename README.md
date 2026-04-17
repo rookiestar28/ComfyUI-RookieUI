@@ -15,11 +15,61 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 - **integrated ControlNet and ADetailer behavior**
 - **PNG metadata round-trip and apply workflow**
 - **queue / progress / result UX and host-embedded validation coverage**
+
 <br>
 
 The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Even so, RookieUI supports more than just the Stable Diffusion family.
 
 <details><summary><h2>Last Update - Click to expand</h2></summary>
+
+<details>
+
+<summary><strong>Extensibility refactor and architecture hardening (stability/maintainability)</strong></summary>
+
+- Extracted shared workflow graph builders into `rookieui/services/workflow_builders/*`, keeping `workflow_translation.py` as the stable orchestration façade instead of a regrowing graph monolith.
+- Split `ControlNet` and `ADetailer` backend ownership into focused catalog, normalization, runtime/refinement, and warning modules behind stable route-facing façades.
+- Added backend/frontend integrated feature registries so sidebar bootstrap ownership and validation-lane linkage no longer depend on ad-hoc one-off wiring.
+- Added manifest-backed architecture guardrails, import-cycle checks, façade size budgets, and final live-host `full-pipeline` validation to keep the refactor honest as these high-churn surfaces continue to expand.
+
+**Architecture**
+
+```text
+ComfyUI process (single runtime)
+|
++- ComfyUI core
+|  +- native routes (/prompt, /history, /view, /ws, ...)
+|  +- execution engine and model runtime
+|
++- ComfyUI-RookieUI custom node package
+   +- frontend sidebar shell + bootstrap registry
+   |  +- web/rookieui_extension.js
+   |  +- web/rookieui_feature_registry.js
+   |  +- web/rookieui_sidebar_shell.js
+   |
+   +- internal routes under /rookieui/*
+   +- stable backend facades
+   |  +- workflow_translation.py
+   |  +- controlnet.py
+   |  +- adetailer.py
+   |
+   +- extracted backend ownership seams
+   |  +- workflow_builders/*
+   |  +- controlnet_* modules
+   |  +- adetailer_* modules
+   |  +- integrated_feature_registry.py
+   |
+   +- workflow submission into host ComfyUI queue
+   +- live-host validation lanes for prompt parity and integrated pipelines
+```
+
+Current extension seams:
+
+- `workflow_translation.py` is now a stable orchestration facade that delegates graph-building work into `rookieui/services/workflow_builders/*`.
+- `controlnet.py` and `adetailer.py` stay as route-facing facades while catalog, normalization, runtime/refinement, and warning ownership live in focused vertical modules.
+- `web/rookieui_extension.js` and `web/rookieui_feature_registry.js` now own integrated bootstrap loading explicitly, instead of scattering one-off feature fetch wiring through the extension entrypoint.
+- The refactor is guarded by manifest-backed boundary checks, facade size budgets, import-cycle regression coverage, and live-host `full-pipeline` validation.
+
+</details>
 
 <details>
 
@@ -191,7 +241,6 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 ## Table of Contents
 
 - [Last Update](#last-update---click-to-expand)
-- [Architecture Snapshot](#architecture-snapshot)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
 - [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
@@ -202,21 +251,6 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - [Support for Other Extensions](#support-for-other-extensions)
 - [License](#license)
 
-## Architecture Snapshot
-
-```text
-ComfyUI process (single runtime)
-|
-+- ComfyUI core
-|  +- native routes (/prompt, /history, /view, /ws, ...)
-|  +- execution engine and model runtime
-|
-+- ComfyUI-RookieUI custom node package
-   +- frontend sidebar shell (web/rookieui_sidebar_shell.js, web/rookieui.css)
-   +- internal routes under /rookieui/*
-   +- request normalization and parity translation services
-   +- workflow submission into host ComfyUI queue
-```
 
 ## Installation
 
