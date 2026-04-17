@@ -253,6 +253,127 @@ class LiveSmokePromptParityTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+class LiveSmokePromptWorkbenchTests(unittest.TestCase):
+    def test_default_profiles_for_prompt_workbench_is_empty(self) -> None:
+        self.assertEqual(live_smoke._default_profiles_for_mode("prompt-workbench"), "")
+
+    def test_build_prompt_workbench_host_context_accepts_expected_contract(self) -> None:
+        config_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "prompt_tools_config",
+                "version": live_smoke._LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+                "route_family": "/rookieui/prompt-tools",
+                "state_schema_version": 1,
+                "namespaces": list(live_smoke.PROMPT_WORKBENCH_NAMESPACES),
+            },
+            "config": {
+                "language": "en",
+                "theme_style": "rookieui_classic",
+                "ai_assist": {"instruction_preset": "Write a Stable Diffusion prompt."},
+            },
+            "language_options": [{"code": "en", "title": "English"}],
+            "theme_style_options": [{"id": "rookieui_classic", "title": "RookieUI Classic"}],
+        }
+        providers_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "prompt_tools_providers",
+                "version": live_smoke._LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+            },
+            "surfaces": {
+                "translation": {
+                    "default_provider": "mymemory_free",
+                    "shipped_provider_ids": list(live_smoke.PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS),
+                    "providers": [
+                        {
+                            "provider_id": "mymemory_free",
+                            "availability": {"status": "ready"},
+                        }
+                    ],
+                },
+                "ai_assist": {
+                    "default_provider": "",
+                    "shipped_provider_ids": list(live_smoke.PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS),
+                    "providers": [
+                        {
+                            "provider_id": "openai",
+                            "availability": {"status": "configuration_required"},
+                        }
+                    ],
+                },
+            },
+        }
+
+        context, errors = live_smoke._build_prompt_workbench_host_context(config_payload, providers_payload)
+
+        self.assertEqual(errors, [])
+        assert context is not None
+        self.assertEqual(context.namespace, live_smoke.PROMPT_WORKBENCH_NAMESPACES[0])
+        self.assertEqual(context.translation_default_provider, "mymemory_free")
+        self.assertEqual(context.translation_default_availability, "ready")
+        self.assertEqual(context.ai_assist_default_provider, "")
+        self.assertEqual(context.ai_assist_default_availability, "unconfigured")
+
+    def test_validate_prompt_workbench_host_sync_reports_contract_drift(self) -> None:
+        errors = live_smoke._validate_prompt_workbench_host_sync(
+            live_smoke.PromptWorkbenchHostContext(
+                namespace="txt2img_prompt",
+                host_contract_version="r123f114f115-20260417",
+                local_contract_version=live_smoke._LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+                translation_default_provider="mymemory_free",
+                translation_default_availability="ready",
+                ai_assist_default_provider="",
+                ai_assist_default_availability="unconfigured",
+            )
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("host='r123f114f115-20260417'", errors[0])
+
+    def test_main_prompt_workbench_report_only_returns_zero_on_lane_issues(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "prompt-workbench", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"checkpoints": []}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_prompt_workbench_validation_lane",
+                return_value=(["contract drift"], []),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+    def test_run_prompt_workbench_validation_lane_reports_missing_prompt_tools_routes(self) -> None:
+        with mock.patch.object(
+            live_smoke,
+            "_load_bootstrap_payload",
+            return_value={"routes": ["/rookieui/health"]},
+        ):
+            combined_errors, execution_errors = live_smoke._run_prompt_workbench_validation_lane(
+                "http://127.0.0.1:8188",
+                execute=False,
+                request_timeout_seconds=10.0,
+            )
+
+        self.assertEqual(execution_errors, [])
+        self.assertEqual(len(combined_errors), 1)
+        self.assertIn("/rookieui/prompt-tools/config", combined_errors[0])
+
+
 class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
     def test_build_auxiliary_pipeline_context_prefers_sd_family_checkpoint_over_non_sd_default(self) -> None:
         context = live_smoke._build_auxiliary_pipeline_context(

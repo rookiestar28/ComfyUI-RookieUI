@@ -24,6 +24,12 @@ from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.contracts.adetailer import ADETAILER_INTEGRATED_CONTRACT_VERSION
 from rookieui.contracts.controlnet_integrated import CONTROLNET_INTEGRATED_CONTRACT_VERSION
+from rookieui.contracts.prompt_workbench import (
+    PROMPT_WORKBENCH_CONTRACT_VERSION,
+    PROMPT_WORKBENCH_NAMESPACES,
+    PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS,
+    PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS,
+)
 from rookieui.services.adetailer import (
     ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING,
     ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY,
@@ -56,6 +62,7 @@ _SDXL_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("pony", "illustrious", "noob", 
 _LOCAL_CONTROLNET_CONTRACT_VERSION = CONTROLNET_INTEGRATED_CONTRACT_VERSION
 _LOCAL_ADETAILER_CONTRACT_VERSION = ADETAILER_INTEGRATED_CONTRACT_VERSION
 _LOCAL_PROMPT_CONTRACT_VERSION = str(build_prompt_capability_matrix_payload().get("contract_version", "")).strip()
+_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION = PROMPT_WORKBENCH_CONTRACT_VERSION
 _CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 _CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
@@ -170,6 +177,17 @@ class LivePNGInfoCase:
     expected_workflow_kind: str | None = None
 
 
+@dataclass(frozen=True)
+class PromptWorkbenchHostContext:
+    namespace: str
+    host_contract_version: str
+    local_contract_version: str
+    translation_default_provider: str
+    translation_default_availability: str
+    ai_assist_default_provider: str
+    ai_assist_default_availability: str
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -182,6 +200,8 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
         return ",".join(_CONTROLNET_VALIDATION_PROFILES)
     if validation_mode == "adetailer":
         return ",".join(_ADETAILER_VALIDATION_PROFILES)
+    if validation_mode == "prompt-workbench":
+        return ""
     if validation_mode == "full-pipeline":
         return ""
     if validation_mode == "auxiliary-pipelines":
@@ -204,7 +224,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validation-mode",
-        choices=("catalog", "prompt-parity", "auxiliary-contracts", "auxiliary-pipelines", "controlnet", "adetailer", "full-pipeline"),
+        choices=(
+            "catalog",
+            "prompt-parity",
+            "prompt-workbench",
+            "auxiliary-contracts",
+            "auxiliary-pipelines",
+            "controlnet",
+            "adetailer",
+            "full-pipeline",
+        ),
         default=os.getenv("ROOKIEUI_LIVE_VALIDATION_MODE", "catalog").strip().lower() or "catalog",
         help="Validation lane to run (default: %(default)s).",
     )
@@ -280,6 +309,35 @@ def _request_json(
         raise RuntimeError(f"{method} {url} failed: {exc.reason}") from exc
 
 
+def _request_json_with_status(
+    method: str,
+    url: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    timeout_seconds: float,
+) -> tuple[int, dict[str, Any]]:
+    request_data = None
+    headers = {"Accept": "application/json"}
+    if payload is not None:
+        request_data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    request = urllib.request.Request(url, data=request_data, method=method.upper(), headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            body = response.read().decode("utf-8")
+            return int(getattr(response, "status", 200) or 200), (json.loads(body) if body else {})
+    except urllib.error.HTTPError as exc:  # pragma: no cover - runtime path depends on host state.
+        detail = exc.read().decode("utf-8", errors="replace")
+        try:
+            payload_data = json.loads(detail) if detail else {}
+        except json.JSONDecodeError:
+            payload_data = {"detail": detail}
+        return exc.code, payload_data if isinstance(payload_data, dict) else {"detail": detail}
+    except urllib.error.URLError as exc:  # pragma: no cover - runtime path depends on host reachability.
+        raise RuntimeError(f"{method} {url} failed: {exc.reason}") from exc
+
+
 def _load_server_payloads(base_url: str, timeout_seconds: float) -> tuple[dict[str, Any], dict[str, Any]]:
     models = _request_json(
         "GET",
@@ -292,6 +350,14 @@ def _load_server_payloads(base_url: str, timeout_seconds: float) -> tuple[dict[s
         timeout_seconds=timeout_seconds,
     )
     return models, presets
+
+
+def _load_bootstrap_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+    return _request_json(
+        "GET",
+        f"{base_url}/rookieui/bootstrap",
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def _load_capabilities_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
@@ -315,6 +381,47 @@ def _load_controlnet_payloads(
 
 def _load_adetailer_catalog_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     return _request_json("GET", f"{base_url}/rookieui/adetailer/catalog", timeout_seconds=timeout_seconds)
+
+
+def _prompt_workbench_url(base_url: str, route_suffix: str, *, query: dict[str, str] | None = None) -> str:
+    base = f"{base_url}/rookieui/prompt-tools/{route_suffix.lstrip('/')}"
+    if not query:
+        return base
+    return f"{base}?{urllib.parse.urlencode(query)}"
+
+
+def _request_prompt_workbench_json(
+    base_url: str,
+    route_suffix: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    query: dict[str, str] | None = None,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    return _request_json(
+        method,
+        _prompt_workbench_url(base_url, route_suffix, query=query),
+        payload=payload,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _request_prompt_workbench_json_with_status(
+    base_url: str,
+    route_suffix: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    query: dict[str, str] | None = None,
+    timeout_seconds: float,
+) -> tuple[int, dict[str, Any]]:
+    return _request_json_with_status(
+        method,
+        _prompt_workbench_url(base_url, route_suffix, query=query),
+        payload=payload,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def _build_png_data_url(*, color: str = "white", metadata: dict[str, str] | None = None) -> str:
@@ -530,6 +637,553 @@ def _run_auxiliary_contract_smoke(base_url: str, *, request_timeout_seconds: flo
             continue
         errors.extend(_validate_route_contract_payload(probe, response_payload))
     return errors
+
+
+def _build_prompt_workbench_host_context(
+    config_payload: dict[str, Any],
+    providers_payload: dict[str, Any],
+) -> tuple[PromptWorkbenchHostContext | None, list[str]]:
+    errors: list[str] = []
+    config_probe = LiveRouteContractProbe(
+        surface="prompt_tools_config",
+        route_path="/rookieui/prompt-tools/config",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    providers_probe = LiveRouteContractProbe(
+        surface="prompt_tools_providers",
+        route_path="/rookieui/prompt-tools/providers",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors.extend(_validate_route_contract_payload(config_probe, config_payload))
+    errors.extend(_validate_route_contract_payload(providers_probe, providers_payload))
+    contract = config_payload.get("contract")
+    if not isinstance(contract, dict):
+        return None, errors + ["prompt-workbench config payload missing contract."]
+    route_family = str(contract.get("route_family", "")).strip()
+    if route_family != "/rookieui/prompt-tools":
+        errors.append(f"prompt-workbench route_family drifted to '{route_family}'.")
+    namespaces = contract.get("namespaces")
+    if list(PROMPT_WORKBENCH_NAMESPACES) != (namespaces if isinstance(namespaces, list) else []):
+        errors.append("prompt-workbench namespaces no longer match the shipped contract surface.")
+    state_schema_version = contract.get("state_schema_version")
+    if not isinstance(state_schema_version, int):
+        errors.append("prompt-workbench config payload missing state_schema_version.")
+
+    config = config_payload.get("config")
+    if not isinstance(config, dict):
+        return None, errors + ["prompt-workbench config payload missing config object."]
+    if not str(config.get("language", "")).strip():
+        errors.append("prompt-workbench config payload missing language.")
+    if not str(config.get("theme_style", "")).strip():
+        errors.append("prompt-workbench config payload missing theme_style.")
+    ai_assist = config.get("ai_assist")
+    if not isinstance(ai_assist, dict) or not str(ai_assist.get("instruction_preset", "")).strip():
+        errors.append("prompt-workbench config payload missing ai_assist.instruction_preset.")
+
+    language_options = config_payload.get("language_options")
+    if not isinstance(language_options, list) or not any(
+        isinstance(entry, dict) and str(entry.get("code", "")).strip() == "en" for entry in language_options
+    ):
+        errors.append("prompt-workbench config payload missing expected language option 'en'.")
+    theme_style_options = config_payload.get("theme_style_options")
+    if not isinstance(theme_style_options, list) or not any(
+        isinstance(entry, dict) and str(entry.get("id", "")).strip() == "rookieui_classic"
+        for entry in theme_style_options
+    ):
+        errors.append("prompt-workbench config payload missing expected theme style 'rookieui_classic'.")
+
+    surfaces = providers_payload.get("surfaces")
+    if not isinstance(surfaces, dict):
+        return None, errors + ["prompt-workbench providers payload missing surfaces."]
+    translation_surface = surfaces.get("translation")
+    ai_surface = surfaces.get("ai_assist")
+    if not isinstance(translation_surface, dict) or not isinstance(ai_surface, dict):
+        return None, errors + ["prompt-workbench providers payload missing translation/ai_assist surfaces."]
+
+    translation_shipped = tuple(translation_surface.get("shipped_provider_ids", ()))
+    if translation_shipped != PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS:
+        errors.append(
+            "prompt-workbench translation shipped_provider_ids drifted from the workspace contract."
+        )
+    ai_shipped = tuple(ai_surface.get("shipped_provider_ids", ()))
+    if ai_shipped != PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS:
+        errors.append("prompt-workbench AI assist shipped_provider_ids drifted from the workspace contract.")
+
+    translation_default_provider = str(translation_surface.get("default_provider", "")).strip()
+    ai_assist_default_provider = str(ai_surface.get("default_provider", "")).strip()
+
+    def _provider_availability(surface_payload: dict[str, Any], provider_id: str) -> str:
+        if not provider_id:
+            return "unconfigured"
+        providers = surface_payload.get("providers")
+        if not isinstance(providers, list):
+            return "unavailable"
+        for entry in providers:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("provider_id", "")).strip() == provider_id:
+                availability = entry.get("availability")
+                if isinstance(availability, dict):
+                    return str(availability.get("status", "")).strip() or "unavailable"
+        return "unavailable"
+
+    return (
+        PromptWorkbenchHostContext(
+            namespace=PROMPT_WORKBENCH_NAMESPACES[0],
+            host_contract_version=str(contract.get("version", "")).strip(),
+            local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+            translation_default_provider=translation_default_provider,
+            translation_default_availability=_provider_availability(translation_surface, translation_default_provider),
+            ai_assist_default_provider=ai_assist_default_provider,
+            ai_assist_default_availability=_provider_availability(ai_surface, ai_assist_default_provider),
+        ),
+        errors,
+    )
+
+
+def _validate_prompt_workbench_host_sync(context: PromptWorkbenchHostContext) -> list[str]:
+    errors: list[str] = []
+    if not context.host_contract_version:
+        errors.append("prompt-workbench config payload did not expose contract.version.")
+    elif context.host_contract_version != context.local_contract_version:
+        errors.append(
+            "live host prompt-workbench contract mismatch: "
+            f"host='{context.host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    return errors
+
+
+def _validate_prompt_workbench_state_payload(
+    namespace: str,
+    payload: dict[str, Any],
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_state",
+        route_path="/rookieui/prompt-tools/state",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("namespace", "")).strip() != namespace:
+        errors.append(f"prompt-workbench state namespace drifted from '{namespace}'.")
+    state = payload.get("state")
+    if not isinstance(state, dict):
+        return errors + ["prompt-workbench state payload missing state object."]
+    if str(state.get("namespace", "")).strip() != namespace:
+        errors.append("prompt-workbench state.state.namespace drifted from the requested namespace.")
+    return errors
+
+
+def _validate_prompt_workbench_entry_list_payload(
+    surface: str,
+    namespace: str,
+    payload: dict[str, Any],
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface=surface,
+        route_path=f"/rookieui/prompt-tools/{surface.split('_')[-1]}",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("namespace", "")).strip() != namespace:
+        errors.append(f"{surface}: namespace drifted from '{namespace}'.")
+    items = payload.get("items")
+    if not isinstance(items, list):
+        errors.append(f"{surface}: items list missing.")
+    return errors
+
+
+def _validate_prompt_workbench_blacklist_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_blacklist",
+        route_path="/rookieui/prompt-tools/blacklist",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    blacklist = payload.get("blacklist")
+    if not isinstance(blacklist, dict):
+        return errors + ["prompt-workbench blacklist payload missing blacklist object."]
+    if not isinstance(blacklist.get("enabled"), bool):
+        errors.append("prompt-workbench blacklist.enabled was not boolean.")
+    if not isinstance(blacklist.get("entries"), list):
+        errors.append("prompt-workbench blacklist.entries was not a list.")
+    return errors
+
+
+def _validate_prompt_workbench_catalog_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_catalog",
+        route_path="/rookieui/prompt-tools/catalog",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    group_tags = payload.get("group_tags")
+    prompt_library = payload.get("prompt_library")
+    extra_networks = payload.get("extra_networks")
+    if not isinstance(group_tags, dict) or not isinstance(group_tags.get("groups"), list):
+        errors.append("prompt-workbench catalog payload missing group_tags.groups.")
+    if not isinstance(prompt_library, dict) or not isinstance(prompt_library.get("sections"), list):
+        errors.append("prompt-workbench catalog payload missing prompt_library.sections.")
+    if not isinstance(extra_networks, dict):
+        errors.append("prompt-workbench catalog payload missing extra_networks.")
+    else:
+        if not isinstance(extra_networks.get("embeddings"), list):
+            errors.append("prompt-workbench catalog payload missing extra_networks.embeddings.")
+        if not isinstance(extra_networks.get("loras"), list):
+            errors.append("prompt-workbench catalog payload missing extra_networks.loras.")
+    return errors
+
+
+def _validate_prompt_workbench_analyze_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_analyze",
+        route_path="/rookieui/prompt-tools/analyze",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    prompt_payload = payload.get("prompt")
+    negative_payload = payload.get("negative_prompt")
+    if not isinstance(prompt_payload, dict) or not isinstance(negative_payload, dict):
+        return errors + ["prompt-workbench analyze payload missing prompt/negative_prompt objects."]
+    for key in ("raw", "cleaned", "semantics", "metrics"):
+        if key not in prompt_payload:
+            errors.append(f"prompt-workbench analyze prompt payload missing '{key}'.")
+        if key not in negative_payload:
+            errors.append(f"prompt-workbench analyze negative payload missing '{key}'.")
+    inventory_snapshot = payload.get("inventory_snapshot")
+    if not isinstance(inventory_snapshot, dict):
+        errors.append("prompt-workbench analyze payload missing inventory_snapshot.")
+    return errors
+
+
+def _validate_prompt_workbench_translate_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_translate",
+        route_path="/rookieui/prompt-tools/translate",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("provider_id", "")).strip() != "mymemory_free":
+        errors.append("prompt-workbench translate did not execute through mymemory_free.")
+    if not str(payload.get("translated_text", "")).strip():
+        errors.append("prompt-workbench translate returned empty translated_text.")
+    return errors
+
+
+def _validate_prompt_workbench_assist_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_assist",
+        route_path="/rookieui/prompt-tools/assist",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("provider_id", "")).strip() != "openai":
+        errors.append("prompt-workbench AI assist did not execute through openai.")
+    if not str(payload.get("generated_prompt", "")).strip():
+        errors.append("prompt-workbench AI assist returned empty generated_prompt.")
+    return errors
+
+
+def _run_prompt_workbench_validation_lane(
+    base_url: str,
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+) -> tuple[list[str], list[str]]:
+    bootstrap_payload = _load_bootstrap_payload(base_url, request_timeout_seconds)
+    routes = bootstrap_payload.get("routes")
+    if not isinstance(routes, list) or "/rookieui/prompt-tools/config" not in routes:
+        return (
+            [
+                "prompt-workbench live-host bootstrap did not expose /rookieui/prompt-tools/config; "
+                "restart or re-sync the ComfyUI host before closure acceptance."
+            ],
+            [],
+        )
+    config_payload = _request_prompt_workbench_json(
+        base_url,
+        "config",
+        timeout_seconds=request_timeout_seconds,
+    )
+    providers_payload = _request_prompt_workbench_json(
+        base_url,
+        "providers",
+        timeout_seconds=request_timeout_seconds,
+    )
+    context, context_errors = _build_prompt_workbench_host_context(config_payload, providers_payload)
+    if context_errors:
+        return context_errors, []
+    assert context is not None
+
+    combined_errors = _validate_prompt_workbench_host_sync(context)
+    execution_errors: list[str] = []
+    namespace = context.namespace
+
+    original_state = _request_prompt_workbench_json(
+        base_url,
+        "state",
+        query={"namespace": namespace},
+        timeout_seconds=request_timeout_seconds,
+    )
+    original_history = _request_prompt_workbench_json(
+        base_url,
+        "history",
+        query={"namespace": namespace},
+        timeout_seconds=request_timeout_seconds,
+    )
+    original_favorites = _request_prompt_workbench_json(
+        base_url,
+        "favorites",
+        query={"namespace": namespace},
+        timeout_seconds=request_timeout_seconds,
+    )
+    original_blacklist = _request_prompt_workbench_json(
+        base_url,
+        "blacklist",
+        timeout_seconds=request_timeout_seconds,
+    )
+    original_config = config_payload
+
+    combined_errors.extend(_validate_prompt_workbench_state_payload(namespace, original_state))
+    combined_errors.extend(_validate_prompt_workbench_entry_list_payload("prompt_tools_history", namespace, original_history))
+    combined_errors.extend(
+        _validate_prompt_workbench_entry_list_payload("prompt_tools_favorites", namespace, original_favorites)
+    )
+    combined_errors.extend(_validate_prompt_workbench_blacklist_payload(original_blacklist))
+
+    stage_token = str(int(time.time() * 1000))
+    history_item = {
+        "label": f"Prompt Workbench Smoke {stage_token}",
+        "prompt_text": "masterpiece, city skyline at dusk",
+        "tag_tokens": ["masterpiece", "city skyline"],
+    }
+    favorite_item = {
+        "label": f"Favorite Workbench Smoke {stage_token}",
+        "prompt_text": "best quality, harbor lights",
+        "tag_tokens": ["best quality", "harbor lights"],
+    }
+    target_state = {
+        "workbench_open": True,
+        "active_panel": "assist",
+        "draft_prompt": f"masterpiece, stage token {stage_token}",
+        "selected_entry_id": f"entry-{stage_token}",
+    }
+    target_blacklist = {
+        "enabled": True,
+        "entries": [f"bad-hands-{stage_token}", f"bad-feet-{stage_token}"],
+    }
+    target_config = {
+        "language": "zh-TW",
+        "theme_style": "rookieui_graphite",
+        "translation": {
+            "default_provider": "mymemory_free",
+            "providers": {
+                "mymemory_free": {
+                    "base_url": "https://api.mymemory.translated.net/get",
+                    "timeout_seconds": 15,
+                }
+            },
+        },
+    }
+
+    try:
+        updated_config = _request_prompt_workbench_json(
+            base_url,
+            "config",
+            method="POST",
+            payload={"config": target_config},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_route_contract_payload(
+            LiveRouteContractProbe(
+                surface="prompt_tools_config",
+                route_path="/rookieui/prompt-tools/config",
+                local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+            ),
+            updated_config,
+        ))
+        updated_state = _request_prompt_workbench_json(
+            base_url,
+            "state",
+            method="POST",
+            payload={"namespace": namespace, "state": target_state},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_prompt_workbench_state_payload(namespace, updated_state))
+        state_payload = updated_state.get("state")
+        if isinstance(state_payload, dict):
+            for key, value in target_state.items():
+                if state_payload.get(key) != value:
+                    combined_errors.append(f"prompt-workbench state update did not persist '{key}'.")
+
+        updated_history = _request_prompt_workbench_json(
+            base_url,
+            "history",
+            method="POST",
+            payload={"namespace": namespace, "action": "push", "item": history_item},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_prompt_workbench_entry_list_payload("prompt_tools_history", namespace, updated_history))
+        history_items = updated_history.get("items")
+        if not isinstance(history_items, list) or not any(
+            isinstance(item, dict) and item.get("prompt_text") == history_item["prompt_text"] for item in history_items
+        ):
+            combined_errors.append("prompt-workbench history update did not persist the injected prompt entry.")
+
+        updated_favorites = _request_prompt_workbench_json(
+            base_url,
+            "favorites",
+            method="POST",
+            payload={"namespace": namespace, "action": "push", "item": favorite_item},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(
+            _validate_prompt_workbench_entry_list_payload("prompt_tools_favorites", namespace, updated_favorites)
+        )
+        favorite_items = updated_favorites.get("items")
+        if not isinstance(favorite_items, list) or not any(
+            isinstance(item, dict) and item.get("prompt_text") == favorite_item["prompt_text"] for item in favorite_items
+        ):
+            combined_errors.append("prompt-workbench favorites update did not persist the injected prompt entry.")
+
+        updated_blacklist = _request_prompt_workbench_json(
+            base_url,
+            "blacklist",
+            method="POST",
+            payload={"blacklist": target_blacklist},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_prompt_workbench_blacklist_payload(updated_blacklist))
+        blacklist_payload = updated_blacklist.get("blacklist")
+        if not isinstance(blacklist_payload, dict) or blacklist_payload.get("entries") != target_blacklist["entries"]:
+            combined_errors.append("prompt-workbench blacklist update did not persist the injected entries.")
+
+        catalog_payload = _request_prompt_workbench_json(
+            base_url,
+            "catalog",
+            query={"language": "en"},
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_prompt_workbench_catalog_payload(catalog_payload))
+
+        analyze_payload = _request_prompt_workbench_json(
+            base_url,
+            "analyze",
+            method="POST",
+            payload={
+                "prompt": "masterpiece, <lora:demo:0.8>, city skyline at dusk",
+                "negative_prompt": "blurry, low quality",
+                "steps": 28,
+            },
+            timeout_seconds=request_timeout_seconds,
+        )
+        combined_errors.extend(_validate_prompt_workbench_analyze_payload(analyze_payload))
+
+        if execute and not combined_errors:
+            translate_payload = _request_prompt_workbench_json(
+                base_url,
+                "translate",
+                method="POST",
+                payload={
+                    "provider": "mymemory_free",
+                    "from_lang": "auto",
+                    "to_lang": "en",
+                    "text": "city skyline at dusk",
+                },
+                timeout_seconds=request_timeout_seconds,
+            )
+            execution_errors.extend(_validate_prompt_workbench_translate_payload(translate_payload))
+
+            if not context.ai_assist_default_provider:
+                status_code, assist_payload = _request_prompt_workbench_json_with_status(
+                    base_url,
+                    "assist",
+                    method="POST",
+                    payload={"image_description": "city skyline at dusk"},
+                    timeout_seconds=request_timeout_seconds,
+                )
+                if status_code != 400:
+                    execution_errors.append(
+                        f"prompt-workbench AI assist expected 400 for unconfigured provider but got {status_code}."
+                    )
+                if _read_nested_text(assist_payload, "status") != "invalid-request":
+                    execution_errors.append("prompt-workbench AI assist unconfigured path lost invalid-request truthfulness.")
+                if "No prompt-workbench AI assist provider is configured." not in _read_nested_text(
+                    assist_payload, "detail"
+                ):
+                    execution_errors.append("prompt-workbench AI assist unconfigured detail drifted.")
+            elif context.ai_assist_default_availability == "ready":
+                assist_payload = _request_prompt_workbench_json(
+                    base_url,
+                    "assist",
+                    method="POST",
+                    payload={
+                        "image_description": "city skyline at dusk",
+                        "language": "en",
+                        "theme_style": "rookieui_graphite",
+                    },
+                    timeout_seconds=request_timeout_seconds,
+                )
+                execution_errors.extend(_validate_prompt_workbench_assist_payload(assist_payload))
+            elif context.ai_assist_default_availability == "configuration_required":
+                status_code, assist_payload = _request_prompt_workbench_json_with_status(
+                    base_url,
+                    "assist",
+                    method="POST",
+                    payload={"image_description": "city skyline at dusk"},
+                    timeout_seconds=request_timeout_seconds,
+                )
+                if status_code != 502:
+                    execution_errors.append(
+                        f"prompt-workbench AI assist expected 502 for configuration-required provider but got {status_code}."
+                    )
+                if _read_nested_text(assist_payload, "status") != "provider-error":
+                    execution_errors.append("prompt-workbench AI assist configuration-required path lost provider-error truthfulness.")
+                if "OpenAI-compatible execution requires api_key and model." not in _read_nested_text(
+                    assist_payload, "detail"
+                ):
+                    execution_errors.append("prompt-workbench AI assist configuration-required detail drifted.")
+            else:
+                execution_errors.append(
+                    f"prompt-workbench AI assist default provider availability '{context.ai_assist_default_availability}' is not covered by the live lane."
+                )
+    finally:
+        _request_prompt_workbench_json(
+            base_url,
+            "config",
+            method="POST",
+            payload={"config": original_config.get("config", {})},
+            timeout_seconds=request_timeout_seconds,
+        )
+        _request_prompt_workbench_json(
+            base_url,
+            "state",
+            method="POST",
+            payload={"namespace": namespace, "state": original_state.get("state", {})},
+            timeout_seconds=request_timeout_seconds,
+        )
+        _request_prompt_workbench_json(
+            base_url,
+            "history",
+            method="POST",
+            payload={"namespace": namespace, "action": "replace", "items": original_history.get("items", [])},
+            timeout_seconds=request_timeout_seconds,
+        )
+        _request_prompt_workbench_json(
+            base_url,
+            "favorites",
+            method="POST",
+            payload={"namespace": namespace, "action": "replace", "items": original_favorites.get("items", [])},
+            timeout_seconds=request_timeout_seconds,
+        )
+        _request_prompt_workbench_json(
+            base_url,
+            "blacklist",
+            method="POST",
+            payload={"blacklist": original_blacklist.get("blacklist", {})},
+            timeout_seconds=request_timeout_seconds,
+        )
+
+    return combined_errors, execution_errors
 
 
 def _validate_extras_execution_response(response_payload: dict[str, Any]) -> list[str]:
@@ -2699,7 +3353,7 @@ def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
-    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "full-pipeline"} and not profiles:
+    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "prompt-workbench", "full-pipeline"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
@@ -2766,6 +3420,43 @@ def main() -> int:
                         print(f"  - {error}", file=sys.stderr)
                     return 0 if args.report_only else 1
                 print("[live-smoke] auxiliary queue/apply-back execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
+
+    if args.validation_mode == "prompt-workbench":
+        try:
+            combined_errors, execution_errors = _run_prompt_workbench_validation_lane(
+                base_url,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: prompt-workbench validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        if combined_errors:
+            print("[live-smoke] WARNING: prompt-workbench validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] prompt-workbench route/state checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because prompt-workbench dry-run checks were not green.")
+            elif execution_errors:
+                print("[live-smoke] ERROR: prompt-workbench execute lane failed:", file=sys.stderr)
+                for error in execution_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] prompt-workbench execute checks passed.")
 
         if combined_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")
