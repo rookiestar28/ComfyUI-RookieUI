@@ -41,6 +41,10 @@ function createBootstrapState(overrides = {}) {
           normalize_spacing: true,
           trim_outer_whitespace: true,
         },
+        translation: {
+          default_provider: "",
+          providers: {},
+        },
         ui_preferences: { default_open: false },
       },
       blacklist: { enabled: false, entries: [] },
@@ -93,6 +97,17 @@ function createBootstrapState(overrides = {}) {
       ok: true,
       data: {
         blacklist: { enabled: false, entries: [] },
+      },
+    })),
+    translatePromptWorkbenchRequest: vi.fn(async (payload) => ({
+      ok: true,
+      data: {
+        provider_id: payload?.provider ?? "mymemory_free",
+        provider_title: "MyMemory Free Translation",
+        mode: "single",
+        from_lang: payload?.from_lang ?? "auto",
+        to_lang: payload?.to_lang ?? "en",
+        translated_text: payload?.to_lang === "en" ? "city skyline at dusk" : "城市天際線黃昏",
       },
     })),
     updatePromptWorkbenchStateRequest: vi.fn(async (_namespace, state) => ({
@@ -302,5 +317,101 @@ describe("prompt workbench shell", () => {
       enabled: true,
       entries: [],
     });
+  });
+
+  test("supports translation actions and catalog quick insert flows", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    prompt.value = "傍晚城市天際線";
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "zh-TW",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: {
+            default_provider: "mymemory_free",
+            providers: {},
+          },
+          ui_preferences: { default_open: false },
+        },
+        blacklist: { enabled: false, entries: [] },
+      },
+      fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
+        ok: true,
+        data: {
+          state: {
+            namespace,
+            workbench_open: false,
+            active_panel: "editor",
+            draft_prompt: namespace.includes("negative") ? "" : "傍晚城市天際線",
+            selected_entry_id: "",
+          },
+        },
+      })),
+      fetchPromptWorkbenchCatalogRequest: vi.fn(async () => ({
+        ok: true,
+        data: {
+          group_tags: { groups: [{ id: "quality", title: "Quality", tags: ["masterpiece"] }] },
+          prompt_library: {
+            sections: [
+              {
+                id: "positive_base",
+                title: "Positive Base",
+                entries: [{ id: "masterpiece_core", label: "Masterpiece Core", prompt_text: "masterpiece, best quality, high detail" }],
+              },
+            ],
+          },
+          extra_networks: {
+            embeddings: [{ id: "badhandv4.pt", insert_token: "embedding:badhandv4.pt" }],
+            loras: [{ id: "detail_tweaker.safetensors", insert_token: "<lora:detail_tweaker.safetensors:0.8>" }],
+          },
+        },
+      })),
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "catalog-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("catalog-workbench-translate-en").click();
+    await flushPromises();
+    expect(bootstrapState.translatePromptWorkbenchRequest).toHaveBeenCalledWith({
+      provider: "mymemory_free",
+      from_lang: "auto",
+      to_lang: "en",
+      text: "傍晚城市天際線",
+    });
+    expect(prompt.value).toBe("city skyline at dusk");
+
+    document.getElementById("catalog-workbench-panel-catalog").click();
+    await flushPromises();
+    document.getElementById("catalog-workbench-quality-0").click();
+    expect(prompt.value).toBe("city skyline at dusk, masterpiece");
+
+    document.getElementById("catalog-workbench-library-append-0-0").click();
+    expect(prompt.value).toContain("masterpiece, best quality, high detail");
+
+    document.getElementById("catalog-workbench-embeddings-0").click();
+    expect(prompt.value).toContain("embedding:badhandv4.pt");
+
+    document.getElementById("catalog-workbench-loras-0").click();
+    expect(prompt.value).toContain("<lora:detail_tweaker.safetensors:0.8>");
   });
 });

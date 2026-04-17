@@ -120,6 +120,7 @@ export function createPromptWorkbenchShell({
   parent.appendChild(shell);
 
   const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
+  configState.translation = configState.translation ?? { default_provider: "", providers: {} };
   const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [] });
   const namespaceMap = {
     prompt: String(namespaces?.prompt ?? "").trim(),
@@ -221,7 +222,7 @@ export function createPromptWorkbenchShell({
   body.appendChild(panelRail);
 
   const panelButtons = new Map();
-  ["editor", "history", "favorites", "format"].forEach((panelId) => {
+  ["editor", "history", "favorites", "catalog", "format"].forEach((panelId) => {
     const button = document.createElement("button");
     button.type = "button";
     button.id = `${idPrefix}-panel-${panelId}`;
@@ -281,6 +282,11 @@ export function createPromptWorkbenchShell({
   favoritesPane.id = `${idPrefix}-favorites-pane`;
   favoritesPane.className = "rookieui-shell__prompt-workbench-pane";
   panelContent.appendChild(favoritesPane);
+
+  const catalogPane = document.createElement("section");
+  catalogPane.id = `${idPrefix}-catalog-pane`;
+  catalogPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(catalogPane);
 
   const formatPane = document.createElement("section");
   formatPane.id = `${idPrefix}-format-pane`;
@@ -379,6 +385,69 @@ export function createPromptWorkbenchShell({
       updateStatus(result?.ok === false ? "Formatting preferences saved with fallback semantics" : "Formatting preferences synchronized");
       syncUi();
     });
+  }
+
+  function getTranslationProviders() {
+    return Array.isArray(providersPayload?.surfaces?.translation?.providers)
+      ? providersPayload.surfaces.translation.providers.filter((entry) => entry?.execution_state === "shipped")
+      : [];
+  }
+
+  function appendPromptFragment(fragment, { replace = false, statusMessage = "" } = {}) {
+    const normalizedFragment = String(fragment ?? "").trim();
+    if (!normalizedFragment) {
+      return;
+    }
+    const currentText = String(getActiveState().draft_prompt || getActiveInput()?.value || "").trim();
+    const nextText = replace || !currentText ? normalizedFragment : `${currentText}, ${normalizedFragment}`;
+    applyPromptTextToInput(nextText, {
+      updateEditor: true,
+      statusMessage: statusMessage || "Updated prompt from Prompt Workbench catalog action",
+    });
+  }
+
+  function persistTranslationProviderSelection(providerId) {
+    configState.translation = {
+      ...(configState.translation ?? {}),
+      default_provider: String(providerId ?? "").trim(),
+      providers: configState.translation?.providers ?? {},
+    };
+    queueConfigPersist();
+  }
+
+  function translateActivePrompt(targetLanguage) {
+    const providerId = String(configState.translation?.default_provider ?? "").trim();
+    const promptText = String(getActiveState().draft_prompt || getActiveInput()?.value || "").trim();
+    if (!providerId) {
+      updateStatus("Select a shipped translation provider before translating");
+      return;
+    }
+    if (!promptText) {
+      updateStatus("No prompt text is available for translation");
+      return;
+    }
+    updateStatus("Translating prompt text...");
+    void bootstrapState
+      ?.translatePromptWorkbenchRequest?.({
+        provider: providerId,
+        from_lang: "auto",
+        to_lang: targetLanguage,
+        text: promptText,
+      })
+      .then((result) => {
+        const translatedText = String(result?.data?.translated_text ?? "").trim();
+        if (!translatedText) {
+          updateStatus("Translation response did not include translated text");
+          return;
+        }
+        applyPromptTextToInput(translatedText, {
+          updateEditor: true,
+          statusMessage: `Translated prompt text to ${targetLanguage}`,
+        });
+      })
+      .catch(() => {
+        updateStatus("Prompt translation failed");
+      });
   }
 
   function applyPromptTextToInput(nextText, { updateEditor = true, statusMessage = "" } = {}) {
@@ -550,6 +619,44 @@ export function createPromptWorkbenchShell({
       rebuildPromptFromEditor("Added prompt token");
     });
     addRow.appendChild(addButton);
+
+    const translateRow = document.createElement("div");
+    translateRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    editorPane.appendChild(translateRow);
+
+    const providerSelect = document.createElement("select");
+    providerSelect.id = `${idPrefix}-translation-provider`;
+    providerSelect.className = "rookieui-shell__input rookieui-shell__prompt-workbench-provider-select";
+    const providerPlaceholder = document.createElement("option");
+    providerPlaceholder.value = "";
+    providerPlaceholder.textContent = "Translation provider";
+    providerSelect.appendChild(providerPlaceholder);
+    getTranslationProviders().forEach((provider) => {
+      const option = document.createElement("option");
+      option.value = String(provider.provider_id ?? "");
+      option.textContent = String(provider.title ?? provider.provider_id ?? "");
+      providerSelect.appendChild(option);
+    });
+    providerSelect.value = String(configState.translation?.default_provider ?? "").trim();
+    providerSelect.addEventListener("change", () => {
+      persistTranslationProviderSelection(providerSelect.value);
+    });
+    translateRow.appendChild(providerSelect);
+
+    const translateEnglishButton = createActionButton(`${idPrefix}-translate-en`, "Translate to English");
+    translateEnglishButton.addEventListener("click", () => {
+      translateActivePrompt("en");
+    });
+    translateRow.appendChild(translateEnglishButton);
+
+    if (String(configState.language ?? "en").trim().toLowerCase() !== "en") {
+      const localLanguage = String(configState.language ?? "en").trim() || "en";
+      const translateLocalButton = createActionButton(`${idPrefix}-translate-local`, `Translate to ${localLanguage}`);
+      translateLocalButton.addEventListener("click", () => {
+        translateActivePrompt(localLanguage);
+      });
+      translateRow.appendChild(translateLocalButton);
+    }
 
     const tokens = ensureEditorTokens(getActiveNamespace());
     const list = document.createElement("div");
@@ -757,6 +864,108 @@ export function createPromptWorkbenchShell({
     });
   }
 
+  function renderCatalogPane() {
+    clearChildren(catalogPane);
+    const heading = document.createElement("div");
+    heading.className = "rookieui-shell__prompt-workbench-pane-header";
+    catalogPane.appendChild(heading);
+    appendTextElement(heading, "h6", "rookieui-shell__prompt-workbench-pane-title", "Catalog and Quick Insert");
+
+    const groups = Array.isArray(catalogPayload?.group_tags?.groups) ? catalogPayload.group_tags.groups : [];
+    const sections = Array.isArray(catalogPayload?.prompt_library?.sections) ? catalogPayload.prompt_library.sections : [];
+    const embeddings = Array.isArray(catalogPayload?.extra_networks?.embeddings) ? catalogPayload.extra_networks.embeddings : [];
+    const loras = Array.isArray(catalogPayload?.extra_networks?.loras) ? catalogPayload.extra_networks.loras : [];
+
+    const renderChipRow = (title, entries, fragmentBuilder, actionLabel = "Add") => {
+      const block = document.createElement("section");
+      block.className = "rookieui-shell__prompt-workbench-catalog-block";
+      catalogPane.appendChild(block);
+      appendTextElement(block, "h6", "rookieui-shell__prompt-workbench-pane-title", title);
+      const chipGrid = document.createElement("div");
+      chipGrid.className = "rookieui-shell__prompt-workbench-chip-grid";
+      block.appendChild(chipGrid);
+      if (!entries.length) {
+        appendTextElement(
+          chipGrid,
+          "p",
+          "rookieui-shell__prompt-workbench-empty",
+          `No ${title.toLowerCase()} entries are available for this workbench profile.`,
+        );
+        return;
+      }
+      entries.forEach((entry, index) => {
+        const button = createActionButton(`${idPrefix}-${title.toLowerCase().replace(/\s+/g, "-")}-${index}`, actionLabel);
+        button.classList.add("rookieui-shell__prompt-workbench-chip");
+        button.textContent = String(entry?.label ?? entry?.title ?? entry?.id ?? fragmentBuilder(entry));
+        button.addEventListener("click", () => {
+          appendPromptFragment(fragmentBuilder(entry), {
+            statusMessage: `Inserted ${String(entry?.label ?? entry?.title ?? entry?.id ?? "catalog entry")}`,
+          });
+        });
+        chipGrid.appendChild(button);
+      });
+    };
+
+    groups.forEach((group, groupIndex) => {
+      renderChipRow(
+        String(group?.title ?? `Group ${groupIndex + 1}`),
+        Array.isArray(group?.tags) ? group.tags.map((tag) => ({ id: tag, label: tag })) : [],
+        (entry) => String(entry?.label ?? ""),
+      );
+    });
+
+    sections.forEach((section, sectionIndex) => {
+      const block = document.createElement("section");
+      block.className = "rookieui-shell__prompt-workbench-catalog-block";
+      catalogPane.appendChild(block);
+      appendTextElement(
+        block,
+        "h6",
+        "rookieui-shell__prompt-workbench-pane-title",
+        String(section?.title ?? `Section ${sectionIndex + 1}`),
+      );
+      const list = document.createElement("div");
+      list.className = "rookieui-shell__prompt-workbench-entry-list";
+      block.appendChild(list);
+      const entries = Array.isArray(section?.entries) ? section.entries : [];
+      if (!entries.length) {
+        appendTextElement(list, "p", "rookieui-shell__prompt-workbench-empty", "No prompt-library entries available.");
+        return;
+      }
+      entries.forEach((entry, entryIndex) => {
+        const row = document.createElement("div");
+        row.className = "rookieui-shell__prompt-workbench-entry";
+        list.appendChild(row);
+        const copy = document.createElement("div");
+        copy.className = "rookieui-shell__prompt-workbench-entry-copy";
+        row.appendChild(copy);
+        appendTextElement(copy, "strong", "rookieui-shell__prompt-workbench-entry-label", String(entry?.label ?? "Library Entry"));
+        appendTextElement(copy, "p", "rookieui-shell__prompt-workbench-entry-text", String(entry?.prompt_text ?? ""));
+        const controls = document.createElement("div");
+        controls.className = "rookieui-shell__prompt-workbench-entry-actions";
+        row.appendChild(controls);
+        const appendButton = createActionButton(`${idPrefix}-library-append-${sectionIndex}-${entryIndex}`, "Append");
+        appendButton.addEventListener("click", () => {
+          appendPromptFragment(String(entry?.prompt_text ?? ""), {
+            statusMessage: `Appended ${String(entry?.label ?? "library entry")}`,
+          });
+        });
+        controls.appendChild(appendButton);
+        const replaceButton = createActionButton(`${idPrefix}-library-replace-${sectionIndex}-${entryIndex}`, "Replace");
+        replaceButton.addEventListener("click", () => {
+          appendPromptFragment(String(entry?.prompt_text ?? ""), {
+            replace: true,
+            statusMessage: `Replaced prompt with ${String(entry?.label ?? "library entry")}`,
+          });
+        });
+        controls.appendChild(replaceButton);
+      });
+    });
+
+    renderChipRow("Embeddings", embeddings, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
+    renderChipRow("LoRAs", loras, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
+  }
+
   function renderFormatPane() {
     clearChildren(formatPane);
     const heading = document.createElement("div");
@@ -873,6 +1082,7 @@ export function createPromptWorkbenchShell({
     editorPane.hidden = state.active_panel !== "editor";
     historyPane.hidden = state.active_panel !== "history";
     favoritesPane.hidden = state.active_panel !== "favorites";
+    catalogPane.hidden = state.active_panel !== "catalog";
     formatPane.hidden = state.active_panel !== "format";
 
     setText(summaryNodes.state, state.workbench_open ? "Persisted open" : "Collapsed");
@@ -892,6 +1102,7 @@ export function createPromptWorkbenchShell({
     renderEditorPane();
     renderCollectionPane(historyPane, "history");
     renderCollectionPane(favoritesPane, "favorites");
+    renderCatalogPane();
     renderFormatPane();
   }
 
