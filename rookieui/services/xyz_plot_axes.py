@@ -36,6 +36,7 @@ _XYZ_AXIS_COSTS = {
     "rng_source": "not_supported",
     "fp8_mode": "not_supported",
 }
+_XYZ_SESSION_RUNNER_UNSUPPORTED_AXES = {"var_seed", "var_strength"}
 
 
 def _compatibility_sampler_choices() -> list[str]:
@@ -85,6 +86,8 @@ def _build_axis_payload(axis: XYZPlotAxisContract) -> dict[str, Any]:
         "choices": choices,
         "choice_source": choice_source,
         "truthfulness": "runnable" if axis.support_tier in {"direct", "adapted"} else "gated",
+        "session_runner_support": axis.support_tier in {"direct", "adapted"}
+        and axis.axis_id not in _XYZ_SESSION_RUNNER_UNSUPPORTED_AXES,
     }
 
 

@@ -33,6 +33,10 @@ from rookieui.services.prompt_workbench import (
 from rookieui.services.xyz_plot import (
     build_xyz_plot_axes_snapshot,
     build_xyz_plot_estimate_snapshot,
+    build_xyz_plot_session_detail_snapshot,
+    build_xyz_plot_session_list_snapshot,
+    execute_xyz_plot_run_snapshot,
+    execute_xyz_plot_session_cancel_snapshot,
 )
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.txt2img import normalize_txt2img_request
@@ -76,6 +80,10 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze",
     f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes",
     f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/run",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}/cancel",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list",
@@ -725,6 +733,126 @@ async def xyz_plot_estimate(request: Any) -> Any:
     return _json_response(response_payload, request=request)
 
 
+async def xyz_plot_run(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        response_payload = await execute_xyz_plot_run_snapshot(payload, _get_prompt_server_for_submission())
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    except RuntimeError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("host-unavailable"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=503,
+            request=request,
+        )
+
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
+async def xyz_plot_sessions(request: Any) -> Any:
+    try:
+        response_payload = await build_xyz_plot_session_list_snapshot(
+            _get_prompt_server_for_submission(),
+            client_id=_read_request_query_value(request, "client_id"),
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
+async def xyz_plot_session_detail(request: Any) -> Any:
+    session_id = _read_request_match_value(request, "session_id")
+    if not session_id:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text("session_id is required."),
+            },
+            status=400,
+            request=request,
+        )
+    try:
+        response_payload = await build_xyz_plot_session_detail_snapshot(
+            session_id,
+            _get_prompt_server_for_submission(),
+            client_id=_read_request_query_value(request, "client_id"),
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
+async def xyz_plot_session_cancel(request: Any) -> Any:
+    session_id = _read_request_match_value(request, "session_id")
+    if not session_id:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text("session_id is required."),
+            },
+            status=400,
+            request=request,
+        )
+    try:
+        response_payload = await execute_xyz_plot_session_cancel_snapshot(
+            session_id,
+            _get_prompt_server_for_submission(),
+            client_id=_read_request_query_value(request, "client_id"),
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
 async def pnginfo_inspect(request: Any) -> Any:
     return await pnginfo_parse(request)
 
@@ -968,6 +1096,10 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze", prompt_tools_analyze)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes", xyz_plot_axes)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate", xyz_plot_estimate)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/run", xyz_plot_run)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions", xyz_plot_sessions)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}", xyz_plot_session_detail)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}/cancel", xyz_plot_session_cancel)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)

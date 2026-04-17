@@ -48,6 +48,28 @@ class PromptSubmissionTests(unittest.TestCase):
         self.assertEqual(queued_item[3]["rookieui_surface"], "txt2img")
         self.assertEqual(queued_item[3]["preview_method"], "auto")
 
+    def test_submit_prompt_workflow_merges_extra_metadata(self) -> None:
+        prompt_server = _FakePromptServer()
+        execution_module = types.SimpleNamespace(
+            validate_prompt=mock.AsyncMock(return_value=(True, None, ["7"], {}))
+        )
+
+        with mock.patch(
+            "rookieui.services.prompt_submission._get_execution_module",
+            return_value=execution_module,
+        ):
+            asyncio.run(
+                submit_prompt_workflow(
+                    prompt_server,
+                    {"7": {"class_type": "SaveImage"}},
+                    surface="xyz_plot",
+                    extra_metadata={"rookieui_xyz_session_id": "xyz-1"},
+                )
+            )
+
+        queued_item = prompt_server.prompt_queue.items[0]
+        self.assertEqual(queued_item[3]["rookieui_xyz_session_id"], "xyz-1")
+
     def test_submit_prompt_workflow_requires_host_prompt_queue(self) -> None:
         with self.assertRaises(RuntimeError):
             asyncio.run(submit_prompt_workflow(None, {}))
