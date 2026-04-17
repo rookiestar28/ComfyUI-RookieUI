@@ -7,7 +7,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from rookieui.services.asset_store import build_data_url_from_path, resolve_asset_path, save_output_image
+from rookieui.services.asset_store import build_data_url_from_path, resolve_generated_output_path, save_output_image
 from rookieui.services.xyz_plot_estimate import XYZ_PLOT_MAX_GRID_MEGAPIXELS
 from rookieui.services.xyz_plot_metadata import build_xyz_plot_png_metadata
 
@@ -178,7 +178,7 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
                 {
                     "cell": cell,
                     "asset_handle": asset_handle,
-                    "path": resolve_asset_path(asset_handle),
+                    "path": resolve_generated_output_path(asset_handle),
                 }
             )
         elif status not in {"failed", "cancelled"}:

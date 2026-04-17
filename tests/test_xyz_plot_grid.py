@@ -157,3 +157,47 @@ class XYZPlotGridTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "incomplete")
         self.assertIn("no reusable output asset", " ".join(payload["warnings"]).lower())
+
+    def test_build_xyz_plot_grid_results_resolves_live_host_output_filenames(self) -> None:
+        host_output_root = Path(self.runtime_dir.name) / "host-output"
+        host_output_root.mkdir(parents=True, exist_ok=True)
+        host_output_file = host_output_root / "RookieUI_00089_.png"
+        Image.new("RGB", (32, 24), color="purple").save(host_output_file, format="PNG")
+        folder_paths_module = mock.Mock()
+        folder_paths_module.get_output_directory.return_value = str(host_output_root)
+        session = {
+            "session_id": "xyz-live-host",
+            "mode": "txt2img",
+            "axes": [
+                {
+                    "slot": "X",
+                    "axis_id": "steps",
+                    "title": "Steps",
+                    "parsed_values": [{"label": "10"}],
+                }
+            ],
+            "grid_options": {
+                "draw_legend": True,
+                "include_sub_grids": False,
+                "include_lone_images": True,
+                "margin_size": 0,
+            },
+            "cells": [
+                {
+                    "cell_id": "cell-1",
+                    "status": "completed",
+                    "axis_indices": {"X": 0},
+                    "bindings": [],
+                    "prompt_id": "p1",
+                    "reusable_outputs": ["RookieUI_00089_.png"],
+                    "output_filenames": ["RookieUI_00089_.png"],
+                }
+            ],
+        }
+
+        with mock.patch.object(asset_store, "_load_folder_paths_module", return_value=folder_paths_module):
+            payload = xyz_plot_grid.build_xyz_plot_grid_results(session)
+
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(len(payload["lone_images"]), 1)
+        self.assertTrue(payload["main_grid"]["asset_handle"].startswith("xyz_plot_grid_"))
