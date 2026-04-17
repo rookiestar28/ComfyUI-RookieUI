@@ -55,6 +55,7 @@ _MAX_AND_BRANCHES = 8
 _MAX_BREAK_CHUNKS = 16
 _MAX_SCHEDULE_SLICES = 128
 _MAX_SCHEDULE_EXPANSIONS = 16
+_MAX_ATTENTION_GROUP_DEPTH = 32
 _DEFAULT_PROMPT_STEP_COUNT = 10
 
 _WARNING_MESSAGES = {
@@ -625,7 +626,11 @@ def _split_top_level_explicit_attention(content: str) -> tuple[str, str | None]:
             if re.fullmatch(r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)", suffix or ""):
                 return content[:index], suffix
     return content, None
-def _rewrite_a1111_attention_groups(text: str) -> str:
+def _rewrite_a1111_attention_groups(text: str, *, depth: int = 0) -> str:
+    if depth > _MAX_ATTENTION_GROUP_DEPTH:
+        raise ValueError(
+            f"Prompt attention nesting exceeded maximum depth {_MAX_ATTENTION_GROUP_DEPTH}."
+        )
     parts: list[str] = []
     index = 0
     while index < len(text):
@@ -637,10 +642,10 @@ def _rewrite_a1111_attention_groups(text: str) -> str:
                 index += 1
                 continue
             if _looks_like_prompt_schedule_group(group_content) or _looks_like_alternate_prompt_group(group_content):
-                rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+                rewritten_inner = _rewrite_a1111_attention_groups(group_content, depth=depth + 1)
                 parts.append(f"[{rewritten_inner}]")
             else:
-                rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+                rewritten_inner = _rewrite_a1111_attention_groups(group_content, depth=depth + 1)
                 parts.append(f"({rewritten_inner}:{_A1111_DEEMPHASIS_WEIGHT})")
             index = next_index
             continue
@@ -650,7 +655,7 @@ def _rewrite_a1111_attention_groups(text: str) -> str:
                 parts.append(char)
                 index += 1
                 continue
-            rewritten_inner = _rewrite_a1111_attention_groups(group_content)
+            rewritten_inner = _rewrite_a1111_attention_groups(group_content, depth=depth + 1)
             base_text, explicit_weight = _split_top_level_explicit_attention(rewritten_inner)
             if explicit_weight is None:
                 parts.append(f"({rewritten_inner})")
