@@ -58,6 +58,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
       estimateBackgroundImage: estimateButton ? getComputedStyle(estimateButton).backgroundImage : "",
       refreshBackgroundImage: refreshButton ? getComputedStyle(refreshButton).backgroundImage : "",
       cancelBackgroundImage: cancelButton ? getComputedStyle(cancelButton).backgroundImage : "",
+      cancelBorderColor: cancelButton ? getComputedStyle(cancelButton).borderColor : "",
       cancelColor: cancelButton ? getComputedStyle(cancelButton).color : "",
       actionWidths: actionRects.map((rect) => rect?.width ?? 0),
       rowLeftDelta: rowRect && actionRects[0] ? Math.abs(actionRects[0].left - rowRect.left) : 999,
@@ -68,6 +69,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(controlSurfaceMetrics.estimateBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
   expect(controlSurfaceMetrics.refreshBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
   expect(controlSurfaceMetrics.cancelBackgroundImage).not.toBe(controlSurfaceMetrics.generateBackgroundImage);
+  expect(controlSurfaceMetrics.cancelBackgroundImage).toContain("255, 40, 0");
+  expect(controlSurfaceMetrics.cancelBorderColor).toBe("rgb(255, 40, 0)");
   expect(controlSurfaceMetrics.cancelColor).toBe(controlSurfaceMetrics.generateColor);
   expect(Math.max(...controlSurfaceMetrics.actionWidths) - Math.min(...controlSurfaceMetrics.actionWidths)).toBeLessThanOrEqual(1);
   expect(controlSurfaceMetrics.rowLeftDelta).toBeLessThanOrEqual(1);

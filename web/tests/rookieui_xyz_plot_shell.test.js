@@ -252,6 +252,7 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-xyz-run")?.className).toContain("rookieui-shell__button--accent");
     expect(document.getElementById("txt2img-xyz-refresh")?.className).toContain("rookieui-shell__button--accent");
     expect(document.getElementById("txt2img-xyz-cancel")?.className).toContain("rookieui-shell__button--danger");
+    expect(document.getElementById("txt2img-xyz-cancel")?.className).toContain("rookieui-shell__xyz-plot-action--danger");
     expect(document.getElementById("txt2img-xyz-cancel")?.className).not.toContain("rookieui-shell__button--secondary");
 
     expect(document.getElementById("txt2img-xyz-axis-x-select").value).toBe("steps");

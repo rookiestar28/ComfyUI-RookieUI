@@ -501,6 +501,12 @@
   white-space: nowrap;
 }
 
+.rookieui-shell__xyz-plot-action--danger {
+  border-color: #ff2800;
+  background: linear-gradient(180deg, #ff5a36, #ff2800);
+  color: var(--rookieui-text-inverse);
+}
+
 .rookieui-shell__xyz-plot-estimate-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

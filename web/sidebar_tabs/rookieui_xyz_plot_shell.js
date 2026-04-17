@@ -453,7 +453,8 @@ export function createXYZPlotShell({
   [estimateButton, runButton, refreshButton].forEach((button) => {
     button.classList.add("rookieui-shell__button--accent");
   });
-  cancelButton.classList.add("rookieui-shell__button--danger");
+  // IMPORTANT: keep the XYZ cancel action on its own Ferrari-red lane; the shared danger token is intentionally softer elsewhere.
+  cancelButton.classList.add("rookieui-shell__button--danger", "rookieui-shell__xyz-plot-action--danger");
   [estimateButton, runButton, refreshButton, cancelButton].forEach((button) => actionRow.appendChild(button));
 
   const estimateSection = document.createElement("section");
