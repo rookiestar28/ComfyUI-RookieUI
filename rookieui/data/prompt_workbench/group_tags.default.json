@@ -1,0 +1,49 @@
+{
+  "language": "default",
+  "groups": [
+    {
+      "id": "subject",
+      "title": "Subject",
+      "tags": [
+        "portrait",
+        "cinematic character",
+        "city skyline",
+        "fantasy armor",
+        "detailed environment"
+      ]
+    },
+    {
+      "id": "quality",
+      "title": "Quality",
+      "tags": [
+        "masterpiece",
+        "best quality",
+        "high detail",
+        "sharp focus",
+        "dramatic light"
+      ]
+    },
+    {
+      "id": "camera",
+      "title": "Camera",
+      "tags": [
+        "35mm lens",
+        "close-up",
+        "wide shot",
+        "depth of field",
+        "low angle"
+      ]
+    },
+    {
+      "id": "negative_core",
+      "title": "Negative Core",
+      "tags": [
+        "low quality",
+        "blurry",
+        "bad anatomy",
+        "extra digits",
+        "text watermark"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "sections": [
+    {
+      "id": "positive_base",
+      "title": "Positive Base",
+      "entries": [
+        {
+          "id": "masterpiece_core",
+          "label": "Masterpiece Core",
+          "prompt_text": "masterpiece, best quality, high detail"
+        },
+        {
+          "id": "cinematic_portrait",
+          "label": "Cinematic Portrait",
+          "prompt_text": "cinematic portrait, dramatic light, 35mm lens, depth of field"
+        }
+      ]
+    },
+    {
+      "id": "negative_base",
+      "title": "Negative Base",
+      "entries": [
+        {
+          "id": "negative_cleanup",
+          "label": "Negative Cleanup",
+          "prompt_text": "low quality, blurry, bad anatomy, extra digits"
+        }
+      ]
+    },
+    {
+      "id": "style_blocks",
+      "title": "Style Blocks",
+      "entries": [
+        {
+          "id": "illustration_detail",
+          "label": "Illustration Detail",
+          "prompt_text": "illustration, painterly texture, intricate detail"
+        },
+        {
+          "id": "photo_real",
+          "label": "Photo Real",
+          "prompt_text": "photorealistic, natural skin texture, realistic lighting"
+        }
+      ]
+    }
+  ]
+}

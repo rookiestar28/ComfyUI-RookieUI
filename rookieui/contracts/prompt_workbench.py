@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-PROMPT_WORKBENCH_CONTRACT_VERSION = "r123f114f115-20260417"
+PROMPT_WORKBENCH_CONTRACT_VERSION = "r123f114f115f116-20260417"
 PROMPT_WORKBENCH_STATE_SCHEMA_VERSION = 1
 PROMPT_WORKBENCH_ROUTE_FAMILY = "/rookieui/prompt-tools"
 PROMPT_WORKBENCH_NAMESPACES = (

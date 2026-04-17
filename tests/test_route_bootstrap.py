@@ -56,6 +56,8 @@ class RouteBootstrapTests(unittest.TestCase):
                 "/rookieui/prompt-tools/blacklist",
                 "/rookieui/prompt-tools/providers",
                 "/rookieui/prompt-tools/translate",
+                "/rookieui/prompt-tools/catalog",
+                "/rookieui/prompt-tools/analyze",
                 "/rookieui/pnginfo/parse",
                 "/rookieui/pnginfo/inspect",
                 "/rookieui/controlnet/detect",
@@ -84,4 +86,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 35)
+        self.assertEqual(len(prompt_server.app.router.routes), 37)

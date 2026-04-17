@@ -145,3 +145,29 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["provider_id"], "openai")
         self.assertEqual(response["payload"]["translated_text"], "translated prompt")
+
+    def test_prompt_tools_catalog_route_returns_catalog_payload(self) -> None:
+        response = asyncio.run(routes.prompt_tools_catalog(_FakeJsonRequest(query={"language": "en"})))
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["contract"]["surface"], "prompt_tools_catalog")
+        self.assertTrue(response["payload"]["group_tags"]["groups"])
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_analysis")
+    def test_prompt_tools_analyze_route_returns_analysis_payload(self, mocked_execute: mock.Mock) -> None:
+        mocked_execute.return_value = {
+            "contract": {"surface": "prompt_tools_analyze"},
+            "analysis_mode": "syntax_inventory",
+            "prompt": {"raw": "masterpiece", "cleaned": "masterpiece", "metrics": {"mode": "syntax_inventory_estimate"}},
+            "negative_prompt": {"raw": "", "cleaned": "", "metrics": {"mode": "syntax_inventory_estimate"}},
+            "warnings": [],
+            "warning_codes": [],
+            "lora_activations": [],
+            "inventory_snapshot": {"embedding_count": 0, "lora_count": 0},
+        }
+
+        response = asyncio.run(routes.prompt_tools_analyze(_FakeJsonRequest({"prompt": "masterpiece"})))
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["contract"]["surface"], "prompt_tools_analyze")
+        self.assertEqual(response["payload"]["analysis_mode"], "syntax_inventory")
