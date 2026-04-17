@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import ExitStack
+import json
 import os
 import tempfile
 import types
@@ -436,3 +437,14 @@ class XYZPlotSessionTests(unittest.TestCase):
 
         asyncio.run(_run_overlap())
         self.assertEqual(max_refreshes, 1)
+
+    def test_load_xyz_plot_store_quarantines_corrupt_json(self) -> None:
+        state_path = xyz_plot_sessions._xyz_plot_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text("{not-json", encoding="utf-8")
+
+        store = xyz_plot_sessions._load_xyz_plot_store()
+
+        self.assertEqual(store["sessions"], {})
+        self.assertFalse(state_path.exists())
+        self.assertEqual(len(list(state_path.parent.glob("sessions.corrupt-*.json"))), 1)

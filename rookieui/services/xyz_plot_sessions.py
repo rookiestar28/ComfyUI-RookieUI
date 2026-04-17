@@ -23,6 +23,7 @@ from rookieui.security.request_guard import (
 from rookieui.services.coercion import coerce_bool, coerce_int
 from rookieui.services.xyz_plot_grid import build_xyz_plot_grid_results
 from rookieui.services.img2img import normalize_img2img_request
+from rookieui.services.state_persistence import atomic_write_json, quarantine_corrupt_json
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.queue_snapshot import build_queue_snapshot
 from rookieui.services.txt2img import normalize_txt2img_request
@@ -82,7 +83,10 @@ def _load_xyz_plot_store() -> dict[str, Any]:
         return _default_xyz_plot_store()
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError:
+        return _default_xyz_plot_store()
+    except json.JSONDecodeError:
+        quarantine_corrupt_json(state_path)
         return _default_xyz_plot_store()
     if not isinstance(payload, dict) or int(payload.get("schema_version", 0) or 0) != _XYZ_PLOT_SESSION_SCHEMA_VERSION:
         return _default_xyz_plot_store()
@@ -95,7 +99,7 @@ def _load_xyz_plot_store() -> dict[str, Any]:
 
 def _save_xyz_plot_store(store: dict[str, Any]) -> None:
     _ensure_xyz_plot_runtime_dir()
-    _xyz_plot_state_path().write_text(json.dumps(store, indent=2, ensure_ascii=True), encoding="utf-8")
+    atomic_write_json(_xyz_plot_state_path(), store)
 
 
 def _normalize_xyz_mode(raw_mode: object) -> str:

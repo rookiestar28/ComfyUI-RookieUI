@@ -9,6 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from rookieui.services.state_persistence import atomic_write_json, quarantine_corrupt_json
 from rookieui.contracts.prompt_workbench import (
     PROMPT_WORKBENCH_NAMESPACES,
     PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS,
@@ -350,6 +351,9 @@ def load_prompt_workbench_store() -> dict[str, Any]:
         return _default_prompt_workbench_store()
     try:
         return _coerce_store_shape(json.loads(path.read_text(encoding="utf-8")))
+    except json.JSONDecodeError:
+        quarantine_corrupt_json(path)
+        return _default_prompt_workbench_store()
     except Exception:
         return _default_prompt_workbench_store()
 
@@ -358,10 +362,7 @@ def save_prompt_workbench_store(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = _coerce_store_shape(payload)
     _ensure_prompt_workbench_dir()
     with _STATE_LOCK:
-        _prompt_workbench_state_path().write_text(
-            json.dumps(normalized, indent=2, ensure_ascii=True),
-            encoding="utf-8",
-        )
+        atomic_write_json(_prompt_workbench_state_path(), normalized)
     return normalized
 
 

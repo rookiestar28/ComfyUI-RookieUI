@@ -125,3 +125,14 @@ class PromptWorkbenchStateTests(unittest.TestCase):
 
         self.assertTrue(updated["enabled"])
         self.assertEqual(updated["entries"], ["bad-hands", "blurry"])
+
+    def test_load_prompt_workbench_store_quarantines_corrupt_json(self) -> None:
+        state_path = prompt_workbench_state._prompt_workbench_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text("{not-json", encoding="utf-8")
+
+        store = prompt_workbench_state.load_prompt_workbench_store()
+
+        self.assertIn("config", store)
+        self.assertFalse(state_path.exists())
+        self.assertEqual(len(list(state_path.parent.glob("state.corrupt-*.json"))), 1)
