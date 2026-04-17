@@ -255,7 +255,7 @@ export function createADetailerEditor(options) {
   const root = document.createElement("details");
   root.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires rookieui-shell__adetailer-integrated";
   root.id = `${idPrefix}-section`;
-  root.open = true;
+  root.open = false;
   parent.appendChild(root);
 
   const summary = document.createElement("summary");

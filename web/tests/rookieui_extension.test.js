@@ -1071,6 +1071,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")?.textContent).toContain("ControlNet Unit 1");
     expect(document.getElementById("rookieui-txt2img-adetailer-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-adetailer-section")?.open).toBe(false);
     expect(document.getElementById("rookieui-txt2img-adetailer-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-adetailer-tab-3")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-adetailer-section")?.textContent).not.toContain("r74f77-20260414");
@@ -1385,6 +1386,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     ).toBeLessThan(Array.from(img2imgGenerationSection?.children ?? []).indexOf(img2imgControlNetSection));
     expect(document.getElementById("rookieui-img2img-controlnet-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-adetailer-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-adetailer-section")?.open).toBe(false);
     expect(document.getElementById("rookieui-img2img-adetailer-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-allow-preview-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-controlnet-use-mask-0")).not.toBeNull();
