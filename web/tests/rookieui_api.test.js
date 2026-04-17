@@ -9,7 +9,9 @@ import {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchCatalog,
   fetchRookieUIPromptWorkbenchConfig,
+  fetchRookieUIPromptWorkbenchState,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
@@ -17,6 +19,7 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  updateRookieUIPromptWorkbenchState,
 } from "../rookieui_api.js";
 
 describe("fetchRookieUICapabilities", () => {
@@ -208,6 +211,66 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.contract.surface).toBe("prompt_tools_config");
     expect(result.data.config.translation.providers).toEqual({});
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+  });
+
+  test("loads prompt-workbench namespace state with a fallback payload", async () => {
+    const result = await fetchRookieUIPromptWorkbenchState("txt2img_prompt", async () => {
+      throw new Error("offline");
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.data.namespace).toBe("txt2img_prompt");
+    expect(result.data.state.active_panel).toBe("editor");
+  });
+
+  test("updates prompt-workbench namespace state through the backend", async () => {
+    const calls = [];
+    const result = await updateRookieUIPromptWorkbenchState(
+      "txt2img_prompt",
+      { workbench_open: true, active_panel: "history", draft_prompt: "masterpiece, skyline" },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: { surface: "prompt_tools_state" },
+              namespace: "txt2img_prompt",
+              state: {
+                namespace: "txt2img_prompt",
+                workbench_open: true,
+                active_panel: "history",
+                draft_prompt: "masterpiece, skyline",
+                selected_entry_id: "",
+              },
+              saved: true,
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/state");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      namespace: "txt2img_prompt",
+      state: {
+        workbench_open: true,
+        active_panel: "history",
+        draft_prompt: "masterpiece, skyline",
+      },
+    });
+  });
+
+  test("loads prompt-workbench catalog fallback summary", async () => {
+    const result = await fetchRookieUIPromptWorkbenchCatalog("en", async () => {
+      throw new Error("offline");
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.data.group_tags.language).toBe("en");
+    expect(result.data.prompt_library.sections).toEqual([]);
   });
 
   test("builds client-scoped queue paths and prompt-history helpers", async () => {

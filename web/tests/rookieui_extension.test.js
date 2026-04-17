@@ -117,6 +117,33 @@ describe("registerRookieUIBootstrapExtension", () => {
         };
       }
 
+      if (typeof url === "string" && url.startsWith("/rookieui/prompt-tools/state")) {
+        const namespace = url.includes("namespace=img2img_negative")
+          ? "img2img_negative"
+          : url.includes("namespace=img2img_prompt")
+            ? "img2img_prompt"
+            : url.includes("namespace=txt2img_negative")
+              ? "txt2img_negative"
+              : "txt2img_prompt";
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: { version: "r123f114f115f116-20260417", surface: "prompt_tools_state" },
+              namespace,
+              state: {
+                namespace,
+                workbench_open: false,
+                active_panel: "editor",
+                draft_prompt: "",
+                selected_entry_id: "",
+              },
+            };
+          },
+        };
+      }
+
       if (typeof url === "string" && url.startsWith("/view?")) {
         return {
           ok: true,
@@ -516,6 +543,45 @@ describe("registerRookieUIBootstrapExtension", () => {
               scheduler_choices: ["Normal", "Karras"],
               mask_filter_methods: ["Area", "Confidence"],
               mask_merge_modes: ["None", "Merge", "Merge and Invert"],
+            };
+          },
+        };
+      }
+
+      if (url === "/rookieui/prompt-tools/config") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: {
+                version: "r123f114f115f116-20260417",
+                surface: "prompt_tools_config",
+                route_family: "/rookieui/prompt-tools",
+              },
+              config: {
+                language: "en",
+                theme_style: "rookieui_classic",
+                history_limit: 100,
+                favorites_limit: 100,
+                formatting_rules: {
+                  dedupe_commas: true,
+                  normalize_spacing: true,
+                  trim_outer_whitespace: true,
+                },
+                ui_preferences: {
+                  default_open: false,
+                  preferred_panel: "editor",
+                  show_history: true,
+                  show_favorites: true,
+                },
+                translation: { default_provider: "", providers: {} },
+                ai_assist: { default_provider: "", providers: {} },
+              },
+              blacklist: {
+                enabled: false,
+                entries: [],
+              },
             };
           },
         };
@@ -945,6 +1011,9 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-prompt-counter").textContent).toBe("0/75");
     expect(document.getElementById("rookieui-prompt").placeholder).toContain("Ctrl+Enter to Generate");
     expect(document.getElementById("rookieui-negative-prompt").placeholder).toContain("Ctrl+Enter to Generate");
+    expect(document.getElementById("rookieui-txt2img-workbench-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-img2img-workbench-section")).not.toBeNull();
+    expect(document.getElementById("rookieui-txt2img-workbench-state")?.textContent).toContain("Collapsed");
     document.getElementById("rookieui-prompt").value = "  \n  ";
     document.getElementById("rookieui-prompt").dispatchEvent(new Event("input", { bubbles: true }));
     expect(document.getElementById("rookieui-prompt").value).toBe("");
