@@ -72,6 +72,17 @@ function createBootstrapState(overrides = {}) {
           a1111_reference_label: "Checkpoint name",
           notes: [],
         },
+        hires_upscaler: {
+          axis_id: "hires_upscaler",
+          title: "Hires Upscaler",
+          support_tier: "adapted",
+          mode_scopes: ["txt2img"],
+          value_input_mode: "choices_or_csv",
+          choices: ["nearest", "lanczos"],
+          session_runner_support: true,
+          a1111_reference_label: "Hires upscaler",
+          notes: [],
+        },
         denoising_strength: {
           axis_id: "denoising_strength",
           title: "Denoising",
@@ -222,8 +233,10 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-xyz-axis-x-select").value).toBe("steps");
     document.getElementById("txt2img-xyz-axis-z-select").value = "checkpoint_name";
     document.getElementById("txt2img-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
-    document.getElementById("txt2img-xyz-axis-z-fill").click();
-    expect(document.getElementById("txt2img-xyz-axis-z-values").value).toContain("model-a.safetensors");
+    expect(document.getElementById("txt2img-xyz-axis-z-values").hidden).toBe(true);
+    expect(document.getElementById("txt2img-xyz-axis-z-values-select").hidden).toBe(false);
+    expect(document.getElementById("txt2img-xyz-axis-z-fill").disabled).toBe(true);
+    expect(document.getElementById("txt2img-xyz-axis-z-values-select").value).toBe("model-a.safetensors");
 
     document.getElementById("txt2img-xyz-axis-x-values").value = "20, 28, 36";
     document.getElementById("txt2img-xyz-axis-y-values").value = "5.5, 7, 8.5";
@@ -238,7 +251,7 @@ describe("xyz plot shell", () => {
       axes: [
         { axis_id: "steps", values: "20, 28, 36" },
         { axis_id: "cfg_scale", values: "5.5, 7, 8.5" },
-        { axis_id: "checkpoint_name", values: "model-a.safetensors, model-b.safetensors" },
+        { axis_id: "checkpoint_name", values: "model-a.safetensors" },
       ],
       draw_legend: true,
       include_lone_images: false,
@@ -327,5 +340,75 @@ describe("xyz plot shell", () => {
 
     expect(bootstrapState.cancelXYZPlotSessionRequest).toHaveBeenCalledWith("xyz-1", "browser-1");
     expect(document.getElementById("img2img-xyz-session-status").textContent).toContain("cancelled");
+  });
+
+  test("uses dropdown values for non-numeric choice axes and preserves them across swaps", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const bootstrapState = createBootstrapState({
+      xyzPlot: {
+        axes: {
+          ...createBootstrapState().xyzPlot.axes,
+          sampler: {
+            axis_id: "sampler",
+            title: "Sampler",
+            support_tier: "direct",
+            mode_scopes: ["txt2img", "img2img"],
+            value_input_mode: "choices_or_csv",
+            choices: ["euler", "dpmpp_2m"],
+            session_runner_support: true,
+            a1111_reference_label: "Sampler",
+            notes: [],
+          },
+        },
+      },
+    });
+
+    createXYZPlotShell({
+      idPrefix: "swap-xyz",
+      parent,
+      mode: "txt2img",
+      bootstrapState,
+      buildBaseRequest: () => ({ prompt: "city" }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("swap-xyz-axis-x-select").value = "sampler";
+    document.getElementById("swap-xyz-axis-x-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("swap-xyz-axis-x-values-select").value = "dpmpp_2m";
+    document.getElementById("swap-xyz-swap-xy").click();
+
+    expect(document.getElementById("swap-xyz-axis-y-select").value).toBe("sampler");
+    expect(document.getElementById("swap-xyz-axis-y-values-select").hidden).toBe(false);
+    expect(document.getElementById("swap-xyz-axis-y-values-select").value).toBe("dpmpp_2m");
+    expect(document.getElementById("swap-xyz-axis-x-values").hidden).toBe(false);
+  });
+
+  test("uses dropdown mode for whitelisted choice axes including hires upscaler", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+
+    createXYZPlotShell({
+      idPrefix: "txt2img-hires",
+      parent,
+      mode: "txt2img",
+      bootstrapState: createBootstrapState(),
+      buildBaseRequest: () => ({ prompt: "city" }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("txt2img-hires-axis-z-select").value = "hires_upscaler";
+    document.getElementById("txt2img-hires-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(document.getElementById("txt2img-hires-axis-z-values").hidden).toBe(true);
+    expect(document.getElementById("txt2img-hires-axis-z-values-select").hidden).toBe(false);
+    expect(document.getElementById("txt2img-hires-axis-z-values-select").value).toBe("nearest");
+    expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(true);
   });
 });

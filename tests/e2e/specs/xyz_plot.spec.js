@@ -21,6 +21,10 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
 
   await page.locator("#rookieui-txt2img-xyz-plot-section > summary").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toHaveAttribute("open", "");
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-select").selectOption("checkpoint_name");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-select")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();
+  const txt2imgCheckpointValue = await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-select").inputValue();
   await page.locator("#rookieui-txt2img-xyz-plot-axis-x-values").fill("20, 28, 36");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-y-values").fill("5.5, 7, 8.5");
   await page.locator("#rookieui-txt2img-xyz-plot-estimate").click();
@@ -38,6 +42,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(txt2imgRunRequests[0].axes).toEqual([
     { axis_id: "steps", values: "20, 28, 36" },
     { axis_id: "cfg_scale", values: "5.5, 7, 8.5" },
+    { axis_id: "checkpoint_name", values: txt2imgCheckpointValue },
   ]);
 
   await page.locator("#rookieui-tab-img2img").click();
