@@ -504,6 +504,14 @@ window.fetch = async (url, options = {}) => {
     window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] = {
       session_id: sessionId,
       status: "in_progress",
+      seed_policy: {
+        keep_negative_one_seed: Boolean(payload.keep_negative_one_seed),
+        vary_seeds_x: Boolean(payload.vary_seeds_x),
+        vary_seeds_y: Boolean(payload.vary_seeds_y),
+        vary_seeds_z: Boolean(payload.vary_seeds_z),
+        fixed_base_seed: payload.keep_negative_one_seed ? null : 101,
+        fixed_axis_values: {},
+      },
       summary: {
         total_cells: 9,
         completed_cells: 3,
@@ -511,6 +519,7 @@ window.fetch = async (url, options = {}) => {
         failed_cells: 0,
       },
       axes: payload.axes ?? [],
+      cells: [{ resolved_seed: 101 }, {}, {}, {}],
       results: {
         status: "running",
         main_grid: {},
@@ -536,8 +545,17 @@ window.fetch = async (url, options = {}) => {
     window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.cancel.push({ sessionId, payload });
     const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
       session_id: sessionId,
+      seed_policy: {
+        keep_negative_one_seed: false,
+        vary_seeds_x: false,
+        vary_seeds_y: false,
+        vary_seeds_z: false,
+        fixed_base_seed: 101,
+        fixed_axis_values: {},
+      },
       summary: { total_cells: 0, completed_cells: 0, queued_cells: 0, failed_cells: 0 },
       axes: [],
+      cells: [],
       results: { status: "pending", main_grid: {}, sub_grids: [], lone_images: [], warnings: [] },
     };
     session.status = "cancelled";
@@ -557,6 +575,14 @@ window.fetch = async (url, options = {}) => {
     const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
       session_id: sessionId,
       status: "completed",
+      seed_policy: {
+        keep_negative_one_seed: false,
+        vary_seeds_x: false,
+        vary_seeds_y: false,
+        vary_seeds_z: false,
+        fixed_base_seed: 101,
+        fixed_axis_values: {},
+      },
       summary: {
         total_cells: 9,
         completed_cells: 9,
@@ -564,6 +590,7 @@ window.fetch = async (url, options = {}) => {
         failed_cells: 0,
       },
       axes: [],
+      cells: [{ resolved_seed: 101 }, { resolved_seed: 101 }],
       results: {
         status: "ready",
         main_grid: { preview_data_url: "data:image/png;base64,ZmFrZQ==" },
@@ -580,6 +607,7 @@ window.fetch = async (url, options = {}) => {
         queued_cells: 0,
         failed_cells: 0,
       };
+      session.cells = [{ resolved_seed: 101 }, { resolved_seed: 101 }];
       session.results = {
         status: "ready",
         main_grid: { preview_data_url: "data:image/png;base64,ZmFrZQ==" },

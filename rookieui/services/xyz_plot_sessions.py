@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Any
 
 from rookieui.contracts.xyz_plot import build_xyz_plot_contract_meta
-from rookieui.security.request_guard import normalize_client_id, normalize_option_label
+from rookieui.security.request_guard import (
+    RANDOM_SEED_SENTINEL,
+    normalize_client_id,
+    normalize_option_label,
+    resolve_execution_seed,
+    validate_seed_range,
+)
 from rookieui.services.coercion import coerce_bool, coerce_int
 from rookieui.services.xyz_plot_grid import build_xyz_plot_grid_results
 from rookieui.services.img2img import normalize_img2img_request
@@ -28,7 +34,7 @@ from rookieui.services.xyz_plot_values import parse_xyz_axis_values
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 _STATE_LOCK = threading.RLock()
-_XYZ_PLOT_SESSION_SCHEMA_VERSION = 1
+_XYZ_PLOT_SESSION_SCHEMA_VERSION = 2
 _XYZ_PLOT_MAX_PARALLEL = 4
 _XYZ_SLOT_LABELS = ("X", "Y", "Z")
 
@@ -114,6 +120,63 @@ def _normalize_grid_options(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _normalize_seed_value(raw_value: object, *, field_name: str) -> int:
+    seed_value = coerce_int(raw_value, field_name, via_str=True, default=RANDOM_SEED_SENTINEL)
+    return validate_seed_range(seed_value, field_name=field_name)
+
+
+def _normalize_seed_policy(
+    payload: dict[str, Any],
+    *,
+    base_request: dict[str, Any],
+    normalized_axes: list[dict[str, Any]],
+) -> dict[str, Any]:
+    keep_negative_one_seed = coerce_bool(
+        payload.get("keep_negative_one_seed", False),
+        "keep_negative_one_seed",
+        default=False,
+        strict=False,
+    )
+    vary_seeds_x = coerce_bool(payload.get("vary_seeds_x", False), "vary_seeds_x", default=False, strict=False)
+    vary_seeds_y = coerce_bool(payload.get("vary_seeds_y", False), "vary_seeds_y", default=False, strict=False)
+    vary_seeds_z = coerce_bool(payload.get("vary_seeds_z", False), "vary_seeds_z", default=False, strict=False)
+    seed_policy = {
+        "keep_negative_one_seed": keep_negative_one_seed,
+        "vary_seeds_x": vary_seeds_x,
+        "vary_seeds_y": vary_seeds_y,
+        "vary_seeds_z": vary_seeds_z,
+        "fixed_base_seed": None,
+        "fixed_axis_values": {},
+    }
+    base_seed = _normalize_seed_value(base_request.get("seed", RANDOM_SEED_SENTINEL), field_name="base_request.seed")
+    if keep_negative_one_seed:
+        base_request["seed"] = base_seed
+        return seed_policy
+
+    # CRITICAL: freeze A1111-style `-1` seed semantics once per XYZ session; re-rolling per cell breaks parity and makes the grid irreproducible.
+    fixed_base_seed = resolve_execution_seed(base_seed, field_name="base_request.seed")
+    base_request["seed"] = fixed_base_seed
+    seed_policy["fixed_base_seed"] = fixed_base_seed
+
+    fixed_axis_values: dict[str, list[int]] = {}
+    for axis in normalized_axes:
+        if str(axis.get("axis_id", "")).strip() != "seed":
+            continue
+        realized_values: list[int] = []
+        for index, parsed_entry in enumerate(axis.get("parsed_values", [])):
+            if not isinstance(parsed_entry, dict):
+                continue
+            axis_seed = _normalize_seed_value(
+                parsed_entry.get("value", RANDOM_SEED_SENTINEL),
+                field_name=f"{axis.get('slot', '?')}.seed[{index}]",
+            )
+            realized_values.append(resolve_execution_seed(axis_seed, field_name=f"{axis.get('slot', '?')}.seed[{index}]"))
+        if realized_values:
+            fixed_axis_values[str(axis.get("slot", "")).strip()] = realized_values
+    seed_policy["fixed_axis_values"] = fixed_axis_values
+    return seed_policy
+
+
 def _axis_runtime_payload(axis_id: str) -> dict[str, Any]:
     payload = build_xyz_plot_axes_payload().get("axes", {})
     if not isinstance(payload, dict):
@@ -179,6 +242,24 @@ def _apply_prompt_order(prompt_text: str, ordered_tokens: list[str]) -> str:
     return ", ".join(list(ordered_tokens) + remaining)
 
 
+def _resolve_seed_binding_value(
+    axis: dict[str, Any],
+    *,
+    value_index: int,
+    parsed_entry: dict[str, Any],
+    seed_policy: dict[str, Any],
+) -> Any:
+    if str(axis.get("axis_id", "")).strip() != "seed":
+        return parsed_entry.get("value")
+    fixed_axis_values = seed_policy.get("fixed_axis_values", {})
+    if not isinstance(fixed_axis_values, dict):
+        return parsed_entry.get("value")
+    slot_values = fixed_axis_values.get(str(axis.get("slot", "")).strip())
+    if isinstance(slot_values, list) and value_index < len(slot_values):
+        return slot_values[value_index]
+    return parsed_entry.get("value")
+
+
 def _apply_axis_binding(request_payload: dict[str, Any], binding: dict[str, Any], *, mode: str) -> None:
     axis_id = str(binding.get("axis_id", "")).strip()
     axis_value = binding.get("value")
@@ -233,7 +314,7 @@ def _apply_axis_binding(request_payload: dict[str, Any], binding: dict[str, Any]
     raise ValueError(f"xyz_plot axis {axis_id} cannot be applied by the session runner.")
 
 
-def _build_session_cells(normalized_axes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_session_cells(normalized_axes: list[dict[str, Any]], *, seed_policy: dict[str, Any]) -> list[dict[str, Any]]:
     total_cells = 1
     for axis in normalized_axes:
         total_cells *= len(axis["parsed_values"])
@@ -254,7 +335,12 @@ def _build_session_cells(normalized_axes: list[dict[str, Any]]) -> list[dict[str
                     "axis_id": axis["axis_id"],
                     "title": axis["title"],
                     "label": parsed_entry["label"],
-                    "value": parsed_entry["value"],
+                    "value": _resolve_seed_binding_value(
+                        axis,
+                        value_index=value_index,
+                        parsed_entry=parsed_entry,
+                        seed_policy=seed_policy,
+                    ),
                 }
             )
         cells.append(
@@ -269,6 +355,7 @@ def _build_session_cells(normalized_axes: list[dict[str, Any]]) -> list[dict[str
                 "output_filenames": [],
                 "reusable_outputs": [],
                 "error_detail": "",
+                "resolved_seed": None,
                 "submitted_at": None,
                 "updated_at": int(time.time() * 1000),
             }
@@ -337,6 +424,7 @@ def _serialize_session(session: dict[str, Any], *, surface: str, include_cells: 
         "cancel_requested": bool(session.get("cancel_requested", False)),
         "axes": session["axes"],
         "grid_options": session.get("grid_options", {}),
+        "seed_policy": session.get("seed_policy", {}),
         "summary": _build_session_summary(session),
         "last_error": session.get("last_error", ""),
         "results": session.get("results", {}),
@@ -362,10 +450,36 @@ def _best_effort_cancel_prompt(prompt_server: Any, prompt_id: str) -> bool:
     return False
 
 
+def _apply_seed_variation_policy(request_payload: dict[str, Any], session: dict[str, Any], cell: dict[str, Any]) -> None:
+    seed_policy = session.get("seed_policy", {})
+    if not isinstance(seed_policy, dict):
+        return
+    vary_seeds_x = bool(seed_policy.get("vary_seeds_x", False))
+    vary_seeds_y = bool(seed_policy.get("vary_seeds_y", False))
+    vary_seeds_z = bool(seed_policy.get("vary_seeds_z", False))
+    if not any((vary_seeds_x, vary_seeds_y, vary_seeds_z)):
+        return
+    current_seed = _normalize_seed_value(request_payload.get("seed", RANDOM_SEED_SENTINEL), field_name="seed")
+    axes = session.get("axes", [])
+    xdim = len(axes[0].get("parsed_values", [])) if vary_seeds_x and len(axes) > 0 else 1
+    ydim = len(axes[1].get("parsed_values", [])) if vary_seeds_y and len(axes) > 1 else 1
+    axis_indices = cell.get("axis_indices", {})
+    if vary_seeds_x:
+        current_seed += int(axis_indices.get("X", 0) or 0)
+    if vary_seeds_y:
+        current_seed += int(axis_indices.get("Y", 0) or 0) * xdim
+    if vary_seeds_z:
+        current_seed += int(axis_indices.get("Z", 0) or 0) * xdim * ydim
+    request_payload["seed"] = validate_seed_range(current_seed, field_name="seed")
+
+
 async def _submit_cell_for_session(session: dict[str, Any], cell: dict[str, Any], prompt_server: Any) -> None:
     request_payload = copy.deepcopy(session["base_request"])
     for binding in cell.get("bindings", []):
         _apply_axis_binding(request_payload, binding, mode=session["mode"])
+    # IMPORTANT: vary-seed offsets must be applied before request normalization so execution_seed follows A1111's cell-coordinate ordering instead of re-randomizing later.
+    _apply_seed_variation_policy(request_payload, session, cell)
+    cell["resolved_seed"] = _normalize_seed_value(request_payload.get("seed", RANDOM_SEED_SENTINEL), field_name="seed")
     if session["mode"] == "txt2img":
         normalized = normalize_txt2img_request(request_payload)
         translation = translate_txt2img_request(normalized)
@@ -479,17 +593,20 @@ def _normalize_session_request(payload: object) -> dict[str, Any]:
         raise ValueError("xyz_plot base_request must be an object.")
     mode = _normalize_xyz_mode(payload.get("mode"))
     axes = _normalize_session_axes(payload.get("axes", []), mode=mode)
+    normalized_base_request = copy.deepcopy(base_request)
+    seed_policy = _normalize_seed_policy(payload, base_request=normalized_base_request, normalized_axes=axes)
     return {
         "session_id": f"xyz-{secrets.token_hex(8)}",
         "mode": mode,
-        "base_request": copy.deepcopy(base_request),
+        "base_request": normalized_base_request,
         "axes": axes,
-        "cells": _build_session_cells(axes),
+        "cells": _build_session_cells(axes, seed_policy=seed_policy),
         "created_at": int(time.time() * 1000),
         "updated_at": int(time.time() * 1000),
         "client_id": normalize_client_id(payload.get("client_id")),
         "max_parallel": _normalize_max_parallel(payload.get("max_parallel")),
         "grid_options": _normalize_grid_options(payload),
+        "seed_policy": seed_policy,
         "cancel_requested": False,
         "last_error": "",
         "results": {

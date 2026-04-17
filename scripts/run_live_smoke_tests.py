@@ -1047,7 +1047,7 @@ def _build_xyz_plot_execute_payload(context: XYZPlotHostContext, client_id: str)
             "cfg_scale": 6.5,
             "sampler_name": "euler",
             "scheduler_name": "normal",
-            "seed": 101,
+            "seed": -1,
         },
         "axes": [
             {"axis_id": "steps", "values": "12,16"},
@@ -1056,6 +1056,10 @@ def _build_xyz_plot_execute_payload(context: XYZPlotHostContext, client_id: str)
         "draw_legend": True,
         "include_lone_images": True,
         "include_sub_grids": False,
+        "keep_negative_one_seed": False,
+        "vary_seeds_x": False,
+        "vary_seeds_y": False,
+        "vary_seeds_z": False,
         "margin_size": 0,
     }
 
@@ -1084,6 +1088,13 @@ def _validate_xyz_plot_session_payload(
         errors.append(f"{surface}: expected session_id '{expect_session_id}' but got '{session_id}'.")
     if expect_client_id is not None and str(session.get("client_id", "")).strip() != expect_client_id:
         errors.append(f"{surface}: client_id drifted from '{expect_client_id}'.")
+    seed_policy = session.get("seed_policy")
+    if not isinstance(seed_policy, dict):
+        errors.append(f"{surface}: seed_policy missing.")
+    else:
+        for key in ("keep_negative_one_seed", "vary_seeds_x", "vary_seeds_y", "vary_seeds_z"):
+            if not isinstance(seed_policy.get(key), bool):
+                errors.append(f"{surface}: seed_policy.{key} missing or non-boolean.")
     summary = session.get("summary")
     if not isinstance(summary, dict):
         errors.append(f"{surface}: summary missing.")
@@ -1175,6 +1186,18 @@ def _validate_xyz_plot_terminal_detail_payload(
         errors.append("xyz-plot session detail missing sub_grids list.")
     if not isinstance(results.get("warnings"), list):
         errors.append("xyz-plot session detail missing warnings list.")
+    seed_policy = session.get("seed_policy")
+    if isinstance(seed_policy, dict):
+        fixed_base_seed = seed_policy.get("fixed_base_seed")
+        if not isinstance(fixed_base_seed, int) or fixed_base_seed < 0:
+            errors.append("xyz-plot session detail expected a non-negative fixed_base_seed.")
+        cells = session.get("cells")
+        if isinstance(cells, list):
+            resolved_seeds = [cell.get("resolved_seed") for cell in cells if isinstance(cell, dict)]
+            if any(not isinstance(seed, int) for seed in resolved_seeds):
+                errors.append("xyz-plot session detail expected integer resolved_seed values for every cell.")
+            elif isinstance(fixed_base_seed, int) and any(seed != fixed_base_seed for seed in resolved_seeds):
+                errors.append("xyz-plot session detail expected all resolved seeds to match the fixed base seed.")
     return errors
 
 
