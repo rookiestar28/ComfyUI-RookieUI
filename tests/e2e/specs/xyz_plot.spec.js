@@ -2,6 +2,23 @@ const { test, expect } = require("@playwright/test");
 
 test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", async ({ page }) => {
   await page.goto("test-harness.html");
+  await page.evaluate(() => {
+    let fullscreenElement = null;
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get() {
+        return fullscreenElement;
+      },
+    });
+    HTMLElement.prototype.requestFullscreen = async function requestFullscreenShim() {
+      fullscreenElement = this;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+    document.exitFullscreen = async function exitFullscreenShim() {
+      fullscreenElement = null;
+      document.dispatchEvent(new Event("fullscreenchange"));
+    };
+  });
 
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).not.toHaveAttribute("open", "");
@@ -71,6 +88,20 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await expect(page.locator("#rookieui-txt2img-xyz-plot-session-status")).toContainText("in_progress");
   await page.locator("#rookieui-txt2img-xyz-plot-refresh").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-main-grid-preview img")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-preview-fullscreen")).toBeVisible();
+  await page.locator("#rookieui-txt2img-xyz-plot-preview-fullscreen").click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() =>
+        document.fullscreenElement?.classList?.contains("rookieui-shell__preview-surface") ?? false,
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-fullscreen-zoom")).toBeVisible();
+  await page.locator("#rookieui-txt2img-xyz-plot-preview-fullscreen").click();
+  await expect
+    .poll(async () => page.evaluate(() => document.fullscreenElement === null))
+    .toBe(true);
 
   const txt2imgRunRequests = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run);
   expect(txt2imgRunRequests).toHaveLength(1);

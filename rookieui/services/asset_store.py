@@ -162,6 +162,16 @@ def _resolve_host_output_path(selector: str) -> Path:
     raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}")
 
 
+def _resolve_host_output_root() -> Path | None:
+    folder_paths_module = _load_folder_paths_module()
+    get_output_directory = getattr(folder_paths_module, "get_output_directory", None) if folder_paths_module is not None else None
+    if not callable(get_output_directory):
+        return None
+    output_root = Path(str(get_output_directory())).resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    return output_root
+
+
 def decode_image_data(raw_value: object) -> tuple[bytes, str]:
     if not isinstance(raw_value, str) or not raw_value.strip():
         raise ValueError("image_data is required.")
@@ -233,6 +243,20 @@ def resolve_generated_output_path(selector: str) -> Path:
         return resolve_asset_path(selector)
     except ValueError:
         return _resolve_host_output_path(selector)
+
+
+def mirror_output_asset_to_host_output(path: Path, *, filename: str) -> str:
+    output_root = _resolve_host_output_root()
+    if output_root is None:
+        raise ValueError("Host output directory is unavailable for RookieUI asset mirroring.")
+    normalized_name = validate_asset_identifier(filename)
+    target_path = (output_root / normalized_name).resolve()
+    try:
+        target_path.relative_to(output_root)
+    except ValueError as exc:
+        raise ValueError(f"Unknown RookieUI asset handle: {normalized_name}") from exc
+    target_path.write_bytes(path.read_bytes())
+    return target_path.name
 
 
 def list_output_assets() -> list[str]:
