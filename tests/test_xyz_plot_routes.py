@@ -8,9 +8,16 @@ from rookieui.api import routes
 
 
 class _FakeJsonRequest:
-    def __init__(self, payload: dict[str, object] | None = None) -> None:
+    def __init__(
+        self,
+        payload: dict[str, object] | None = None,
+        *,
+        query: dict[str, object] | None = None,
+        match_info: dict[str, object] | None = None,
+    ) -> None:
         self._payload = payload or {}
-        self.query: dict[str, object] = {}
+        self.query: dict[str, object] = query or {}
+        self.match_info: dict[str, object] = match_info or {}
 
     async def json(self) -> dict[str, object]:
         return self._payload
@@ -54,3 +61,47 @@ class XYZPlotRouteTests(unittest.TestCase):
 
         self.assertEqual(response["status"], 400)
         self.assertEqual(response["payload"]["status"], "invalid-request")
+
+    @mock.patch("rookieui.api.routes.execute_xyz_plot_run_snapshot")
+    def test_xyz_plot_run_route_returns_session_payload(self, mocked_run: mock.Mock) -> None:
+        mocked_run.return_value = {
+            "contract": {"surface": "xyz_plot_run"},
+            "session": {"session_id": "xyz-1", "status": "in_progress"},
+        }
+
+        response = asyncio.run(routes.xyz_plot_run(_FakeJsonRequest({"mode": "txt2img"})))
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["session"]["session_id"], "xyz-1")
+
+    @mock.patch("rookieui.api.routes.build_xyz_plot_session_list_snapshot")
+    def test_xyz_plot_sessions_route_returns_list_payload(self, mocked_list: mock.Mock) -> None:
+        mocked_list.return_value = {
+            "contract": {"surface": "xyz_plot_session_list"},
+            "sessions": [{"session_id": "xyz-1"}],
+        }
+
+        response = asyncio.run(routes.xyz_plot_sessions(_FakeJsonRequest(query={"client_id": "browser-1"})))
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["sessions"][0]["session_id"], "xyz-1")
+
+    def test_xyz_plot_session_detail_route_requires_session_id(self) -> None:
+        response = asyncio.run(routes.xyz_plot_session_detail(_FakeJsonRequest()))
+
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(response["payload"]["status"], "invalid-request")
+
+    @mock.patch("rookieui.api.routes.execute_xyz_plot_session_cancel_snapshot")
+    def test_xyz_plot_session_cancel_route_returns_payload(self, mocked_cancel: mock.Mock) -> None:
+        mocked_cancel.return_value = {
+            "contract": {"surface": "xyz_plot_session_cancel"},
+            "session": {"session_id": "xyz-1", "cancel_requested": True},
+        }
+
+        response = asyncio.run(
+            routes.xyz_plot_session_cancel(_FakeJsonRequest(match_info={"session_id": "xyz-1"}))
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertTrue(response["payload"]["session"]["cancel_requested"])

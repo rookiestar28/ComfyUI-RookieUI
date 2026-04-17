@@ -30,6 +30,7 @@ async def submit_prompt_workflow(
     origin: str = "rookieui",
     surface: str = "txt2img",
     profile: str | None = None,
+    extra_metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
     _validate_prompt_server(prompt_server)
     execution_module = _get_execution_module()
@@ -60,6 +61,9 @@ async def submit_prompt_workflow(
         extra_data["rookieui_profile"] = profile
     if client_id:
         extra_data["client_id"] = client_id
+    if isinstance(extra_metadata, dict):
+        # IMPORTANT: feature-specific queue metadata must merge here rather than piggybacking on prompt text; queue/history reconstruction depends on explicit internal tags.
+        extra_data.update(extra_metadata)
 
     outputs_to_execute = valid[2]
     node_errors = valid[3]

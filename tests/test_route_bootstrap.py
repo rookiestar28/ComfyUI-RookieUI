@@ -61,6 +61,10 @@ class RouteBootstrapTests(unittest.TestCase):
                 "/rookieui/prompt-tools/analyze",
                 "/rookieui/xyz-plot/axes",
                 "/rookieui/xyz-plot/estimate",
+                "/rookieui/xyz-plot/run",
+                "/rookieui/xyz-plot/sessions",
+                "/rookieui/xyz-plot/sessions/{session_id}",
+                "/rookieui/xyz-plot/sessions/{session_id}/cancel",
                 "/rookieui/pnginfo/parse",
                 "/rookieui/pnginfo/inspect",
                 "/rookieui/controlnet/detect",
@@ -89,4 +93,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 40)
+        self.assertEqual(len(prompt_server.app.router.routes), 44)
