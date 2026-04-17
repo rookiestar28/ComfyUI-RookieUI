@@ -151,7 +151,10 @@ function syncAxisRowChoiceSummary(row) {
   if (!row.choiceSummaryText) {
     return;
   }
-  row.choiceSummaryText.textContent = buildChoiceSummaryText(getAxisRowSelectedValues(row));
+  const selectedValues = getAxisRowSelectedValues(row);
+  const summaryText = buildChoiceSummaryText(selectedValues);
+  row.choiceSummaryText.textContent = summaryText;
+  row.choiceSummaryText.title = selectedValues.length ? selectedValues.join(", ") : summaryText;
 }
 
 function rebuildAxisRowChoiceOptions(row, choices) {
@@ -171,7 +174,9 @@ function rebuildAxisRowChoiceOptions(row, choices) {
     label.appendChild(input);
 
     const text = document.createElement("span");
+    text.className = "rookieui-shell__xyz-plot-choice-option-text";
     text.textContent = String(choice);
+    text.title = String(choice);
     label.appendChild(text);
 
     row.choiceOptionList.appendChild(label);
