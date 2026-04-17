@@ -44,6 +44,16 @@ class RouteBootstrapTests(unittest.TestCase):
                 "/rookieui/adetailer/catalog",
                 "/rookieui/queue",
                 "/rookieui/queue/{prompt_id}",
+                "/rookieui/prompt-tools/config",
+                "/rookieui/prompt-tools/config",
+                "/rookieui/prompt-tools/state",
+                "/rookieui/prompt-tools/state",
+                "/rookieui/prompt-tools/history",
+                "/rookieui/prompt-tools/history",
+                "/rookieui/prompt-tools/favorites",
+                "/rookieui/prompt-tools/favorites",
+                "/rookieui/prompt-tools/blacklist",
+                "/rookieui/prompt-tools/blacklist",
                 "/rookieui/pnginfo/parse",
                 "/rookieui/pnginfo/inspect",
                 "/rookieui/controlnet/detect",
@@ -72,4 +82,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 23)
+        self.assertEqual(len(prompt_server.app.router.routes), 33)

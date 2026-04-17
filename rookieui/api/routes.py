@@ -13,6 +13,18 @@ from rookieui.services.presets import build_preset_payload
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.pnginfo import parse_pnginfo_payload
 from rookieui.services.queue_snapshot import build_queue_job_snapshot, build_queue_snapshot
+from rookieui.services.prompt_workbench import (
+    apply_prompt_workbench_blacklist_update,
+    apply_prompt_workbench_config_update,
+    apply_prompt_workbench_favorites_update,
+    apply_prompt_workbench_history_update,
+    apply_prompt_workbench_surface_state_update,
+    build_prompt_workbench_blacklist_payload,
+    build_prompt_workbench_config_payload,
+    build_prompt_workbench_favorites_payload,
+    build_prompt_workbench_history_payload,
+    build_prompt_workbench_surface_state_payload,
+)
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import (
@@ -43,6 +55,11 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/presets",
     f"{INTERNAL_ROUTE_PREFIX}/queue",
     f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/config",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/state",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list",
@@ -306,6 +323,228 @@ async def queue_prompt(request: Any) -> Any:
     return _json_response(payload, request=request)
 
 
+async def prompt_tools_config(request: Any) -> Any:
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **build_prompt_workbench_config_payload(),
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_config_update(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_config_update(payload.get("config", payload))
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_state(request: Any) -> Any:
+    namespace = _read_request_query_value(request, "namespace")
+    try:
+        result = build_prompt_workbench_surface_state_payload(namespace)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_state_update(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_surface_state_update(payload.get("namespace"), payload.get("state"))
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_history(request: Any) -> Any:
+    namespace = _read_request_query_value(request, "namespace")
+    try:
+        result = build_prompt_workbench_history_payload(namespace)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_history_update(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_history_update(
+            payload.get("namespace"),
+            action=payload.get("action", "push"),
+            payload=payload,
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_favorites(request: Any) -> Any:
+    namespace = _read_request_query_value(request, "namespace")
+    try:
+        result = build_prompt_workbench_favorites_payload(namespace)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_favorites_update(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_favorites_update(
+            payload.get("namespace"),
+            action=payload.get("action", "push"),
+            payload=payload,
+        )
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_blacklist(request: Any) -> Any:
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **build_prompt_workbench_blacklist_payload(),
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_blacklist_update(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_blacklist_update(payload.get("blacklist", payload))
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
 async def pnginfo_parse(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
@@ -552,6 +791,18 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/adetailer/catalog", adetailer_catalog)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue", queue)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}", queue_prompt)
+    # IMPORTANT: keep prompt-workbench tooling under one coherent /prompt-tools/* family; scattering these routes
+    # would reopen the phase-60 ownership contract before the workbench ships.
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/config", prompt_tools_config)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/config", prompt_tools_config_update)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/state", prompt_tools_state)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/state", prompt_tools_state_update)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history", prompt_tools_history)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history", prompt_tools_history_update)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites", prompt_tools_favorites)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites", prompt_tools_favorites_update)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist_update)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)
