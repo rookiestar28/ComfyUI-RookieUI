@@ -215,6 +215,10 @@ describe("xyz plot shell", () => {
 
     await flushPromises();
 
+    const section = document.getElementById("txt2img-xyz-section");
+    expect(section?.open).toBe(false);
+    expect(section?.querySelector("summary")?.className).toContain("rookieui-shell__hires-summary");
+
     expect(document.getElementById("txt2img-xyz-axis-x-select").value).toBe("steps");
     document.getElementById("txt2img-xyz-axis-z-select").value = "checkpoint_name";
     document.getElementById("txt2img-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
@@ -293,6 +297,9 @@ describe("xyz plot shell", () => {
     });
 
     await flushPromises();
+
+    const section = document.getElementById("img2img-xyz-section");
+    expect(section?.open).toBe(false);
 
     document.getElementById("img2img-xyz-axis-x-values").value = "1, 2, 3";
     document.getElementById("img2img-xyz-axis-y-values").value = "0.35, 0.55, 0.75";

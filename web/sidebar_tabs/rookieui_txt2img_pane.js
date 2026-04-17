@@ -516,6 +516,25 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         createSliderField(advancedGrid, "Hires Denoise", elements.hiresDenoise, elements.hiresDenoiseSlider, "rookieui-hires-denoise-field");
         createField(advancedGrid, "Upscale Method", elements.hiresUpscaleMethod);
 
+        txt2imgADetailerEditor = createADetailerEditor({
+          idPrefix: "rookieui-txt2img-adetailer",
+          parent: samplingSection,
+          hiddenInput: elements.adetailer,
+          catalog: mergedADetailerCatalog,
+          surface: "txt2img",
+          createInput,
+          createRangeInput,
+          createSelect,
+          createTextarea,
+          createCheckbox,
+          createField,
+          createSliderField,
+          createInlineCheckboxField,
+          appendTextElement,
+          bindSliderPair,
+          syncBoundControls,
+        });
+
         txt2imgControlNetEditor = createControlNetUnitEditor({
           idPrefix: "rookieui-txt2img-controlnet",
           parent: samplingSection,
@@ -536,25 +555,6 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           },
         });
         txt2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
-
-        txt2imgADetailerEditor = createADetailerEditor({
-          idPrefix: "rookieui-txt2img-adetailer",
-          parent: samplingSection,
-          hiddenInput: elements.adetailer,
-          catalog: mergedADetailerCatalog,
-          surface: "txt2img",
-          createInput,
-          createRangeInput,
-          createSelect,
-          createTextarea,
-          createCheckbox,
-          createField,
-          createSliderField,
-          createInlineCheckboxField,
-          appendTextElement,
-          bindSliderPair,
-          syncBoundControls,
-        });
 
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";

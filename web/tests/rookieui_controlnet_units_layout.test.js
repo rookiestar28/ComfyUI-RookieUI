@@ -120,6 +120,13 @@ function buildEditor(idPrefix, overrides = {}) {
 }
 
 describe("createControlNetUnitEditor layout and rollback contract", () => {
+  test("defaults the integrated section to collapsed after refresh", () => {
+    const { host } = buildEditor("rookieui-img2img-controlnet");
+    const section = host.querySelector("#rookieui-img2img-controlnet-section");
+    expect(section).not.toBeNull();
+    expect(section?.open).toBe(false);
+  });
+
   test("keeps exactly one active control-type chip while switching radio options", () => {
     const { host } = buildEditor("rookieui-img2img-controlnet");
     document.body.appendChild(host);

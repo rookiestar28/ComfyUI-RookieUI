@@ -115,9 +115,10 @@ export function createXYZPlotShell({
   createActionButton,
   onStatusMessage,
 } = {}) {
-  const shell = document.createElement("section");
+  const shell = document.createElement("details");
   shell.id = `${idPrefix}-section`;
-  shell.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__xyz-plot";
+  shell.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires rookieui-shell__xyz-plot";
+  shell.open = false;
   parent.appendChild(shell);
 
   const axisCatalog = normalizeAxisCatalog(bootstrapState?.xyzPlot?.axes ?? {}, mode);
@@ -135,20 +136,26 @@ export function createXYZPlotShell({
     axisCatalog,
   };
 
+  const summary = document.createElement("summary");
+  summary.className = "rookieui-shell__hires-summary rookieui-shell__xyz-plot-summary-bar";
+  shell.appendChild(summary);
+
   const header = document.createElement("div");
-  header.className = "rookieui-shell__xyz-plot-header";
-  shell.appendChild(header);
-  appendTextElement(header, "h4", "rookieui-shell__section-title", "XYZ Plot");
-  appendTextElement(
-    header,
-    "p",
-    "rookieui-shell__status rookieui-shell__xyz-plot-note",
-    `Bottom-mounted sweep surface for ${mode}. It stays below ControlNet / ADetailer blocks by design.`,
-  );
+  header.className = "rookieui-shell__hires-header";
+  summary.appendChild(header);
+  appendTextElement(header, "span", "rookieui-shell__hires-title", "XYZ Plot");
+  appendTextElement(header, "span", "rookieui-shell__hires-caret", "▸");
 
   const body = document.createElement("div");
   body.className = "rookieui-shell__xyz-plot-body";
   shell.appendChild(body);
+
+  appendTextElement(
+    body,
+    "p",
+    "rookieui-shell__status rookieui-shell__xyz-plot-note",
+    `Bottom-mounted sweep surface for ${mode}. It stays below ControlNet / ADetailer blocks by design.`,
+  );
 
   const leftColumn = document.createElement("div");
   leftColumn.className = "rookieui-shell__xyz-plot-column";

@@ -1062,8 +1062,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(txt2imgGenerationSection?.contains(txt2imgControlNetSection)).toBe(true);
     expect(txt2imgHiresControls).not.toBeNull();
     expect(txt2imgControlNetSection).not.toBeNull();
+    expect(txt2imgControlNetSection?.open).toBe(false);
     expect(txt2imgControlNetSection?.classList.contains("rookieui-shell__controlnet-integrated")).toBe(true);
     expect(txt2imgControlNetSection?.textContent).toContain("Controlnet");
+    expect(
+      Array.from(txt2imgGenerationSection?.children ?? []).indexOf(document.getElementById("rookieui-txt2img-adetailer-section")),
+    ).toBeLessThan(Array.from(txt2imgGenerationSection?.children ?? []).indexOf(txt2imgControlNetSection));
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-controlnet-tab-0")?.textContent).toContain("ControlNet Unit 1");
     expect(document.getElementById("rookieui-txt2img-adetailer-section")).not.toBeNull();
@@ -1373,8 +1377,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgGenerationSection?.contains(img2imgControlNetSection)).toBe(true);
     expect(img2imgHiresControls).not.toBeNull();
     expect(img2imgControlNetSection).not.toBeNull();
+    expect(img2imgControlNetSection?.open).toBe(false);
     expect(img2imgControlNetSection?.classList.contains("rookieui-shell__controlnet-integrated")).toBe(true);
     expect(img2imgControlNetSection?.textContent).toContain("Controlnet");
+    expect(
+      Array.from(img2imgGenerationSection?.children ?? []).indexOf(document.getElementById("rookieui-img2img-adetailer-section")),
+    ).toBeLessThan(Array.from(img2imgGenerationSection?.children ?? []).indexOf(img2imgControlNetSection));
     expect(document.getElementById("rookieui-img2img-controlnet-tab-0")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-adetailer-section")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-adetailer-tab-0")).not.toBeNull();

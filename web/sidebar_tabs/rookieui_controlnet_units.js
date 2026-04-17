@@ -905,7 +905,7 @@ export function createControlNetUnitEditor({
   integratedDetails.className =
     "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__hires rookieui-shell__controlnet-integrated";
   integratedDetails.id = `${idPrefix}-section`;
-  integratedDetails.open = true;
+  integratedDetails.open = false;
   parent.appendChild(integratedDetails);
 
   const summary = document.createElement("summary");
