@@ -336,6 +336,7 @@
 
 .rookieui-shell__xyz-plot-choice-dropdown {
   position: relative;
+  min-width: 0;
 }
 
 .rookieui-shell__xyz-plot-choice-summary {
@@ -349,6 +350,9 @@
   border-radius: 8px;
   background: var(--rookieui-bg-input);
   color: var(--rookieui-text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
   cursor: pointer;
   list-style: none;
 }
@@ -382,8 +386,11 @@
   z-index: 8;
   top: calc(100% + 6px);
   left: 0;
-  right: 0;
+  right: auto;
   display: grid;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(72rem, calc(100vw - 48px));
   gap: 6px;
   max-height: 220px;
   overflow: auto;
@@ -391,20 +398,39 @@
   border: 1px solid var(--rookieui-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--rookieui-bg-panel) 98%, transparent);
+  font: inherit;
+  font-size: 12px;
   box-shadow: 0 16px 24px rgba(0, 0, 0, 0.22);
 }
 
 .rookieui-shell__xyz-plot-choice-options {
   display: grid;
   gap: 6px;
+  min-width: max-content;
 }
 
 .rookieui-shell__xyz-plot-choice-option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 28px;
   color: var(--rookieui-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.rookieui-shell__xyz-plot-choice-option input {
+  flex: none;
+  margin-top: 2px;
+}
+
+.rookieui-shell__xyz-plot-choice-option-text {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rookieui-shell__xyz-plot-axis-slot {

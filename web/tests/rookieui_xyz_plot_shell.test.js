@@ -243,6 +243,12 @@ describe("xyz plot shell", () => {
         document.querySelectorAll("#txt2img-xyz-axis-z-values-options input:checked"),
       ).map((input) => input.value),
     ).toEqual(["model-a.safetensors", "model-b.safetensors"]);
+    expect(
+      document.querySelector("#txt2img-xyz-axis-z-values-options .rookieui-shell__xyz-plot-choice-option-text")?.title,
+    ).toBe("model-a.safetensors");
+    expect(
+      document.querySelector("#txt2img-xyz-axis-z-values-summary .rookieui-shell__xyz-plot-choice-summary-text")?.title,
+    ).toBe("model-a.safetensors, model-b.safetensors");
 
     document.getElementById("txt2img-xyz-axis-x-values").value = "20, 28, 36";
     document.getElementById("txt2img-xyz-axis-y-values").value = "5.5, 7, 8.5";

@@ -28,6 +28,26 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
     .locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input")
     .evaluateAll((nodes) => nodes.map((node) => node.value).slice(0, 2));
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-summary").click();
+  const choicePanelLayout = await page.evaluate(() => {
+    const summary = document.getElementById("rookieui-txt2img-xyz-plot-axis-z-values-summary");
+    const panel = document.querySelector("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect .rookieui-shell__xyz-plot-choice-panel");
+    const optionText = document.querySelector("#rookieui-txt2img-xyz-plot-axis-z-values-options .rookieui-shell__xyz-plot-choice-option-text");
+    const select = document.getElementById("rookieui-txt2img-xyz-plot-axis-z-select");
+    const summaryRect = summary?.getBoundingClientRect();
+    const panelRect = panel?.getBoundingClientRect();
+    return {
+      summaryWidth: summaryRect?.width ?? 0,
+      panelWidth: panelRect?.width ?? 0,
+      summaryFont: summary ? getComputedStyle(summary).fontSize : "",
+      panelFont: panel ? getComputedStyle(panel).fontSize : "",
+      selectFont: select ? getComputedStyle(select).fontSize : "",
+      optionWrap: optionText ? getComputedStyle(optionText).overflowWrap : "",
+    };
+  });
+  expect(choicePanelLayout.panelWidth).toBeGreaterThanOrEqual(choicePanelLayout.summaryWidth);
+  expect(choicePanelLayout.summaryFont).toBe(choicePanelLayout.selectFont);
+  expect(choicePanelLayout.panelFont).toBe(choicePanelLayout.selectFont);
+  expect(choicePanelLayout.optionWrap).toBe("anywhere");
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[0]}"]`).check();
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[1]}"]`).check();
   await page.locator("#rookieui-txt2img-xyz-plot-axis-x-values").fill("20, 28, 36");
