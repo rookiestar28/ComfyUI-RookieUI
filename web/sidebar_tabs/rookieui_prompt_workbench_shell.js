@@ -1,3 +1,14 @@
+let tokenSequence = 0;
+
+function createToken(text, { disabled = false } = {}) {
+  tokenSequence += 1;
+  return {
+    id: `pw-token-${tokenSequence}`,
+    text: String(text ?? "").trim(),
+    disabled: Boolean(disabled),
+  };
+}
+
 function normalizeStatePayload(namespace, payload) {
   return {
     namespace,
@@ -8,7 +19,22 @@ function normalizeStatePayload(namespace, payload) {
   };
 }
 
-function countPromptTokens(value) {
+function normalizePromptEntry(entry) {
+  return {
+    id: String(entry?.id ?? "").trim() || `pw-entry-${Date.now()}`,
+    label: String(entry?.label ?? "").trim(),
+    prompt_text: String(entry?.prompt_text ?? "").trim(),
+    created_at: Number(entry?.created_at ?? 0) || 0,
+  };
+}
+
+function setText(node, value) {
+  if (node) {
+    node.textContent = String(value ?? "");
+  }
+}
+
+function countPromptUnits(value) {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) {
     return 0;
@@ -16,9 +42,64 @@ function countPromptTokens(value) {
   return trimmed.split(/[\s,]+/).filter(Boolean).length;
 }
 
-function setText(node, value) {
+function parsePromptTokens(text) {
+  return String(text ?? "")
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => createToken(entry));
+}
+
+function buildPromptTextFromTokens(tokens) {
+  return (Array.isArray(tokens) ? tokens : [])
+    .filter((token) => token && !token.disabled && String(token.text ?? "").trim())
+    .map((token) => String(token.text).trim())
+    .join(", ");
+}
+
+function formatPromptText(text, formattingRules) {
+  let nextText = String(text ?? "");
+  if (formattingRules?.normalize_spacing) {
+    nextText = nextText
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+  if (formattingRules?.dedupe_commas) {
+    const seen = new Set();
+    nextText = nextText
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .filter((entry) => {
+        const key = entry.toLowerCase();
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .join(", ");
+  }
+  if (formattingRules?.trim_outer_whitespace) {
+    nextText = nextText.trim();
+  }
+  return nextText;
+}
+
+function buildEntryLabel(scope, promptText) {
+  const preview = String(promptText ?? "").trim();
+  if (!preview) {
+    return scope === "negative" ? "Negative Prompt" : "Prompt";
+  }
+  const prefix = scope === "negative" ? "Negative" : "Prompt";
+  return `${prefix}: ${preview.slice(0, 48)}`;
+}
+
+function clearChildren(node) {
   if (node) {
-    node.textContent = String(value ?? "");
+    node.replaceChildren();
   }
 }
 
@@ -38,7 +119,8 @@ export function createPromptWorkbenchShell({
   shell.className = "rookieui-shell__prompt-workbench";
   parent.appendChild(shell);
 
-  const config = bootstrapState?.promptWorkbench?.config ?? {};
+  const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
+  const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [] });
   const namespaceMap = {
     prompt: String(namespaces?.prompt ?? "").trim(),
     negative: String(namespaces?.negative ?? "").trim(),
@@ -48,6 +130,7 @@ export function createPromptWorkbenchShell({
     negative: negativePromptInput,
   };
   const stateCache = new Map();
+  const editorCache = new Map();
   const historyCache = new Map();
   const favoritesCache = new Map();
   const dirtyTimers = new Map();
@@ -57,6 +140,7 @@ export function createPromptWorkbenchShell({
   let resourcesReadyPromise = null;
   let activeScope = "prompt";
   let resourcesLoaded = false;
+  let dragTokenId = "";
 
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
@@ -70,14 +154,14 @@ export function createPromptWorkbenchShell({
     headerCopy,
     "p",
     "rookieui-shell__prompt-workbench-subtitle",
-    "Foundation shell for prompt state, providers, catalogs, and later editor actions.",
+    "Structured prompt editor with persisted history, favorites, formatting rules, and blacklist-aware cleanup.",
   );
 
   const headerActions = document.createElement("div");
   headerActions.className = "rookieui-shell__prompt-workbench-header-actions";
   header.appendChild(headerActions);
 
-  const toggleButton = createActionButton(`${idPrefix}-toggle`, "Open Workbench", "secondary");
+  const toggleButton = createActionButton(`${idPrefix}-toggle`, "Open Workbench");
   toggleButton.classList.add("rookieui-shell__prompt-workbench-toggle");
   headerActions.appendChild(toggleButton);
 
@@ -99,9 +183,7 @@ export function createPromptWorkbenchShell({
     button.textContent = label;
     button.addEventListener("click", () => {
       activeScope = scope;
-      void ensureStateLoaded().then(() => {
-        syncUi();
-      });
+      syncUi();
     });
     namespaceTabs.appendChild(button);
     tabButtons.set(scope, button);
@@ -139,12 +221,12 @@ export function createPromptWorkbenchShell({
   body.appendChild(panelRail);
 
   const panelButtons = new Map();
-  ["editor", "history", "favorites", "library"].forEach((panelId) => {
+  ["editor", "history", "favorites", "format"].forEach((panelId) => {
     const button = document.createElement("button");
     button.type = "button";
     button.id = `${idPrefix}-panel-${panelId}`;
     button.className = "rookieui-shell__prompt-workbench-panel-button";
-    button.textContent = panelId === "library" ? "Library" : panelId.charAt(0).toUpperCase() + panelId.slice(1);
+    button.textContent = panelId === "format" ? "Format" : panelId.charAt(0).toUpperCase() + panelId.slice(1);
     button.addEventListener("click", () => {
       const currentState = getActiveState();
       currentState.active_panel = panelId;
@@ -159,29 +241,51 @@ export function createPromptWorkbenchShell({
   actionsRow.className = "rookieui-shell__prompt-workbench-actions";
   body.appendChild(actionsRow);
 
-  const captureButton = createActionButton(`${idPrefix}-capture`, "Capture Current Text", "ghost");
+  const captureButton = createActionButton(`${idPrefix}-capture`, "Capture Current Text");
   captureButton.addEventListener("click", () => {
-    const state = getActiveState();
     const input = getActiveInput();
-    state.draft_prompt = String(input?.value ?? "");
+    const nextText = String(input?.value ?? "");
+    const state = getActiveState();
+    state.draft_prompt = nextText;
+    editorCache.set(getActiveNamespace(), parsePromptTokens(nextText));
     queueStatePersist();
     syncUi();
     onStatusMessage?.("Captured current prompt text into Prompt Workbench state");
   });
   actionsRow.appendChild(captureButton);
 
-  const restoreButton = createActionButton(`${idPrefix}-restore`, "Restore Draft", "ghost");
+  const restoreButton = createActionButton(`${idPrefix}-restore`, "Restore Draft");
   restoreButton.addEventListener("click", () => {
-    const state = getActiveState();
-    const input = getActiveInput();
-    if (input) {
-      input.value = state.draft_prompt;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-    }
-    onStatusMessage?.("Restored saved Prompt Workbench draft into the active prompt field");
+    applyPromptTextToInput(getActiveState().draft_prompt, {
+      updateEditor: true,
+      statusMessage: "Restored saved Prompt Workbench draft into the active prompt field",
+    });
   });
   actionsRow.appendChild(restoreButton);
+
+  const panelContent = document.createElement("div");
+  panelContent.className = "rookieui-shell__prompt-workbench-panel-content";
+  body.appendChild(panelContent);
+
+  const editorPane = document.createElement("section");
+  editorPane.id = `${idPrefix}-editor-pane`;
+  editorPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(editorPane);
+
+  const historyPane = document.createElement("section");
+  historyPane.id = `${idPrefix}-history-pane`;
+  historyPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(historyPane);
+
+  const favoritesPane = document.createElement("section");
+  favoritesPane.id = `${idPrefix}-favorites-pane`;
+  favoritesPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(favoritesPane);
+
+  const formatPane = document.createElement("section");
+  formatPane.id = `${idPrefix}-format-pane`;
+  formatPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(formatPane);
 
   const details = document.createElement("div");
   details.className = "rookieui-shell__prompt-workbench-details";
@@ -191,19 +295,11 @@ export function createPromptWorkbenchShell({
     scope: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
     draft: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
     panel: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
-    status: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-status", "Workbench shell ready"),
+    status: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-status", "Prompt Workbench ready"),
   };
 
   function getActiveNamespace() {
     return namespaceMap[activeScope];
-  }
-
-  function getActiveState() {
-    const namespace = getActiveNamespace();
-    if (!stateCache.has(namespace)) {
-      stateCache.set(namespace, normalizeStatePayload(namespace, { draft_prompt: getActiveInput()?.value ?? "" }));
-    }
-    return stateCache.get(namespace);
   }
 
   function getActiveInput() {
@@ -220,6 +316,22 @@ export function createPromptWorkbenchShell({
     return null;
   }
 
+  function getActiveState() {
+    const namespace = getActiveNamespace();
+    if (!stateCache.has(namespace)) {
+      stateCache.set(namespace, normalizeStatePayload(namespace, { draft_prompt: getActiveInput()?.value ?? "" }));
+    }
+    return stateCache.get(namespace);
+  }
+
+  function ensureEditorTokens(namespace) {
+    if (!editorCache.has(namespace)) {
+      const state = stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
+      editorCache.set(namespace, parsePromptTokens(state.draft_prompt || getNamespaceInput(namespace)?.value));
+    }
+    return editorCache.get(namespace);
+  }
+
   function setBodyOpen(isOpen) {
     shell.dataset.open = String(isOpen);
     body.hidden = !isOpen;
@@ -231,17 +343,511 @@ export function createPromptWorkbenchShell({
     if (state.workbench_open) {
       return true;
     }
-    return Boolean(config?.ui_preferences?.default_open);
+    return Boolean(configState?.ui_preferences?.default_open);
+  }
+
+  function updateStatus(message) {
+    setText(detailNodes.status, message);
+  }
+
+  function queueStatePersist() {
+    const namespace = getActiveNamespace();
+    const state = getActiveState();
+    const existingTimer = dirtyTimers.get(namespace);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    const nextTimer = setTimeout(async () => {
+      dirtyTimers.delete(namespace);
+      const result = await bootstrapState?.updatePromptWorkbenchStateRequest?.(namespace, {
+        workbench_open: state.workbench_open,
+        active_panel: state.active_panel,
+        draft_prompt: state.draft_prompt,
+        selected_entry_id: state.selected_entry_id,
+      });
+      updateStatus(result?.ok === false ? "Prompt Workbench state saved with fallback semantics" : "Prompt Workbench state synchronized");
+      syncUi();
+    }, 180);
+    dirtyTimers.set(namespace, nextTimer);
+  }
+
+  function queueConfigPersist() {
+    void bootstrapState?.updatePromptWorkbenchConfigRequest?.(configState).then((result) => {
+      if (result?.data?.config) {
+        Object.assign(configState, result.data.config);
+      }
+      updateStatus(result?.ok === false ? "Formatting preferences saved with fallback semantics" : "Formatting preferences synchronized");
+      syncUi();
+    });
+  }
+
+  function applyPromptTextToInput(nextText, { updateEditor = true, statusMessage = "" } = {}) {
+    const namespace = getActiveNamespace();
+    const input = getActiveInput();
+    const state = getActiveState();
+    const normalizedText = String(nextText ?? "");
+    state.draft_prompt = normalizedText;
+    if (updateEditor) {
+      editorCache.set(namespace, parsePromptTokens(normalizedText));
+    }
+    if (input) {
+      input.value = normalizedText;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      queueStatePersist();
+      syncUi();
+    }
+    if (statusMessage) {
+      onStatusMessage?.(statusMessage);
+      updateStatus(statusMessage);
+    }
+  }
+
+  function rebuildPromptFromEditor(statusMessage) {
+    const namespace = getActiveNamespace();
+    const tokens = ensureEditorTokens(namespace);
+    const nextText = buildPromptTextFromTokens(tokens);
+    const state = getActiveState();
+    state.draft_prompt = nextText;
+    const input = getActiveInput();
+    if (input) {
+      input.value = nextText;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    } else {
+      queueStatePersist();
+      syncUi();
+    }
+    if (statusMessage) {
+      onStatusMessage?.(statusMessage);
+      updateStatus(statusMessage);
+    }
+  }
+
+  function addCurrentPromptToCollection(collectionName) {
+    const actionMethod =
+      collectionName === "favorites"
+        ? bootstrapState?.updatePromptWorkbenchFavoritesRequest
+        : bootstrapState?.updatePromptWorkbenchHistoryRequest;
+    const namespace = getActiveNamespace();
+    const state = getActiveState();
+    const promptText = state.draft_prompt || String(getActiveInput()?.value ?? "").trim();
+    if (!promptText) {
+      updateStatus(`No ${activeScope === "negative" ? "negative prompt" : "prompt"} text to save`);
+      return;
+    }
+    const item = {
+      label: buildEntryLabel(activeScope, promptText),
+      prompt_text: promptText,
+      tag_tokens: ensureEditorTokens(namespace).filter((token) => !token.disabled).map((token) => token.text),
+    };
+    void actionMethod?.(namespace, "push", { item }).then((result) => {
+      const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
+      if (collectionName === "favorites") {
+        favoritesCache.set(namespace, normalizedItems);
+      } else {
+        historyCache.set(namespace, normalizedItems);
+      }
+      updateStatus(`Saved current ${activeScope === "negative" ? "negative prompt" : "prompt"} to ${collectionName}`);
+      syncUi();
+    });
+  }
+
+  function applyCollectionEntry(entry) {
+    applyPromptTextToInput(entry.prompt_text, {
+      updateEditor: true,
+      statusMessage: `Applied ${activeScope === "negative" ? "negative prompt" : "prompt"} entry`,
+    });
+  }
+
+  function mutateCollection(collectionName, action, payload) {
+    const namespace = getActiveNamespace();
+    const actionMethod =
+      collectionName === "favorites"
+        ? bootstrapState?.updatePromptWorkbenchFavoritesRequest
+        : bootstrapState?.updatePromptWorkbenchHistoryRequest;
+    void actionMethod?.(namespace, action, payload).then((result) => {
+      const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
+      if (collectionName === "favorites") {
+        favoritesCache.set(namespace, normalizedItems);
+      } else {
+        historyCache.set(namespace, normalizedItems);
+      }
+      updateStatus(`${collectionName === "favorites" ? "Favorites" : "History"} updated`);
+      syncUi();
+    });
+  }
+
+  function addTokenToBlacklist(tokenText) {
+    const normalized = String(tokenText ?? "").trim();
+    if (!normalized) {
+      return;
+    }
+    const nextEntries = Array.from(new Set([...(blacklistState.entries ?? []), normalized]));
+    blacklistState.enabled = true;
+    blacklistState.entries = nextEntries;
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+      if (result?.data?.blacklist) {
+        Object.assign(blacklistState, result.data.blacklist);
+      }
+      updateStatus("Prompt Workbench blacklist updated");
+      syncUi();
+    });
+  }
+
+  function removeBlacklistEntry(entryText) {
+    blacklistState.entries = (blacklistState.entries ?? []).filter((entry) => entry !== entryText);
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+      if (result?.data?.blacklist) {
+        Object.assign(blacklistState, result.data.blacklist);
+      }
+      updateStatus("Removed blacklist entry");
+      syncUi();
+    });
+  }
+
+  function applyBlacklistFilter() {
+    const tokens = ensureEditorTokens(getActiveNamespace());
+    const blacklistSet = new Set((blacklistState.entries ?? []).map((entry) => String(entry).trim().toLowerCase()));
+    tokens.forEach((token) => {
+      token.disabled = blacklistSet.has(String(token.text ?? "").trim().toLowerCase());
+    });
+    rebuildPromptFromEditor("Applied Prompt Workbench blacklist filter");
+  }
+
+  function renderEditorPane() {
+    clearChildren(editorPane);
+    const heading = document.createElement("div");
+    heading.className = "rookieui-shell__prompt-workbench-pane-header";
+    editorPane.appendChild(heading);
+    appendTextElement(
+      heading,
+      "h6",
+      "rookieui-shell__prompt-workbench-pane-title",
+      activeScope === "negative" ? "Negative Prompt Editor" : "Prompt Editor",
+    );
+
+    const addRow = document.createElement("div");
+    addRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    editorPane.appendChild(addRow);
+
+    const addInput = document.createElement("input");
+    addInput.type = "text";
+    addInput.id = `${idPrefix}-token-add`;
+    addInput.className = "rookieui-shell__input";
+    addInput.placeholder = "Add keyword or token";
+    addRow.appendChild(addInput);
+
+    const addButton = createActionButton(`${idPrefix}-token-add-button`, "Add Token");
+    addButton.addEventListener("click", () => {
+      const normalizedText = String(addInput.value ?? "").trim();
+      if (!normalizedText) {
+        return;
+      }
+      ensureEditorTokens(getActiveNamespace()).push(createToken(normalizedText));
+      addInput.value = "";
+      rebuildPromptFromEditor("Added prompt token");
+    });
+    addRow.appendChild(addButton);
+
+    const tokens = ensureEditorTokens(getActiveNamespace());
+    const list = document.createElement("div");
+    list.id = `${idPrefix}-token-list`;
+    list.className = "rookieui-shell__prompt-workbench-token-list";
+    editorPane.appendChild(list);
+
+    if (!tokens.length) {
+      appendTextElement(
+        list,
+        "p",
+        "rookieui-shell__prompt-workbench-empty",
+        "No tokens yet. Capture or add prompt text to begin editing.",
+      );
+      return;
+    }
+
+    tokens.forEach((token, index) => {
+      const row = document.createElement("div");
+      row.className = "rookieui-shell__prompt-workbench-token";
+      row.dataset.disabled = String(token.disabled);
+      row.draggable = true;
+      row.id = `${idPrefix}-token-${token.id}`;
+      row.addEventListener("dragstart", () => {
+        dragTokenId = token.id;
+      });
+      row.addEventListener("dragover", (event) => {
+        event.preventDefault();
+      });
+      row.addEventListener("drop", (event) => {
+        event.preventDefault();
+        const draggedIndex = tokens.findIndex((entry) => entry.id === dragTokenId);
+        const dropIndex = tokens.findIndex((entry) => entry.id === token.id);
+        if (draggedIndex < 0 || dropIndex < 0 || draggedIndex === dropIndex) {
+          return;
+        }
+        const [draggedToken] = tokens.splice(draggedIndex, 1);
+        tokens.splice(dropIndex, 0, draggedToken);
+        rebuildPromptFromEditor("Reordered prompt tokens");
+      });
+
+      const dragHandle = document.createElement("span");
+      dragHandle.className = "rookieui-shell__prompt-workbench-token-handle";
+      dragHandle.textContent = "⋮⋮";
+      row.appendChild(dragHandle);
+
+      const valueInput = document.createElement("input");
+      valueInput.type = "text";
+      valueInput.className = "rookieui-shell__input rookieui-shell__prompt-workbench-token-input";
+      valueInput.value = token.text;
+      valueInput.addEventListener("change", () => {
+        token.text = String(valueInput.value ?? "").trim();
+        rebuildPromptFromEditor("Edited prompt token");
+      });
+      row.appendChild(valueInput);
+
+      const controls = document.createElement("div");
+      controls.className = "rookieui-shell__prompt-workbench-token-actions";
+      row.appendChild(controls);
+
+      const toggleButton = createActionButton(`${idPrefix}-token-toggle-${index}`, token.disabled ? "Enable" : "Disable");
+      toggleButton.addEventListener("click", () => {
+        token.disabled = !token.disabled;
+        rebuildPromptFromEditor(token.disabled ? "Disabled prompt token" : "Enabled prompt token");
+      });
+      controls.appendChild(toggleButton);
+
+      const upButton = createActionButton(`${idPrefix}-token-up-${index}`, "Up");
+      upButton.addEventListener("click", () => {
+        if (index <= 0) {
+          return;
+        }
+        [tokens[index - 1], tokens[index]] = [tokens[index], tokens[index - 1]];
+        rebuildPromptFromEditor("Moved prompt token up");
+      });
+      controls.appendChild(upButton);
+
+      const downButton = createActionButton(`${idPrefix}-token-down-${index}`, "Down");
+      downButton.addEventListener("click", () => {
+        if (index >= tokens.length - 1) {
+          return;
+        }
+        [tokens[index], tokens[index + 1]] = [tokens[index + 1], tokens[index]];
+        rebuildPromptFromEditor("Moved prompt token down");
+      });
+      controls.appendChild(downButton);
+
+      const deleteButton = createActionButton(`${idPrefix}-token-delete-${index}`, "Delete");
+      deleteButton.addEventListener("click", () => {
+        tokens.splice(index, 1);
+        rebuildPromptFromEditor("Deleted prompt token");
+      });
+      controls.appendChild(deleteButton);
+
+      const favoriteButton = createActionButton(`${idPrefix}-token-favorite-${index}`, "Favorite");
+      favoriteButton.addEventListener("click", () => {
+        const item = {
+          label: token.text,
+          prompt_text: token.text,
+          tag_tokens: [token.text],
+        };
+        void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(getActiveNamespace(), "push", { item }).then((result) => {
+          favoritesCache.set(
+            getActiveNamespace(),
+            Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [],
+          );
+          updateStatus("Saved token to favorites");
+          syncUi();
+        });
+      });
+      controls.appendChild(favoriteButton);
+
+      const blacklistButton = createActionButton(`${idPrefix}-token-blacklist-${index}`, "Blacklist");
+      blacklistButton.addEventListener("click", () => {
+        addTokenToBlacklist(token.text);
+      });
+      controls.appendChild(blacklistButton);
+
+      list.appendChild(row);
+    });
+  }
+
+  function renderCollectionPane(targetPane, collectionName) {
+    clearChildren(targetPane);
+    const heading = document.createElement("div");
+    heading.className = "rookieui-shell__prompt-workbench-pane-header";
+    targetPane.appendChild(heading);
+    appendTextElement(
+      heading,
+      "h6",
+      "rookieui-shell__prompt-workbench-pane-title",
+      collectionName === "favorites" ? "Favorites" : "History",
+    );
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    targetPane.appendChild(toolbar);
+
+    const saveButton = createActionButton(
+      `${idPrefix}-${collectionName}-save-current`,
+      collectionName === "favorites" ? "Save Current Favorite" : "Save Current Prompt",
+    );
+    saveButton.addEventListener("click", () => {
+      addCurrentPromptToCollection(collectionName);
+    });
+    toolbar.appendChild(saveButton);
+
+    const clearButton = createActionButton(`${idPrefix}-${collectionName}-clear`, "Clear");
+    clearButton.addEventListener("click", () => {
+      mutateCollection(collectionName, "clear", {});
+    });
+    toolbar.appendChild(clearButton);
+
+    const entries = collectionName === "favorites"
+      ? favoritesCache.get(getActiveNamespace()) ?? []
+      : historyCache.get(getActiveNamespace()) ?? [];
+    const list = document.createElement("div");
+    list.className = "rookieui-shell__prompt-workbench-entry-list";
+    targetPane.appendChild(list);
+
+    if (!entries.length) {
+      appendTextElement(
+        list,
+        "p",
+        "rookieui-shell__prompt-workbench-empty",
+        `No ${collectionName} saved for this namespace yet.`,
+      );
+      return;
+    }
+
+    entries.forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "rookieui-shell__prompt-workbench-entry";
+      list.appendChild(row);
+
+      const copy = document.createElement("div");
+      copy.className = "rookieui-shell__prompt-workbench-entry-copy";
+      row.appendChild(copy);
+      appendTextElement(copy, "strong", "rookieui-shell__prompt-workbench-entry-label", entry.label || "Saved Prompt");
+      appendTextElement(copy, "p", "rookieui-shell__prompt-workbench-entry-text", entry.prompt_text);
+
+      const controls = document.createElement("div");
+      controls.className = "rookieui-shell__prompt-workbench-entry-actions";
+      row.appendChild(controls);
+
+      const applyButton = createActionButton(`${idPrefix}-${collectionName}-apply-${index}`, "Apply");
+      applyButton.addEventListener("click", () => {
+        applyCollectionEntry(entry);
+      });
+      controls.appendChild(applyButton);
+
+      const removeButton = createActionButton(`${idPrefix}-${collectionName}-remove-${index}`, "Remove");
+      removeButton.addEventListener("click", () => {
+        mutateCollection(collectionName, "remove", { item_id: entry.id });
+      });
+      controls.appendChild(removeButton);
+
+      if (collectionName === "favorites") {
+        const upButton = createActionButton(`${idPrefix}-${collectionName}-up-${index}`, "Up");
+        upButton.addEventListener("click", () => {
+          mutateCollection(collectionName, "move_up", { item_id: entry.id });
+        });
+        controls.appendChild(upButton);
+      }
+    });
+  }
+
+  function renderFormatPane() {
+    clearChildren(formatPane);
+    const heading = document.createElement("div");
+    heading.className = "rookieui-shell__prompt-workbench-pane-header";
+    formatPane.appendChild(heading);
+    appendTextElement(heading, "h6", "rookieui-shell__prompt-workbench-pane-title", "Formatting and Blacklist");
+
+    const ruleGrid = document.createElement("div");
+    ruleGrid.className = "rookieui-shell__prompt-workbench-format-grid";
+    formatPane.appendChild(ruleGrid);
+
+    const createRuleToggle = (key, label) => {
+      const row = document.createElement("label");
+      row.className = "rookieui-shell__prompt-workbench-rule";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = Boolean(configState?.formatting_rules?.[key]);
+      input.addEventListener("change", () => {
+        configState.formatting_rules = {
+          ...configState.formatting_rules,
+          [key]: input.checked,
+        };
+        queueConfigPersist();
+      });
+      row.appendChild(input);
+      appendTextElement(row, "span", "rookieui-shell__prompt-workbench-rule-label", label);
+      ruleGrid.appendChild(row);
+    };
+
+    createRuleToggle("dedupe_commas", "Remove duplicate prompt entries");
+    createRuleToggle("normalize_spacing", "Normalize spacing and comma separators");
+    createRuleToggle("trim_outer_whitespace", "Trim outer whitespace");
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    formatPane.appendChild(toolbar);
+
+    const applyFormattingButton = createActionButton(`${idPrefix}-apply-formatting`, "Apply Formatting");
+    applyFormattingButton.addEventListener("click", () => {
+      const formatted = formatPromptText(getActiveState().draft_prompt || getActiveInput()?.value, configState.formatting_rules);
+      applyPromptTextToInput(formatted, {
+        updateEditor: true,
+        statusMessage: "Applied Prompt Workbench formatting rules",
+      });
+    });
+    toolbar.appendChild(applyFormattingButton);
+
+    const applyBlacklistButton = createActionButton(`${idPrefix}-apply-blacklist`, "Apply Blacklist");
+    applyBlacklistButton.addEventListener("click", () => {
+      applyBlacklistFilter();
+    });
+    toolbar.appendChild(applyBlacklistButton);
+
+    const blacklistHeading = appendTextElement(
+      formatPane,
+      "p",
+      "rookieui-shell__prompt-workbench-detail",
+      blacklistState.enabled ? "Blacklist entries" : "Blacklist disabled",
+    );
+    blacklistHeading.id = `${idPrefix}-blacklist-heading`;
+
+    const list = document.createElement("div");
+    list.className = "rookieui-shell__prompt-workbench-entry-list";
+    formatPane.appendChild(list);
+
+    if (!(blacklistState.entries ?? []).length) {
+      appendTextElement(list, "p", "rookieui-shell__prompt-workbench-empty", "No blacklist entries configured.");
+      return;
+    }
+
+    (blacklistState.entries ?? []).forEach((entry, index) => {
+      const row = document.createElement("div");
+      row.className = "rookieui-shell__prompt-workbench-entry";
+      list.appendChild(row);
+      appendTextElement(row, "strong", "rookieui-shell__prompt-workbench-entry-label", entry);
+      const controls = document.createElement("div");
+      controls.className = "rookieui-shell__prompt-workbench-entry-actions";
+      row.appendChild(controls);
+      const removeButton = createActionButton(`${idPrefix}-blacklist-remove-${index}`, "Remove");
+      removeButton.addEventListener("click", () => {
+        removeBlacklistEntry(entry);
+      });
+      controls.appendChild(removeButton);
+    });
   }
 
   function syncUi() {
     const state = getActiveState();
-    const language = String(config?.language ?? "en").trim() || "en";
     const historyItems = historyCache.get(getActiveNamespace()) ?? [];
     const favoriteItems = favoritesCache.get(getActiveNamespace()) ?? [];
-    const blacklistEntries = Array.isArray(bootstrapState?.promptWorkbench?.blacklist?.entries)
-      ? bootstrapState.promptWorkbench.blacklist.entries
-      : [];
+    const language = String(configState?.language ?? "en").trim() || "en";
     const translationSurface = providersPayload?.surfaces?.translation ?? null;
     const shippedProviders = Array.isArray(translationSurface?.shipped_provider_ids)
       ? translationSurface.shipped_provider_ids.length
@@ -264,6 +870,11 @@ export function createPromptWorkbenchShell({
       button.setAttribute("aria-pressed", String(panelId === state.active_panel));
     });
 
+    editorPane.hidden = state.active_panel !== "editor";
+    historyPane.hidden = state.active_panel !== "history";
+    favoritesPane.hidden = state.active_panel !== "favorites";
+    formatPane.hidden = state.active_panel !== "format";
+
     setText(summaryNodes.state, state.workbench_open ? "Persisted open" : "Collapsed");
     setText(summaryNodes.providers, resourcesLoaded ? `${shippedProviders} shipped / ${language}` : "Lazy");
     setText(
@@ -272,15 +883,16 @@ export function createPromptWorkbenchShell({
     );
     setText(summaryNodes.history, `${historyItems.length} entries`);
     setText(summaryNodes.favorites, `${favoriteItems.length} entries`);
-    setText(
-      summaryNodes.blacklist,
-      bootstrapState?.promptWorkbench?.blacklist?.enabled ? `${blacklistEntries.length} blocked` : "Disabled",
-    );
+    setText(summaryNodes.blacklist, blacklistState.enabled ? `${(blacklistState.entries ?? []).length} blocked` : "Disabled");
 
-    const promptUnits = countPromptTokens(state.draft_prompt);
     setText(detailNodes.scope, `${activeScope === "prompt" ? "Prompt" : "Negative Prompt"} namespace: ${getActiveNamespace()}`);
-    setText(detailNodes.draft, `Saved draft: ${promptUnits} prompt units`);
+    setText(detailNodes.draft, `Saved draft: ${countPromptUnits(state.draft_prompt)} prompt units`);
     setText(detailNodes.panel, `Active panel: ${state.active_panel}`);
+
+    renderEditorPane();
+    renderCollectionPane(historyPane, "history");
+    renderCollectionPane(favoritesPane, "favorites");
+    renderFormatPane();
   }
 
   async function ensureStateLoaded() {
@@ -299,6 +911,7 @@ export function createPromptWorkbenchShell({
           nextState.draft_prompt = String(getNamespaceInput(namespace)?.value ?? "");
         }
         stateCache.set(namespace, nextState);
+        editorCache.set(namespace, parsePromptTokens(nextState.draft_prompt));
       }),
     )
       .then(() => {
@@ -320,54 +933,55 @@ export function createPromptWorkbenchShell({
     }
     resourcesReadyPromise = Promise.all([
       bootstrapState?.fetchPromptWorkbenchProvidersRequest?.(),
-      bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(config?.language ?? "en"),
+      bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(configState?.language ?? "en"),
       bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.prompt),
       bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.negative),
       bootstrapState?.fetchPromptWorkbenchFavoritesRequest?.(namespaceMap.prompt),
       bootstrapState?.fetchPromptWorkbenchFavoritesRequest?.(namespaceMap.negative),
+      bootstrapState?.fetchPromptWorkbenchBlacklistRequest?.(),
     ])
-      .then(([providersResult, catalogResult, promptHistory, negativeHistory, promptFavorites, negativeFavorites]) => {
-        providersPayload = providersResult?.data ?? null;
-        catalogPayload = catalogResult?.data ?? null;
-        historyCache.set(namespaceMap.prompt, promptHistory?.data?.items ?? []);
-        historyCache.set(namespaceMap.negative, negativeHistory?.data?.items ?? []);
-        favoritesCache.set(namespaceMap.prompt, promptFavorites?.data?.items ?? []);
-        favoritesCache.set(namespaceMap.negative, negativeFavorites?.data?.items ?? []);
-        resourcesLoaded = true;
-        setText(detailNodes.status, "Prompt Workbench resources loaded");
-      })
+      .then(
+        ([
+          providersResult,
+          catalogResult,
+          promptHistory,
+          negativeHistory,
+          promptFavorites,
+          negativeFavorites,
+          blacklistResult,
+        ]) => {
+          providersPayload = providersResult?.data ?? null;
+          catalogPayload = catalogResult?.data ?? null;
+          historyCache.set(
+            namespaceMap.prompt,
+            Array.isArray(promptHistory?.data?.items) ? promptHistory.data.items.map(normalizePromptEntry) : [],
+          );
+          historyCache.set(
+            namespaceMap.negative,
+            Array.isArray(negativeHistory?.data?.items) ? negativeHistory.data.items.map(normalizePromptEntry) : [],
+          );
+          favoritesCache.set(
+            namespaceMap.prompt,
+            Array.isArray(promptFavorites?.data?.items) ? promptFavorites.data.items.map(normalizePromptEntry) : [],
+          );
+          favoritesCache.set(
+            namespaceMap.negative,
+            Array.isArray(negativeFavorites?.data?.items) ? negativeFavorites.data.items.map(normalizePromptEntry) : [],
+          );
+          if (blacklistResult?.data?.blacklist) {
+            Object.assign(blacklistState, blacklistResult.data.blacklist);
+          }
+          resourcesLoaded = true;
+          updateStatus("Prompt Workbench resources loaded");
+        },
+      )
       .catch(() => {
-        setText(detailNodes.status, "Prompt Workbench resources are using fallback data");
+        updateStatus("Prompt Workbench resources are using fallback data");
       })
       .finally(() => {
         syncUi();
       });
     return resourcesReadyPromise;
-  }
-
-  function queueStatePersist() {
-    const namespace = getActiveNamespace();
-    const state = getActiveState();
-    const existingTimer = dirtyTimers.get(namespace);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
-    const nextTimer = setTimeout(async () => {
-      dirtyTimers.delete(namespace);
-      const result = await bootstrapState?.updatePromptWorkbenchStateRequest?.(namespace, {
-        workbench_open: state.workbench_open,
-        active_panel: state.active_panel,
-        draft_prompt: state.draft_prompt,
-        selected_entry_id: state.selected_entry_id,
-      });
-      if (result?.ok === false) {
-        setText(detailNodes.status, "Prompt Workbench state saved locally with fallback semantics");
-      } else {
-        setText(detailNodes.status, "Prompt Workbench state synchronized");
-      }
-      syncUi();
-    }, 180);
-    dirtyTimers.set(namespace, nextTimer);
   }
 
   toggleButton.addEventListener("click", () => {
@@ -378,9 +992,9 @@ export function createPromptWorkbenchShell({
       syncUi();
       if (state.workbench_open) {
         await ensureResourcesLoaded();
-        onStatusMessage?.("Opened Prompt Workbench shell");
+        onStatusMessage?.("Opened Prompt Workbench");
       } else {
-        onStatusMessage?.("Collapsed Prompt Workbench shell");
+        onStatusMessage?.("Collapsed Prompt Workbench");
       }
     });
   });
@@ -395,6 +1009,7 @@ export function createPromptWorkbenchShell({
         stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: String(input.value ?? "") });
       cachedState.draft_prompt = String(input.value ?? "");
       stateCache.set(namespace, cachedState);
+      editorCache.set(namespace, parsePromptTokens(cachedState.draft_prompt));
       if (scope === activeScope) {
         queueStatePersist();
         syncUi();

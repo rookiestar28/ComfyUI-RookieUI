@@ -1,4 +1,5 @@
 import {
+  createPromptWorkbenchRequestBindings,
   fetchRookieUIADetailerCatalog,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
@@ -6,16 +7,10 @@ import {
   fetchRookieUIHistoryPrompt,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
-  fetchRookieUIPromptWorkbenchCatalog,
-  fetchRookieUIPromptWorkbenchFavorites,
   inspectRookieUIPngInfo,
-  fetchRookieUIPromptWorkbenchHistory,
-  fetchRookieUIPromptWorkbenchProviders,
-  fetchRookieUIPromptWorkbenchState,
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
-  updateRookieUIPromptWorkbenchState,
   describeHostSurface,
   detectHostSurface,
   isHostSurfaceSupported,
@@ -179,13 +174,7 @@ export function registerRookieUIBootstrapExtension({
         fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(fetchImpl),
         fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
         fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(fetchImpl),
-        fetchPromptWorkbenchStateRequest: (namespace) => fetchRookieUIPromptWorkbenchState(namespace, fetchImpl),
-        updatePromptWorkbenchStateRequest: (namespace, state) =>
-          updateRookieUIPromptWorkbenchState(namespace, state, fetchImpl),
-        fetchPromptWorkbenchHistoryRequest: (namespace) => fetchRookieUIPromptWorkbenchHistory(namespace, fetchImpl),
-        fetchPromptWorkbenchFavoritesRequest: (namespace) => fetchRookieUIPromptWorkbenchFavorites(namespace, fetchImpl),
-        fetchPromptWorkbenchProvidersRequest: () => fetchRookieUIPromptWorkbenchProviders(fetchImpl),
-        fetchPromptWorkbenchCatalogRequest: (language) => fetchRookieUIPromptWorkbenchCatalog(language, fetchImpl),
+        ...createPromptWorkbenchRequestBindings(fetchImpl),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {

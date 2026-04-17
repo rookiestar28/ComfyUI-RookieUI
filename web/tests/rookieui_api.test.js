@@ -9,6 +9,7 @@ import {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchBlacklist,
   fetchRookieUIPromptWorkbenchCatalog,
   fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPromptWorkbenchState,
@@ -19,6 +20,10 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  updateRookieUIPromptWorkbenchBlacklist,
+  updateRookieUIPromptWorkbenchConfig,
+  updateRookieUIPromptWorkbenchFavorites,
+  updateRookieUIPromptWorkbenchHistory,
   updateRookieUIPromptWorkbenchState,
 } from "../rookieui_api.js";
 
@@ -223,6 +228,16 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.state.active_panel).toBe("editor");
   });
 
+  test("loads prompt-workbench blacklist with a fallback payload", async () => {
+    const result = await fetchRookieUIPromptWorkbenchBlacklist(async () => {
+      throw new Error("offline");
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.data.contract.surface).toBe("prompt_tools_blacklist");
+    expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+  });
+
   test("updates prompt-workbench namespace state through the backend", async () => {
     const calls = [];
     const result = await updateRookieUIPromptWorkbenchState(
@@ -260,6 +275,145 @@ describe("fetchRookieUICapabilities", () => {
         active_panel: "history",
         draft_prompt: "masterpiece, skyline",
       },
+    });
+  });
+
+  test("updates prompt-workbench config through the backend", async () => {
+    const calls = [];
+    const result = await updateRookieUIPromptWorkbenchConfig(
+      {
+        formatting_rules: {
+          dedupe_commas: false,
+          normalize_spacing: true,
+          trim_outer_whitespace: true,
+        },
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              config: {
+                formatting_rules: {
+                  dedupe_commas: false,
+                  normalize_spacing: true,
+                  trim_outer_whitespace: true,
+                },
+              },
+              saved: true,
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/config");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      config: {
+        formatting_rules: {
+          dedupe_commas: false,
+          normalize_spacing: true,
+          trim_outer_whitespace: true,
+        },
+      },
+    });
+  });
+
+  test("updates prompt-workbench blacklist through the backend", async () => {
+    const calls = [];
+    const result = await updateRookieUIPromptWorkbenchBlacklist(
+      { enabled: true, entries: ["bad-hands"] },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              blacklist: { enabled: true, entries: ["bad-hands"] },
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/blacklist");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      blacklist: { enabled: true, entries: ["bad-hands"] },
+    });
+  });
+
+  test("updates prompt-workbench history through the backend", async () => {
+    const calls = [];
+    const result = await updateRookieUIPromptWorkbenchHistory(
+      "txt2img_prompt",
+      "push",
+      {
+        item: {
+          label: "Prompt: masterpiece",
+          prompt_text: "masterpiece",
+          tag_tokens: ["masterpiece"],
+        },
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              namespace: "txt2img_prompt",
+              items: [{ id: "history-1", label: "Prompt: masterpiece", prompt_text: "masterpiece" }],
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/history");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      namespace: "txt2img_prompt",
+      action: "push",
+      item: {
+        label: "Prompt: masterpiece",
+        prompt_text: "masterpiece",
+        tag_tokens: ["masterpiece"],
+      },
+    });
+  });
+
+  test("updates prompt-workbench favorites through the backend", async () => {
+    const calls = [];
+    const result = await updateRookieUIPromptWorkbenchFavorites(
+      "txt2img_negative",
+      "move_up",
+      { item_id: "favorite-1" },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              namespace: "txt2img_negative",
+              items: [{ id: "favorite-1", label: "Negative: bad anatomy", prompt_text: "bad anatomy" }],
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/favorites");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      namespace: "txt2img_negative",
+      action: "move_up",
+      item_id: "favorite-1",
     });
   });
 

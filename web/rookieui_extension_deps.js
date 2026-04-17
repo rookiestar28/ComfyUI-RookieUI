@@ -15,6 +15,7 @@ export const {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchBlacklist,
   fetchRookieUIPromptWorkbenchCatalog,
   fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPromptWorkbenchFavorites,
@@ -28,8 +29,32 @@ export const {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  updateRookieUIPromptWorkbenchBlacklist,
+  updateRookieUIPromptWorkbenchConfig,
+  updateRookieUIPromptWorkbenchFavorites,
+  updateRookieUIPromptWorkbenchHistory,
   updateRookieUIPromptWorkbenchState,
 } = apiModule;
+
+export function createPromptWorkbenchRequestBindings(fetchImpl) {
+  return {
+    fetchPromptWorkbenchStateRequest: (namespace) => fetchRookieUIPromptWorkbenchState(namespace, fetchImpl),
+    updatePromptWorkbenchStateRequest: (namespace, state) =>
+      updateRookieUIPromptWorkbenchState(namespace, state, fetchImpl),
+    fetchPromptWorkbenchHistoryRequest: (namespace) => fetchRookieUIPromptWorkbenchHistory(namespace, fetchImpl),
+    fetchPromptWorkbenchFavoritesRequest: (namespace) => fetchRookieUIPromptWorkbenchFavorites(namespace, fetchImpl),
+    fetchPromptWorkbenchProvidersRequest: () => fetchRookieUIPromptWorkbenchProviders(fetchImpl),
+    fetchPromptWorkbenchCatalogRequest: (language) => fetchRookieUIPromptWorkbenchCatalog(language, fetchImpl),
+    fetchPromptWorkbenchBlacklistRequest: () => fetchRookieUIPromptWorkbenchBlacklist(fetchImpl),
+    updatePromptWorkbenchBlacklistRequest: (blacklist) =>
+      updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImpl),
+    updatePromptWorkbenchConfigRequest: (config) => updateRookieUIPromptWorkbenchConfig(config, fetchImpl),
+    updatePromptWorkbenchHistoryRequest: (namespace, action, payload) =>
+      updateRookieUIPromptWorkbenchHistory(namespace, action, payload, fetchImpl),
+    updatePromptWorkbenchFavoritesRequest: (namespace, action, payload) =>
+      updateRookieUIPromptWorkbenchFavorites(namespace, action, payload, fetchImpl),
+  };
+}
 
 export const {
   describeHostSurface,
