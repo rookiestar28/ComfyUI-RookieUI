@@ -48,7 +48,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                     "default_provider": "openai",
                     "providers": {
                         "openai": {
-                            "api_key": "test-openai-key",
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
                             "base_url": "https://example.test/v1",
                             "model": "gpt-4.1-mini",
                         }
@@ -78,7 +78,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                     "default_provider": "openai",
                     "providers": {
                         "openai": {
-                            "api_key": "test-openai-key",
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
                             "base_url": "https://example.test/v1",
                             "model": "gpt-4.1-mini",
                         }

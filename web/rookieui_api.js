@@ -909,7 +909,7 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
         "/rookieui/prompt-tools/config",
     {
       contract: {
-        version: "r123f114f115-20260417",
+        version: "r123f114f115f116-20260417",
         surface: "prompt_tools_config",
         route_family: "/rookieui/prompt-tools",
         state_schema_version: 1,
