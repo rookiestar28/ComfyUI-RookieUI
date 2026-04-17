@@ -45,7 +45,11 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
                             "translation": {
                                 "default_provider": "openai",
                                 "providers": {
-                                    "openai": {"api_key": "sk-secret", "endpoint": "https://example.test"}
+                                    "openai": {
+                                        "api_key": "test-openai-key",  # pragma: allowlist secret
+                                        "base_url": "https://example.test/v1",
+                                        "model": "gpt-4.1-mini",
+                                    }
                                 },
                             }
                         }
@@ -112,3 +116,32 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(update_response["payload"]["status"], "ok")
         self.assertTrue(get_response["payload"]["blacklist"]["enabled"])
         self.assertEqual(get_response["payload"]["blacklist"]["entries"], ["bad anatomy", "blurry"])
+
+    def test_prompt_tools_providers_route_returns_catalog(self) -> None:
+        response = asyncio.run(routes.prompt_tools_providers(_FakeJsonRequest()))
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["contract"]["surface"], "prompt_tools_providers")
+        self.assertIn("openai", response["payload"]["surfaces"]["translation"]["shipped_provider_ids"])
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_translate")
+    def test_prompt_tools_translate_route_returns_execution_payload(self, mocked_execute: mock.Mock) -> None:
+        mocked_execute.return_value = {
+            "contract": {"surface": "prompt_tools_translate"},
+            "provider_id": "openai",
+            "provider_title": "OpenAI-Compatible Chat Translation",
+            "mode": "single",
+            "from_lang": "auto",
+            "to_lang": "zh-TW",
+            "translated_text": "translated prompt",
+        }
+
+        response = asyncio.run(
+            routes.prompt_tools_translate(
+                _FakeJsonRequest({"text": "masterpiece, city skyline", "to_lang": "zh-TW"})
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["provider_id"], "openai")
+        self.assertEqual(response["payload"]["translated_text"], "translated prompt")

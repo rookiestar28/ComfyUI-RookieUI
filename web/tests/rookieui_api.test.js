@@ -204,7 +204,7 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.data.contract.version).toBe("r123f114-20260417");
+    expect(result.data.contract.version).toBe("r123f114f115-20260417");
     expect(result.data.contract.surface).toBe("prompt_tools_config");
     expect(result.data.config.translation.providers).toEqual({});
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
