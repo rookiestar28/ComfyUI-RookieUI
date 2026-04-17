@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
 from typing import Any
-from urllib import parse, request
+from urllib import parse
 
 from rookieui.contracts.prompt_workbench import (
     PromptWorkbenchProviderCatalogEntry,
@@ -11,6 +10,11 @@ from rookieui.contracts.prompt_workbench import (
     build_prompt_workbench_provider_catalog_payload,
     get_prompt_workbench_provider_catalog_entry,
     get_prompt_workbench_provider_execution_state,
+)
+from rookieui.services.prompt_workbench_openai import (
+    PromptWorkbenchOpenAIProviderError,
+    openai_chat_completion,
+    urlopen_json,
 )
 from rookieui.services.prompt_workbench_state import load_prompt_workbench_store
 
@@ -149,57 +153,23 @@ def build_prompt_workbench_provider_payload() -> dict[str, Any]:
     return payload
 
 
-def _openai_headers(api_key: str) -> dict[str, str]:
-    return {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-
-
-def _urlopen_json(url: str, *, data: bytes | None = None, headers: dict[str, str] | None = None, timeout: int = 20) -> dict[str, Any]:
-    req = request.Request(url, data=data, headers=headers or {}, method="POST" if data is not None else "GET")
-    with request.urlopen(req, timeout=timeout) as response:
-        charset = response.headers.get_content_charset() or "utf-8"
-        return json.loads(response.read().decode(charset))
-
-
 def _translate_via_openai(text: str, *, from_lang: str, to_lang: str, provider_config: dict[str, Any]) -> str:
-    api_key = str(provider_config.get("api_key", "")).strip()
-    base_url = str(provider_config.get("base_url", "")).strip() or "https://api.openai.com/v1"
-    model = str(provider_config.get("model", "")).strip()
-    timeout_seconds = int(provider_config.get("timeout_seconds", 20) or 20)
-    if not api_key or not model:
-        raise PromptWorkbenchTranslateProviderError("OpenAI-compatible translation requires api_key and model.")
-
     system_prompt = (
         f"Translate the user's Stable Diffusion prompt from {from_lang} to {to_lang}. "
         "Preserve prompt syntax, weighting parentheses/brackets, BREAK, AND, inline <lora:...> tokens, "
         "embedding: tokens, numbers, and comma-separated structure. Return only the translated prompt text."
     )
-    response_payload = _urlopen_json(
-        f"{base_url.rstrip('/')}/chat/completions",
-        data=json.dumps(
-            {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text},
-                ],
-                "temperature": 0.2,
-            },
-            ensure_ascii=True,
-        ).encode("utf-8"),
-        headers=_openai_headers(api_key),
-        timeout=timeout_seconds,
-    )
-    choices = response_payload.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise PromptWorkbenchTranslateProviderError("OpenAI-compatible translation response did not include choices.")
-    message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
-    translated_text = str(message.get("content", "")).strip()
-    if not translated_text:
-        raise PromptWorkbenchTranslateProviderError("OpenAI-compatible translation response returned empty content.")
-    return translated_text
+    try:
+        return openai_chat_completion(
+            provider_config=provider_config,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.2,
+        )
+    except PromptWorkbenchOpenAIProviderError as exc:
+        raise PromptWorkbenchTranslateProviderError(str(exc)) from exc
 
 
 def _translate_via_mymemory(text: str, *, from_lang: str, to_lang: str, provider_config: dict[str, Any]) -> str:
@@ -212,7 +182,7 @@ def _translate_via_mymemory(text: str, *, from_lang: str, to_lang: str, provider
     email = str(provider_config.get("email", "")).strip()
     if email:
         query["de"] = email
-    response_payload = _urlopen_json(
+    response_payload = urlopen_json(
         f"{base_url}?{parse.urlencode(query)}",
         timeout=timeout_seconds,
     )

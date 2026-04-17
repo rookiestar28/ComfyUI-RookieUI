@@ -130,7 +130,7 @@ describe("registerRookieUIBootstrapExtension", () => {
           status: 200,
           async json() {
             return {
-              contract: { version: "r123f114f115f116-20260417", surface: "prompt_tools_state" },
+              contract: { version: "r123f114f115f116f120-20260417", surface: "prompt_tools_state" },
               namespace,
               state: {
                 namespace,
@@ -555,7 +555,7 @@ describe("registerRookieUIBootstrapExtension", () => {
           async json() {
             return {
               contract: {
-                version: "r123f114f115f116-20260417",
+                version: "r123f114f115f116f120-20260417",
                 surface: "prompt_tools_config",
                 route_family: "/rookieui/prompt-tools",
               },
@@ -576,12 +576,18 @@ describe("registerRookieUIBootstrapExtension", () => {
                   show_favorites: true,
                 },
                 translation: { default_provider: "", providers: {} },
-                ai_assist: { default_provider: "", providers: {} },
+                ai_assist: {
+                  default_provider: "",
+                  providers: {},
+                  instruction_preset: "Write a concise Stable Diffusion prompt.",
+                },
               },
               blacklist: {
                 enabled: false,
                 entries: [],
               },
+              language_options: [{ code: "en", title: "English" }],
+              theme_style_options: [{ id: "rookieui_classic", title: "RookieUI Classic" }],
             };
           },
         };

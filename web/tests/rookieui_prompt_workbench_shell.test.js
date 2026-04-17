@@ -36,6 +36,7 @@ function createBootstrapState(overrides = {}) {
     promptWorkbench: {
       config: {
         language: "en",
+        theme_style: "rookieui_classic",
         formatting_rules: {
           dedupe_commas: true,
           normalize_spacing: true,
@@ -45,9 +46,22 @@ function createBootstrapState(overrides = {}) {
           default_provider: "",
           providers: {},
         },
+        ai_assist: {
+          default_provider: "",
+          providers: {},
+          instruction_preset: "Write a concise Stable Diffusion prompt.",
+        },
         ui_preferences: { default_open: false },
       },
       blacklist: { enabled: false, entries: [] },
+      language_options: [
+        { code: "en", title: "English" },
+        { code: "zh-TW", title: "Traditional Chinese" },
+      ],
+      theme_style_options: [
+        { id: "rookieui_classic", title: "RookieUI Classic" },
+        { id: "rookieui_graphite", title: "Graphite Studio" },
+      ],
     },
     fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
       ok: true,
@@ -66,9 +80,26 @@ function createBootstrapState(overrides = {}) {
       data: {
         surfaces: {
           translation: {
+            providers: [{ provider_id: "openai", title: "OpenAI-Compatible Chat Translation", execution_state: "shipped" }],
             shipped_provider_ids: ["openai"],
             deferred_provider_ids: [],
             reference_only_provider_ids: ["google_free"],
+          },
+          ai_assist: {
+            providers: [
+              {
+                provider_id: "openai",
+                title: "OpenAI-Compatible Chat Translation",
+                execution_state: "shipped",
+                config_fields: [
+                  { key: "api_key", title: "API Key", secret: true, placeholder: "sk-..." },
+                  { key: "model", title: "Model", placeholder: "gpt-4.1-mini" },
+                ],
+              },
+            ],
+            shipped_provider_ids: ["openai"],
+            deferred_provider_ids: [],
+            reference_only_provider_ids: [],
           },
         },
       },
@@ -108,6 +139,18 @@ function createBootstrapState(overrides = {}) {
         from_lang: payload?.from_lang ?? "auto",
         to_lang: payload?.to_lang ?? "en",
         translated_text: payload?.to_lang === "en" ? "city skyline at dusk" : "城市天際線黃昏",
+      },
+    })),
+    assistPromptWorkbenchRequest: vi.fn(async (payload) => ({
+      ok: true,
+      data: {
+        provider_id: payload?.provider ?? "openai",
+        provider_title: "OpenAI-Compatible Chat Translation",
+        language: payload?.language ?? "en",
+        theme_style: payload?.theme_style ?? "rookieui_classic",
+        instruction_preset: payload?.instruction_preset ?? "",
+        image_description: payload?.image_description ?? "",
+        generated_prompt: "masterpiece, city skyline, dusk lighting",
       },
     })),
     updatePromptWorkbenchStateRequest: vi.fn(async (_namespace, state) => ({
@@ -184,7 +227,7 @@ describe("prompt workbench shell", () => {
     expect(tokenInputs.map((node) => node.value)).toEqual(["masterpiece", "city skyline"]);
     expect(bootstrapState.fetchPromptWorkbenchProvidersRequest).toHaveBeenCalledTimes(1);
     expect(bootstrapState.fetchPromptWorkbenchBlacklistRequest).toHaveBeenCalledTimes(1);
-    expect(document.getElementById("test-workbench-providers")?.textContent).toContain("1 shipped");
+    expect(document.getElementById("test-workbench-providers")?.textContent).toContain("1 translate / 1 assist / en");
     expect(document.getElementById("test-workbench-catalogs")?.textContent).toContain("1 groups");
   });
 
@@ -326,6 +369,7 @@ describe("prompt workbench shell", () => {
       promptWorkbench: {
         config: {
           language: "zh-TW",
+          theme_style: "rookieui_classic",
           formatting_rules: {
             dedupe_commas: true,
             normalize_spacing: true,
@@ -335,9 +379,22 @@ describe("prompt workbench shell", () => {
             default_provider: "mymemory_free",
             providers: {},
           },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
           ui_preferences: { default_open: false },
         },
         blacklist: { enabled: false, entries: [] },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+        ],
+        theme_style_options: [
+          { id: "rookieui_classic", title: "RookieUI Classic" },
+          { id: "rookieui_graphite", title: "Graphite Studio" },
+        ],
       },
       fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
         ok: true,
@@ -413,5 +470,94 @@ describe("prompt workbench shell", () => {
 
     document.getElementById("catalog-workbench-loras-0").click();
     expect(prompt.value).toContain("<lora:detail_tweaker.safetensors:0.8>");
+  });
+
+  test("supports ai assist generation plus language and theme persistence", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "en",
+          theme_style: "rookieui_classic",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: {
+            default_provider: "",
+            providers: {},
+          },
+          ai_assist: {
+            default_provider: "openai",
+            providers: { openai: { api_key: "sk-test", model: "gpt-4.1-mini" } }, // pragma: allowlist secret
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+          ui_preferences: { default_open: false },
+        },
+        blacklist: { enabled: false, entries: [] },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+        ],
+        theme_style_options: [
+          { id: "rookieui_classic", title: "RookieUI Classic" },
+          { id: "rookieui_graphite", title: "Graphite Studio" },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "assist-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("assist-workbench-panel-assist").click();
+    await flushPromises();
+
+    const languageSelect = document.getElementById("assist-workbench-assist-language");
+    languageSelect.value = "zh-TW";
+    languageSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const themeSelect = document.getElementById("assist-workbench-assist-theme");
+    themeSelect.value = "rookieui_graphite";
+    themeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const description = document.getElementById("assist-workbench-assist-description");
+    description.value = "city skyline at dusk";
+    description.dispatchEvent(new Event("input", { bubbles: true }));
+
+    document.getElementById("assist-workbench-assist-generate").click();
+    await flushPromises();
+
+    expect(bootstrapState.assistPromptWorkbenchRequest).toHaveBeenCalledWith({
+      provider: "openai",
+      instruction_preset: "Write a concise Stable Diffusion prompt.",
+      image_description: "city skyline at dusk",
+      language: "zh-TW",
+      theme_style: "rookieui_graphite",
+    });
+    expect(document.getElementById("assist-workbench-assist-result").value).toBe(
+      "masterpiece, city skyline, dusk lighting",
+    );
+
+    document.getElementById("assist-workbench-assist-apply").click();
+    expect(prompt.value).toBe("masterpiece, city skyline, dusk lighting");
+    expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenCalled();
   });
 });

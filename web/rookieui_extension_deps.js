@@ -29,6 +29,7 @@ export const {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  assistRookieUIPromptWorkbench,
   translateRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
@@ -47,6 +48,7 @@ export function createPromptWorkbenchRequestBindings(fetchImpl) {
     fetchPromptWorkbenchProvidersRequest: () => fetchRookieUIPromptWorkbenchProviders(fetchImpl),
     fetchPromptWorkbenchCatalogRequest: (language) => fetchRookieUIPromptWorkbenchCatalog(language, fetchImpl),
     translatePromptWorkbenchRequest: (payload) => translateRookieUIPromptWorkbench(payload, fetchImpl),
+    assistPromptWorkbenchRequest: (payload) => assistRookieUIPromptWorkbench(payload, fetchImpl),
     fetchPromptWorkbenchBlacklistRequest: () => fetchRookieUIPromptWorkbenchBlacklist(fetchImpl),
     updatePromptWorkbenchBlacklistRequest: (blacklist) =>
       updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImpl),

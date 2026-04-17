@@ -215,7 +215,18 @@ def _normalize_config_payload(existing: dict[str, Any], payload: object) -> dict
     if "translation" in payload:
         merged["translation"] = _normalize_provider_payload(payload.get("translation"), surface="translation")
     if "ai_assist" in payload:
-        merged["ai_assist"] = _normalize_provider_payload(payload.get("ai_assist"), surface="ai_assist")
+        normalized_ai_assist = _normalize_provider_payload(payload.get("ai_assist"), surface="ai_assist")
+        if isinstance(payload.get("ai_assist"), dict):
+            normalized_ai_assist["instruction_preset"] = _normalize_text(
+                payload["ai_assist"].get("instruction_preset", merged.get("ai_assist", {}).get("instruction_preset", "")),
+                max_length=_MAX_PROMPT_TEXT_LENGTH,
+            ) or defaults["ai_assist"]["instruction_preset"]
+        else:
+            normalized_ai_assist["instruction_preset"] = (
+                merged.get("ai_assist", {}).get("instruction_preset")
+                or defaults["ai_assist"]["instruction_preset"]
+            )
+        merged["ai_assist"] = normalized_ai_assist
     return merged
 
 

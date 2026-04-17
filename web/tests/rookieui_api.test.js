@@ -20,6 +20,7 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  assistRookieUIPromptWorkbench,
   translateRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
@@ -213,9 +214,12 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.data.contract.version).toBe("r123f114f115f116-20260417");
+    expect(result.data.contract.version).toBe("r123f114f115f116f120-20260417");
     expect(result.data.contract.surface).toBe("prompt_tools_config");
     expect(result.data.config.translation.providers).toEqual({});
+    expect(result.data.config.ai_assist.instruction_preset).toContain("Stable Diffusion prompt");
+    expect(result.data.language_options[0].code).toBe("en");
+    expect(result.data.theme_style_options[0].id).toBe("rookieui_classic");
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
   });
 
@@ -463,6 +467,47 @@ describe("fetchRookieUICapabilities", () => {
       from_lang: "auto",
       to_lang: "en",
       text: "傍晚城市天際線",
+    });
+  });
+
+  test("submits prompt-workbench ai assist requests through the backend", async () => {
+    const calls = [];
+    const result = await assistRookieUIPromptWorkbench(
+      {
+        provider: "openai",
+        instruction_preset: "Write a concise Stable Diffusion prompt.",
+        image_description: "city skyline at dusk",
+        language: "zh-TW",
+        theme_style: "rookieui_graphite",
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              provider_id: "openai",
+              provider_title: "OpenAI-Compatible Chat Translation",
+              language: "zh-TW",
+              theme_style: "rookieui_graphite",
+              instruction_preset: "Write a concise Stable Diffusion prompt.",
+              image_description: "city skyline at dusk",
+              generated_prompt: "masterpiece, city skyline, dusk lighting",
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/assist");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      provider: "openai",
+      instruction_preset: "Write a concise Stable Diffusion prompt.",
+      image_description: "city skyline at dusk",
+      language: "zh-TW",
+      theme_style: "rookieui_graphite",
     });
   });
 

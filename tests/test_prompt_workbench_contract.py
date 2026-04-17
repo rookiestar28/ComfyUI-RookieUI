@@ -55,6 +55,6 @@ class PromptWorkbenchContractTests(unittest.TestCase):
         self.assertIn("google_free", reference_only_ids)
         self.assertEqual(openai_entry["title"], "OpenAI-Compatible Chat Translation")
         self.assertEqual(
-            payload["surfaces"]["ai_assist"]["deferred_provider_ids"],
+            payload["surfaces"]["ai_assist"]["shipped_provider_ids"],
             ["openai"],
         )

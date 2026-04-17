@@ -68,9 +68,9 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         ai_openai_entry = next(
             provider for provider in payload["surfaces"]["ai_assist"]["providers"] if provider["provider_id"] == "openai"
         )
-        self.assertEqual(ai_openai_entry["availability"]["status"], "deferred")
+        self.assertEqual(ai_openai_entry["availability"]["status"], "configuration_required")
 
-    @mock.patch("rookieui.services.prompt_workbench_translation.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
     def test_translate_payload_uses_openai_provider(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
@@ -97,7 +97,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["translated_text"], "translated prompt")
         self.assertIn("/chat/completions", mocked_urlopen.call_args.args[0].full_url)
 
-    @mock.patch("rookieui.services.prompt_workbench_translation.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
     def test_translate_payload_supports_mymemory_batch(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
