@@ -20,6 +20,7 @@ import {
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  translateRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
   updateRookieUIPromptWorkbenchFavorites,
@@ -425,6 +426,44 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.ok).toBe(false);
     expect(result.data.group_tags.language).toBe("en");
     expect(result.data.prompt_library.sections).toEqual([]);
+  });
+
+  test("submits prompt-workbench translation requests through the backend", async () => {
+    const calls = [];
+    const result = await translateRookieUIPromptWorkbench(
+      {
+        provider: "mymemory_free",
+        from_lang: "auto",
+        to_lang: "en",
+        text: "傍晚城市天際線",
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              provider_id: "mymemory_free",
+              provider_title: "MyMemory Free Translation",
+              mode: "single",
+              from_lang: "auto",
+              to_lang: "en",
+              translated_text: "city skyline at dusk",
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/translate");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      provider: "mymemory_free",
+      from_lang: "auto",
+      to_lang: "en",
+      text: "傍晚城市天際線",
+    });
   });
 
   test("builds client-scoped queue paths and prompt-history helpers", async () => {

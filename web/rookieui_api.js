@@ -1103,6 +1103,27 @@ export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetch
   );
 }
 
+export async function translateRookieUIPromptWorkbench(payload, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/translate",
+    payload ?? {},
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_translate",
+      },
+      provider_id: String(payload?.provider ?? ""),
+      provider_title: "",
+      mode: Array.isArray(payload?.texts) ? "batch" : "single",
+      from_lang: String(payload?.from_lang ?? "auto"),
+      to_lang: String(payload?.to_lang ?? "en"),
+      translated_text: String(payload?.text ?? ""),
+      translated_texts: Array.isArray(payload?.texts) ? payload.texts.map((value) => String(value ?? "")) : [],
+    },
+    fetchImpl,
+  );
+}
+
 export async function updateRookieUIPromptWorkbenchConfig(config, fetchImpl = globalThis.fetch) {
   return postRookieUIJson(
     "/rookieui/prompt-tools/config",

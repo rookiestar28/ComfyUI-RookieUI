@@ -1543,6 +1543,26 @@
   gap: 8px;
 }
 
+.rookieui-shell__prompt-workbench-catalog-block {
+  display: grid;
+  gap: 8px;
+}
+
+.rookieui-shell__prompt-workbench-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__prompt-workbench-chip {
+  min-height: 32px;
+  border-radius: 999px;
+}
+
+.rookieui-shell__prompt-workbench-provider-select {
+  min-width: 180px;
+}
+
 .rookieui-shell__prompt-workbench-token,
 .rookieui-shell__prompt-workbench-entry,
 .rookieui-shell__prompt-workbench-rule {
