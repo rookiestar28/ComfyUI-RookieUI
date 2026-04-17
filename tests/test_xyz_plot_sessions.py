@@ -448,3 +448,109 @@ class XYZPlotSessionTests(unittest.TestCase):
         self.assertEqual(store["sessions"], {})
         self.assertFalse(state_path.exists())
         self.assertEqual(len(list(state_path.parent.glob("sessions.corrupt-*.json"))), 1)
+
+    def test_load_xyz_plot_store_prunes_stale_terminal_sessions_but_keeps_active_sessions(self) -> None:
+        now_ms = 1_700_000_000_000
+        active_session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "cat", "steps": 20},
+                "axes": [{"axis_id": "steps", "values": "10,20"}],
+            }
+        )
+        recent_terminal_session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "dog", "steps": 20},
+                "axes": [{"axis_id": "steps", "values": "10"}],
+            }
+        )
+        stale_terminal_session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "fox", "steps": 20},
+                "axes": [{"axis_id": "steps", "values": "10"}],
+            }
+        )
+        recent_terminal_session["cells"][0]["status"] = "completed"
+        stale_terminal_session["cells"][0]["status"] = "completed"
+        active_session["updated_at"] = now_ms
+        recent_terminal_session["updated_at"] = now_ms
+        stale_terminal_session["updated_at"] = now_ms - (5 * 3600 * 1000)
+        state_path = xyz_plot_sessions._xyz_plot_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": xyz_plot_sessions._XYZ_PLOT_SESSION_SCHEMA_VERSION,
+                    "sessions": {
+                        active_session["session_id"]: active_session,
+                        recent_terminal_session["session_id"]: recent_terminal_session,
+                        stale_terminal_session["session_id"]: stale_terminal_session,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with (
+            mock.patch.dict(os.environ, {"ROOKIEUI_XYZ_PLOT_TERMINAL_RETENTION_HOURS": "1"}, clear=False),
+            mock.patch.object(xyz_plot_sessions.time, "time", return_value=now_ms / 1000),
+        ):
+            store = xyz_plot_sessions._load_xyz_plot_store()
+
+        self.assertIn(active_session["session_id"], store["sessions"])
+        self.assertIn(recent_terminal_session["session_id"], store["sessions"])
+        self.assertNotIn(stale_terminal_session["session_id"], store["sessions"])
+
+    def test_load_xyz_plot_store_enforces_terminal_session_cap_without_dropping_active_sessions(self) -> None:
+        active_session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "cat", "steps": 20},
+                "axes": [{"axis_id": "steps", "values": "10,20"}],
+            }
+        )
+        terminal_sessions = [
+            xyz_plot_sessions._normalize_session_request(
+                {
+                    "mode": "txt2img",
+                    "base_request": {"prompt": label, "steps": 20},
+                    "axes": [{"axis_id": "steps", "values": "10"}],
+                }
+            )
+            for label in ("dog", "fox", "owl")
+        ]
+        for updated_at, session in zip((100, 200, 300), terminal_sessions, strict=True):
+            session["cells"][0]["status"] = "completed"
+            session["updated_at"] = updated_at
+        active_session["updated_at"] = 50
+        state_path = xyz_plot_sessions._xyz_plot_state_path()
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": xyz_plot_sessions._XYZ_PLOT_SESSION_SCHEMA_VERSION,
+                    "sessions": {
+                        active_session["session_id"]: active_session,
+                        **{session["session_id"]: session for session in terminal_sessions},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "ROOKIEUI_XYZ_PLOT_MAX_TERMINAL_SESSIONS": "2",
+                "ROOKIEUI_XYZ_PLOT_TERMINAL_RETENTION_HOURS": "999999",
+            },
+            clear=False,
+        ):
+            store = xyz_plot_sessions._load_xyz_plot_store()
+
+        self.assertIn(active_session["session_id"], store["sessions"])
+        self.assertIn(terminal_sessions[1]["session_id"], store["sessions"])
+        self.assertIn(terminal_sessions[2]["session_id"], store["sessions"])
+        self.assertNotIn(terminal_sessions[0]["session_id"], store["sessions"])

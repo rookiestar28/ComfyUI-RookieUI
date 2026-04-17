@@ -41,6 +41,8 @@ _ASYNC_STATE_LOCKS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio
 _XYZ_PLOT_SESSION_SCHEMA_VERSION = 2
 _XYZ_PLOT_MAX_PARALLEL = 4
 _XYZ_SLOT_LABELS = ("X", "Y", "Z")
+_XYZ_PLOT_TERMINAL_RETENTION_HOURS = 72
+_XYZ_PLOT_MAX_TERMINAL_SESSIONS = 64
 
 
 def _get_async_state_lock() -> asyncio.Lock:
@@ -76,6 +78,59 @@ def _default_xyz_plot_store() -> dict[str, Any]:
     }
 
 
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.environ.get(name, "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _is_terminal_session(session: dict[str, Any]) -> bool:
+    return _derive_session_status(session) in {"completed", "failed", "cancelled"}
+
+
+def _prune_xyz_plot_sessions(store: dict[str, Any]) -> dict[str, Any]:
+    sessions = store.get("sessions", {})
+    if not isinstance(sessions, dict) or not sessions:
+        return store
+
+    retention_hours = _read_positive_int_env(
+        "ROOKIEUI_XYZ_PLOT_TERMINAL_RETENTION_HOURS",
+        _XYZ_PLOT_TERMINAL_RETENTION_HOURS,
+    )
+    max_terminal_sessions = _read_positive_int_env(
+        "ROOKIEUI_XYZ_PLOT_MAX_TERMINAL_SESSIONS",
+        _XYZ_PLOT_MAX_TERMINAL_SESSIONS,
+    )
+    terminal_cutoff_ms = int(time.time() * 1000) - int(retention_hours * 3600 * 1000)
+
+    kept_sessions: dict[str, Any] = {}
+    terminal_candidates: list[tuple[str, dict[str, Any]]] = []
+    for session_id, session in sessions.items():
+        if not isinstance(session, dict):
+            continue
+        if _is_terminal_session(session):
+            updated_at = int(session.get("updated_at", 0) or 0)
+            if updated_at and updated_at < terminal_cutoff_ms:
+                continue
+            terminal_candidates.append((str(session_id), session))
+            continue
+        kept_sessions[str(session_id)] = session
+
+    terminal_candidates.sort(
+        key=lambda entry: int(entry[1].get("updated_at", 0) or 0),
+        reverse=True,
+    )
+    for session_id, session in terminal_candidates[:max_terminal_sessions]:
+        kept_sessions[session_id] = session
+    store["sessions"] = kept_sessions
+    return store
+
+
 def _load_xyz_plot_store() -> dict[str, Any]:
     _ensure_xyz_plot_runtime_dir()
     state_path = _xyz_plot_state_path()
@@ -91,14 +146,17 @@ def _load_xyz_plot_store() -> dict[str, Any]:
     if not isinstance(payload, dict) or int(payload.get("schema_version", 0) or 0) != _XYZ_PLOT_SESSION_SCHEMA_VERSION:
         return _default_xyz_plot_store()
     sessions = payload.get("sessions", {})
-    return {
+    return _prune_xyz_plot_sessions(
+        {
         "schema_version": _XYZ_PLOT_SESSION_SCHEMA_VERSION,
         "sessions": sessions if isinstance(sessions, dict) else {},
-    }
+        }
+    )
 
 
 def _save_xyz_plot_store(store: dict[str, Any]) -> None:
     _ensure_xyz_plot_runtime_dir()
+    store = _prune_xyz_plot_sessions(store)
     atomic_write_json(_xyz_plot_state_path(), store)
 
 
