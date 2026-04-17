@@ -15,6 +15,7 @@ from typing import Any
 
 from PIL import Image
 
+from rookieui.security.request_guard import normalize_host_selector
 from rookieui.security.asset_guard import validate_asset_identifier
 
 _DATA_URL_RE = re.compile(r"^data:image/(?P<fmt>[a-zA-Z0-9.+-]+);base64,(?P<data>.+)$")
@@ -119,6 +120,48 @@ def _reset_runtime_cleanup_state_for_tests() -> None:
         _last_cleanup_at = 0.0
 
 
+def _load_folder_paths_module() -> Any | None:
+    try:
+        import folder_paths
+    except Exception:
+        return None
+    return folder_paths
+
+
+def _resolve_host_output_path(selector: str) -> Path:
+    normalized_selector = normalize_host_selector(selector, "selector", default_value="")
+    if not normalized_selector:
+        raise ValueError("selector is required.")
+
+    folder_paths_module = _load_folder_paths_module()
+    get_output_directory = getattr(folder_paths_module, "get_output_directory", None) if folder_paths_module is not None else None
+    if not callable(get_output_directory):
+        raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}")
+
+    output_root = Path(str(get_output_directory())).resolve()
+    direct_candidate = (output_root / normalized_selector).resolve()
+    try:
+        direct_candidate.relative_to(output_root)
+    except ValueError as exc:
+        raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}") from exc
+    if direct_candidate.exists() and direct_candidate.is_file():
+        return direct_candidate
+
+    if "/" in normalized_selector:
+        raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}")
+
+    basename_matches = sorted(
+        (path for path in output_root.rglob(normalized_selector) if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if basename_matches:
+        # IMPORTANT: queue/history contracts currently surface basename-only host outputs;
+        # prefer the newest matching file so downstream consumers can still materialize live grids.
+        return basename_matches[0]
+    raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}")
+
+
 def decode_image_data(raw_value: object) -> tuple[bytes, str]:
     if not isinstance(raw_value, str) or not raw_value.strip():
         raise ValueError("image_data is required.")
@@ -183,6 +226,13 @@ def resolve_asset_path(handle: str) -> Path:
         if path.exists() and path.is_file():
             return path
     raise ValueError(f"Unknown RookieUI asset handle: {normalized_handle}")
+
+
+def resolve_generated_output_path(selector: str) -> Path:
+    try:
+        return resolve_asset_path(selector)
+    except ValueError:
+        return _resolve_host_output_path(selector)
 
 
 def list_output_assets() -> list[str]:

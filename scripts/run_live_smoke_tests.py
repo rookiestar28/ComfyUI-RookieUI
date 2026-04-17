@@ -30,6 +30,7 @@ from rookieui.contracts.prompt_workbench import (
     PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS,
     PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS,
 )
+from rookieui.contracts.xyz_plot import XYZ_PLOT_CONTRACT_VERSION
 from rookieui.services.adetailer import (
     ADETAILER_WARNING_CONTROLNET_CUSTOM_MODEL_MISSING,
     ADETAILER_WARNING_CONTROLNET_PASSTHROUGH_EMPTY,
@@ -63,6 +64,7 @@ _LOCAL_CONTROLNET_CONTRACT_VERSION = CONTROLNET_INTEGRATED_CONTRACT_VERSION
 _LOCAL_ADETAILER_CONTRACT_VERSION = ADETAILER_INTEGRATED_CONTRACT_VERSION
 _LOCAL_PROMPT_CONTRACT_VERSION = str(build_prompt_capability_matrix_payload().get("contract_version", "")).strip()
 _LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION = PROMPT_WORKBENCH_CONTRACT_VERSION
+_LOCAL_XYZ_PLOT_CONTRACT_VERSION = XYZ_PLOT_CONTRACT_VERSION
 _CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 _CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
@@ -188,6 +190,14 @@ class PromptWorkbenchHostContext:
     ai_assist_default_availability: str
 
 
+@dataclass(frozen=True)
+class XYZPlotHostContext:
+    checkpoint_name: str
+    workflow_family: str
+    host_contract_version: str
+    local_contract_version: str
+
+
 def _env_flag(name: str, *, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -201,6 +211,8 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
     if validation_mode == "adetailer":
         return ",".join(_ADETAILER_VALIDATION_PROFILES)
     if validation_mode == "prompt-workbench":
+        return ""
+    if validation_mode == "xyz-plot":
         return ""
     if validation_mode == "full-pipeline":
         return ""
@@ -228,6 +240,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "catalog",
             "prompt-parity",
             "prompt-workbench",
+            "xyz-plot",
             "auxiliary-contracts",
             "auxiliary-pipelines",
             "controlnet",
@@ -381,6 +394,10 @@ def _load_controlnet_payloads(
 
 def _load_adetailer_catalog_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     return _request_json("GET", f"{base_url}/rookieui/adetailer/catalog", timeout_seconds=timeout_seconds)
+
+
+def _load_xyz_plot_axes_payload(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+    return _request_json("GET", f"{base_url}/rookieui/xyz-plot/axes", timeout_seconds=timeout_seconds)
 
 
 def _prompt_workbench_url(base_url: str, route_suffix: str, *, query: dict[str, str] | None = None) -> str:
@@ -883,6 +900,311 @@ def _validate_prompt_workbench_assist_payload(payload: dict[str, Any]) -> list[s
     return errors
 
 
+def _validate_xyz_plot_axes_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="xyz_plot_axes",
+        route_path="/rookieui/xyz-plot/axes",
+        local_contract_version=_LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    axes = payload.get("axes")
+    if not isinstance(axes, dict):
+        return errors + ["xyz-plot axes payload missing axes mapping."]
+    for required_axis in ("steps", "cfg_scale", "seed", "checkpoint_name"):
+        axis_payload = axes.get(required_axis)
+        if not isinstance(axis_payload, dict):
+            errors.append(f"xyz-plot axes payload missing '{required_axis}'.")
+            continue
+        if not axis_payload.get("session_runner_support", False):
+            errors.append(f"xyz-plot axis '{required_axis}' was not session-runner ready.")
+    denoise_axis = axes.get("denoising_strength")
+    if not isinstance(denoise_axis, dict):
+        errors.append("xyz-plot axes payload missing 'denoising_strength'.")
+    else:
+        scopes = denoise_axis.get("mode_scopes")
+        if not isinstance(scopes, list) or "img2img" not in scopes:
+            errors.append("xyz-plot denoising_strength axis lost img2img scope.")
+    return errors
+
+
+def _build_xyz_plot_host_context(
+    models_payload: dict[str, Any],
+    axes_payload: dict[str, Any],
+) -> tuple[XYZPlotHostContext | None, list[str]]:
+    errors = _validate_xyz_plot_axes_payload(axes_payload)
+    auxiliary_context = _build_auxiliary_pipeline_context(models_payload)
+    return (
+        XYZPlotHostContext(
+            checkpoint_name=auxiliary_context.checkpoint_name,
+            workflow_family=auxiliary_context.workflow_family,
+            host_contract_version=_read_nested_text(axes_payload, "contract", "version"),
+            local_contract_version=_LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+        ),
+        errors,
+    )
+
+
+def _validate_xyz_plot_host_sync(context: XYZPlotHostContext) -> list[str]:
+    if context.host_contract_version == context.local_contract_version:
+        return []
+    return [
+        "xyz-plot contract mismatch: "
+        f"host='{context.host_contract_version or '<missing>'}' "
+        f"workspace='{context.local_contract_version}'."
+    ]
+
+
+def _build_xyz_plot_txt2img_estimate_payload(context: XYZPlotHostContext) -> dict[str, Any]:
+    return {
+        "mode": "txt2img",
+        "base_request": {
+            "prompt": "rookieui xyz live smoke harbor dusk",
+            "negative_prompt": "blurry",
+            "checkpoint_name": context.checkpoint_name,
+            "width": 512,
+            "height": 512,
+            "steps": 20,
+        },
+        "axes": [
+            {"axis_id": "steps", "values": "12,20"},
+            {"axis_id": "cfg_scale", "values": "5.5,7.0"},
+        ],
+    }
+
+
+def _build_xyz_plot_img2img_estimate_payload(context: XYZPlotHostContext) -> dict[str, Any]:
+    return {
+        "mode": "img2img",
+        "base_request": {
+            "prompt": "rookieui xyz live smoke portrait cleanup",
+            "negative_prompt": "artifact",
+            "checkpoint_name": context.checkpoint_name,
+            "width": 512,
+            "height": 512,
+            "steps": 20,
+            "denoise_strength": 0.5,
+        },
+        "axes": [
+            {"axis_id": "steps", "values": "10,18"},
+            {"axis_id": "denoising_strength", "values": "0.35,0.55"},
+        ],
+    }
+
+
+def _validate_xyz_plot_estimate_payload(
+    payload: dict[str, Any],
+    *,
+    mode: str,
+    expected_axis_ids: tuple[str, ...],
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="xyz_plot_estimate",
+        route_path="/rookieui/xyz-plot/estimate",
+        local_contract_version=_LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+        method="POST",
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("mode", "")).strip() != mode:
+        errors.append(f"xyz-plot estimate expected mode '{mode}' but got '{payload.get('mode')}'.")
+    axes = payload.get("axes")
+    if not isinstance(axes, list):
+        return errors + ["xyz-plot estimate payload missing axes list."]
+    axis_ids = tuple(
+        str(entry.get("axis_id", "")).strip()
+        for entry in axes
+        if isinstance(entry, dict)
+    )
+    if axis_ids != expected_axis_ids:
+        errors.append(f"xyz-plot estimate axis ids drifted from {expected_axis_ids} to {axis_ids}.")
+    estimate = payload.get("estimate")
+    if not isinstance(estimate, dict):
+        return errors + ["xyz-plot estimate payload missing estimate object."]
+    if int(estimate.get("cell_count", 0) or 0) != 4:
+        errors.append("xyz-plot estimate expected cell_count=4.")
+    if int(estimate.get("generated_image_count", 0) or 0) != 4:
+        errors.append("xyz-plot estimate expected generated_image_count=4.")
+    if not payload.get("can_run", False):
+        errors.append("xyz-plot estimate unexpectedly reported can_run=false.")
+    if not isinstance(payload.get("warnings"), list):
+        errors.append("xyz-plot estimate warnings missing.")
+    if not isinstance(payload.get("warning_codes"), list):
+        errors.append("xyz-plot estimate warning_codes missing.")
+    return errors
+
+
+def _build_xyz_plot_execute_payload(context: XYZPlotHostContext, client_id: str) -> dict[str, Any]:
+    return {
+        "mode": "txt2img",
+        "client_id": client_id,
+        "max_parallel": 1,
+        "base_request": {
+            "prompt": "rookieui xyz live smoke harbor dusk",
+            "negative_prompt": "blurry",
+            "checkpoint_name": context.checkpoint_name,
+            "width": 512,
+            "height": 512,
+            "steps": 16,
+            "cfg_scale": 6.5,
+            "sampler_name": "euler",
+            "scheduler_name": "normal",
+            "seed": 101,
+        },
+        "axes": [
+            {"axis_id": "steps", "values": "12,16"},
+            {"axis_id": "cfg_scale", "values": "5.5,7.0"},
+        ],
+        "draw_legend": True,
+        "include_lone_images": True,
+        "include_sub_grids": False,
+        "margin_size": 0,
+    }
+
+
+def _validate_xyz_plot_session_payload(
+    payload: dict[str, Any],
+    *,
+    surface: str,
+    expect_session_id: str | None = None,
+    expect_client_id: str | None = None,
+    require_cells: bool,
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface=surface,
+        route_path=f"/rookieui/xyz-plot/{'run' if surface == 'xyz_plot_run' else 'sessions'}",
+        local_contract_version=_LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    session = payload.get("session")
+    if not isinstance(session, dict):
+        return errors + [f"{surface}: payload missing session object."]
+    session_id = str(session.get("session_id", "")).strip()
+    if not session_id:
+        errors.append(f"{surface}: session_id missing.")
+    if expect_session_id and session_id != expect_session_id:
+        errors.append(f"{surface}: expected session_id '{expect_session_id}' but got '{session_id}'.")
+    if expect_client_id is not None and str(session.get("client_id", "")).strip() != expect_client_id:
+        errors.append(f"{surface}: client_id drifted from '{expect_client_id}'.")
+    summary = session.get("summary")
+    if not isinstance(summary, dict):
+        errors.append(f"{surface}: summary missing.")
+    else:
+        if int(summary.get("total_cells", 0) or 0) != 4:
+            errors.append(f"{surface}: expected total_cells=4.")
+    axes = session.get("axes")
+    if not isinstance(axes, list) or len(axes) != 2:
+        errors.append(f"{surface}: expected exactly two configured axes.")
+    if require_cells:
+        cells = session.get("cells")
+        if not isinstance(cells, list) or len(cells) != 4:
+            errors.append(f"{surface}: expected four session cells.")
+    return errors
+
+
+def _validate_xyz_plot_session_list_payload(
+    payload: dict[str, Any],
+    *,
+    expect_session_id: str | None,
+    expect_client_id: str | None,
+) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="xyz_plot_session_list",
+        route_path="/rookieui/xyz-plot/sessions",
+        local_contract_version=_LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    sessions = payload.get("sessions")
+    if not isinstance(sessions, list):
+        return errors + ["xyz-plot session list missing sessions array."]
+    if expect_session_id is None:
+        return errors
+    matched = next(
+        (
+            session
+            for session in sessions
+            if isinstance(session, dict) and str(session.get("session_id", "")).strip() == expect_session_id
+        ),
+        None,
+    )
+    if not isinstance(matched, dict):
+        errors.append(f"xyz-plot session list did not include '{expect_session_id}'.")
+        return errors
+    if expect_client_id is not None and str(matched.get("client_id", "")).strip() != expect_client_id:
+        errors.append("xyz-plot session list returned a mismatched client_id.")
+    return errors
+
+
+def _validate_xyz_plot_terminal_detail_payload(
+    payload: dict[str, Any],
+    *,
+    session_id: str,
+    client_id: str,
+) -> list[str]:
+    errors = _validate_xyz_plot_session_payload(
+        payload,
+        surface="xyz_plot_session_detail",
+        expect_session_id=session_id,
+        expect_client_id=client_id,
+        require_cells=True,
+    )
+    session = payload.get("session")
+    if not isinstance(session, dict):
+        return errors
+    status = str(session.get("status", "")).strip()
+    if status != "completed":
+        errors.append(f"xyz-plot session detail expected completed status but got '{status}'.")
+    summary = session.get("summary")
+    if isinstance(summary, dict) and int(summary.get("completed_cells", 0) or 0) != 4:
+        errors.append("xyz-plot session detail expected completed_cells=4.")
+    results = session.get("results")
+    if not isinstance(results, dict):
+        return errors + ["xyz-plot session detail missing results object."]
+    if str(results.get("status", "")).strip() != "ready":
+        errors.append("xyz-plot session detail expected ready results.")
+    main_grid = results.get("main_grid")
+    if not isinstance(main_grid, dict):
+        errors.append("xyz-plot session detail missing main_grid payload.")
+    else:
+        if not str(main_grid.get("asset_handle", "")).strip():
+            errors.append("xyz-plot session detail main_grid.asset_handle missing.")
+        if not _read_nested_text(results, "main_grid", "preview_data_url").startswith("data:image/png;base64,"):
+            errors.append("xyz-plot session detail main_grid.preview_data_url missing.")
+    lone_images = results.get("lone_images")
+    if not isinstance(lone_images, list) or len(lone_images) != 4:
+        errors.append("xyz-plot session detail expected four lone_images entries.")
+    if not isinstance(results.get("sub_grids"), list):
+        errors.append("xyz-plot session detail missing sub_grids list.")
+    if not isinstance(results.get("warnings"), list):
+        errors.append("xyz-plot session detail missing warnings list.")
+    return errors
+
+
+def _poll_xyz_plot_session_until_terminal(
+    base_url: str,
+    *,
+    session_id: str,
+    client_id: str,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[dict[str, Any], list[str]]:
+    deadline = time.monotonic() + poll_timeout_seconds
+    last_payload: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        payload = _request_json(
+            "GET",
+            f"{base_url}/rookieui/xyz-plot/sessions/{urllib.parse.quote(session_id)}?client_id={urllib.parse.quote(client_id)}",
+            timeout_seconds=request_timeout_seconds,
+        )
+        last_payload = payload
+        session = payload.get("session")
+        if isinstance(session, dict):
+            status = str(session.get("status", "")).strip()
+            if status in {"completed", "failed", "cancelled"}:
+                return payload, []
+        time.sleep(poll_interval_seconds)
+    return last_payload, [f"xyz-plot session '{session_id}' did not reach terminal state within {poll_timeout_seconds} seconds."]
+
+
 def _run_prompt_workbench_validation_lane(
     base_url: str,
     *,
@@ -1182,6 +1504,140 @@ def _run_prompt_workbench_validation_lane(
             payload={"blacklist": original_blacklist.get("blacklist", {})},
             timeout_seconds=request_timeout_seconds,
         )
+
+    return combined_errors, execution_errors
+
+
+def _run_xyz_plot_validation_lane(
+    base_url: str,
+    models_payload: dict[str, Any],
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[list[str], list[str]]:
+    bootstrap_payload = _load_bootstrap_payload(base_url, request_timeout_seconds)
+    routes = bootstrap_payload.get("routes")
+    if not isinstance(routes, list) or "/rookieui/xyz-plot/axes" not in routes:
+        return (
+            [
+                "xyz-plot live-host bootstrap did not expose /rookieui/xyz-plot/axes; "
+                "restart or re-sync the ComfyUI host before closure acceptance."
+            ],
+            [],
+        )
+
+    axes_payload = _load_xyz_plot_axes_payload(base_url, request_timeout_seconds)
+    context, context_errors = _build_xyz_plot_host_context(models_payload, axes_payload)
+    if context_errors:
+        return context_errors, []
+    assert context is not None
+
+    combined_errors = _validate_xyz_plot_host_sync(context)
+    txt2img_estimate_payload = _request_json(
+        "POST",
+        f"{base_url}/rookieui/xyz-plot/estimate",
+        payload=_build_xyz_plot_txt2img_estimate_payload(context),
+        timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors.extend(
+        _validate_xyz_plot_estimate_payload(
+            txt2img_estimate_payload,
+            mode="txt2img",
+            expected_axis_ids=("steps", "cfg_scale"),
+        )
+    )
+    img2img_estimate_payload = _request_json(
+        "POST",
+        f"{base_url}/rookieui/xyz-plot/estimate",
+        payload=_build_xyz_plot_img2img_estimate_payload(context),
+        timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors.extend(
+        _validate_xyz_plot_estimate_payload(
+            img2img_estimate_payload,
+            mode="img2img",
+            expected_axis_ids=("steps", "denoising_strength"),
+        )
+    )
+
+    list_payload = _request_json(
+        "GET",
+        f"{base_url}/rookieui/xyz-plot/sessions?client_id=rookieui-live-xyz-list-probe",
+        timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors.extend(
+        _validate_xyz_plot_session_list_payload(
+            list_payload,
+            expect_session_id=None,
+            expect_client_id=None,
+        )
+    )
+
+    execution_errors: list[str] = []
+    if execute and not combined_errors:
+        client_id = f"rookieui-live-xyz-{context.workflow_family}-{int(time.time() * 1000)}"
+        run_payload = _request_json(
+            "POST",
+            f"{base_url}/rookieui/xyz-plot/run",
+            payload=_build_xyz_plot_execute_payload(context, client_id),
+            timeout_seconds=request_timeout_seconds,
+        )
+        execution_errors.extend(
+            _validate_xyz_plot_session_payload(
+                run_payload,
+                surface="xyz_plot_run",
+                expect_session_id=None,
+                expect_client_id=client_id,
+                require_cells=True,
+            )
+        )
+        session_payload = run_payload.get("session")
+        if not isinstance(session_payload, dict):
+            execution_errors.append("xyz-plot run payload missing session object.")
+            return combined_errors, execution_errors
+        session_id = str(session_payload.get("session_id", "")).strip()
+        cells = session_payload.get("cells")
+        first_prompt_id = ""
+        if isinstance(cells, list) and cells and isinstance(cells[0], dict):
+            first_prompt_id = str(cells[0].get("prompt_id", "")).strip()
+        if not first_prompt_id:
+            execution_errors.append("xyz-plot run payload did not submit the first cell.")
+            return combined_errors, execution_errors
+
+        list_payload = _request_json(
+            "GET",
+            f"{base_url}/rookieui/xyz-plot/sessions?client_id={urllib.parse.quote(client_id)}",
+            timeout_seconds=request_timeout_seconds,
+        )
+        execution_errors.extend(
+            _validate_xyz_plot_session_list_payload(
+                list_payload,
+                expect_session_id=session_id,
+                expect_client_id=client_id,
+            )
+        )
+        if execution_errors:
+            return combined_errors, execution_errors
+
+        terminal_payload, poll_errors = _poll_xyz_plot_session_until_terminal(
+            base_url,
+            session_id=session_id,
+            client_id=client_id,
+            request_timeout_seconds=request_timeout_seconds,
+            poll_timeout_seconds=poll_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+        execution_errors.extend(poll_errors)
+        if not poll_errors:
+            execution_errors.extend(
+                _validate_xyz_plot_terminal_detail_payload(
+                    terminal_payload,
+                    session_id=session_id,
+                    client_id=client_id,
+                )
+            )
 
     return combined_errors, execution_errors
 
@@ -3353,7 +3809,7 @@ def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
-    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "prompt-workbench", "full-pipeline"} and not profiles:
+    if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "prompt-workbench", "xyz-plot", "full-pipeline"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
@@ -3457,6 +3913,46 @@ def main() -> int:
                 return 0 if args.report_only else 1
             else:
                 print("[live-smoke] prompt-workbench execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
+
+    if args.validation_mode == "xyz-plot":
+        try:
+            combined_errors, execution_errors = _run_xyz_plot_validation_lane(
+                base_url,
+                models_payload,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: xyz-plot validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        if combined_errors:
+            print("[live-smoke] WARNING: xyz-plot validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] xyz-plot contract + estimate checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because xyz-plot route checks were not green.")
+            elif execution_errors:
+                print("[live-smoke] ERROR: xyz-plot execute lane failed:", file=sys.stderr)
+                for error in execution_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] xyz-plot execute checks passed.")
 
         if combined_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")
@@ -3646,6 +4142,38 @@ def main() -> int:
                 return 0 if args.report_only else 1
             else:
                 print("[live-smoke] full-pipeline auxiliary execute checks passed.")
+
+        try:
+            xyz_errors, xyz_execute_errors = _run_xyz_plot_validation_lane(
+                base_url,
+                models_payload,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline XYZ lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if xyz_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline xyz lane reported issues:", file=sys.stderr)
+            for error in xyz_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline xyz route checks passed.")
+        if args.execute:
+            if xyz_errors:
+                print("[live-smoke] full-pipeline xyz execute skipped because route checks were not green.")
+            elif xyz_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline xyz execute lane failed:", file=sys.stderr)
+                for error in xyz_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline xyz execute checks passed.")
 
         if pipeline_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")

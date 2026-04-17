@@ -68,3 +68,38 @@ class AssetStoreCleanupTests(unittest.TestCase):
 
         remaining = sorted(path.name for path in self.output_root.iterdir() if path.is_file())
         self.assertEqual(remaining, ["output_2.png", "output_3.png"])
+
+    def test_resolve_generated_output_path_prefers_runtime_asset_handles(self) -> None:
+        generated = self.output_root / "runtime-grid.png"
+        generated.write_bytes(b"runtime")
+
+        resolved = asset_store.resolve_generated_output_path("runtime-grid.png")
+
+        self.assertEqual(resolved, generated)
+
+    def test_resolve_generated_output_path_falls_back_to_host_output_directory(self) -> None:
+        host_output_root = Path(self.runtime_dir.name) / "host-output"
+        host_output_root.mkdir(parents=True, exist_ok=True)
+        host_output_file = host_output_root / "RookieUI_00089_.png"
+        host_output_file.write_bytes(b"host")
+        folder_paths_module = mock.Mock()
+        folder_paths_module.get_output_directory.return_value = str(host_output_root)
+
+        with mock.patch.object(asset_store, "_load_folder_paths_module", return_value=folder_paths_module):
+            resolved = asset_store.resolve_generated_output_path("RookieUI_00089_.png")
+
+        self.assertEqual(resolved, host_output_file.resolve())
+
+    def test_resolve_generated_output_path_supports_relative_host_subfolders(self) -> None:
+        host_output_root = Path(self.runtime_dir.name) / "host-output"
+        nested_root = host_output_root / "xyz"
+        nested_root.mkdir(parents=True, exist_ok=True)
+        nested_file = nested_root / "RookieUI_00090_.png"
+        nested_file.write_bytes(b"host")
+        folder_paths_module = mock.Mock()
+        folder_paths_module.get_output_directory.return_value = str(host_output_root)
+
+        with mock.patch.object(asset_store, "_load_folder_paths_module", return_value=folder_paths_module):
+            resolved = asset_store.resolve_generated_output_path("xyz/RookieUI_00090_.png")
+
+        self.assertEqual(resolved, nested_file.resolve())

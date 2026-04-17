@@ -374,6 +374,312 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/config", combined_errors[0])
 
 
+class LiveSmokeXYZPlotTests(unittest.TestCase):
+    def test_default_profiles_for_xyz_plot_is_empty(self) -> None:
+        self.assertEqual(live_smoke._default_profiles_for_mode("xyz-plot"), "")
+
+    def test_validate_xyz_plot_axes_payload_accepts_matching_contract(self) -> None:
+        errors = live_smoke._validate_xyz_plot_axes_payload(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "xyz_plot_axes",
+                    "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                    "route_family": "/rookieui/xyz-plot",
+                },
+                "axis_order": ["steps", "cfg_scale", "seed", "checkpoint_name", "denoising_strength"],
+                "axes": {
+                    "steps": {"session_runner_support": True},
+                    "cfg_scale": {"session_runner_support": True},
+                    "seed": {"session_runner_support": True},
+                    "checkpoint_name": {"session_runner_support": True},
+                    "denoising_strength": {
+                        "session_runner_support": True,
+                        "mode_scopes": ["img2img"],
+                    },
+                },
+            }
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_xyz_plot_host_sync_reports_contract_drift(self) -> None:
+        errors = live_smoke._validate_xyz_plot_host_sync(
+            live_smoke.XYZPlotHostContext(
+                checkpoint_name="SD15\\BravNew.safetensors",
+                workflow_family="sd15",
+                host_contract_version="r125-20260416",
+                local_contract_version=live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+            )
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("host='r125-20260416'", errors[0])
+
+    def test_validate_xyz_plot_estimate_payload_accepts_matching_response(self) -> None:
+        errors = live_smoke._validate_xyz_plot_estimate_payload(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "xyz_plot_estimate",
+                    "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                    "route_family": "/rookieui/xyz-plot",
+                },
+                "mode": "txt2img",
+                "axes": [
+                    {"axis_id": "steps"},
+                    {"axis_id": "cfg_scale"},
+                ],
+                "estimate": {
+                    "cell_count": 4,
+                    "generated_image_count": 4,
+                },
+                "can_run": True,
+                "warnings": [],
+                "warning_codes": [],
+            },
+            mode="txt2img",
+            expected_axis_ids=("steps", "cfg_scale"),
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_xyz_plot_terminal_detail_payload_accepts_ready_grid_results(self) -> None:
+        errors = live_smoke._validate_xyz_plot_terminal_detail_payload(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "xyz_plot_session_detail",
+                    "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                    "route_family": "/rookieui/xyz-plot",
+                },
+                "session": {
+                    "session_id": "xyz-1",
+                    "client_id": "client-1",
+                    "status": "completed",
+                    "axes": [{"axis_id": "steps"}, {"axis_id": "cfg_scale"}],
+                    "cells": [{}, {}, {}, {}],
+                    "summary": {"total_cells": 4, "completed_cells": 4},
+                    "results": {
+                        "status": "ready",
+                        "main_grid": {
+                            "asset_handle": "xyz_plot_grid_1.png",
+                            "preview_data_url": "data:image/png;base64,abc",
+                        },
+                        "sub_grids": [],
+                        "lone_images": [{}, {}, {}, {}],
+                        "warnings": [],
+                    },
+                },
+            },
+            session_id="xyz-1",
+            client_id="client-1",
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_main_xyz_plot_report_only_returns_zero_on_validation_errors(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--validation-mode", "xyz-plot", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                return_value=({"default_checkpoint": "SD15\\BravNew.safetensors"}, {"presets": []}),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_xyz_plot_validation_lane",
+                return_value=(["xyz error"], []),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+    def test_run_xyz_plot_validation_lane_reports_missing_route_family(self) -> None:
+        with mock.patch.object(
+            live_smoke,
+            "_load_bootstrap_payload",
+            return_value={"routes": ["/rookieui/health"]},
+        ):
+            combined_errors, execution_errors = live_smoke._run_xyz_plot_validation_lane(
+                "http://127.0.0.1:8188",
+                {"default_checkpoint": "SD15\\BravNew.safetensors"},
+                execute=False,
+                request_timeout_seconds=10.0,
+                poll_timeout_seconds=10.0,
+                poll_interval_seconds=0.5,
+            )
+
+        self.assertEqual(execution_errors, [])
+        self.assertEqual(len(combined_errors), 1)
+        self.assertIn("/rookieui/xyz-plot/axes", combined_errors[0])
+
+    def test_run_xyz_plot_validation_lane_execute_uses_session_terminal_closure(self) -> None:
+        axes_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "xyz_plot_axes",
+                "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                "route_family": "/rookieui/xyz-plot",
+            },
+            "axes": {
+                "steps": {"session_runner_support": True},
+                "cfg_scale": {"session_runner_support": True},
+                "seed": {"session_runner_support": True},
+                "checkpoint_name": {"session_runner_support": True},
+                "denoising_strength": {
+                    "session_runner_support": True,
+                    "mode_scopes": ["img2img"],
+                },
+            },
+        }
+        estimate_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "xyz_plot_estimate",
+                "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                "route_family": "/rookieui/xyz-plot",
+            },
+            "mode": "txt2img",
+            "axes": [{"axis_id": "steps"}, {"axis_id": "cfg_scale"}],
+            "estimate": {"cell_count": 4, "generated_image_count": 4},
+            "can_run": True,
+            "warnings": [],
+            "warning_codes": [],
+        }
+        img2img_estimate_payload = {
+            **estimate_payload,
+            "mode": "img2img",
+            "axes": [{"axis_id": "steps"}, {"axis_id": "denoising_strength"}],
+        }
+        run_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "xyz_plot_run",
+                "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                "route_family": "/rookieui/xyz-plot",
+            },
+            "session": {
+                "session_id": "xyz-1",
+                "client_id": "rookieui-live-xyz-sd15-1234000",
+                "status": "in_progress",
+                "axes": [{"axis_id": "steps"}, {"axis_id": "cfg_scale"}],
+                "cells": [
+                    {"prompt_id": "prompt-1"},
+                    {},
+                    {},
+                    {},
+                ],
+                "summary": {"total_cells": 4},
+                "results": {"status": "pending", "main_grid": {}, "sub_grids": [], "lone_images": [], "warnings": []},
+            },
+        }
+        session_list_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "xyz_plot_session_list",
+                "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                "route_family": "/rookieui/xyz-plot",
+            },
+            "sessions": [{"session_id": "xyz-1", "client_id": "rookieui-live-xyz-sd15-1234000"}],
+        }
+        empty_session_list_payload = {
+            **session_list_payload,
+            "sessions": [],
+        }
+        terminal_payload = {
+            "service": "rookieui",
+            "status": "ok",
+            "contract": {
+                "surface": "xyz_plot_session_detail",
+                "version": live_smoke._LOCAL_XYZ_PLOT_CONTRACT_VERSION,
+                "route_family": "/rookieui/xyz-plot",
+            },
+            "session": {
+                "session_id": "xyz-1",
+                "client_id": "rookieui-live-xyz-sd15-1234000",
+                "status": "completed",
+                "axes": [{"axis_id": "steps"}, {"axis_id": "cfg_scale"}],
+                "cells": [{}, {}, {}, {}],
+                "summary": {"total_cells": 4, "completed_cells": 4},
+                "results": {
+                    "status": "ready",
+                    "main_grid": {
+                        "asset_handle": "xyz_plot_grid_1.png",
+                        "preview_data_url": "data:image/png;base64,abc",
+                    },
+                    "sub_grids": [],
+                    "lone_images": [{}, {}, {}, {}],
+                    "warnings": [],
+                },
+            },
+        }
+
+        with (
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value={"routes": ["/rookieui/xyz-plot/axes"]},
+            ),
+            mock.patch.object(live_smoke, "_load_xyz_plot_axes_payload", return_value=axes_payload),
+            mock.patch.object(
+                live_smoke,
+                "_request_json",
+                side_effect=[
+                    estimate_payload,
+                    img2img_estimate_payload,
+                    empty_session_list_payload,
+                    run_payload,
+                    session_list_payload,
+                ],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_poll_queue_snapshot_until_job_visible",
+                side_effect=AssertionError("xyz execute should not require queue snapshot polling"),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_poll_xyz_plot_session_until_terminal",
+                return_value=(terminal_payload, []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_shared_queue_post_state_smoke",
+                side_effect=AssertionError("xyz execute should not use shared queue closure"),
+            ),
+            mock.patch.object(live_smoke.time, "time", return_value=1234.0),
+        ):
+            combined_errors, execution_errors = live_smoke._run_xyz_plot_validation_lane(
+                "http://127.0.0.1:8188",
+                {
+                    "default_checkpoint": "SD15\\BravNew.safetensors",
+                    "checkpoints": ["SD15\\BravNew.safetensors"],
+                },
+                execute=True,
+                request_timeout_seconds=10.0,
+                poll_timeout_seconds=10.0,
+                poll_interval_seconds=0.5,
+            )
+
+        self.assertEqual(combined_errors, [])
+        self.assertEqual(execution_errors, [])
+
+
 class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
     def test_build_auxiliary_pipeline_context_prefers_sd_family_checkpoint_over_non_sd_default(self) -> None:
         context = live_smoke._build_auxiliary_pipeline_context(
@@ -679,6 +985,11 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
                 live_smoke,
                 "_run_auxiliary_pipeline_validation_lane",
                 return_value=(["auxiliary error"], []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_xyz_plot_validation_lane",
+                return_value=(["xyz error"], []),
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),
