@@ -9,6 +9,7 @@ import {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
@@ -195,6 +196,18 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(queue.data.queue_remaining).toBe(0);
+  });
+
+  test("loads prompt-workbench bootstrap config with fallback masking contract", async () => {
+    const result = await fetchRookieUIPromptWorkbenchConfig(async () => {
+      throw new Error("offline");
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.data.contract.version).toBe("r123f114-20260417");
+    expect(result.data.contract.surface).toBe("prompt_tools_config");
+    expect(result.data.config.translation.providers).toEqual({});
+    expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
   });
 
   test("builds client-scoped queue paths and prompt-history helpers", async () => {

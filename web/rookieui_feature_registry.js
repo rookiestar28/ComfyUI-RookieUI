@@ -6,6 +6,7 @@ import {
   fetchRookieUIControlNetModules,
   fetchRookieUIControlNetTypes,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
 } from "./rookieui_extension_deps.js";
@@ -55,6 +56,7 @@ function buildDefaultBootstrapLoaders() {
     controlnetModules: (fetchImpl) => fetchRookieUIControlNetModules(fetchImpl),
     controlnetTypes: (fetchImpl) => fetchRookieUIControlNetTypes(fetchImpl),
     adetailerCatalog: (fetchImpl) => fetchRookieUIADetailerCatalog(fetchImpl),
+    promptWorkbench: (fetchImpl) => fetchRookieUIPromptWorkbenchConfig(fetchImpl),
     queue: (fetchImpl, { clientId }) => fetchRookieUIQueue(fetchImpl, { clientId }),
   };
 }
@@ -106,6 +108,11 @@ export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBoot
       featureId: "queue",
       bootstrapKey: "queue",
       load: (fetchImpl, context) => loaders.queue(fetchImpl, context),
+    },
+    {
+      featureId: "prompt_workbench",
+      bootstrapKey: "promptWorkbench",
+      load: (fetchImpl) => loaders.promptWorkbench(fetchImpl),
     },
     {
       featureId: "controlnet_catalog",

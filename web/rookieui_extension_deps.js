@@ -15,6 +15,7 @@ export const {
   fetchRookieUIControlNetTypes,
   fetchRookieUIHistoryPrompt,
   fetchRookieUIModels,
+  fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,

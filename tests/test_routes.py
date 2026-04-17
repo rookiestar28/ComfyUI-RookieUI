@@ -5,6 +5,7 @@ import unittest
 from rookieui.api import routes
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
+from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 
 
@@ -38,6 +39,11 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/generate/txt2img", payload["routes"])
         self.assertIn("/rookieui/generate/img2img", payload["routes"])
         self.assertIn("/rookieui/extras/run", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/config", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/state", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/history", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/favorites", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/blacklist", payload["routes"])
 
     def test_adetailer_snapshot_exposes_contract_and_detector_catalog(self) -> None:
         payload = routes.build_adetailer_snapshot()
@@ -129,3 +135,10 @@ class RoutePayloadTests(unittest.TestCase):
 
         self.assertEqual(contract["version"], EXTRAS_CONTRACT_VERSION)
         self.assertEqual(contract["surface"], "extras_run")
+
+    def test_prompt_tools_config_payload_exposes_contract(self) -> None:
+        payload = routes.build_prompt_workbench_config_payload()
+
+        self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
+        self.assertEqual(payload["contract"]["surface"], "prompt_tools_config")
+        self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})

@@ -904,6 +904,46 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
   );
 }
 
+export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/prompt-tools/config",
+    {
+      contract: {
+        version: "r123f114-20260417",
+        surface: "prompt_tools_config",
+        route_family: "/rookieui/prompt-tools",
+        state_schema_version: 1,
+        namespaces: ["txt2img_prompt", "txt2img_negative", "img2img_prompt", "img2img_negative"],
+        provider_secret_field_keys: ["access_token", "api_key", "authorization", "password", "secret", "token"],
+      },
+      config: {
+        language: "en",
+        theme_style: "rookieui_classic",
+        history_limit: 100,
+        favorites_limit: 100,
+        formatting_rules: {
+          dedupe_commas: true,
+          normalize_spacing: true,
+          trim_outer_whitespace: true,
+        },
+        ui_preferences: {
+          default_open: false,
+          preferred_panel: "editor",
+          show_history: true,
+          show_favorites: true,
+        },
+        translation: { default_provider: "", providers: {} },
+        ai_assist: { default_provider: "", providers: {} },
+      },
+      blacklist: {
+        enabled: false,
+        entries: [],
+      },
+    },
+    fetchImpl,
+  );
+}
+
 export async function detectRookieUIControlNet(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
     rookieUIDebugWarn("api.controlnet_detect", "Detect request skipped because fetch() is unavailable.");

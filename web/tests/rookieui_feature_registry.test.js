@@ -17,6 +17,7 @@ describe("rookieui feature registry", () => {
       controlnetModules: vi.fn(),
       controlnetTypes: vi.fn(),
       adetailerCatalog: vi.fn(),
+      promptWorkbench: vi.fn(),
       queue: vi.fn(),
     });
 
@@ -30,6 +31,7 @@ describe("rookieui feature registry", () => {
       "controlnet_types",
       "adetailer_catalog",
       "queue",
+      "prompt_workbench",
       "controlnet_catalog",
     ]);
   });
@@ -77,6 +79,7 @@ describe("rookieui feature registry", () => {
           data: { source: "internal", control_type_order: ["All"], default_type: "All", control_types: {} },
         }),
         adetailerCatalog: async () => ({ data: { detectors: [] } }),
+        promptWorkbench: async () => ({ data: { config: { language: "en" } } }),
         queue: queueLoader,
       },
     });
@@ -85,6 +88,7 @@ describe("rookieui feature registry", () => {
     expect(bootstrapData.capabilitySource).toBe("host");
     expect(bootstrapData.capabilities).toEqual({ service: "rookieui" });
     expect(bootstrapData.queue).toEqual({ jobs: [], clientId: "client-123" });
+    expect(bootstrapData.promptWorkbench).toEqual({ config: { language: "en" } });
     expect(bootstrapData.controlnetCatalog.model_list).toEqual(["canny.safetensors"]);
     expect(bootstrapData.adetailerCatalog).toEqual({ detectors: [] });
   });

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-INTEGRATED_FEATURE_REGISTRY_VERSION = "f113-20260417"
+INTEGRATED_FEATURE_REGISTRY_VERSION = "f114-20260417"
 
 
 @dataclass(frozen=True)
@@ -72,6 +72,13 @@ def _registry_entries() -> tuple[IntegratedFeatureRegistryEntry, ...]:
             route_paths=("/rookieui/queue",),
             validation_modes=("auxiliary-pipelines", "full-pipeline"),
             notes="Client-scoped queue snapshot fetched after client-id resolution during bootstrap.",
+        ),
+        IntegratedFeatureRegistryEntry(
+            feature_id="prompt_workbench",
+            bootstrap_key="promptWorkbench",
+            route_paths=("/rookieui/prompt-tools/config",),
+            validation_modes=("prompt-workbench",),
+            notes="Lightweight prompt-workbench bootstrap config; heavy history/favorites remain lazy-loaded.",
         ),
     )
 
