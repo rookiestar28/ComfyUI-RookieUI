@@ -451,8 +451,12 @@
   font-size: 11px;
 }
 
-.rookieui-shell__xyz-plot-swap-row,
 .rookieui-shell__xyz-plot-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.rookieui-shell__xyz-plot-swap-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -472,9 +476,29 @@
   color: var(--rookieui-text-secondary);
 }
 
+.rookieui-shell__xyz-plot-option-label {
+  font-size: 12px;
+}
+
 .rookieui-shell__xyz-plot-margin {
   display: grid;
   gap: 6px;
+}
+
+.rookieui-shell__xyz-plot-actions {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+}
+
+.rookieui-shell__xyz-plot-action {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 40px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .rookieui-shell__xyz-plot-estimate-grid {
@@ -530,6 +554,10 @@
 
   .rookieui-shell__xyz-plot-options {
     grid-template-columns: 1fr;
+  }
+
+  .rookieui-shell__xyz-plot-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
