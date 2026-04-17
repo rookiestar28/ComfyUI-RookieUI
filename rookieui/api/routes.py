@@ -30,6 +30,10 @@ from rookieui.services.prompt_workbench import (
     execute_prompt_workbench_analysis,
     execute_prompt_workbench_translate,
 )
+from rookieui.services.xyz_plot import (
+    build_xyz_plot_axes_snapshot,
+    build_xyz_plot_estimate_snapshot,
+)
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import (
@@ -70,6 +74,8 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes",
+    f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list",
@@ -692,6 +698,33 @@ async def pnginfo_parse(request: Any) -> Any:
     return _json_response(response_payload, request=request)
 
 
+async def xyz_plot_axes(request: Any) -> Any:
+    payload = build_xyz_plot_axes_snapshot()
+    payload["service"] = normalize_metadata_text("rookieui")
+    payload["status"] = normalize_metadata_text("ok")
+    return _json_response(payload, request=request)
+
+
+async def xyz_plot_estimate(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        response_payload = build_xyz_plot_estimate_snapshot(payload)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+
+    response_payload["service"] = normalize_metadata_text("rookieui")
+    response_payload["status"] = normalize_metadata_text("ok")
+    return _json_response(response_payload, request=request)
+
+
 async def pnginfo_inspect(request: Any) -> Any:
     return await pnginfo_parse(request)
 
@@ -933,6 +966,8 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist", prompt_tools_assist)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog", prompt_tools_catalog)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze", prompt_tools_analyze)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes", xyz_plot_axes)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate", xyz_plot_estimate)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)

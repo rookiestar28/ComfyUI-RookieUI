@@ -80,6 +80,13 @@ def _registry_entries() -> tuple[IntegratedFeatureRegistryEntry, ...]:
             validation_modes=("prompt-workbench",),
             notes="Lightweight prompt-workbench bootstrap config; heavy history/favorites remain lazy-loaded.",
         ),
+        IntegratedFeatureRegistryEntry(
+            feature_id="xyz_plot",
+            bootstrap_key="xyzPlot",
+            route_paths=("/rookieui/xyz-plot/axes",),
+            validation_modes=("xyz-plot",),
+            notes="XYZ Plot axis registry bootstrap surface; estimate/session/grid routes stay lazy-loaded until requested.",
+        ),
     )
 
 

@@ -26,6 +26,7 @@ class IntegratedFeatureRegistryTests(unittest.TestCase):
                 "adetailer_catalog",
                 "queue",
                 "prompt_workbench",
+                "xyz_plot",
             ],
         )
 
@@ -42,6 +43,7 @@ class IntegratedFeatureRegistryTests(unittest.TestCase):
         )
         self.assertEqual(route_map["queue"], ["/rookieui/queue"])
         self.assertEqual(route_map["promptWorkbench"], ["/rookieui/prompt-tools/config"])
+        self.assertEqual(route_map["xyzPlot"], ["/rookieui/xyz-plot/axes"])
 
     def test_validation_map_links_integrated_surfaces_to_live_smoke_modes(self) -> None:
         validation_map = build_integrated_feature_validation_map()
@@ -50,3 +52,4 @@ class IntegratedFeatureRegistryTests(unittest.TestCase):
         self.assertEqual(validation_map["adetailer_catalog"], ["adetailer", "full-pipeline"])
         self.assertEqual(validation_map["queue"], ["auxiliary-pipelines", "full-pipeline"])
         self.assertEqual(validation_map["prompt_workbench"], ["prompt-workbench"])
+        self.assertEqual(validation_map["xyz_plot"], ["xyz-plot"])
