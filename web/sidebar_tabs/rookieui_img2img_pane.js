@@ -1725,6 +1725,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     buildBaseRequest: buildXYZBaseRequest,
     appendTextElement,
     createActionButton,
+    createIconActionButton,
+    createPreviewFullscreenViewer,
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },

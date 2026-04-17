@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { createIconActionButton } from "../rookieui_action_buttons.js";
+import { createPreviewFullscreenViewer } from "../rookieui_preview_fullscreen.js";
 import { createXYZPlotShell } from "../sidebar_tabs/rookieui_xyz_plot_shell.js";
 
 function flushPromises() {
@@ -444,5 +446,59 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-hires-axis-z-values-multiselect").hidden).toBe(false);
     expect(document.getElementById("txt2img-hires-axis-z-values-summary").textContent).toContain("Select values");
     expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(false);
+  });
+
+  test("wires the results preview into the shared fullscreen viewer", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    let fullscreenActive = false;
+
+    createXYZPlotShell({
+      idPrefix: "xyz-preview",
+      parent,
+      mode: "img2img",
+      bootstrapState: createBootstrapState({
+        fetchXYZPlotSessionsRequest: vi.fn(async () => ({
+          ok: true,
+          data: { sessions: [] },
+        })),
+      }),
+      buildBaseRequest: () => ({ prompt: "portrait", denoise_strength: 0.5 }),
+      appendTextElement,
+      createActionButton,
+      createIconActionButton,
+      createPreviewFullscreenViewer: (config) =>
+        createPreviewFullscreenViewer(config, {
+          isCanvasElementFullscreen: () => fullscreenActive,
+          toggleCanvasFullscreen: async () => {
+            fullscreenActive = !fullscreenActive;
+            return fullscreenActive ? "entered" : "exited";
+          },
+        }),
+    });
+
+    await flushPromises();
+
+    document.getElementById("xyz-preview-axis-y-select").value = "denoising_strength";
+    document.getElementById("xyz-preview-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("xyz-preview-axis-x-values").value = "1, 2";
+    document.getElementById("xyz-preview-axis-y-values").value = "0.35, 0.55";
+    document.getElementById("xyz-preview-axis-z-select").value = "";
+    document.getElementById("xyz-preview-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
+
+    document.getElementById("xyz-preview-run").click();
+    await flushPromises();
+    document.getElementById("xyz-preview-refresh").click();
+    await flushPromises();
+
+    const fullscreenButton = document.getElementById("xyz-preview-preview-fullscreen");
+    expect(fullscreenButton).not.toBeNull();
+    fullscreenButton.click();
+    await flushPromises();
+
+    const zoomSlider = document.getElementById("xyz-preview-fullscreen-zoom");
+    expect(zoomSlider).not.toBeNull();
+    expect(zoomSlider.parentElement.hidden).toBe(false);
+    expect(document.getElementById("xyz-preview-session-status").textContent).toContain("entered fullscreen mode");
   });
 });

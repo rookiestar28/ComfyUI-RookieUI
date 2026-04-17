@@ -7,7 +7,12 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from rookieui.services.asset_store import build_data_url_from_path, resolve_generated_output_path, save_output_image
+from rookieui.services.asset_store import (
+    build_data_url_from_path,
+    mirror_output_asset_to_host_output,
+    resolve_generated_output_path,
+    save_output_image,
+)
 from rookieui.services.xyz_plot_estimate import XYZ_PLOT_MAX_GRID_MEGAPIXELS
 from rookieui.services.xyz_plot_metadata import build_xyz_plot_png_metadata
 
@@ -16,6 +21,7 @@ _TEXT_COLOR = (32, 32, 32)
 _BORDER_COLOR = (210, 210, 214)
 _TITLE_BG_COLOR = (236, 236, 240)
 _MIN_LABEL_PAD = 12
+_CORNER_LINE_SPACING = 4
 
 
 def _safe_font() -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
@@ -41,6 +47,63 @@ def _normalize_grid_cell(image: Image.Image, *, width: int, height: int) -> Imag
     return normalized
 
 
+def _build_axis_descriptor_lines(*axes: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for axis in axes:
+        if not isinstance(axis, dict):
+            continue
+        slot = str(axis.get("slot", "")).strip() or "?"
+        title = str(axis.get("title", axis.get("axis_id", ""))).strip()
+        if not title:
+            continue
+        lines.append(f"{slot}: {title}")
+    return lines
+
+
+def _measure_corner_block(
+    draw: ImageDraw.ImageDraw,
+    lines: list[str],
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
+) -> tuple[int, int]:
+    if not lines:
+        return (0, 0)
+    widths: list[int] = []
+    heights: list[int] = []
+    for line in lines:
+        width, height = _measure_text(draw, line, font)
+        widths.append(width)
+        heights.append(height)
+    total_height = sum(heights) + (_CORNER_LINE_SPACING * max(0, len(heights) - 1))
+    return (
+        max(widths) + (_MIN_LABEL_PAD * 2),
+        total_height + (_MIN_LABEL_PAD * 2),
+    )
+
+
+def _draw_corner_block(
+    draw: ImageDraw.ImageDraw,
+    lines: list[str],
+    *,
+    left_pad: int,
+    top_pad: int,
+    font: ImageFont.ImageFont | ImageFont.FreeTypeFont,
+) -> None:
+    if not lines or left_pad <= 0 or top_pad <= 0:
+        return
+    draw.rectangle((0, 0, left_pad - 1, top_pad - 1), fill=_TITLE_BG_COLOR, outline=_BORDER_COLOR, width=1)
+    line_sizes = [_measure_text(draw, line, font) for line in lines]
+    total_height = sum(height for _, height in line_sizes) + (_CORNER_LINE_SPACING * max(0, len(line_sizes) - 1))
+    draw_y = max(0.0, (top_pad - total_height) / 2)
+    for line, (line_width, line_height) in zip(lines, line_sizes, strict=True):
+        draw.text(
+            (max(_MIN_LABEL_PAD / 2, (left_pad - line_width) / 2), draw_y),
+            line,
+            fill=_TEXT_COLOR,
+            font=font,
+        )
+        draw_y += line_height + _CORNER_LINE_SPACING
+
+
 def _compose_annotated_grid(
     cells: list[Image.Image],
     *,
@@ -48,6 +111,7 @@ def _compose_annotated_grid(
     rows: int,
     col_labels: list[str],
     row_labels: list[str],
+    corner_lines: list[str],
     draw_legend: bool,
     margin_size: int,
 ) -> Image.Image:
@@ -67,6 +131,9 @@ def _compose_annotated_grid(
             top_pad = max(_measure_text(draw, label, font)[1] for label in col_labels) + (_MIN_LABEL_PAD * 2)
         if row_labels:
             left_pad = max(_measure_text(draw, label, font)[0] for label in row_labels) + (_MIN_LABEL_PAD * 2)
+        corner_width, corner_height = _measure_corner_block(draw, corner_lines, font)
+        top_pad = max(top_pad, corner_height)
+        left_pad = max(left_pad, corner_width)
     canvas_width = left_pad + (cols * max_width) + (margin * max(0, cols - 1))
     canvas_height = top_pad + (rows * max_height) + (margin * max(0, rows - 1))
     projected_mp = round((canvas_width * canvas_height) / 1_000_000, 3)
@@ -84,6 +151,7 @@ def _compose_annotated_grid(
         canvas.paste(cell, (x, y))
         draw.rectangle((x, y, x + max_width - 1, y + max_height - 1), outline=_BORDER_COLOR, width=1)
     if draw_legend:
+        _draw_corner_block(draw, corner_lines, left_pad=left_pad, top_pad=top_pad, font=font)
         for col, label in enumerate(col_labels):
             if not label:
                 continue
@@ -243,6 +311,7 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
             rows=y_len,
             col_labels=axis_labels[0] if axes else [],
             row_labels=axis_labels[1] if len(axes) > 1 else [],
+            corner_lines=_build_axis_descriptor_lines(*(axis for axis in axes[:2] if isinstance(axis, dict))),
             draw_legend=draw_legend,
             margin_size=margin_size,
         )
@@ -264,12 +333,18 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
                 signature=signature,
             )
             saved = save_output_image(sub_grid, prefix="xyz_plot_subgrid", metadata=metadata)
+            host_output_filename = ""
+            try:
+                host_output_filename = mirror_output_asset_to_host_output(saved.path, filename=saved.handle)
+            except Exception as exc:
+                warnings.append(f"Failed to mirror XYZ sub-grid to host output: {exc}")
             persisted_sub_grids.append(
                 {
                     "z_index": z_index,
                     "z_label": axis_labels[2][z_index] if len(axis_labels) > 2 else "",
                     "asset_handle": saved.handle,
                     "sha256": saved.sha256,
+                    "host_output_filename": host_output_filename,
                 }
             )
     if incomplete:
@@ -292,6 +367,7 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
             rows=1,
             col_labels=axis_labels[2] if len(axis_labels) > 2 else [],
             row_labels=[],
+            corner_lines=_build_axis_descriptor_lines(axes[2] if len(axes) > 2 else {}),
             draw_legend=draw_legend,
             margin_size=margin_size,
         )
@@ -301,10 +377,16 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
         signature=f"{signature}:{_serialize_image_to_digest(main_grid_image)}",
     )
     saved_main = save_output_image(main_grid_image, prefix="xyz_plot_grid", metadata=main_metadata)
+    host_output_filename = ""
+    try:
+        host_output_filename = mirror_output_asset_to_host_output(saved_main.path, filename=saved_main.handle)
+    except Exception as exc:
+        warnings.append(f"Failed to mirror XYZ main grid to host output: {exc}")
     main_grid_payload = {
         "asset_handle": saved_main.handle,
         "sha256": saved_main.sha256,
         "preview_data_url": build_data_url_from_path(Path(saved_main.path)),
+        "host_output_filename": host_output_filename,
     }
 
     lone_images: list[dict[str, Any]] = []

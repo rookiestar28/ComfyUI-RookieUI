@@ -221,6 +221,8 @@ export function createXYZPlotShell({
   buildBaseRequest,
   appendTextElement,
   createActionButton,
+  createIconActionButton,
+  createPreviewFullscreenViewer,
   onStatusMessage,
 } = {}) {
   const shell = document.createElement("details");
@@ -479,6 +481,24 @@ export function createXYZPlotShell({
   previewBox.className = "rookieui-shell__preview-box rookieui-shell__preview-box--compact rookieui-shell__xyz-plot-preview";
   resultSection.appendChild(previewBox);
   appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", "No XYZ plot grid yet.");
+
+  const previewToolbar = document.createElement("div");
+  previewToolbar.className = "rookieui-shell__preview-toolbar";
+  previewToolbar.hidden = true;
+  resultSection.appendChild(previewToolbar);
+
+  const previewViewer =
+    typeof createIconActionButton === "function" && typeof createPreviewFullscreenViewer === "function"
+      ? createPreviewFullscreenViewer({
+          idPrefix,
+          previewBox,
+          previewToolbar,
+          createIconActionButton,
+          statusNode: sessionStatusNode,
+          labelText: "Preview",
+        })
+      : null;
+
   const resultSummaryNode = appendTextElement(
     resultSection,
     "p",
@@ -495,9 +515,11 @@ export function createXYZPlotShell({
       image.src = dataUrl;
       image.alt = "XYZ Plot grid preview";
       previewBox.appendChild(image);
-      return;
+    } else {
+      appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", "No XYZ plot grid yet.");
     }
-    appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", "No XYZ plot grid yet.");
+    previewViewer?.syncImage?.();
+    previewBox.__previewFullscreenController?.syncImage?.();
   }
 
   function collectPayload() {

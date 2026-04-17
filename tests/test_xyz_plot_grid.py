@@ -201,3 +201,94 @@ class XYZPlotGridTests(unittest.TestCase):
         self.assertEqual(payload["status"], "ready")
         self.assertEqual(len(payload["lone_images"]), 1)
         self.assertTrue(payload["main_grid"]["asset_handle"].startswith("xyz_plot_grid_"))
+
+    def test_build_xyz_plot_grid_results_mirrors_grids_to_host_output_with_axis_descriptor_framing(self) -> None:
+        host_output_root = Path(self.runtime_dir.name) / "host-output"
+        host_output_root.mkdir(parents=True, exist_ok=True)
+        folder_paths_module = mock.Mock()
+        folder_paths_module.get_output_directory.return_value = str(host_output_root)
+        cell_handles = [
+            self._save_cell_image("red", prefix="xyz_cell"),
+            self._save_cell_image("blue", prefix="xyz_cell"),
+            self._save_cell_image("green", prefix="xyz_cell"),
+            self._save_cell_image("yellow", prefix="xyz_cell"),
+        ]
+        session = {
+            "session_id": "xyz-host-grid",
+            "mode": "txt2img",
+            "axes": [
+                {
+                    "slot": "X",
+                    "axis_id": "steps",
+                    "title": "Steps",
+                    "parsed_values": [{"label": "10"}, {"label": "20"}],
+                },
+                {
+                    "slot": "Y",
+                    "axis_id": "cfg_scale",
+                    "title": "CFG Scale",
+                    "parsed_values": [{"label": "5"}],
+                },
+                {
+                    "slot": "Z",
+                    "axis_id": "sampler",
+                    "title": "Sampler",
+                    "parsed_values": [{"label": "Euler"}, {"label": "DPM"}],
+                },
+            ],
+            "grid_options": {
+                "draw_legend": True,
+                "include_sub_grids": True,
+                "include_lone_images": False,
+                "margin_size": 4,
+            },
+            "cells": [
+                {
+                    "cell_id": "cell-1",
+                    "status": "completed",
+                    "axis_indices": {"X": 0, "Y": 0, "Z": 0},
+                    "bindings": [],
+                    "prompt_id": "p1",
+                    "reusable_outputs": [cell_handles[0]],
+                    "output_filenames": [cell_handles[0]],
+                },
+                {
+                    "cell_id": "cell-2",
+                    "status": "completed",
+                    "axis_indices": {"X": 1, "Y": 0, "Z": 0},
+                    "bindings": [],
+                    "prompt_id": "p2",
+                    "reusable_outputs": [cell_handles[1]],
+                    "output_filenames": [cell_handles[1]],
+                },
+                {
+                    "cell_id": "cell-3",
+                    "status": "completed",
+                    "axis_indices": {"X": 0, "Y": 0, "Z": 1},
+                    "bindings": [],
+                    "prompt_id": "p3",
+                    "reusable_outputs": [cell_handles[2]],
+                    "output_filenames": [cell_handles[2]],
+                },
+                {
+                    "cell_id": "cell-4",
+                    "status": "completed",
+                    "axis_indices": {"X": 1, "Y": 0, "Z": 1},
+                    "bindings": [],
+                    "prompt_id": "p4",
+                    "reusable_outputs": [cell_handles[3]],
+                    "output_filenames": [cell_handles[3]],
+                },
+            ],
+        }
+
+        with mock.patch.object(asset_store, "_load_folder_paths_module", return_value=folder_paths_module):
+            payload = xyz_plot_grid.build_xyz_plot_grid_results(session)
+
+        self.assertEqual(payload["status"], "ready")
+        runtime_main_path = asset_store.resolve_asset_path(payload["main_grid"]["asset_handle"])
+        runtime_subgrid_path = asset_store.resolve_asset_path(payload["sub_grids"][0]["asset_handle"])
+        with Image.open(runtime_main_path) as runtime_main_image, Image.open(runtime_subgrid_path) as runtime_subgrid_image:
+            self.assertGreater(runtime_main_image.width, (runtime_subgrid_image.width * 2) + 4)
+        self.assertGreaterEqual(len(list(host_output_root.glob("xyz_plot_grid_*.png"))), 1)
+        self.assertGreaterEqual(len(list(host_output_root.glob("xyz_plot_subgrid_*.png"))), 2)
