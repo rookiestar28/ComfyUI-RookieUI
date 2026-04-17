@@ -400,3 +400,39 @@ class XYZPlotSessionTests(unittest.TestCase):
                     prompt_server,
                 )
             )
+
+    def test_session_detail_serializes_overlapping_async_state_refreshes(self) -> None:
+        prompt_server = _FakePromptServer()
+        session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "cat", "steps": 20},
+                "axes": [{"axis_id": "steps", "values": "10,20"}],
+            }
+        )
+        xyz_plot_sessions._save_xyz_plot_store(
+            {
+                "schema_version": xyz_plot_sessions._XYZ_PLOT_SESSION_SCHEMA_VERSION,
+                "sessions": {session["session_id"]: session},
+            }
+        )
+
+        active_refreshes = 0
+        max_refreshes = 0
+
+        async def _fake_refresh(_session: dict[str, object], _prompt_server: object) -> None:
+            nonlocal active_refreshes, max_refreshes
+            active_refreshes += 1
+            max_refreshes = max(max_refreshes, active_refreshes)
+            await asyncio.sleep(0)
+            active_refreshes -= 1
+
+        async def _run_overlap() -> None:
+            with mock.patch.object(xyz_plot_sessions, "_refresh_session_state", side_effect=_fake_refresh):
+                await asyncio.gather(
+                    xyz_plot_sessions.build_xyz_plot_session_detail_payload(session["session_id"], prompt_server),
+                    xyz_plot_sessions.build_xyz_plot_session_detail_payload(session["session_id"], prompt_server),
+                )
+
+        asyncio.run(_run_overlap())
+        self.assertEqual(max_refreshes, 1)

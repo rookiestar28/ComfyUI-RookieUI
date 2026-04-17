@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import itertools
 import json
@@ -7,6 +8,7 @@ import os
 import secrets
 import threading
 import time
+import weakref
 from pathlib import Path
 from typing import Any
 
@@ -33,10 +35,22 @@ from rookieui.services.xyz_plot_estimate import XYZ_PLOT_MAX_TOTAL_CELLS
 from rookieui.services.xyz_plot_values import parse_xyz_axis_values
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-_STATE_LOCK = threading.RLock()
+_ASYNC_STATE_LOCK_REGISTRY_LOCK = threading.Lock()
+_ASYNC_STATE_LOCKS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
 _XYZ_PLOT_SESSION_SCHEMA_VERSION = 2
 _XYZ_PLOT_MAX_PARALLEL = 4
 _XYZ_SLOT_LABELS = ("X", "Y", "Z")
+
+
+def _get_async_state_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    with _ASYNC_STATE_LOCK_REGISTRY_LOCK:
+        lock = _ASYNC_STATE_LOCKS.get(loop)
+        if lock is None:
+            # IMPORTANT: keep one asyncio lock per running loop; XYZ session mutations await host work and must be coroutine-safe.
+            lock = asyncio.Lock()
+            _ASYNC_STATE_LOCKS[loop] = lock
+        return lock
 
 
 def _xyz_plot_runtime_root() -> Path:
@@ -631,7 +645,7 @@ def _load_session_or_raise(store: dict[str, Any], session_id: object, *, client_
 
 
 async def execute_xyz_plot_run(payload: object, prompt_server: Any) -> dict[str, Any]:
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _normalize_session_request(payload)
         await _refresh_session_state(session, prompt_server)
@@ -642,7 +656,7 @@ async def execute_xyz_plot_run(payload: object, prompt_server: Any) -> dict[str,
 
 async def build_xyz_plot_session_list_payload(prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         sessions: list[dict[str, Any]] = []
         for session in store.get("sessions", {}).values():
@@ -662,7 +676,7 @@ async def build_xyz_plot_session_list_payload(prompt_server: Any, *, client_id: 
 
 async def build_xyz_plot_session_detail_payload(session_id: object, prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _load_session_or_raise(store, session_id, client_id=normalized_client_id)
         await _refresh_session_state(session, prompt_server)
@@ -672,7 +686,7 @@ async def build_xyz_plot_session_detail_payload(session_id: object, prompt_serve
 
 async def execute_xyz_plot_session_cancel(session_id: object, prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _load_session_or_raise(store, session_id, client_id=normalized_client_id)
         session["cancel_requested"] = True
@@ -691,7 +705,8 @@ async def execute_xyz_plot_session_cancel(session_id: object, prompt_server: Any
 
 
 def reset_xyz_plot_session_store_for_tests() -> None:
-    with _STATE_LOCK:
-        state_path = _xyz_plot_state_path()
-        if state_path.exists():
-            state_path.unlink()
+    with _ASYNC_STATE_LOCK_REGISTRY_LOCK:
+        _ASYNC_STATE_LOCKS.clear()
+    state_path = _xyz_plot_state_path()
+    if state_path.exists():
+        state_path.unlink()
