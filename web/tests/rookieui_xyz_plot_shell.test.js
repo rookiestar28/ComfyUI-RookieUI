@@ -293,6 +293,7 @@ describe("xyz plot shell", () => {
   test("runs, refreshes, and cancels sessions while updating preview state", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
+    const syncPrimaryPreview = vi.fn();
     const bootstrapState = createBootstrapState({
       fetchXYZPlotSessionsRequest: vi.fn(async () => ({
         ok: true,
@@ -336,6 +337,7 @@ describe("xyz plot shell", () => {
       }),
       appendTextElement,
       createActionButton,
+      syncPrimaryPreview,
     });
 
     await flushPromises();
@@ -362,6 +364,7 @@ describe("xyz plot shell", () => {
     expect(bootstrapState.fetchXYZPlotSessionDetailRequest).toHaveBeenCalledWith("xyz-1", "browser-1");
     const previewImage = document.querySelector("#img2img-xyz-main-grid-preview img");
     expect(previewImage?.getAttribute("src")).toBe("data:image/png;base64,ZmFrZQ==");
+    expect(syncPrimaryPreview).toHaveBeenCalledWith("data:image/png;base64,ZmFrZQ==", expect.any(Object));
     expect(document.getElementById("img2img-xyz-result-summary").textContent).toContain("Sub-grids: 1");
 
     document.getElementById("img2img-xyz-cancel").click();

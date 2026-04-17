@@ -88,6 +88,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await expect(page.locator("#rookieui-txt2img-xyz-plot-session-status")).toContainText("in_progress");
   await page.locator("#rookieui-txt2img-xyz-plot-refresh").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-main-grid-preview img")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-preview img")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-preview-fullscreen")).toBeVisible();
   await page.locator("#rookieui-txt2img-xyz-plot-preview-fullscreen").click();
   await expect
@@ -139,6 +140,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await page.locator("#rookieui-img2img-xyz-plot-run").click();
   await page.locator("#rookieui-img2img-xyz-plot-refresh").click();
   await expect(page.locator("#rookieui-img2img-xyz-plot-main-grid-preview img")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-preview img")).toBeVisible();
 
   const allRunRequests = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run);
   expect(allRunRequests).toHaveLength(2);

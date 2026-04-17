@@ -261,6 +261,58 @@ class XYZPlotSessionTests(unittest.TestCase):
             results["main_grid"]["asset_handle"],
         )
 
+    def test_session_detail_emits_partial_preview_while_session_is_still_running(self) -> None:
+        prompt_server = _FakePromptServer()
+        first_asset = self._save_output_asset("red")
+        submit_mock = mock.AsyncMock(side_effect=[{"prompt_id": "prompt-1", "number": 1}, {"prompt_id": "prompt-2", "number": 2}])
+        with ExitStack() as stack:
+            for patcher in self._patch_generation_pipeline():
+                stack.enter_context(patcher)
+            stack.enter_context(mock.patch.object(xyz_plot_sessions, "submit_prompt_workflow", submit_mock))
+            run_payload = asyncio.run(
+                xyz_plot_sessions.execute_xyz_plot_run(
+                    {
+                        "mode": "txt2img",
+                        "base_request": {"prompt": "cat", "steps": 20},
+                        "axes": [{"axis_id": "steps", "values": "10,20"}],
+                    },
+                    prompt_server,
+                )
+            )
+            session_id = run_payload["session"]["session_id"]
+            prompt_server.prompt_queue.items = [
+                (
+                    2,
+                    "prompt-2",
+                    {"7": {"class_type": "SaveImage"}},
+                    {"create_time": 102, "rookieui_origin": "rookieui"},
+                    ["7"],
+                    {},
+                )
+            ]
+            prompt_server.prompt_queue.history["prompt-1"] = {
+                "prompt": (
+                    1,
+                    "prompt-1",
+                    {"7": {"class_type": "SaveImage"}},
+                    {"create_time": 101, "rookieui_origin": "rookieui"},
+                    ["7"],
+                    {},
+                ),
+                "outputs": {"7": {"images": [{"filename": first_asset}]}},
+                "status": {"status_str": "success", "messages": []},
+            }
+
+            detail_payload = asyncio.run(
+                xyz_plot_sessions.build_xyz_plot_session_detail_payload(session_id, prompt_server)
+            )
+
+        self.assertEqual(detail_payload["session"]["status"], "in_progress")
+        self.assertEqual(detail_payload["session"]["results"]["status"], "running")
+        self.assertTrue(
+            str(detail_payload["session"]["results"]["main_grid"]["preview_data_url"]).startswith("data:image/png;base64,")
+        )
+
     def test_rejects_non_runner_ready_axis(self) -> None:
         prompt_server = _FakePromptServer()
         with self.assertRaisesRegex(ValueError, "not session-runnable yet"):

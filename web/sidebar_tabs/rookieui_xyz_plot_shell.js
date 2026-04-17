@@ -223,6 +223,7 @@ export function createXYZPlotShell({
   createActionButton,
   createIconActionButton,
   createPreviewFullscreenViewer,
+  syncPrimaryPreview,
   onStatusMessage,
 } = {}) {
   const shell = document.createElement("details");
@@ -603,7 +604,15 @@ export function createXYZPlotShell({
       `Failed ${summary.failed_cells ?? 0}`,
     ].join(" | ");
     const results = normalizedSession.results ?? {};
-    setPreview(String(results?.main_grid?.preview_data_url ?? ""));
+    const mainGridPreview = String(results?.main_grid?.preview_data_url ?? "");
+    setPreview(mainGridPreview);
+    if (mainGridPreview && typeof syncPrimaryPreview === "function") {
+      // IMPORTANT: XYZ sessions must drive the pane's primary preview as well as the local Results card; removing this reintroduces the "top preview stays empty" regression.
+      syncPrimaryPreview(mainGridPreview, {
+        session: normalizedSession,
+        results,
+      });
+    }
     resultSummaryNode.textContent = `Sub-grids: ${Array.isArray(results.sub_grids) ? results.sub_grids.length : 0} | Lone images: ${
       Array.isArray(results.lone_images) ? results.lone_images.length : 0
     }`;
