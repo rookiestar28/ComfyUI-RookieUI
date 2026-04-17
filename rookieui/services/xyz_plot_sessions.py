@@ -12,7 +12,8 @@ from typing import Any
 
 from rookieui.contracts.xyz_plot import build_xyz_plot_contract_meta
 from rookieui.security.request_guard import normalize_client_id, normalize_option_label
-from rookieui.services.coercion import coerce_int
+from rookieui.services.coercion import coerce_bool, coerce_int
+from rookieui.services.xyz_plot_grid import build_xyz_plot_grid_results
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.queue_snapshot import build_queue_snapshot
@@ -89,6 +90,28 @@ def _normalize_max_parallel(raw_value: object) -> int:
     if max_parallel < 1 or max_parallel > _XYZ_PLOT_MAX_PARALLEL:
         raise ValueError(f"max_parallel must be between 1 and {_XYZ_PLOT_MAX_PARALLEL}.")
     return max_parallel
+
+
+def _normalize_grid_options(payload: dict[str, Any]) -> dict[str, Any]:
+    margin_size = coerce_int(payload.get("margin_size"), "margin_size", via_str=True, default=0)
+    if margin_size < 0 or margin_size > 500:
+        raise ValueError("margin_size must be between 0 and 500.")
+    return {
+        "draw_legend": coerce_bool(payload.get("draw_legend", True), "draw_legend", default=True, strict=False),
+        "include_lone_images": coerce_bool(
+            payload.get("include_lone_images", False),
+            "include_lone_images",
+            default=False,
+            strict=False,
+        ),
+        "include_sub_grids": coerce_bool(
+            payload.get("include_sub_grids", False),
+            "include_sub_grids",
+            default=False,
+            strict=False,
+        ),
+        "margin_size": margin_size,
+    }
 
 
 def _axis_runtime_payload(axis_id: str) -> dict[str, Any]:
@@ -218,9 +241,13 @@ def _build_session_cells(normalized_axes: list[dict[str, Any]]) -> list[dict[str
             raise ValueError(f"xyz_plot expands to too many cells (max {XYZ_PLOT_MAX_TOTAL_CELLS}).")
     cells: list[dict[str, Any]] = []
     combinations = [axis["parsed_values"] for axis in normalized_axes]
-    for order_index, combination in enumerate(itertools.product(*combinations)):
+    indexed_combinations = [list(enumerate(axis["parsed_values"])) for axis in normalized_axes]
+    for order_index, combination in enumerate(itertools.product(*indexed_combinations)):
         bindings = []
-        for axis, parsed_entry in zip(normalized_axes, combination, strict=True):
+        axis_indices: dict[str, int] = {}
+        for axis, indexed_entry in zip(normalized_axes, combination, strict=True):
+            value_index, parsed_entry = indexed_entry
+            axis_indices[axis["slot"]] = int(value_index)
             bindings.append(
                 {
                     "slot": axis["slot"],
@@ -234,6 +261,7 @@ def _build_session_cells(normalized_axes: list[dict[str, Any]]) -> list[dict[str
             {
                 "cell_id": f"cell-{order_index + 1:04d}",
                 "order_index": order_index,
+                "axis_indices": axis_indices,
                 "status": "pending",
                 "bindings": bindings,
                 "prompt_id": "",
@@ -308,8 +336,10 @@ def _serialize_session(session: dict[str, Any], *, surface: str, include_cells: 
         "max_parallel": session["max_parallel"],
         "cancel_requested": bool(session.get("cancel_requested", False)),
         "axes": session["axes"],
+        "grid_options": session.get("grid_options", {}),
         "summary": _build_session_summary(session),
         "last_error": session.get("last_error", ""),
+        "results": session.get("results", {}),
     }
     if include_cells:
         session_payload["cells"] = session["cells"]
@@ -416,7 +446,29 @@ async def _refresh_session_state(session: dict[str, Any], prompt_server: Any) ->
             session["last_error"] = str(exc)
             break
         active_count += 1
+    _refresh_session_results(session)
     session["updated_at"] = int(time.time() * 1000)
+
+
+def _refresh_session_results(session: dict[str, Any]) -> None:
+    existing_results = session.get("results", {})
+    if not isinstance(existing_results, dict):
+        existing_results = {}
+    try:
+        next_results = build_xyz_plot_grid_results(session)
+    except Exception as exc:
+        next_results = {
+            "status": "incomplete",
+            "signature": existing_results.get("signature", ""),
+            "main_grid": {},
+            "sub_grids": [],
+            "lone_images": [],
+            "warnings": [str(exc)],
+        }
+    if existing_results.get("signature") == next_results.get("signature") and existing_results.get("status") == next_results.get("status"):
+        session["results"] = existing_results
+        return
+    session["results"] = next_results
 
 
 def _normalize_session_request(payload: object) -> dict[str, Any]:
@@ -437,8 +489,17 @@ def _normalize_session_request(payload: object) -> dict[str, Any]:
         "updated_at": int(time.time() * 1000),
         "client_id": normalize_client_id(payload.get("client_id")),
         "max_parallel": _normalize_max_parallel(payload.get("max_parallel")),
+        "grid_options": _normalize_grid_options(payload),
         "cancel_requested": False,
         "last_error": "",
+        "results": {
+            "status": "pending",
+            "signature": "",
+            "main_grid": {},
+            "sub_grids": [],
+            "lone_images": [],
+            "warnings": [],
+        },
     }
 
 
