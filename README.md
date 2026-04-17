@@ -14,6 +14,7 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 - **img2img, inpaint, and extras postprocessing flows**
 - **integrated ControlNet and ADetailer behavior**
 - **PNG metadata round-trip and apply workflow**
+- **Prompt Workbench authoring tools and XYZ Plot sweep sessions**
 - **queue / progress / result UX and host-embedded validation coverage**
 
 <br>
@@ -24,12 +25,12 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Prompt Workbench, XYZ Plot, and panel UX polish (new functionality/stability)</strong></summary>
+<summary><strong>Prompt Workbench and XYZ Plot delivery (new functionality/stability)</strong></summary>
 
 - Shipped an integrated `Prompt Workbench` in the `txt2img` and `img2img` prompt band, with persisted prompt/negative namespaces, quick-insert catalogs, translation tooling, AI assist delivery, history/favorites, and blacklist-aware formatting.
-- Shipped a built-in `XYZ Plot` sweep surface for `txt2img` and `img2img`, including axis registry, estimate checks, queue-backed session runs, main-grid/sub-grid assembly, and metadata-aware result delivery.
+- Shipped a built-in `XYZ Plot` sweep surface for `txt2img` and `img2img`, including axis registry, estimate checks, queue-backed session runs, main-grid/sub-grid assembly, primary-preview synchronization, fullscreen result inspection, and metadata-aware result delivery.
+- Added recent `XYZ Plot` parity follow-ups for choice-axis multiselect entry, running partial-grid preview delivery, A1111-style seed-policy controls (`Keep -1 for seeds` plus per-axis seed variation toggles), and output mirroring for assembled grids.
 - Added dedicated live-host smoke lanes for `Prompt Workbench` and `XYZ Plot`, so route/state/session behavior is validated against the restarted ComfyUI host before acceptance.
-- Polished the generation-pane extension layout so `ADetailer` now sits above `ControlNet`, while `ADetailer`, `ControlNet`, and `XYZ Plot` all default to collapsed sections after refresh.
 
 </details>
 
@@ -254,14 +255,16 @@ Current extension seams:
 - [Last Update](#last-update---click-to-expand)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
-- [Prompt Workbench](#prompt-workbench)
-- [XYZ Plot](#xyz-plot)
-- [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
-- [Live-Host Validation Coverage](#live-host-validation-coverage)
-- [Default Model Read Paths](#default-model-read-paths-host-comfyui)
-- [ControlNet Support](#controlnet-support)
-- [ADetailer Support](#adetailer-support)
-- [Support for Other Extensions](#support-for-other-extensions)
+- [Extensions](#extensions)
+  - [Prompt Workbench](#prompt-workbench)
+  - [XYZ Plot](#xyz-plot)
+  - [ControlNet Support](#controlnet-support)
+  - [ADetailer Support](#adetailer-support)
+  - [Support for Other Extensions](#support-for-other-extensions)
+- [Runtime and Host Integration](#runtime-and-host-integration)
+  - [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
+  - [Live-Host Validation Coverage](#live-host-validation-coverage)
+  - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [License](#license)
 
 
@@ -321,13 +324,15 @@ If your host or Manager install path does not automatically install custom-node 
 - persisted `prompt` / `negative` namespace state, history, and favorites
 - quick-insert catalogs for group tags, prompt-library entries, embeddings, and LoRA references
 - translation, prompt analysis, AI assist delivery, and blacklist-aware formatting tools
+- provider truthfulness for shipped, deferred, reference-only, and misconfigured Prompt Workbench provider states
 
 ### XYZ Plot
 
 - integrated bottom-mounted sweep surface in `txt2img` and `img2img`
-- axis registry with estimate checks before queue submission
-- queue-backed session runs with progress, cancellation, and result tracking
-- delivered results include main grid, sub-grids, lone cell images, and XYZ metadata
+- axis registry with estimate checks before queue submission and multiselect choice-axis entry where appropriate
+- queue-backed session runs with progress, cancellation, seed-policy controls, and result tracking
+- running sessions can surface partial main-grid preview while completed results sync into the shared preview box and the normal host output flow
+- delivered results include main grid, sub-grids, lone cell images, fullscreen inspection support, and XYZ metadata
 
 ### PNG Info
 
@@ -374,92 +379,65 @@ Prompt semantics note:
 - Exact A1111-style prompt parsing and conditioning parity is currently targeted at the Stable Diffusion family.
 - Newer/non-SD families continue to use their native ComfyUI execution semantics even when exposed in the same RookieUI interface.
 
-## Prompt Workbench
+## Extensions
+
+### Prompt Workbench
+
+<div align="left">
+  <img src="assets/prompt_workbench.png" width="70%" />
+</div>
+
+<br>
 
 Simple usage:
 
 1. Open `txt2img` or `img2img`, then click `Open Workbench` in the prompt band.
-2. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit.
-3. Use the editor, catalog, translation, formatting, history/favorites, or AI assist panels as needed.
-4. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
+2. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit, then use `Capture Current Text` if you want to pull the current field value into the workbench explicitly.
+3. Use the `Editor`, `History`, `Favorites`, `Catalog`, `Assist`, and `Format` panels as needed; token insertion, formatting cleanup, blacklist application, translation, and AI assist all operate on the active scope.
+4. Choose a configured shipped translation or AI-assist provider before running translation/assist actions, then apply the returned text back into the active RookieUI prompt field.
+5. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
 
 Behavior and compatibility:
 
 - `Prompt Workbench` is built directly into RookieUI's prompt band instead of relying on an A1111 textarea hijack or a separate external extension surface.
 - State is persisted separately for the shipped `txt2img` / `img2img` prompt and negative namespaces.
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
-- Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is unconfigured or requires extra host-side setup.
+- Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, deferred, reference-only, or otherwise unavailable on the current host/setup.
+- The current shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist currently uses the OpenAI-compatible provider contract.
 - The shipped live-host smoke lane validates config/state payloads, provider/catalog/analyze responses, history/favorites/blacklist persistence, translation behavior, and AI-assist truthfulness against the current host.
 
-## XYZ Plot
+---
+
+### XYZ Plot
+
+<div align="center">
+  <img src="assets/xyzplot.gif" width="90%" />
+</div>
+
+<br>
 
 Simple usage:
 
 1. Open `txt2img` or `img2img`, scroll below `Hires.fix`, `ADetailer`, and `ControlNet`, then expand `XYZ Plot`.
-2. Start from the current form as the base request, choose the `X`, `Y`, and optional `Z` axis types, then enter the values to sweep.
-3. Run an estimate first to review generated image count, session warnings, and whether the current axis combination can execute.
-4. Start the session and watch the session panel for progress, then inspect the generated main grid, sub-grids, or lone cell images when the run completes.
+2. Start from the current form as the base request, choose the `X`, `Y`, and optional `Z` axis types, then enter the values to sweep. Choice-backed axes use the built-in multiselect dropdown, while free-text axes still accept manual value entry.
+3. Review the seed controls when your sweep depends on deterministic or coordinate-varying seeds. RookieUI now supports `Keep -1 for seeds` plus separate `Vary seeds for X/Y/Z` toggles.
+4. Run an estimate first to review generated image count, session warnings, and whether the current axis combination can execute.
+5. Start the session and watch the session panel for progress. Running sessions can surface partial main-grid preview before the final assembled result is ready.
+6. Inspect the generated main grid, sub-grids, or lone cell images when the run completes; assembled grids also mirror into the shared preview lane and normal host output flow.
 
 Behavior and compatibility:
 
 - `XYZ Plot` is integrated into RookieUI instead of being exposed as an A1111 script runner, but it stays as a dedicated bottom-mounted sweep surface in the generation panes.
 - The surface is intentionally mounted below the `ADetailer` and `ControlNet` blocks and now follows the same collapsed-by-default section behavior as the surrounding extension panels.
-- Runs are queue-backed sessions rather than a single monolithic prompt submission, so RookieUI can track per-session progress, cancellation, and grid assembly explicitly.
-- Delivered results include a main grid, optional sub-grids, lone cell images, and attached XYZ metadata for later inspection/reuse.
+- Runs are queue-backed sessions rather than a single monolithic prompt submission, so RookieUI can track per-session progress, cancellation, seed materialization, and grid assembly explicitly.
+- Choice-backed axes use a RookieUI-owned multiselect dropdown with fill/clear behavior instead of forcing CSV-only entry for every choice axis.
+- The current shipped seed-policy surface includes `Keep -1 for seeds`, per-axis `Vary seeds for X/Y/Z` toggles, and truthful fixed-seed/session metadata.
+- Delivered results include a main grid, optional sub-grids, lone cell images, attached XYZ metadata for later inspection/reuse, and fullscreen zoom inspection through the shared preview viewer.
 - The shipped live-host smoke lane validates route contract drift, estimate payloads, session launch, terminal session state, and grid asset delivery against the current host.
 
-## Stable Diffusion Prompt Parity
+---
 
-RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough.
-
-Current shipped SD-family parity surface:
-
-- `BREAK`
-- `AND` / weighted multi-condition composition
-- scheduling slices such as `[from:to:at]`
-- alternate prompt scheduling such as `[a|b]`
-- attention markers such as `(text:1.2)`, `(text)`, and `[text]`
-- inventory-aware embeddings / textual inversion tokens on the shipped prompt path
-
-Runtime and validation notes:
-
-- `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
-- Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
-- The shipped parity surface is backed by golden parser/translator fixtures plus local live-host smoke validation (`dry-run` and `execute`) against the current ComfyUI host.
-- Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
-
-## Live-Host Validation Coverage
-
-RookieUI now ships internal live-host smoke lanes in [`scripts/run_live_smoke_tests.py`](scripts/run_live_smoke_tests.py) for acceptance against a restarted ComfyUI host. These lanes are developer/acceptance tooling rather than end-user UI toggles, but they document the current level of host-embedded proof behind the shipped surfaces.
-
-Current live-host coverage:
-
-- `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
-- `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, and AI-assist delivery semantics.
-- `xyz-plot`: validates axis/estimate contracts plus queue-backed session execution, terminal results, and assembled grid asset delivery.
-- `controlnet`: validates host-context compatibility, detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure.
-- `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
-- `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
-- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, and `xyz-plot` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
-
-## Default Model Read Paths (Host ComfyUI)
-
-RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under standard ComfyUI defaults, paths are:
-
-- Checkpoints: `<ComfyUI>/models/checkpoints`
-- Text Encoders (`text_encoders`): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
-- CLIP (`clip`, legacy alias): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
-- Diffusion Models (`diffusion_models`): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
-- UNet (`unet`, legacy alias): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
-- VAE: `<ComfyUI>/models/vae`
-- LoRA: `<ComfyUI>/models/loras`
-- Embeddings: `<ComfyUI>/models/embeddings`
-- CLIP Vision: `<ComfyUI>/models/clip_vision`
-- Upscale Models: `<ComfyUI>/models/upscale_models`
-- ControlNet: `<ComfyUI>/models/controlnet`, `<ComfyUI>/models/t2i_adapter`
-- Ultralytics: host `folder_paths`-defined location (commonly `<ComfyUI>/models/ultralytics` on hosts that provide this key)
-
-## ControlNet Support
+### ControlNet Support
 
 <div align="left">
   <img src="assets/controlnet.png" width="80%" />
@@ -489,7 +467,9 @@ Behavior and compatibility:
 - ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
 - The shipped live-host smoke lane now validates detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure against the current host.
 
-## ADetailer Support
+---
+
+### ADetailer Support
 
 <div align="left">
   <img src="assets/adetailer.png" width="40%" />
@@ -515,9 +495,64 @@ Behavior and compatibility:
 - Availability guidance and warning diagnostics are exposed when detector/model/runtime dependencies are degraded.
 - The shipped live-host smoke lane now validates catalog/runtime truthfulness, refinement-topology dry-run behavior, and fallback-safe execute completion against the current host.
 
-## Support for Other Extensions
+### Support for Other Extensions
 
 - Additional extension-style surfaces beyond the currently shipped `ControlNet`, `ADetailer`, `Prompt Workbench`, and `XYZ Plot` tooling will be added incrementally.
+
+---
+
+## Runtime and Host Integration
+
+### Stable Diffusion Prompt Parity
+
+RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough.
+
+Current shipped SD-family parity surface:
+
+- `BREAK`
+- `AND` / weighted multi-condition composition
+- scheduling slices such as `[from:to:at]`
+- alternate prompt scheduling such as `[a|b]`
+- attention markers such as `(text:1.2)`, `(text)`, and `[text]`
+- inventory-aware embeddings / textual inversion tokens on the shipped prompt path
+
+Runtime and validation notes:
+
+- `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
+- Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
+- The shipped parity surface is backed by golden parser/translator fixtures plus local live-host smoke validation (`dry-run` and `execute`) against the current ComfyUI host.
+- Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
+
+### Live-Host Validation Coverage
+
+RookieUI now ships internal live-host smoke lanes in [`scripts/run_live_smoke_tests.py`](scripts/run_live_smoke_tests.py) for acceptance against a restarted ComfyUI host. These lanes are developer/acceptance tooling rather than end-user UI toggles, but they document the current level of host-embedded proof behind the shipped surfaces.
+
+Current live-host coverage:
+
+- `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
+- `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, and AI-assist delivery semantics.
+- `xyz-plot`: validates axis/estimate contracts plus queue-backed session execution, terminal results, and assembled grid asset delivery.
+- `controlnet`: validates host-context compatibility, detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure.
+- `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
+- `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
+- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, and `xyz-plot` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
+
+### Default Model Read Paths (Host ComfyUI)
+
+RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under standard ComfyUI defaults, paths are:
+
+- Checkpoints: `<ComfyUI>/models/checkpoints`
+- Text Encoders (`text_encoders`): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
+- CLIP (`clip`, legacy alias): `<ComfyUI>/models/text_encoders`, `<ComfyUI>/models/clip`
+- Diffusion Models (`diffusion_models`): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
+- UNet (`unet`, legacy alias): `<ComfyUI>/models/unet`, `<ComfyUI>/models/diffusion_models`
+- VAE: `<ComfyUI>/models/vae`
+- LoRA: `<ComfyUI>/models/loras`
+- Embeddings: `<ComfyUI>/models/embeddings`
+- CLIP Vision: `<ComfyUI>/models/clip_vision`
+- Upscale Models: `<ComfyUI>/models/upscale_models`
+- ControlNet: `<ComfyUI>/models/controlnet`, `<ComfyUI>/models/t2i_adapter`
+- Ultralytics: host `folder_paths`-defined location (commonly `<ComfyUI>/models/ultralytics` on hosts that provide this key)
 
 
 ## License
