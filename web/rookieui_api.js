@@ -1103,6 +1103,98 @@ export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetch
   );
 }
 
+export async function updateRookieUIPromptWorkbenchConfig(config, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/config",
+    { config: config ?? {} },
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_config",
+      },
+      config: config ?? {},
+      saved: false,
+    },
+    fetchImpl,
+  );
+}
+
+export async function fetchRookieUIPromptWorkbenchBlacklist(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/prompt-tools/blacklist",
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_blacklist",
+      },
+      blacklist: {
+        enabled: false,
+        entries: [],
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/blacklist",
+    { blacklist: blacklist ?? {} },
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_blacklist",
+      },
+      blacklist: blacklist ?? { enabled: false, entries: [] },
+    },
+    fetchImpl,
+  );
+}
+
+export async function updateRookieUIPromptWorkbenchHistory(namespace, action, payload, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  const normalizedAction = String(action ?? "").trim() || "push";
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/history",
+    {
+      namespace: normalizedNamespace,
+      action: normalizedAction,
+      ...(payload && typeof payload === "object" ? payload : {}),
+    },
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_history",
+      },
+      namespace: normalizedNamespace,
+      items: [],
+    },
+    fetchImpl,
+  );
+}
+
+export async function updateRookieUIPromptWorkbenchFavorites(namespace, action, payload, fetchImpl = globalThis.fetch) {
+  const normalizedNamespace = String(namespace ?? "").trim();
+  const normalizedAction = String(action ?? "").trim() || "push";
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/favorites",
+    {
+      namespace: normalizedNamespace,
+      action: normalizedAction,
+      ...(payload && typeof payload === "object" ? payload : {}),
+    },
+    {
+      contract: {
+        version: "r123f114f115f116-20260417",
+        surface: "prompt_tools_favorites",
+      },
+      namespace: normalizedNamespace,
+      items: [],
+    },
+    fetchImpl,
+  );
+}
+
 export async function detectRookieUIControlNet(payload, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
     rookieUIDebugWarn("api.controlnet_detect", "Detect request skipped because fetch() is unavailable.");
