@@ -893,6 +893,25 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         );
         createField(hiresGrid, "Upscale Method", elements.hiresUpscaleMethod);
 
+        img2imgADetailerEditor = createADetailerEditor({
+          idPrefix: "rookieui-img2img-adetailer",
+          parent: generationSection,
+          hiddenInput: elements.adetailer,
+          catalog: mergedADetailerCatalog,
+          surface: "img2img",
+          createInput,
+          createRangeInput,
+          createSelect,
+          createTextarea,
+          createCheckbox,
+          createField,
+          createSliderField,
+          createInlineCheckboxField,
+          appendTextElement,
+          bindSliderPair,
+          syncBoundControls,
+        });
+
         img2imgControlNetEditor = createControlNetUnitEditor({
           idPrefix: "rookieui-img2img-controlnet",
           parent: generationSection,
@@ -913,24 +932,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           },
         });
         img2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
-        img2imgADetailerEditor = createADetailerEditor({
-          idPrefix: "rookieui-img2img-adetailer",
-          parent: generationSection,
-          hiddenInput: elements.adetailer,
-          catalog: mergedADetailerCatalog,
-          surface: "img2img",
-          createInput,
-          createRangeInput,
-          createSelect,
-          createTextarea,
-          createCheckbox,
-          createField,
-          createSliderField,
-          createInlineCheckboxField,
-          appendTextElement,
-          bindSliderPair,
-          syncBoundControls,
-        });
 
         createSliderField(
           generationGrid,

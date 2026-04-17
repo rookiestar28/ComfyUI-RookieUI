@@ -4,6 +4,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await page.goto("test-harness.html");
 
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).not.toHaveAttribute("open", "");
   const txt2imgLayout = await page.evaluate(() => {
     const generationSection = document.getElementById("rookieui-txt2img-generation-section");
     const xyzSection = document.getElementById("rookieui-txt2img-xyz-plot-section");
@@ -18,6 +19,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(txt2imgLayout.xyzTop).toBeGreaterThanOrEqual(txt2imgLayout.generationBottom);
   expect(txt2imgLayout.xyzIndex).toBeGreaterThan(txt2imgLayout.subtabIndex);
 
+  await page.locator("#rookieui-txt2img-xyz-plot-section > summary").click();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toHaveAttribute("open", "");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-x-values").fill("20, 28, 36");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-y-values").fill("5.5, 7, 8.5");
   await page.locator("#rookieui-txt2img-xyz-plot-estimate").click();
@@ -39,6 +42,7 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
 
   await page.locator("#rookieui-tab-img2img").click();
   await expect(page.locator("#rookieui-img2img-xyz-plot-section")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-xyz-plot-section")).not.toHaveAttribute("open", "");
   const img2imgLayout = await page.evaluate(() => {
     const generationSection = document.getElementById("rookieui-img2img-generation-section");
     const xyzSection = document.getElementById("rookieui-img2img-xyz-plot-section");
@@ -53,6 +57,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(img2imgLayout.xyzTop).toBeGreaterThanOrEqual(img2imgLayout.generationBottom);
   expect(img2imgLayout.xyzIndex).toBeGreaterThan(img2imgLayout.subtabIndex);
 
+  await page.locator("#rookieui-img2img-xyz-plot-section > summary").click();
+  await expect(page.locator("#rookieui-img2img-xyz-plot-section")).toHaveAttribute("open", "");
   await page.locator("#rookieui-img2img-xyz-plot-axis-y-select").selectOption("denoising_strength");
   await page.locator("#rookieui-img2img-xyz-plot-axis-x-values").fill("1, 2, 3");
   await page.locator("#rookieui-img2img-xyz-plot-axis-y-values").fill("0.35, 0.55, 0.75");
