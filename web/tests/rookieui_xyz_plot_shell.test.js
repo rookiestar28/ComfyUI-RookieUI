@@ -249,6 +249,21 @@ describe("xyz plot shell", () => {
     expect(
       document.querySelector("#txt2img-xyz-axis-z-values-summary .rookieui-shell__xyz-plot-choice-summary-text")?.title,
     ).toBe("model-a.safetensors, model-b.safetensors");
+    document.getElementById("txt2img-xyz-axis-z-values-summary").click();
+    expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect")?.open).toBe(true);
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect")?.open).toBe(false);
+    document.getElementById("txt2img-xyz-axis-z-values-summary").click();
+    expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect")?.open).toBe(true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect")?.open).toBe(false);
+    document.getElementById("txt2img-xyz-axis-z-fill").click();
+    expect(
+      Array.from(
+        document.querySelectorAll("#txt2img-xyz-axis-z-values-options input:checked"),
+      ),
+    ).toHaveLength(0);
+    document.getElementById("txt2img-xyz-axis-z-fill").click();
 
     document.getElementById("txt2img-xyz-axis-x-values").value = "20, 28, 36";
     document.getElementById("txt2img-xyz-axis-y-values").value = "5.5, 7, 8.5";
