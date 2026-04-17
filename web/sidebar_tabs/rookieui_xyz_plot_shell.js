@@ -147,6 +147,19 @@ function getAxisRowSelectedValues(row) {
     : [];
 }
 
+function closeAxisRowChoiceDropdown(row) {
+  if (row?.choiceRoot) {
+    row.choiceRoot.open = false;
+  }
+}
+
+function axisRowHasAllChoicesSelected(row) {
+  if (!Array.isArray(row?.choiceOptions) || !row.choiceOptions.length) {
+    return false;
+  }
+  return row.choiceOptions.every((entry) => entry.input.checked);
+}
+
 function syncAxisRowChoiceSummary(row) {
   if (!row.choiceSummaryText) {
     return;
@@ -356,6 +369,14 @@ export function createXYZPlotShell({
       usesChoiceDropdown: false,
     };
   });
+
+  function closeChoiceDropdowns(exceptRow = null) {
+    axisRows.forEach((row) => {
+      if (row !== exceptRow) {
+        closeAxisRowChoiceDropdown(row);
+      }
+    });
+  }
 
   const swapRow = document.createElement("div");
   swapRow.className = "rookieui-shell__xyz-plot-swap-row";
@@ -616,20 +637,44 @@ export function createXYZPlotShell({
   axisRows.forEach((row) => {
     syncAxisRow(row);
     row.select.addEventListener("change", () => {
+      closeChoiceDropdowns();
       syncAxisRow(row);
+    });
+    row.choiceRoot.addEventListener("toggle", () => {
+      if (row.choiceRoot.open) {
+        closeChoiceDropdowns(row);
+      }
     });
     row.fillButton.addEventListener("click", () => {
       const axis = axisLookup.get(String(row.select.value ?? "").trim());
       if (row.usesChoiceDropdown) {
-        setAxisRowValue(
-          row,
-          Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [],
-        );
+        const choiceValues = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
+        setAxisRowValue(row, axisRowHasAllChoicesSelected(row) ? [] : choiceValues);
       } else {
         setAxisRowValue(row, buildFallbackValues(axis));
       }
       onStatusMessage?.(`Filled ${row.slot} axis values`);
     });
+  });
+
+  // IMPORTANT: native details/summary does not auto-collapse on outside click here; keep explicit document-level close handling.
+  document.addEventListener("pointerdown", (event) => {
+    if (!(event.target instanceof Node)) {
+      return;
+    }
+    const activeRow = axisRows.find((row) => row.choiceRoot.open);
+    if (!activeRow) {
+      return;
+    }
+    if (!activeRow.choiceRoot.contains(event.target)) {
+      closeChoiceDropdowns();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeChoiceDropdowns();
+    }
   });
 
   swapButtons.forEach((entry) => {
