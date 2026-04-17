@@ -120,17 +120,79 @@ function axisUsesChoiceDropdown(axis) {
   return XYZ_DROPDOWN_AXIS_IDS.has(axisId) && inputMode === "choices_or_csv" && choices.length > 0;
 }
 
+function parseChoiceValueList(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
+  }
+  return String(value ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function buildChoiceSummaryText(values) {
+  const normalizedValues = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!normalizedValues.length) {
+    return "Select values";
+  }
+  if (normalizedValues.length <= 2) {
+    return normalizedValues.join(", ");
+  }
+  return `${normalizedValues.length} selected`;
+}
+
+function getAxisRowSelectedValues(row) {
+  return Array.isArray(row.choiceOptions)
+    ? row.choiceOptions.filter((entry) => entry.input.checked).map((entry) => entry.value)
+    : [];
+}
+
+function syncAxisRowChoiceSummary(row) {
+  if (!row.choiceSummaryText) {
+    return;
+  }
+  row.choiceSummaryText.textContent = buildChoiceSummaryText(getAxisRowSelectedValues(row));
+}
+
+function rebuildAxisRowChoiceOptions(row, choices) {
+  clearChildren(row.choiceOptionList);
+  row.choiceOptions = [];
+  choices.forEach((choice, index) => {
+    const label = document.createElement("label");
+    label.className = "rookieui-shell__xyz-plot-choice-option";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = String(choice);
+    input.id = `${row.choiceRoot.id}-option-${index}`;
+    input.addEventListener("change", () => {
+      syncAxisRowChoiceSummary(row);
+    });
+    label.appendChild(input);
+
+    const text = document.createElement("span");
+    text.textContent = String(choice);
+    label.appendChild(text);
+
+    row.choiceOptionList.appendChild(label);
+    row.choiceOptions.push({ value: String(choice), input });
+  });
+}
+
 function getAxisRowValue(row) {
-  return row.usesChoiceDropdown ? row.valueSelect.value : row.valueInput.value;
+  return row.usesChoiceDropdown ? getAxisRowSelectedValues(row).join(", ") : row.valueInput.value;
 }
 
 function setAxisRowValue(row, value) {
-  const normalizedValue = String(value ?? "");
   if (row.usesChoiceDropdown) {
-    row.valueSelect.value = normalizedValue;
+    const selectedValues = new Set(parseChoiceValueList(value));
+    row.choiceOptions.forEach((entry) => {
+      entry.input.checked = selectedValues.has(entry.value);
+    });
+    syncAxisRowChoiceSummary(row);
     return;
   }
-  row.valueInput.value = normalizedValue;
+  row.valueInput.value = String(value ?? "");
 }
 
 export function createXYZPlotShell({
@@ -243,11 +305,30 @@ export function createXYZPlotShell({
     valueInput.className = "rookieui-shell__input rookieui-shell__xyz-plot-axis-values";
     row.appendChild(valueInput);
 
-    const valueSelect = document.createElement("select");
-    valueSelect.id = `${idPrefix}-axis-${slot.toLowerCase()}-values-select`;
-    valueSelect.className = "rookieui-shell__input rookieui-shell__xyz-plot-axis-values";
-    valueSelect.hidden = true;
-    row.appendChild(valueSelect);
+    const choiceRoot = document.createElement("details");
+    choiceRoot.id = `${idPrefix}-axis-${slot.toLowerCase()}-values-multiselect`;
+    choiceRoot.className = "rookieui-shell__xyz-plot-choice-dropdown";
+    choiceRoot.hidden = true;
+    row.appendChild(choiceRoot);
+
+    const choiceSummary = document.createElement("summary");
+    choiceSummary.id = `${idPrefix}-axis-${slot.toLowerCase()}-values-summary`;
+    choiceSummary.className = "rookieui-shell__xyz-plot-choice-summary";
+    choiceRoot.appendChild(choiceSummary);
+    const choiceSummaryText = document.createElement("span");
+    choiceSummaryText.className = "rookieui-shell__xyz-plot-choice-summary-text";
+    choiceSummaryText.textContent = "Select values";
+    choiceSummary.appendChild(choiceSummaryText);
+    appendTextElement(choiceSummary, "span", "rookieui-shell__xyz-plot-choice-caret", "▾");
+
+    const choicePanel = document.createElement("div");
+    choicePanel.className = "rookieui-shell__xyz-plot-choice-panel";
+    choiceRoot.appendChild(choicePanel);
+
+    const choiceOptionList = document.createElement("div");
+    choiceOptionList.id = `${idPrefix}-axis-${slot.toLowerCase()}-values-options`;
+    choiceOptionList.className = "rookieui-shell__xyz-plot-choice-options";
+    choicePanel.appendChild(choiceOptionList);
 
     const fillButton = createActionButton(`${idPrefix}-axis-${slot.toLowerCase()}-fill`, "Fill");
     fillButton.classList.add("rookieui-shell__button--secondary");
@@ -261,9 +342,12 @@ export function createXYZPlotShell({
       row,
       select,
       valueInput,
-      valueSelect,
+      choiceRoot,
+      choiceSummaryText,
+      choiceOptionList,
       fillButton,
       hint,
+      choiceOptions: [],
       usesChoiceDropdown: false,
     };
   });
@@ -412,31 +496,20 @@ export function createXYZPlotShell({
     row.usesChoiceDropdown = axisUsesChoiceDropdown(axis);
     const nextValue = getAxisRowValue(row);
     row.valueInput.hidden = row.usesChoiceDropdown;
-    row.valueSelect.hidden = !row.usesChoiceDropdown;
+    row.choiceRoot.hidden = !row.usesChoiceDropdown;
     row.valueInput.disabled = !axis || row.usesChoiceDropdown;
-    row.valueSelect.disabled = !axis || !row.usesChoiceDropdown;
     row.valueInput.placeholder = axis ? buildFallbackValues(axis) : "";
     if (row.usesChoiceDropdown) {
-      row.valueSelect.replaceChildren();
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = "Select value";
-      row.valueSelect.appendChild(placeholder);
       const choices = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
-      choices.forEach((choice) => {
-        const option = document.createElement("option");
-        option.value = String(choice);
-        option.textContent = String(choice);
-        row.valueSelect.appendChild(option);
-      });
-      const fallbackValue = choices.includes(nextValue) ? nextValue : choices[0] ?? "";
-      row.valueSelect.value = fallbackValue;
+      rebuildAxisRowChoiceOptions(row, choices);
+      setAxisRowValue(row, nextValue);
     } else {
-      row.valueSelect.replaceChildren();
-      row.valueSelect.value = "";
+      row.choiceRoot.open = false;
+      clearChildren(row.choiceOptionList);
+      row.choiceOptions = [];
       row.valueInput.value = nextValue;
     }
-    row.fillButton.disabled = !axis || row.usesChoiceDropdown;
+    row.fillButton.disabled = !axis;
     row.hint.textContent = buildAxisHint(axis);
   }
 
@@ -542,7 +615,14 @@ export function createXYZPlotShell({
     });
     row.fillButton.addEventListener("click", () => {
       const axis = axisLookup.get(String(row.select.value ?? "").trim());
-      setAxisRowValue(row, buildFallbackValues(axis));
+      if (row.usesChoiceDropdown) {
+        setAxisRowValue(
+          row,
+          Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [],
+        );
+      } else {
+        setAxisRowValue(row, buildFallbackValues(axis));
+      }
       onStatusMessage?.(`Filled ${row.slot} axis values`);
     });
   });

@@ -234,9 +234,15 @@ describe("xyz plot shell", () => {
     document.getElementById("txt2img-xyz-axis-z-select").value = "checkpoint_name";
     document.getElementById("txt2img-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("txt2img-xyz-axis-z-values").hidden).toBe(true);
-    expect(document.getElementById("txt2img-xyz-axis-z-values-select").hidden).toBe(false);
-    expect(document.getElementById("txt2img-xyz-axis-z-fill").disabled).toBe(true);
-    expect(document.getElementById("txt2img-xyz-axis-z-values-select").value).toBe("model-a.safetensors");
+    expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect").hidden).toBe(false);
+    expect(document.getElementById("txt2img-xyz-axis-z-fill").disabled).toBe(false);
+    expect(document.getElementById("txt2img-xyz-axis-z-values-summary").textContent).toContain("Select values");
+    document.getElementById("txt2img-xyz-axis-z-fill").click();
+    expect(
+      Array.from(
+        document.querySelectorAll("#txt2img-xyz-axis-z-values-options input:checked"),
+      ).map((input) => input.value),
+    ).toEqual(["model-a.safetensors", "model-b.safetensors"]);
 
     document.getElementById("txt2img-xyz-axis-x-values").value = "20, 28, 36";
     document.getElementById("txt2img-xyz-axis-y-values").value = "5.5, 7, 8.5";
@@ -251,7 +257,7 @@ describe("xyz plot shell", () => {
       axes: [
         { axis_id: "steps", values: "20, 28, 36" },
         { axis_id: "cfg_scale", values: "5.5, 7, 8.5" },
-        { axis_id: "checkpoint_name", values: "model-a.safetensors" },
+        { axis_id: "checkpoint_name", values: "model-a.safetensors, model-b.safetensors" },
       ],
       draw_legend: true,
       include_lone_images: false,
@@ -378,12 +384,19 @@ describe("xyz plot shell", () => {
 
     document.getElementById("swap-xyz-axis-x-select").value = "sampler";
     document.getElementById("swap-xyz-axis-x-select").dispatchEvent(new Event("change", { bubbles: true }));
-    document.getElementById("swap-xyz-axis-x-values-select").value = "dpmpp_2m";
+    document.querySelector("#swap-xyz-axis-x-values-options input[value='euler']").checked = true;
+    document.querySelector("#swap-xyz-axis-x-values-options input[value='euler']").dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector("#swap-xyz-axis-x-values-options input[value='dpmpp_2m']").checked = true;
+    document.querySelector("#swap-xyz-axis-x-values-options input[value='dpmpp_2m']").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("swap-xyz-swap-xy").click();
 
     expect(document.getElementById("swap-xyz-axis-y-select").value).toBe("sampler");
-    expect(document.getElementById("swap-xyz-axis-y-values-select").hidden).toBe(false);
-    expect(document.getElementById("swap-xyz-axis-y-values-select").value).toBe("dpmpp_2m");
+    expect(document.getElementById("swap-xyz-axis-y-values-multiselect").hidden).toBe(false);
+    expect(
+      Array.from(
+        document.querySelectorAll("#swap-xyz-axis-y-values-options input:checked"),
+      ).map((input) => input.value),
+    ).toEqual(["euler", "dpmpp_2m"]);
     expect(document.getElementById("swap-xyz-axis-x-values").hidden).toBe(false);
   });
 
@@ -407,8 +420,8 @@ describe("xyz plot shell", () => {
     document.getElementById("txt2img-hires-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
 
     expect(document.getElementById("txt2img-hires-axis-z-values").hidden).toBe(true);
-    expect(document.getElementById("txt2img-hires-axis-z-values-select").hidden).toBe(false);
-    expect(document.getElementById("txt2img-hires-axis-z-values-select").value).toBe("nearest");
-    expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(true);
+    expect(document.getElementById("txt2img-hires-axis-z-values-multiselect").hidden).toBe(false);
+    expect(document.getElementById("txt2img-hires-axis-z-values-summary").textContent).toContain("Select values");
+    expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(false);
   });
 });

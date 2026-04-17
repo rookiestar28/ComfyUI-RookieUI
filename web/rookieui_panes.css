@@ -334,6 +334,79 @@
   align-items: center;
 }
 
+.rookieui-shell__xyz-plot-choice-dropdown {
+  position: relative;
+}
+
+.rookieui-shell__xyz-plot-choice-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  background: var(--rookieui-bg-input);
+  color: var(--rookieui-text-primary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.rookieui-shell__xyz-plot-choice-summary::-webkit-details-marker {
+  display: none;
+}
+
+.rookieui-shell__xyz-plot-choice-summary::marker {
+  content: "";
+}
+
+.rookieui-shell__xyz-plot-choice-summary-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rookieui-shell__xyz-plot-choice-caret {
+  flex: none;
+  color: var(--rookieui-text-muted);
+}
+
+.rookieui-shell__xyz-plot-choice-dropdown[open] .rookieui-shell__xyz-plot-choice-caret {
+  transform: rotate(180deg);
+}
+
+.rookieui-shell__xyz-plot-choice-panel {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 98%, transparent);
+  box-shadow: 0 16px 24px rgba(0, 0, 0, 0.22);
+}
+
+.rookieui-shell__xyz-plot-choice-options {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__xyz-plot-choice-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--rookieui-text-secondary);
+}
+
 .rookieui-shell__xyz-plot-axis-slot {
   display: inline-flex;
   align-items: center;
@@ -420,6 +493,7 @@
 
   .rookieui-shell__xyz-plot-axis-select,
   .rookieui-shell__xyz-plot-axis-values,
+  .rookieui-shell__xyz-plot-choice-dropdown,
   .rookieui-shell__xyz-plot-axis-row .rookieui-shell__button {
     grid-column: 2;
   }
