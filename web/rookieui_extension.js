@@ -1,5 +1,6 @@
 import {
   createPromptWorkbenchRequestBindings,
+  createXYZPlotRequestBindings,
   fetchRookieUIADetailerCatalog,
   fetchRookieUIControlNetModels,
   fetchRookieUIControlNetModules,
@@ -175,6 +176,7 @@ export function registerRookieUIBootstrapExtension({
         fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
         fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(fetchImpl),
         ...createPromptWorkbenchRequestBindings(fetchImpl),
+        ...createXYZPlotRequestBindings(fetchImpl),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {

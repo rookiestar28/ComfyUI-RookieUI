@@ -25,11 +25,17 @@ export const {
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
+  fetchRookieUIXYZPlotAxes,
+  fetchRookieUIXYZPlotSessions,
+  fetchRookieUIXYZPlotSessionDetail,
   inspectRookieUIPngInfo,
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  submitRookieUIXYZPlotEstimate,
+  submitRookieUIXYZPlotRun,
   assistRookieUIPromptWorkbench,
+  cancelRookieUIXYZPlotSession,
   translateRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
@@ -57,6 +63,19 @@ export function createPromptWorkbenchRequestBindings(fetchImpl) {
       updateRookieUIPromptWorkbenchHistory(namespace, action, payload, fetchImpl),
     updatePromptWorkbenchFavoritesRequest: (namespace, action, payload) =>
       updateRookieUIPromptWorkbenchFavorites(namespace, action, payload, fetchImpl),
+  };
+}
+
+export function createXYZPlotRequestBindings(fetchImpl) {
+  return {
+    fetchXYZPlotAxesRequest: () => fetchRookieUIXYZPlotAxes(fetchImpl),
+    estimateXYZPlotRequest: (payload) => submitRookieUIXYZPlotEstimate(payload, fetchImpl),
+    runXYZPlotRequest: (payload) => submitRookieUIXYZPlotRun(payload, fetchImpl),
+    fetchXYZPlotSessionsRequest: (clientId) => fetchRookieUIXYZPlotSessions(fetchImpl, { clientId }),
+    fetchXYZPlotSessionDetailRequest: (sessionId, clientId) =>
+      fetchRookieUIXYZPlotSessionDetail(sessionId, { clientId }, fetchImpl),
+    cancelXYZPlotSessionRequest: (sessionId, clientId) =>
+      cancelRookieUIXYZPlotSession(sessionId, { clientId }, fetchImpl),
   };
 }
 

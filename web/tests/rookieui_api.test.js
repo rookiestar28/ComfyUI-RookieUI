@@ -16,11 +16,17 @@ import {
   fetchRookieUIPresets,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
+  fetchRookieUIXYZPlotAxes,
+  fetchRookieUIXYZPlotSessions,
+  fetchRookieUIXYZPlotSessionDetail,
   inspectRookieUIPngInfo,
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
+  submitRookieUIXYZPlotEstimate,
+  submitRookieUIXYZPlotRun,
   assistRookieUIPromptWorkbench,
+  cancelRookieUIXYZPlotSession,
   translateRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
@@ -241,6 +247,17 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.ok).toBe(false);
     expect(result.data.contract.surface).toBe("prompt_tools_blacklist");
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+  });
+
+  test("loads xyz-plot axes fallback contract", async () => {
+    const result = await fetchRookieUIXYZPlotAxes(async () => {
+      throw new Error("offline");
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.data.contract.surface).toBe("xyz_plot_axes");
+    expect(result.data.axis_order).toEqual(["steps", "cfg_scale", "sampler"]);
+    expect(result.data.axes.steps.session_runner_support).toBe(true);
   });
 
   test("updates prompt-workbench namespace state through the backend", async () => {
@@ -509,6 +526,141 @@ describe("fetchRookieUICapabilities", () => {
       language: "zh-TW",
       theme_style: "rookieui_graphite",
     });
+  });
+
+  test("submits xyz-plot estimate and run payloads through the backend", async () => {
+    const calls = [];
+    const estimateResult = await submitRookieUIXYZPlotEstimate(
+      {
+        mode: "txt2img",
+        base_request: { prompt: "skyline" },
+        axes: [{ axis_id: "steps", values: "20,28,36" }],
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              estimate: {
+                cell_count: 3,
+                generated_image_count: 3,
+                total_step_estimate: 84,
+                projected_grid_megapixels: 1.5,
+              },
+              can_run: true,
+              warnings: [],
+              warning_codes: [],
+            };
+          },
+        };
+      },
+    );
+    const runResult = await submitRookieUIXYZPlotRun(
+      {
+        mode: "txt2img",
+        base_request: { prompt: "skyline" },
+        axes: [{ axis_id: "steps", values: "20,28,36" }],
+      },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              session: {
+                session_id: "xyz-1",
+                status: "in_progress",
+                summary: { total_cells: 3, pending_cells: 0 },
+                axes: [],
+                results: { status: "pending", main_grid: {}, sub_grids: [], lone_images: [], warnings: [] },
+              },
+            };
+          },
+        };
+      },
+    );
+
+    expect(estimateResult.ok).toBe(true);
+    expect(runResult.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/xyz-plot/estimate");
+    expect(calls[1][0]).toBe("/rookieui/xyz-plot/run");
+    expect(JSON.parse(calls[0][1].body).axes[0].axis_id).toBe("steps");
+    expect(JSON.parse(calls[1][1].body).base_request.prompt).toBe("skyline");
+  });
+
+  test("loads xyz-plot sessions, detail, and cancel routes with client-scoped paths", async () => {
+    const listCalls = [];
+    const listResult = await fetchRookieUIXYZPlotSessions(
+      async (url) => {
+        listCalls.push(url);
+        return {
+          ok: true,
+          async json() {
+            return { sessions: [{ session_id: "xyz-1" }] };
+          },
+        };
+      },
+      { clientId: "browser-1" },
+    );
+    const detailCalls = [];
+    const detailResult = await fetchRookieUIXYZPlotSessionDetail(
+      "xyz-1",
+      { clientId: "browser-1" },
+      async (url) => {
+        detailCalls.push(url);
+        return {
+          ok: true,
+          async json() {
+            return {
+              session: {
+                session_id: "xyz-1",
+                status: "completed",
+                summary: { total_cells: 3, pending_cells: 0 },
+                axes: [],
+                cells: [],
+                results: { status: "ready", main_grid: {}, sub_grids: [], lone_images: [], warnings: [] },
+              },
+            };
+          },
+        };
+      },
+    );
+    const cancelCalls = [];
+    const cancelResult = await cancelRookieUIXYZPlotSession(
+      "xyz-1",
+      { clientId: "browser-1" },
+      async (url, options) => {
+        cancelCalls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              session: {
+                session_id: "xyz-1",
+                status: "cancelled",
+                cancel_requested: true,
+                summary: { total_cells: 3, cancelled_cells: 3 },
+                axes: [],
+                cells: [],
+                results: { status: "pending", main_grid: {}, sub_grids: [], lone_images: [], warnings: [] },
+              },
+            };
+          },
+        };
+      },
+    );
+
+    expect(listResult.ok).toBe(true);
+    expect(detailResult.ok).toBe(true);
+    expect(cancelResult.ok).toBe(true);
+    expect(listCalls[0]).toBe("/rookieui/xyz-plot/sessions?client_id=browser-1");
+    expect(detailCalls[0]).toBe("/rookieui/xyz-plot/sessions/xyz-1?client_id=browser-1");
+    expect(cancelCalls[0][0]).toBe("/rookieui/xyz-plot/sessions/xyz-1/cancel");
+    expect(JSON.parse(cancelCalls[0][1].body)).toEqual({ client_id: "browser-1" });
   });
 
   test("builds client-scoped queue paths and prompt-history helpers", async () => {

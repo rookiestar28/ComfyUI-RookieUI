@@ -299,6 +299,15 @@ window.__ROOKIEUI_E2E_REQUESTS__ = {
   txt2img: [],
   img2img: [],
   extras: [],
+  xyzPlot: {
+    estimate: [],
+    run: [],
+    cancel: [],
+  },
+};
+
+window.__ROOKIEUI_E2E_XYZ__ = {
+  sessions: {},
 };
 
 window.fetch = async (url, options = {}) => {
@@ -383,6 +392,216 @@ window.fetch = async (url, options = {}) => {
         preview_asset: "rookieui_extras_output.png",
         preview_data_url: "data:image/png;base64,ZmFrZQ==",
         warnings: [],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url === "/rookieui/xyz-plot/axes") {
+    return new Response(
+      JSON.stringify({
+        contract: {
+          version: "r125-20260417",
+          surface: "xyz_plot_axes",
+          route_family: "/rookieui/xyz-plot",
+        },
+        axes: {
+          steps: {
+            axis_id: "steps",
+            title: "Steps",
+            support_tier: "direct",
+            mode_scopes: ["txt2img", "img2img"],
+            value_input_mode: "int_csv_or_range",
+            choices: [],
+            session_runner_support: true,
+            a1111_reference_label: "Steps",
+            notes: [],
+          },
+          cfg_scale: {
+            axis_id: "cfg_scale",
+            title: "CFG Scale",
+            support_tier: "direct",
+            mode_scopes: ["txt2img", "img2img"],
+            value_input_mode: "float_csv_or_range",
+            choices: [],
+            session_runner_support: true,
+            a1111_reference_label: "CFG Scale",
+            notes: [],
+          },
+          seed: {
+            axis_id: "seed",
+            title: "Seed",
+            support_tier: "direct",
+            mode_scopes: ["txt2img", "img2img"],
+            value_input_mode: "int_csv_or_range",
+            choices: [],
+            session_runner_support: true,
+            a1111_reference_label: "Seed",
+            notes: [],
+          },
+          checkpoint_name: {
+            axis_id: "checkpoint_name",
+            title: "Checkpoint Name",
+            support_tier: "direct",
+            mode_scopes: ["txt2img", "img2img"],
+            value_input_mode: "choices_or_csv",
+            choices: ["realvisxl.safetensors", "flux1-dev.safetensors"],
+            session_runner_support: true,
+            a1111_reference_label: "Checkpoint name",
+            notes: [],
+          },
+          denoising_strength: {
+            axis_id: "denoising_strength",
+            title: "Denoising",
+            support_tier: "direct",
+            mode_scopes: ["img2img"],
+            value_input_mode: "float_csv_or_range",
+            choices: [],
+            session_runner_support: true,
+            a1111_reference_label: "Denoising",
+            notes: [],
+          },
+        },
+        axis_order: ["steps", "cfg_scale", "seed", "checkpoint_name", "denoising_strength"],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url === "/rookieui/xyz-plot/estimate") {
+    const payload = JSON.parse(options.body ?? "{}");
+    window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.estimate.push(payload);
+    const axisCount = Array.isArray(payload.axes) ? payload.axes.length : 0;
+    return new Response(
+      JSON.stringify({
+        estimate: {
+          cell_count: axisCount * 3,
+          generated_image_count: axisCount * 3,
+          total_step_estimate: 96,
+          projected_grid_megapixels: 2.4,
+        },
+        can_run: axisCount > 0,
+        warnings: [],
+        warning_codes: [],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url === "/rookieui/xyz-plot/run") {
+    const payload = JSON.parse(options.body ?? "{}");
+    window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run.push(payload);
+    const sessionId = `xyz-e2e-${window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run.length}`;
+    window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] = {
+      session_id: sessionId,
+      status: "in_progress",
+      summary: {
+        total_cells: 9,
+        completed_cells: 3,
+        queued_cells: 2,
+        failed_cells: 0,
+      },
+      axes: payload.axes ?? [],
+      results: {
+        status: "running",
+        main_grid: {},
+        sub_grids: [],
+        lone_images: [],
+        warnings: [],
+      },
+    };
+    return new Response(
+      JSON.stringify({
+        session: window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url.startsWith("/rookieui/xyz-plot/sessions/") && url.endsWith("/cancel")) {
+    const sessionId = url.split("/").at(-2);
+    const payload = JSON.parse(options.body ?? "{}");
+    window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.cancel.push({ sessionId, payload });
+    const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
+      session_id: sessionId,
+      summary: { total_cells: 0, completed_cells: 0, queued_cells: 0, failed_cells: 0 },
+      axes: [],
+      results: { status: "pending", main_grid: {}, sub_grids: [], lone_images: [], warnings: [] },
+    };
+    session.status = "cancelled";
+    session.cancel_requested = true;
+    window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] = session;
+    return new Response(
+      JSON.stringify({ session }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url.startsWith("/rookieui/xyz-plot/sessions/")) {
+    const sessionId = url.split("?")[0].split("/").pop();
+    const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
+      session_id: sessionId,
+      status: "completed",
+      summary: {
+        total_cells: 9,
+        completed_cells: 9,
+        queued_cells: 0,
+        failed_cells: 0,
+      },
+      axes: [],
+      results: {
+        status: "ready",
+        main_grid: { preview_data_url: "data:image/png;base64,ZmFrZQ==" },
+        sub_grids: [{ z_index: 0 }],
+        lone_images: [{ cell_id: "cell-1" }],
+        warnings: [],
+      },
+    };
+    if (session.status === "in_progress") {
+      session.status = "completed";
+      session.summary = {
+        total_cells: 9,
+        completed_cells: 9,
+        queued_cells: 0,
+        failed_cells: 0,
+      };
+      session.results = {
+        status: "ready",
+        main_grid: { preview_data_url: "data:image/png;base64,ZmFrZQ==" },
+        sub_grids: [{ z_index: 0 }],
+        lone_images: [{ cell_id: "cell-1" }, { cell_id: "cell-2" }],
+        warnings: [],
+      };
+      window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] = session;
+    }
+    return new Response(
+      JSON.stringify({ session }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url.startsWith("/rookieui/xyz-plot/sessions")) {
+    return new Response(
+      JSON.stringify({
+        sessions: Object.values(window.__ROOKIEUI_E2E_XYZ__.sessions),
       }),
       {
         status: 200,
@@ -663,6 +882,7 @@ window.fetch = async (url, options = {}) => {
         img2img: true,
         pngInfo: true,
         queue: false,
+        xyzPlot: true,
       },
       tabs: [
         { id: "txt2img", title: "Txt2Img", state: "active", enabled: true },
@@ -683,6 +903,12 @@ window.fetch = async (url, options = {}) => {
         "/rookieui/models",
         "/rookieui/presets",
         "/rookieui/queue",
+        "/rookieui/xyz-plot/axes",
+        "/rookieui/xyz-plot/estimate",
+        "/rookieui/xyz-plot/run",
+        "/rookieui/xyz-plot/sessions",
+        "/rookieui/xyz-plot/sessions/{session_id}",
+        "/rookieui/xyz-plot/sessions/{session_id}/cancel",
         "/rookieui/pnginfo/inspect",
         "/rookieui/generate/txt2img",
         "/rookieui/generate/img2img",
