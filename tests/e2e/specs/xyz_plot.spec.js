@@ -69,8 +69,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(controlSurfaceMetrics.estimateBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
   expect(controlSurfaceMetrics.refreshBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
   expect(controlSurfaceMetrics.cancelBackgroundImage).not.toBe(controlSurfaceMetrics.generateBackgroundImage);
-  expect(controlSurfaceMetrics.cancelBackgroundImage).toContain("255, 40, 0");
-  expect(controlSurfaceMetrics.cancelBorderColor).toBe("rgb(255, 40, 0)");
+  expect(controlSurfaceMetrics.cancelBackgroundImage).toContain("219, 0, 0");
+  expect(controlSurfaceMetrics.cancelBorderColor).toBe("rgb(255, 18, 0)");
   expect(controlSurfaceMetrics.cancelColor).toBe(controlSurfaceMetrics.generateColor);
   expect(Math.max(...controlSurfaceMetrics.actionWidths) - Math.min(...controlSurfaceMetrics.actionWidths)).toBeLessThanOrEqual(1);
   expect(controlSurfaceMetrics.rowLeftDelta).toBeLessThanOrEqual(1);

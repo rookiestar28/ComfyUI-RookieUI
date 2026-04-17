@@ -502,8 +502,8 @@
 }
 
 .rookieui-shell__xyz-plot-action--danger {
-  border-color: #ff2800;
-  background: linear-gradient(180deg, #ff5a36, #ff2800);
+  border-color: #ff1200;
+  background: linear-gradient(180deg, #ff3624, #db0000);
   color: var(--rookieui-text-inverse);
 }
 
