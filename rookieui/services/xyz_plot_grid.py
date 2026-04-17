@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 from io import BytesIO
 from pathlib import Path
@@ -22,9 +23,22 @@ _BORDER_COLOR = (210, 210, 214)
 _TITLE_BG_COLOR = (236, 236, 240)
 _MIN_LABEL_PAD = 12
 _CORNER_LINE_SPACING = 4
+_PARTIAL_PREVIEW_PLACEHOLDER_SIZE = (256, 256)
+_GRID_LABEL_FONT_SIZE = 22
+_GRID_FONT_CANDIDATES = (
+    "arial.ttf",
+    "segoeui.ttf",
+    "DejaVuSans.ttf",
+    "LiberationSans-Regular.ttf",
+)
 
 
-def _safe_font() -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+def _safe_font(size: int = _GRID_LABEL_FONT_SIZE) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+    for font_name in _GRID_FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(font_name, size=size)
+        except Exception:
+            continue
     try:
         return ImageFont.load_default()
     except Exception:
@@ -179,6 +193,13 @@ def _serialize_image_to_digest(image: Image.Image) -> str:
     return hashlib.sha256(buffer.getvalue()).hexdigest()
 
 
+def _build_data_url_from_image(image: Image.Image) -> str:
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def _resolve_first_output_asset(cell: dict[str, Any]) -> str:
     reusable_outputs = cell.get("reusable_outputs", [])
     if isinstance(reusable_outputs, list):
@@ -191,6 +212,109 @@ def _resolve_first_output_asset(cell: dict[str, Any]) -> str:
             if isinstance(handle, str) and handle.strip():
                 return handle
     return ""
+
+
+def _build_placeholder_cell(
+    label: str,
+    *,
+    width: int,
+    height: int,
+) -> Image.Image:
+    image = Image.new("RGB", (width, height), _BACKGROUND_COLOR)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, width - 1, height - 1), outline=_BORDER_COLOR, width=1)
+    font = _safe_font()
+    lines = [part for part in str(label).split("\n") if part]
+    if not lines:
+        lines = ["Pending"]
+    line_sizes = [_measure_text(draw, line, font) for line in lines]
+    total_height = sum(height for _, height in line_sizes) + (_CORNER_LINE_SPACING * max(0, len(line_sizes) - 1))
+    cursor_y = max(0.0, (height - total_height) / 2)
+    for line, (line_width, line_height) in zip(lines, line_sizes, strict=True):
+        draw.text(
+            ((width - line_width) / 2, cursor_y),
+            line,
+            fill=_TEXT_COLOR,
+            font=font,
+        )
+        cursor_y += line_height + _CORNER_LINE_SPACING
+    return image
+
+
+def _compose_partial_grid_preview(
+    session: dict[str, Any],
+    *,
+    axes: list[dict[str, Any]],
+    axis_labels: list[list[str]],
+    indexed_cells: dict[tuple[int, int, int], dict[str, Any]],
+    x_len: int,
+    y_len: int,
+    z_len: int,
+    draw_legend: bool,
+    margin_size: int,
+) -> Image.Image | None:
+    completed_images: list[Image.Image] = []
+    for entry in indexed_cells.values():
+        try:
+            completed_images.append(Image.open(entry["path"]).convert("RGB"))
+        except Exception:
+            continue
+    if not completed_images:
+        return None
+    max_width = max(image.width for image in completed_images)
+    max_height = max(image.height for image in completed_images)
+    preview_width = max(max_width, _PARTIAL_PREVIEW_PLACEHOLDER_SIZE[0])
+    preview_height = max(max_height, _PARTIAL_PREVIEW_PLACEHOLDER_SIZE[1])
+    sub_grid_images: list[Image.Image] = []
+    for z_index in range(z_len):
+        sub_cells: list[Image.Image] = []
+        for y_index in range(y_len):
+            for x_index in range(x_len):
+                entry = indexed_cells.get((x_index, y_index, z_index))
+                if entry is not None:
+                    try:
+                        sub_cells.append(Image.open(entry["path"]).convert("RGB"))
+                        continue
+                    except Exception:
+                        pass
+                binding_labels: list[str] = []
+                if axis_labels and x_index < len(axis_labels[0]):
+                    binding_labels.append(f"X {axis_labels[0][x_index]}")
+                if len(axis_labels) > 1 and y_index < len(axis_labels[1]):
+                    binding_labels.append(f"Y {axis_labels[1][y_index]}")
+                if len(axis_labels) > 2 and z_index < len(axis_labels[2]):
+                    binding_labels.append(f"Z {axis_labels[2][z_index]}")
+                sub_cells.append(
+                    _build_placeholder_cell(
+                        "\n".join(binding_labels) if binding_labels else "Pending",
+                        width=preview_width,
+                        height=preview_height,
+                    )
+                )
+        sub_grid_images.append(
+            _compose_annotated_grid(
+                sub_cells,
+                cols=x_len,
+                rows=y_len,
+                col_labels=axis_labels[0] if axes else [],
+                row_labels=axis_labels[1] if len(axes) > 1 else [],
+                corner_lines=_build_axis_descriptor_lines(*(axis for axis in axes[:2] if isinstance(axis, dict))),
+                draw_legend=draw_legend,
+                margin_size=margin_size,
+            )
+        )
+    if len(sub_grid_images) == 1:
+        return sub_grid_images[0]
+    return _compose_annotated_grid(
+        sub_grid_images,
+        cols=z_len,
+        rows=1,
+        col_labels=axis_labels[2] if len(axis_labels) > 2 else [],
+        row_labels=[],
+        corner_lines=_build_axis_descriptor_lines(axes[2] if len(axes) > 2 else {}),
+        draw_legend=draw_legend,
+        margin_size=margin_size,
+    )
 
 
 def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
@@ -252,24 +376,6 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
         elif status not in {"failed", "cancelled"}:
             terminal_only = False
     signature = hashlib.sha256("::".join(signature_source_parts).encode("utf-8")).hexdigest()
-    if not completed_cells:
-        return {
-            "status": "pending",
-            "signature": signature,
-            "main_grid": {},
-            "sub_grids": [],
-            "lone_images": [],
-            "warnings": warnings,
-        }
-    if not terminal_only:
-        return {
-            "status": "running",
-            "signature": signature,
-            "main_grid": {},
-            "sub_grids": [],
-            "lone_images": [],
-            "warnings": warnings,
-        }
 
     axis_lengths = [len(axis.get("parsed_values", [])) for axis in axes]
     axis_labels = [[entry.get("label", "") for entry in axis.get("parsed_values", []) if isinstance(entry, dict)] for axis in axes]
@@ -277,7 +383,6 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
     y_len = axis_lengths[1] if len(axis_lengths) > 1 else 1
     z_len = axis_lengths[2] if len(axis_lengths) > 2 else 1
 
-    slot_by_axis_id = {str(axis.get("axis_id", "")): axis for axis in axes}
     indexed_cells: dict[tuple[int, int, int], dict[str, Any]] = {}
     for entry in cell_assets:
         axis_indices = entry["cell"].get("axis_indices", {})
@@ -288,6 +393,41 @@ def build_xyz_plot_grid_results(session: dict[str, Any]) -> dict[str, Any]:
                 int(axis_indices.get("Z", 0) or 0),
             )
         ] = entry
+
+    if not completed_cells:
+        return {
+            "status": "pending",
+            "signature": signature,
+            "main_grid": {},
+            "sub_grids": [],
+            "lone_images": [],
+            "warnings": warnings,
+        }
+    if not terminal_only:
+        partial_grid_preview = _compose_partial_grid_preview(
+            session,
+            axes=axes,
+            axis_labels=axis_labels,
+            indexed_cells=indexed_cells,
+            x_len=x_len,
+            y_len=y_len,
+            z_len=z_len,
+            draw_legend=draw_legend,
+            margin_size=margin_size,
+        )
+        # IMPORTANT: keep a running-session main_grid preview here; the primary txt2img/img2img preview now depends on this payload instead of waiting for terminal saved assets.
+        return {
+            "status": "running",
+            "signature": signature,
+            "main_grid": {
+                "preview_data_url": _build_data_url_from_image(partial_grid_preview),
+            }
+            if partial_grid_preview is not None
+            else {},
+            "sub_grids": [],
+            "lone_images": [],
+            "warnings": warnings,
+        }
 
     incomplete = False
     sub_grid_images: list[Image.Image] = []

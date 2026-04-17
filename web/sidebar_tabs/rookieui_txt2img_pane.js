@@ -62,6 +62,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     activateShellTab,
     submitTxt2Img,
     readFileAsDataUrl,
+    setPreviewContent,
     bindSliderPair,
     installPaneStateLock,
     applyPayloadToElements,
@@ -752,6 +753,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     createActionButton,
     createIconActionButton,
     createPreviewFullscreenViewer,
+    syncPrimaryPreview: (imageDataUrl) => {
+      // IMPORTANT: keep XYZ session previews flowing into the shared top preview box; otherwise only the local Results card updates and the main txt2img preview looks stalled.
+      runtimeState.previewUrl = imageDataUrl || "";
+      setPreviewContent(txt2imgPreviewBox, runtimeState.previewUrl, runtimeState.previewPlaceholder);
+    },
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },

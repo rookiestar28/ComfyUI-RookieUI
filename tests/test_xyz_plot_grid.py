@@ -158,6 +158,58 @@ class XYZPlotGridTests(unittest.TestCase):
         self.assertEqual(payload["status"], "incomplete")
         self.assertIn("no reusable output asset", " ".join(payload["warnings"]).lower())
 
+    def test_build_xyz_plot_grid_results_emits_partial_preview_for_running_session(self) -> None:
+        first_handle = self._save_cell_image("red", prefix="xyz_cell")
+        session = {
+            "session_id": "xyz-running",
+            "mode": "txt2img",
+            "axes": [
+                {
+                    "slot": "X",
+                    "axis_id": "steps",
+                    "title": "Steps",
+                    "parsed_values": [{"label": "10"}, {"label": "20"}],
+                },
+                {
+                    "slot": "Y",
+                    "axis_id": "cfg_scale",
+                    "title": "CFG Scale",
+                    "parsed_values": [{"label": "5"}],
+                },
+            ],
+            "grid_options": {
+                "draw_legend": True,
+                "include_sub_grids": False,
+                "include_lone_images": False,
+                "margin_size": 4,
+            },
+            "cells": [
+                {
+                    "cell_id": "cell-1",
+                    "status": "completed",
+                    "axis_indices": {"X": 0, "Y": 0, "Z": 0},
+                    "bindings": [],
+                    "prompt_id": "p1",
+                    "reusable_outputs": [first_handle],
+                    "output_filenames": [first_handle],
+                },
+                {
+                    "cell_id": "cell-2",
+                    "status": "queued",
+                    "axis_indices": {"X": 1, "Y": 0, "Z": 0},
+                    "bindings": [],
+                    "prompt_id": "p2",
+                    "reusable_outputs": [],
+                    "output_filenames": [],
+                },
+            ],
+        }
+
+        payload = xyz_plot_grid.build_xyz_plot_grid_results(session)
+
+        self.assertEqual(payload["status"], "running")
+        self.assertTrue(str(payload["main_grid"]["preview_data_url"]).startswith("data:image/png;base64,"))
+
     def test_build_xyz_plot_grid_results_resolves_live_host_output_filenames(self) -> None:
         host_output_root = Path(self.runtime_dir.name) / "host-output"
         host_output_root.mkdir(parents=True, exist_ok=True)

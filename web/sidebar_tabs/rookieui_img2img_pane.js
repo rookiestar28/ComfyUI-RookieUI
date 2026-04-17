@@ -1727,6 +1727,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     createActionButton,
     createIconActionButton,
     createPreviewFullscreenViewer,
+    syncPrimaryPreview: (imageDataUrl) => {
+      // IMPORTANT: keep XYZ session previews flowing into the shared top preview box; otherwise only the local Results card updates and the main img2img preview looks stalled.
+      runtimeState.previewUrl = imageDataUrl || "";
+      setPreviewContent(img2imgPreviewBox, runtimeState.previewUrl, runtimeState.previewPlaceholder);
+    },
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },
