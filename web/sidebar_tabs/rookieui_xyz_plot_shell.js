@@ -95,6 +95,7 @@ function createCheckboxRow(id, label, checked = false) {
   input.checked = checked;
   labelNode.appendChild(input);
   const text = document.createElement("span");
+  text.className = "rookieui-shell__field-label rookieui-shell__xyz-plot-option-label";
   text.textContent = label;
   labelNode.appendChild(text);
   return { root: labelNode, input };
@@ -445,6 +446,14 @@ export function createXYZPlotShell({
   const runButton = createActionButton(`${idPrefix}-run`, "Run XYZ Plot");
   const refreshButton = createActionButton(`${idPrefix}-refresh`, "Refresh");
   const cancelButton = createActionButton(`${idPrefix}-cancel`, "Cancel Session");
+  [estimateButton, runButton, refreshButton, cancelButton].forEach((button) => {
+    button.classList.remove("rookieui-shell__button--secondary");
+    button.classList.add("rookieui-shell__xyz-plot-action");
+  });
+  [estimateButton, runButton, refreshButton].forEach((button) => {
+    button.classList.add("rookieui-shell__button--accent");
+  });
+  cancelButton.classList.add("rookieui-shell__button--danger");
   [estimateButton, runButton, refreshButton, cancelButton].forEach((button) => actionRow.appendChild(button));
 
   const estimateSection = document.createElement("section");

@@ -247,6 +247,12 @@ describe("xyz plot shell", () => {
     const section = document.getElementById("txt2img-xyz-section");
     expect(section?.open).toBe(false);
     expect(section?.querySelector("summary")?.className).toContain("rookieui-shell__hires-summary");
+    expect(document.querySelector("#txt2img-xyz-draw-legend + span")?.className).toContain("rookieui-shell__field-label");
+    expect(document.getElementById("txt2img-xyz-estimate")?.className).toContain("rookieui-shell__button--accent");
+    expect(document.getElementById("txt2img-xyz-run")?.className).toContain("rookieui-shell__button--accent");
+    expect(document.getElementById("txt2img-xyz-refresh")?.className).toContain("rookieui-shell__button--accent");
+    expect(document.getElementById("txt2img-xyz-cancel")?.className).toContain("rookieui-shell__button--danger");
+    expect(document.getElementById("txt2img-xyz-cancel")?.className).not.toContain("rookieui-shell__button--secondary");
 
     expect(document.getElementById("txt2img-xyz-axis-x-select").value).toBe("steps");
     document.getElementById("txt2img-xyz-axis-z-select").value = "checkpoint_name";

@@ -38,6 +38,40 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
 
   await page.locator("#rookieui-txt2img-xyz-plot-section > summary").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toHaveAttribute("open", "");
+  const controlSurfaceMetrics = await page.evaluate(() => {
+    const optionLabel = document.querySelector("#rookieui-txt2img-xyz-plot-draw-legend + span");
+    const marginLabel = document.querySelector("#rookieui-txt2img-xyz-plot-margin-size")?.closest("label")?.querySelector(".rookieui-shell__field-label");
+    const actionRow = document.querySelector("#rookieui-txt2img-xyz-plot-section .rookieui-shell__xyz-plot-actions");
+    const estimateButton = document.getElementById("rookieui-txt2img-xyz-plot-estimate");
+    const runButton = document.getElementById("rookieui-txt2img-xyz-plot-run");
+    const refreshButton = document.getElementById("rookieui-txt2img-xyz-plot-refresh");
+    const cancelButton = document.getElementById("rookieui-txt2img-xyz-plot-cancel");
+    const generateButton = document.getElementById("rookieui-txt2img-submit");
+    const actionButtons = [estimateButton, runButton, refreshButton, cancelButton];
+    const actionRects = actionButtons.map((button) => button?.getBoundingClientRect() ?? null);
+    const rowRect = actionRow?.getBoundingClientRect() ?? null;
+    return {
+      optionFont: optionLabel ? getComputedStyle(optionLabel).fontSize : "",
+      marginFont: marginLabel ? getComputedStyle(marginLabel).fontSize : "",
+      generateBackgroundImage: generateButton ? getComputedStyle(generateButton).backgroundImage : "",
+      generateColor: generateButton ? getComputedStyle(generateButton).color : "",
+      estimateBackgroundImage: estimateButton ? getComputedStyle(estimateButton).backgroundImage : "",
+      refreshBackgroundImage: refreshButton ? getComputedStyle(refreshButton).backgroundImage : "",
+      cancelBackgroundImage: cancelButton ? getComputedStyle(cancelButton).backgroundImage : "",
+      cancelColor: cancelButton ? getComputedStyle(cancelButton).color : "",
+      actionWidths: actionRects.map((rect) => rect?.width ?? 0),
+      rowLeftDelta: rowRect && actionRects[0] ? Math.abs(actionRects[0].left - rowRect.left) : 999,
+      rowRightDelta: rowRect && actionRects[3] ? Math.abs(rowRect.right - actionRects[3].right) : 999,
+    };
+  });
+  expect(controlSurfaceMetrics.optionFont).toBe(controlSurfaceMetrics.marginFont);
+  expect(controlSurfaceMetrics.estimateBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
+  expect(controlSurfaceMetrics.refreshBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
+  expect(controlSurfaceMetrics.cancelBackgroundImage).not.toBe(controlSurfaceMetrics.generateBackgroundImage);
+  expect(controlSurfaceMetrics.cancelColor).toBe(controlSurfaceMetrics.generateColor);
+  expect(Math.max(...controlSurfaceMetrics.actionWidths) - Math.min(...controlSurfaceMetrics.actionWidths)).toBeLessThanOrEqual(1);
+  expect(controlSurfaceMetrics.rowLeftDelta).toBeLessThanOrEqual(1);
+  expect(controlSurfaceMetrics.rowRightDelta).toBeLessThanOrEqual(1);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-select").selectOption("checkpoint_name");
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();

@@ -329,6 +329,22 @@
   border: 1px solid var(--rookieui-border);
 }
 
+.rookieui-shell__button--accent {
+  border-color: color-mix(in srgb, var(--rookieui-accent-strong) 92%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rookieui-accent) 92%, white 6%), var(--rookieui-accent-strong));
+  color: var(--rookieui-text-inverse);
+}
+
+.rookieui-shell__button--danger {
+  border-color: color-mix(in srgb, var(--rookieui-tone-danger) 88%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rookieui-tone-danger) 90%, white 10%),
+    color-mix(in srgb, var(--rookieui-tone-danger) 82%, black 18%)
+  );
+  color: var(--rookieui-text-inverse);
+}
+
 .rookieui-shell__status {
   margin: 12px 0 0;
   font-size: 13px;
