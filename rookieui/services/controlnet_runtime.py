@@ -710,7 +710,8 @@ def _normalize_image_value_range(tensor: "torch.Tensor") -> "torch.Tensor":
     maximum = float(tensor.max().item())
     if minimum >= 0.0 and maximum <= 1.0:
         return tensor
-    if minimum >= 0.0 and maximum <= 255.0:
+    fractional_delta = float((tensor - tensor.round()).abs().max().item())
+    if minimum >= 0.0 and 1.0 < maximum <= 255.0 and fractional_delta <= 1e-4:
         return tensor / 255.0
     # IMPORTANT: host preprocessors may emit signed or non-8bit ranges; normalize by min/max to avoid black-frame previews.
     span = maximum - minimum

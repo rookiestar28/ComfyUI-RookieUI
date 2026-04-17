@@ -299,6 +299,25 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertLessEqual(float(normalized.max().item()), 1.0)
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_normalize_image_value_range_divides_integer_uint8_like_values(self) -> None:
+        tensor = runtime.torch.tensor([[[[0.0, 64.0, 255.0]]]], dtype=runtime.torch.float32)
+
+        normalized = runtime._normalize_image_value_range(tensor)
+
+        self.assertAlmostEqual(float(normalized[0, 0, 0, 1].item()), 64.0 / 255.0, places=5)
+        self.assertAlmostEqual(float(normalized.max().item()), 1.0, places=5)
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_normalize_image_value_range_min_max_normalizes_fractional_low_range(self) -> None:
+        tensor = runtime.torch.tensor([[[[0.0, 0.5, 2.0], [1.5, 0.25, 1.0]]]], dtype=runtime.torch.float32)
+
+        normalized = runtime._normalize_image_value_range(tensor)
+
+        self.assertAlmostEqual(float(normalized.min().item()), 0.0, places=5)
+        self.assertAlmostEqual(float(normalized.max().item()), 1.0, places=5)
+        self.assertGreater(float(normalized[0, 0, 0, 1].item()), 0.2)
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_promotes_alpha_only_rgba_to_visible_rgb(self) -> None:
         tensor = runtime.torch.zeros((1, 2, 2, 4), dtype=runtime.torch.float32)
         tensor[:, :, :, 3] = 1.0
