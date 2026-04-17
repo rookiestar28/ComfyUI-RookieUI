@@ -406,7 +406,23 @@ export function createXYZPlotShell({
   const drawLegend = createCheckboxRow(`${idPrefix}-draw-legend`, "Draw legend", true);
   const includeLoneImages = createCheckboxRow(`${idPrefix}-include-lone-images`, "Include lone images", false);
   const includeSubGrids = createCheckboxRow(`${idPrefix}-include-sub-grids`, "Include sub-grids", false);
-  optionGrid.append(drawLegend.root, includeLoneImages.root, includeSubGrids.root);
+  const keepNegativeOneSeed = createCheckboxRow(
+    `${idPrefix}-keep-negative-one-seed`,
+    "Keep -1 for seeds",
+    false,
+  );
+  const varySeedsX = createCheckboxRow(`${idPrefix}-vary-seeds-x`, "Vary seeds for X", false);
+  const varySeedsY = createCheckboxRow(`${idPrefix}-vary-seeds-y`, "Vary seeds for Y", false);
+  const varySeedsZ = createCheckboxRow(`${idPrefix}-vary-seeds-z`, "Vary seeds for Z", false);
+  optionGrid.append(
+    drawLegend.root,
+    includeLoneImages.root,
+    includeSubGrids.root,
+    keepNegativeOneSeed.root,
+    varySeedsX.root,
+    varySeedsY.root,
+    varySeedsZ.root,
+  );
 
   const marginRow = document.createElement("label");
   marginRow.className = "rookieui-shell__xyz-plot-margin";
@@ -536,6 +552,10 @@ export function createXYZPlotShell({
       draw_legend: drawLegend.input.checked,
       include_lone_images: includeLoneImages.input.checked,
       include_sub_grids: includeSubGrids.input.checked,
+      keep_negative_one_seed: keepNegativeOneSeed.input.checked,
+      vary_seeds_x: varySeedsX.input.checked,
+      vary_seeds_y: varySeedsY.input.checked,
+      vary_seeds_z: varySeedsZ.input.checked,
       margin_size: coerceNumber(marginInput.value, 0),
     };
   }

@@ -70,6 +70,14 @@ class XYZPlotGridTests(unittest.TestCase):
                 "include_lone_images": True,
                 "margin_size": 4,
             },
+            "seed_policy": {
+                "keep_negative_one_seed": False,
+                "vary_seeds_x": False,
+                "vary_seeds_y": False,
+                "vary_seeds_z": False,
+                "fixed_base_seed": 101,
+                "fixed_axis_values": {"X": [111, 222]},
+            },
             "cells": [
                 {
                     "cell_id": "cell-1",
@@ -121,6 +129,8 @@ class XYZPlotGridTests(unittest.TestCase):
         metadata = json.loads(main_image.text["rookieui_xyz_plot"])
         self.assertEqual(metadata["session_id"], "xyz-demo")
         self.assertEqual(metadata["grid_role"], "main_grid")
+        self.assertEqual(metadata["seed_policy"]["fixed_base_seed"], 101)
+        self.assertEqual(metadata["seed_policy"]["fixed_axis_values"]["X"], [111, 222])
 
     def test_build_xyz_plot_grid_results_reports_incomplete_when_completed_cells_lack_assets(self) -> None:
         session = {

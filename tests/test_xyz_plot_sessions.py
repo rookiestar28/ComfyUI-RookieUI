@@ -84,6 +84,37 @@ class XYZPlotSessionTests(unittest.TestCase):
             mock.patch.object(xyz_plot_sessions, "translate_img2img_request", return_value=fake_translation),
         )
 
+    def test_normalize_session_request_freezes_negative_one_seed_when_keep_negative_one_seed_disabled(self) -> None:
+        with mock.patch.object(xyz_plot_sessions, "resolve_execution_seed", side_effect=[111, 222, 333]):
+            session = xyz_plot_sessions._normalize_session_request(
+                {
+                    "mode": "txt2img",
+                    "base_request": {"prompt": "cat", "seed": -1},
+                    "axes": [{"axis_id": "seed", "values": "-1,-1"}],
+                }
+            )
+
+        self.assertEqual(session["base_request"]["seed"], 111)
+        self.assertEqual(session["seed_policy"]["fixed_base_seed"], 111)
+        self.assertEqual(session["seed_policy"]["fixed_axis_values"]["X"], [222, 333])
+        self.assertEqual([cell["bindings"][0]["label"] for cell in session["cells"]], ["-1", "-1"])
+        self.assertEqual([cell["bindings"][0]["value"] for cell in session["cells"]], [222, 333])
+
+    def test_normalize_session_request_preserves_negative_one_seed_when_keep_negative_one_seed_enabled(self) -> None:
+        session = xyz_plot_sessions._normalize_session_request(
+            {
+                "mode": "txt2img",
+                "base_request": {"prompt": "cat", "seed": -1},
+                "axes": [{"axis_id": "seed", "values": "-1,5"}],
+                "keep_negative_one_seed": True,
+            }
+        )
+
+        self.assertEqual(session["base_request"]["seed"], -1)
+        self.assertIsNone(session["seed_policy"]["fixed_base_seed"])
+        self.assertEqual(session["seed_policy"]["fixed_axis_values"], {})
+        self.assertEqual([cell["bindings"][0]["value"] for cell in session["cells"]], [-1, 5])
+
     def test_execute_xyz_plot_run_creates_session_and_submits_first_cell(self) -> None:
         prompt_server = _FakePromptServer()
         with ExitStack() as stack:
@@ -154,6 +185,49 @@ class XYZPlotSessionTests(unittest.TestCase):
         self.assertEqual(detail_payload["session"]["summary"]["completed_cells"], 1)
         self.assertEqual(detail_payload["session"]["summary"]["submitted_cells"], 2)
         self.assertEqual(detail_payload["session"]["cells"][1]["prompt_id"], "prompt-2")
+
+    def test_submit_cell_applies_vary_seed_offsets_after_axis_binding(self) -> None:
+        prompt_server = _FakePromptServer()
+        normalize_txt2img_request = mock.Mock(side_effect=lambda payload: dict(payload))
+        fake_translation = types.SimpleNamespace(
+            workflow={"7": {"class_type": "SaveImage"}},
+            profile="sd15",
+        )
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(xyz_plot_sessions, "normalize_txt2img_request", normalize_txt2img_request))
+            stack.enter_context(mock.patch.object(xyz_plot_sessions, "translate_txt2img_request", return_value=fake_translation))
+            stack.enter_context(mock.patch.object(xyz_plot_sessions, "normalize_img2img_request", return_value={"normalized": True}))
+            stack.enter_context(mock.patch.object(xyz_plot_sessions, "translate_img2img_request", return_value=fake_translation))
+            stack.enter_context(
+                mock.patch.object(
+                    xyz_plot_sessions,
+                    "submit_prompt_workflow",
+                    mock.AsyncMock(return_value={"prompt_id": "prompt-1", "number": 1}),
+                )
+            )
+            session = xyz_plot_sessions._normalize_session_request(
+                {
+                    "mode": "txt2img",
+                    "base_request": {"prompt": "cat", "seed": 5},
+                    "axes": [
+                        {"axis_id": "steps", "values": "10,20"},
+                        {"axis_id": "cfg_scale", "values": "5,7"},
+                    ],
+                    "vary_seeds_x": True,
+                    "vary_seeds_y": True,
+                }
+            )
+            target_cell = next(
+                cell
+                for cell in session["cells"]
+                if cell["axis_indices"] == {"X": 1, "Y": 1}
+            )
+
+            asyncio.run(xyz_plot_sessions._submit_cell_for_session(session, target_cell, prompt_server))
+
+        submitted_payload = normalize_txt2img_request.call_args[0][0]
+        self.assertEqual(submitted_payload["seed"], 8)
+        self.assertEqual(target_cell["resolved_seed"], 8)
 
     def test_cancel_marks_pending_cells_cancelled_and_removes_queued_jobs_when_possible(self) -> None:
         prompt_server = _FakePromptServer()

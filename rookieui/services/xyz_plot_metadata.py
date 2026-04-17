@@ -13,7 +13,14 @@ def build_xyz_plot_text_summary(session: dict[str, Any], *, grid_role: str, z_bi
     header = f"RookieUI XYZ Plot [{grid_role}]"
     if z_binding is not None:
         header = f"{header} - {z_binding.get('title', 'Z')}: {z_binding.get('label', '')}"
-    return f"{header} | Session {session.get('session_id', '')} | Axes: {', '.join(axis_parts)}"
+    seed_policy = session.get("seed_policy", {})
+    seed_summary = ""
+    if isinstance(seed_policy, dict):
+        if bool(seed_policy.get("keep_negative_one_seed", False)):
+            seed_summary = " | Seed policy: keep -1"
+        elif seed_policy.get("fixed_base_seed") is not None:
+            seed_summary = f" | Seed policy: fixed base seed {seed_policy.get('fixed_base_seed')}"
+    return f"{header} | Session {session.get('session_id', '')} | Axes: {', '.join(axis_parts)}{seed_summary}"
 
 
 def build_xyz_plot_png_metadata(
@@ -40,6 +47,7 @@ def build_xyz_plot_png_metadata(
             if isinstance(axis, dict)
         ],
         "grid_options": session.get("grid_options", {}),
+        "seed_policy": session.get("seed_policy", {}),
     }
     if z_binding is not None:
         payload["z_binding"] = {

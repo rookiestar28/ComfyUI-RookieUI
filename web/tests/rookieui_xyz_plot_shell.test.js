@@ -118,6 +118,14 @@ function createBootstrapState(overrides = {}) {
         session: {
           session_id: "xyz-1",
           status: "in_progress",
+          seed_policy: {
+            keep_negative_one_seed: false,
+            vary_seeds_x: false,
+            vary_seeds_y: false,
+            vary_seeds_z: false,
+            fixed_base_seed: 101,
+            fixed_axis_values: {},
+          },
           summary: {
             total_cells: 9,
             completed_cells: 2,
@@ -146,6 +154,14 @@ function createBootstrapState(overrides = {}) {
         session: {
           session_id: sessionId,
           status: "completed",
+          seed_policy: {
+            keep_negative_one_seed: false,
+            vary_seeds_x: false,
+            vary_seeds_y: false,
+            vary_seeds_z: false,
+            fixed_base_seed: 101,
+            fixed_axis_values: {},
+          },
           summary: {
             total_cells: 9,
             completed_cells: 9,
@@ -269,6 +285,8 @@ describe("xyz plot shell", () => {
 
     document.getElementById("txt2img-xyz-axis-x-values").value = "20, 28, 36";
     document.getElementById("txt2img-xyz-axis-y-values").value = "5.5, 7, 8.5";
+    document.getElementById("txt2img-xyz-keep-negative-one-seed").checked = true;
+    document.getElementById("txt2img-xyz-vary-seeds-y").checked = true;
     document.getElementById("txt2img-xyz-estimate").click();
     await flushPromises();
 
@@ -285,6 +303,10 @@ describe("xyz plot shell", () => {
       draw_legend: true,
       include_lone_images: false,
       include_sub_grids: false,
+      keep_negative_one_seed: true,
+      vary_seeds_x: false,
+      vary_seeds_y: true,
+      vary_seeds_z: false,
       margin_size: 0,
     });
     expect(statusMessages.at(-1)).toContain("estimate");
@@ -351,6 +373,10 @@ describe("xyz plot shell", () => {
     document.getElementById("img2img-xyz-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("img2img-xyz-axis-z-select").value = "";
     document.getElementById("img2img-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("img2img-xyz-keep-negative-one-seed").checked).toBe(false);
+    expect(document.getElementById("img2img-xyz-vary-seeds-x").checked).toBe(false);
+    expect(document.getElementById("img2img-xyz-vary-seeds-y").checked).toBe(false);
+    expect(document.getElementById("img2img-xyz-vary-seeds-z").checked).toBe(false);
 
     document.getElementById("img2img-xyz-run").click();
     await flushPromises();
@@ -449,6 +475,44 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-hires-axis-z-values-multiselect").hidden).toBe(false);
     expect(document.getElementById("txt2img-hires-axis-z-values-summary").textContent).toContain("Select values");
     expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(false);
+  });
+
+  test("serializes xyz seed-policy controls into the run payload", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const bootstrapState = createBootstrapState();
+
+    createXYZPlotShell({
+      idPrefix: "seed-policy-xyz",
+      parent,
+      mode: "txt2img",
+      bootstrapState,
+      buildBaseRequest: () => ({ prompt: "seed city", seed: -1 }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("seed-policy-xyz-axis-x-values").value = "10, 20";
+    document.getElementById("seed-policy-xyz-axis-y-values").value = "5.5, 7";
+    document.getElementById("seed-policy-xyz-axis-z-select").value = "";
+    document.getElementById("seed-policy-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("seed-policy-xyz-keep-negative-one-seed").checked = true;
+    document.getElementById("seed-policy-xyz-vary-seeds-x").checked = true;
+    document.getElementById("seed-policy-xyz-vary-seeds-z").checked = true;
+
+    document.getElementById("seed-policy-xyz-run").click();
+    await flushPromises();
+
+    expect(bootstrapState.runXYZPlotRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keep_negative_one_seed: true,
+        vary_seeds_x: true,
+        vary_seeds_y: false,
+        vary_seeds_z: true,
+      }),
+    );
   });
 
   test("wires the results preview into the shared fullscreen viewer", async () => {

@@ -81,6 +81,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[1]}"]`).check();
   await page.locator("#rookieui-txt2img-xyz-plot-axis-x-values").fill("20, 28, 36");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-y-values").fill("5.5, 7, 8.5");
+  await page.locator("#rookieui-txt2img-xyz-plot-keep-negative-one-seed").check();
+  await page.locator("#rookieui-txt2img-xyz-plot-vary-seeds-y").check();
   await page.locator("#rookieui-txt2img-xyz-plot-estimate").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-section")).toContainText("9");
 
@@ -113,6 +115,10 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
     { axis_id: "cfg_scale", values: "5.5, 7, 8.5" },
     { axis_id: "checkpoint_name", values: txt2imgCheckpointChoices.join(", ") },
   ]);
+  expect(txt2imgRunRequests[0].keep_negative_one_seed).toBe(true);
+  expect(txt2imgRunRequests[0].vary_seeds_x).toBe(false);
+  expect(txt2imgRunRequests[0].vary_seeds_y).toBe(true);
+  expect(txt2imgRunRequests[0].vary_seeds_z).toBe(false);
 
   await page.locator("#rookieui-tab-img2img").click();
   await expect(page.locator("#rookieui-img2img-xyz-plot-section")).toBeVisible();
@@ -149,4 +155,8 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
     { axis_id: "steps", values: "1, 2, 3" },
     { axis_id: "denoising_strength", values: "0.35, 0.55, 0.75" },
   ]);
+  expect(allRunRequests[1].keep_negative_one_seed).toBe(false);
+  expect(allRunRequests[1].vary_seeds_x).toBe(false);
+  expect(allRunRequests[1].vary_seeds_y).toBe(false);
+  expect(allRunRequests[1].vary_seeds_z).toBe(false);
 });

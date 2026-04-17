@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-XYZ_PLOT_CONTRACT_VERSION = "r125-20260417"
+XYZ_PLOT_CONTRACT_VERSION = "r139-20260418"
 XYZ_PLOT_ROUTE_FAMILY = "/rookieui/xyz-plot"
 XYZ_PLOT_SESSION_EXECUTION_MODEL = "queue_backed_rookieui_session_runner"
 XYZ_PLOT_GRID_DELIVERY_MODEL = "rookieui_asset_store_grid_outputs"
@@ -82,7 +82,7 @@ def _axis_contracts() -> tuple[XYZPlotAxisContract, ...]:
             mode_scopes=("txt2img", "img2img"),
             value_input_mode="int_csv_or_range",
             a1111_reference_label="Seed",
-            notes=("Maps directly to RookieUI generation seed fields.",),
+            notes=("Maps directly to RookieUI generation seed fields, including session-level fixed-seed and vary-seed policy follow-ups.",),
         ),
         XYZPlotAxisContract(
             axis_id="steps",
