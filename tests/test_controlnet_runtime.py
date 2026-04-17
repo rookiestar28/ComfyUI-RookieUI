@@ -240,6 +240,25 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
         self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
 
+    def test_prompt_server_last_prompt_id_shim_uses_refcounted_lifecycle(self) -> None:
+        fake_prompt_server_instance = types.SimpleNamespace()
+
+        with mock.patch.object(runtime, "_PROMPT_SERVER_SHIM_REFCOUNTS", {}):
+            with mock.patch.object(runtime, "_PROMPT_SERVER_SHIM_VALUES", {}):
+                applied_a, value_a = runtime._ensure_prompt_server_last_prompt_id(fake_prompt_server_instance)
+                applied_b, value_b = runtime._ensure_prompt_server_last_prompt_id(fake_prompt_server_instance)
+
+                self.assertTrue(applied_a)
+                self.assertTrue(applied_b)
+                self.assertEqual(value_a, value_b)
+                self.assertEqual(getattr(fake_prompt_server_instance, "last_prompt_id"), value_a)
+
+                runtime._restore_prompt_server_last_prompt_id(fake_prompt_server_instance, applied_a, value_a)
+                self.assertEqual(getattr(fake_prompt_server_instance, "last_prompt_id"), value_a)
+
+                runtime._restore_prompt_server_last_prompt_id(fake_prompt_server_instance, applied_b, value_b)
+                self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
+
     def test_preprocess_controlnet_marks_host_success_with_near_empty_output_diagnostic(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
