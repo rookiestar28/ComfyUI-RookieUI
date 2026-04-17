@@ -258,6 +258,166 @@
   gap: 10px;
 }
 
+.rookieui-shell__xyz-plot {
+  margin-top: 14px;
+  border-style: dashed;
+}
+
+.rookieui-shell__xyz-plot-header {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.rookieui-shell__xyz-plot-note,
+.rookieui-shell__xyz-plot-summary,
+.rookieui-shell__xyz-plot-session-status,
+.rookieui-shell__xyz-plot-session-summary,
+.rookieui-shell__xyz-plot-result-summary,
+.rookieui-shell__xyz-plot-warnings,
+.rookieui-shell__xyz-plot-axis-hint {
+  margin: 0;
+}
+
+.rookieui-shell__xyz-plot-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(280px, 0.92fr);
+  gap: 12px;
+}
+
+.rookieui-shell__xyz-plot-column {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rookieui-shell__xyz-plot-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, transparent);
+}
+
+.rookieui-shell__xyz-plot-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__xyz-plot-axis-host {
+  display: grid;
+  gap: 10px;
+}
+
+.rookieui-shell__xyz-plot-axis-row {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 0.42fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.rookieui-shell__xyz-plot-axis-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rookieui-accent) 14%, transparent);
+  color: var(--rookieui-text-primary);
+  font-size: 11px;
+}
+
+.rookieui-shell__xyz-plot-axis-hint {
+  grid-column: 2 / -1;
+  color: var(--rookieui-text-muted);
+  font-size: 11px;
+}
+
+.rookieui-shell__xyz-plot-swap-row,
+.rookieui-shell__xyz-plot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__xyz-plot-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rookieui-shell__xyz-plot-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  color: var(--rookieui-text-secondary);
+}
+
+.rookieui-shell__xyz-plot-margin {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__xyz-plot-estimate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rookieui-shell__xyz-plot-metric {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel-soft) 96%, transparent);
+}
+
+.rookieui-shell__xyz-plot-metric-label {
+  font-size: 11px;
+  color: var(--rookieui-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rookieui-shell__xyz-plot-metric-value {
+  font-size: 16px;
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__xyz-plot-preview {
+  min-height: 180px;
+}
+
+@media (max-width: 980px) {
+  .rookieui-shell__xyz-plot-body {
+    grid-template-columns: 1fr;
+  }
+
+  .rookieui-shell__xyz-plot-axis-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .rookieui-shell__xyz-plot-axis-select,
+  .rookieui-shell__xyz-plot-axis-values,
+  .rookieui-shell__xyz-plot-axis-row .rookieui-shell__button {
+    grid-column: 2;
+  }
+
+  .rookieui-shell__xyz-plot-axis-hint {
+    grid-column: 2;
+  }
+
+  .rookieui-shell__xyz-plot-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .rookieui-shell__controlnet-note {
   margin-top: 0;
 }

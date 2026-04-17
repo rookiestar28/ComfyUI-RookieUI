@@ -9,6 +9,7 @@ import {
   fetchRookieUIPromptWorkbenchConfig,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
+  fetchRookieUIXYZPlotAxes,
 } from "./rookieui_extension_deps.js";
 
 function toStringArray(rawValue) {
@@ -57,6 +58,7 @@ function buildDefaultBootstrapLoaders() {
     controlnetTypes: (fetchImpl) => fetchRookieUIControlNetTypes(fetchImpl),
     adetailerCatalog: (fetchImpl) => fetchRookieUIADetailerCatalog(fetchImpl),
     promptWorkbench: (fetchImpl) => fetchRookieUIPromptWorkbenchConfig(fetchImpl),
+    xyzPlot: (fetchImpl) => fetchRookieUIXYZPlotAxes(fetchImpl),
     queue: (fetchImpl, { clientId }) => fetchRookieUIQueue(fetchImpl, { clientId }),
   };
 }
@@ -108,6 +110,11 @@ export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBoot
       featureId: "queue",
       bootstrapKey: "queue",
       load: (fetchImpl, context) => loaders.queue(fetchImpl, context),
+    },
+    {
+      featureId: "xyz_plot",
+      bootstrapKey: "xyzPlot",
+      load: (fetchImpl) => loaders.xyzPlot(fetchImpl),
     },
     {
       featureId: "prompt_workbench",

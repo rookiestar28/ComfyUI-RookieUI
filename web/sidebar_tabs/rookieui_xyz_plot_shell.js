@@ -1,0 +1,546 @@
+function clearChildren(node) {
+  if (node) {
+    node.replaceChildren();
+  }
+}
+
+function parseAxisRows(axisRows) {
+  return axisRows
+    .map((row) => ({
+      slot: row.slot,
+      axis_id: String(row.select.value ?? "").trim(),
+      values: String(row.values.value ?? "").trim(),
+    }))
+    .filter((row) => row.axis_id && row.values);
+}
+
+function normalizeAxisCatalog(rawAxes, mode) {
+  const axes = rawAxes && typeof rawAxes === "object" ? Object.values(rawAxes) : [];
+  return axes
+    .filter((entry) => entry && typeof entry === "object")
+    .filter((entry) => String(entry.support_tier ?? "") !== "not_supported_yet")
+    .filter((entry) => Boolean(entry.session_runner_support))
+    .filter((entry) => Array.isArray(entry.mode_scopes) && entry.mode_scopes.includes(mode))
+    .sort((left, right) => String(left.title ?? "").localeCompare(String(right.title ?? "")));
+}
+
+function buildFallbackValues(axis) {
+  const axisId = String(axis?.axis_id ?? "").trim();
+  const inputMode = String(axis?.value_input_mode ?? "").trim();
+  const choices = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
+  if (choices.length) {
+    return choices.slice(0, 3).join(", ");
+  }
+  if (inputMode === "size_csv") {
+    return "512x512, 768x768, 1024x1024";
+  }
+  if (inputMode === "csv_pairs") {
+    return "cat -> dog, dusk -> dawn";
+  }
+  if (inputMode === "permutation_csv") {
+    return "cat, dog, bird";
+  }
+  if (axisId === "seed") {
+    return "1, 2, 3";
+  }
+  if (axisId === "steps") {
+    return "20, 28, 36";
+  }
+  if (axisId === "cfg_scale") {
+    return "5.5, 7, 8.5";
+  }
+  if (axisId === "clip_skip") {
+    return "1, 2, 3";
+  }
+  if (axisId === "denoising_strength") {
+    return "0.35, 0.5, 0.65";
+  }
+  if (axisId === "hires_steps") {
+    return "8, 12, 16";
+  }
+  return "";
+}
+
+function buildAxisHint(axis) {
+  if (!axis) {
+    return "Select an axis to sweep.";
+  }
+  const reference = String(axis.a1111_reference_label ?? "").trim();
+  const tier = String(axis.support_tier ?? "").trim();
+  const mode = String(axis.value_input_mode ?? "").trim();
+  const notes = Array.isArray(axis.notes) ? axis.notes.filter(Boolean) : [];
+  const summary = [`${reference || axis.title}`, `${tier} parity`, mode.replaceAll("_", " ")];
+  if (notes[0]) {
+    summary.push(notes[0]);
+  }
+  return summary.join(" | ");
+}
+
+function renderWarnings(target, warnings, warningCodes) {
+  const normalizedWarnings = Array.isArray(warnings) ? warnings.filter(Boolean) : [];
+  const normalizedCodes = Array.isArray(warningCodes) ? warningCodes.filter(Boolean) : [];
+  const lines = [];
+  normalizedCodes.forEach((code) => lines.push(String(code)));
+  normalizedWarnings.forEach((warning) => lines.push(String(warning)));
+  target.textContent = lines.length ? lines.join(" | ") : "No warnings";
+  target.dataset.empty = String(lines.length === 0);
+}
+
+function createCheckboxRow(id, label, checked = false) {
+  const labelNode = document.createElement("label");
+  labelNode.className = "rookieui-shell__xyz-plot-option";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.id = id;
+  input.checked = checked;
+  labelNode.appendChild(input);
+  const text = document.createElement("span");
+  text.textContent = label;
+  labelNode.appendChild(text);
+  return { root: labelNode, input };
+}
+
+function coerceNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export function createXYZPlotShell({
+  idPrefix,
+  parent,
+  mode,
+  bootstrapState,
+  buildBaseRequest,
+  appendTextElement,
+  createActionButton,
+  onStatusMessage,
+} = {}) {
+  const shell = document.createElement("section");
+  shell.id = `${idPrefix}-section`;
+  shell.className = "rookieui-shell__section rookieui-shell__section--soft rookieui-shell__xyz-plot";
+  parent.appendChild(shell);
+
+  const axisCatalog = normalizeAxisCatalog(bootstrapState?.xyzPlot?.axes ?? {}, mode);
+  const axisOptions = [{ value: "", label: "Disabled" }].concat(
+    axisCatalog.map((entry) => ({
+      value: String(entry.axis_id ?? ""),
+      label: String(entry.title ?? entry.axis_id ?? ""),
+    })),
+  );
+  const axisLookup = new Map(axisCatalog.map((entry) => [String(entry.axis_id ?? ""), entry]));
+  const state = {
+    activeSessionId: "",
+    pollTimer: null,
+    axesLoaded: axisCatalog.length > 0,
+    axisCatalog,
+  };
+
+  const header = document.createElement("div");
+  header.className = "rookieui-shell__xyz-plot-header";
+  shell.appendChild(header);
+  appendTextElement(header, "h4", "rookieui-shell__section-title", "XYZ Plot");
+  appendTextElement(
+    header,
+    "p",
+    "rookieui-shell__status rookieui-shell__xyz-plot-note",
+    `Bottom-mounted sweep surface for ${mode}. It stays below ControlNet / ADetailer blocks by design.`,
+  );
+
+  const body = document.createElement("div");
+  body.className = "rookieui-shell__xyz-plot-body";
+  shell.appendChild(body);
+
+  const leftColumn = document.createElement("div");
+  leftColumn.className = "rookieui-shell__xyz-plot-column";
+  body.appendChild(leftColumn);
+
+  const rightColumn = document.createElement("div");
+  rightColumn.className = "rookieui-shell__xyz-plot-column rookieui-shell__xyz-plot-column--results";
+  body.appendChild(rightColumn);
+
+  const setupSection = document.createElement("section");
+  setupSection.className = "rookieui-shell__xyz-plot-card";
+  leftColumn.appendChild(setupSection);
+  appendTextElement(setupSection, "h5", "rookieui-shell__xyz-plot-card-title", "Plot Setup");
+
+  const setupSummary = appendTextElement(
+    setupSection,
+    "p",
+    "rookieui-shell__xyz-plot-summary",
+    "Import the current txt2img / img2img form as the baseline request and sweep one to three axes.",
+  );
+  setupSummary.id = `${idPrefix}-setup-summary`;
+
+  const axisHost = document.createElement("div");
+  axisHost.className = "rookieui-shell__xyz-plot-axis-host";
+  setupSection.appendChild(axisHost);
+
+  const axisRows = ["X", "Y", "Z"].map((slot, index) => {
+    const row = document.createElement("div");
+    row.className = "rookieui-shell__xyz-plot-axis-row";
+    axisHost.appendChild(row);
+
+    appendTextElement(row, "strong", "rookieui-shell__xyz-plot-axis-slot", slot);
+
+    const select = document.createElement("select");
+    select.id = `${idPrefix}-axis-${slot.toLowerCase()}-select`;
+    select.className = "rookieui-shell__input rookieui-shell__xyz-plot-axis-select";
+    axisOptions.forEach((entry) => {
+      const option = document.createElement("option");
+      option.value = entry.value;
+      option.textContent = entry.label;
+      select.appendChild(option);
+    });
+    if (index === 0 && axisLookup.has("steps")) {
+      select.value = "steps";
+    }
+    if (index === 1 && axisLookup.has("cfg_scale")) {
+      select.value = "cfg_scale";
+    }
+    if (index === 2 && axisLookup.has("seed")) {
+      select.value = "seed";
+    }
+    row.appendChild(select);
+
+    const values = document.createElement("input");
+    values.type = "text";
+    values.id = `${idPrefix}-axis-${slot.toLowerCase()}-values`;
+    values.className = "rookieui-shell__input rookieui-shell__xyz-plot-axis-values";
+    row.appendChild(values);
+
+    const fillButton = createActionButton(`${idPrefix}-axis-${slot.toLowerCase()}-fill`, "Fill");
+    fillButton.classList.add("rookieui-shell__button--secondary");
+    row.appendChild(fillButton);
+
+    const hint = appendTextElement(row, "p", "rookieui-shell__xyz-plot-axis-hint", "Select an axis to sweep.");
+    hint.id = `${idPrefix}-axis-${slot.toLowerCase()}-hint`;
+
+    return { slot, row, select, values, fillButton, hint };
+  });
+
+  const swapRow = document.createElement("div");
+  swapRow.className = "rookieui-shell__xyz-plot-swap-row";
+  setupSection.appendChild(swapRow);
+  const swapButtons = [
+    { id: "xy", label: "Swap X/Y", left: 0, right: 1 },
+    { id: "yz", label: "Swap Y/Z", left: 1, right: 2 },
+    { id: "xz", label: "Swap X/Z", left: 0, right: 2 },
+  ].map((entry) => {
+    const button = createActionButton(`${idPrefix}-swap-${entry.id}`, entry.label);
+    button.classList.add("rookieui-shell__button--secondary");
+    swapRow.appendChild(button);
+    return { ...entry, button };
+  });
+
+  const optionsSection = document.createElement("section");
+  optionsSection.className = "rookieui-shell__xyz-plot-card";
+  leftColumn.appendChild(optionsSection);
+  appendTextElement(optionsSection, "h5", "rookieui-shell__xyz-plot-card-title", "Plot Options");
+
+  const optionGrid = document.createElement("div");
+  optionGrid.className = "rookieui-shell__xyz-plot-options";
+  optionsSection.appendChild(optionGrid);
+  const drawLegend = createCheckboxRow(`${idPrefix}-draw-legend`, "Draw legend", true);
+  const includeLoneImages = createCheckboxRow(`${idPrefix}-include-lone-images`, "Include lone images", false);
+  const includeSubGrids = createCheckboxRow(`${idPrefix}-include-sub-grids`, "Include sub-grids", false);
+  optionGrid.append(drawLegend.root, includeLoneImages.root, includeSubGrids.root);
+
+  const marginRow = document.createElement("label");
+  marginRow.className = "rookieui-shell__xyz-plot-margin";
+  appendTextElement(marginRow, "span", "rookieui-shell__field-label", "Grid margin");
+  const marginInput = document.createElement("input");
+  marginInput.type = "number";
+  marginInput.id = `${idPrefix}-margin-size`;
+  marginInput.className = "rookieui-shell__input";
+  marginInput.min = "0";
+  marginInput.max = "500";
+  marginInput.step = "1";
+  marginInput.value = "0";
+  marginRow.appendChild(marginInput);
+  optionsSection.appendChild(marginRow);
+
+  const actionRow = document.createElement("div");
+  actionRow.className = "rookieui-shell__xyz-plot-actions";
+  leftColumn.appendChild(actionRow);
+  const estimateButton = createActionButton(`${idPrefix}-estimate`, "Estimate");
+  const runButton = createActionButton(`${idPrefix}-run`, "Run XYZ Plot");
+  const refreshButton = createActionButton(`${idPrefix}-refresh`, "Refresh");
+  const cancelButton = createActionButton(`${idPrefix}-cancel`, "Cancel Session");
+  [estimateButton, runButton, refreshButton, cancelButton].forEach((button) => actionRow.appendChild(button));
+
+  const estimateSection = document.createElement("section");
+  estimateSection.className = "rookieui-shell__xyz-plot-card";
+  rightColumn.appendChild(estimateSection);
+  appendTextElement(estimateSection, "h5", "rookieui-shell__xyz-plot-card-title", "Estimate");
+
+  const estimateGrid = document.createElement("div");
+  estimateGrid.className = "rookieui-shell__xyz-plot-estimate-grid";
+  estimateSection.appendChild(estimateGrid);
+  const estimateNodes = {};
+  ["Cells", "Images", "Steps", "Grid MP"].forEach((label) => {
+    const card = document.createElement("article");
+    card.className = "rookieui-shell__xyz-plot-metric";
+    appendTextElement(card, "span", "rookieui-shell__xyz-plot-metric-label", label);
+    const valueNode = document.createElement("strong");
+    valueNode.className = "rookieui-shell__xyz-plot-metric-value";
+    valueNode.textContent = "0";
+    card.appendChild(valueNode);
+    estimateGrid.appendChild(card);
+    estimateNodes[label] = valueNode;
+  });
+  const warningsNode = appendTextElement(estimateSection, "p", "rookieui-shell__xyz-plot-warnings", "No warnings");
+  warningsNode.id = `${idPrefix}-warnings`;
+
+  const sessionSection = document.createElement("section");
+  sessionSection.className = "rookieui-shell__xyz-plot-card";
+  rightColumn.appendChild(sessionSection);
+  appendTextElement(sessionSection, "h5", "rookieui-shell__xyz-plot-card-title", "Session");
+  const sessionStatusNode = appendTextElement(
+    sessionSection,
+    "p",
+    "rookieui-shell__xyz-plot-session-status",
+    "Idle",
+  );
+  sessionStatusNode.id = `${idPrefix}-session-status`;
+  const sessionSummaryNode = appendTextElement(
+    sessionSection,
+    "p",
+    "rookieui-shell__xyz-plot-session-summary",
+    "No active session",
+  );
+  sessionSummaryNode.id = `${idPrefix}-session-summary`;
+
+  const resultSection = document.createElement("section");
+  resultSection.className = "rookieui-shell__xyz-plot-card";
+  rightColumn.appendChild(resultSection);
+  appendTextElement(resultSection, "h5", "rookieui-shell__xyz-plot-card-title", "Results");
+  const previewBox = document.createElement("div");
+  previewBox.id = `${idPrefix}-main-grid-preview`;
+  previewBox.className = "rookieui-shell__preview-box rookieui-shell__preview-box--compact rookieui-shell__xyz-plot-preview";
+  resultSection.appendChild(previewBox);
+  appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", "No XYZ plot grid yet.");
+  const resultSummaryNode = appendTextElement(
+    resultSection,
+    "p",
+    "rookieui-shell__xyz-plot-result-summary",
+    "Sub-grids: 0 | Lone images: 0",
+  );
+  resultSummaryNode.id = `${idPrefix}-result-summary`;
+
+  function setPreview(dataUrl) {
+    previewBox.replaceChildren();
+    if (typeof dataUrl === "string" && dataUrl.trim()) {
+      const image = document.createElement("img");
+      image.className = "rookieui-shell__preview-image";
+      image.src = dataUrl;
+      image.alt = "XYZ Plot grid preview";
+      previewBox.appendChild(image);
+      return;
+    }
+    appendTextElement(previewBox, "span", "rookieui-shell__preview-placeholder", "No XYZ plot grid yet.");
+  }
+
+  function collectPayload() {
+    return {
+      mode,
+      client_id: String(bootstrapState?.clientId ?? "").trim(),
+      max_parallel: 1,
+      base_request: buildBaseRequest?.() ?? {},
+      axes: parseAxisRows(axisRows).map((entry) => ({
+        axis_id: entry.axis_id,
+        values: entry.values,
+      })),
+      draw_legend: drawLegend.input.checked,
+      include_lone_images: includeLoneImages.input.checked,
+      include_sub_grids: includeSubGrids.input.checked,
+      margin_size: coerceNumber(marginInput.value, 0),
+    };
+  }
+
+  function syncAxisRow(row) {
+    const axis = axisLookup.get(String(row.select.value ?? "").trim());
+    row.values.placeholder = axis ? buildFallbackValues(axis) : "";
+    row.values.disabled = !axis;
+    row.fillButton.disabled = !axis;
+    row.hint.textContent = buildAxisHint(axis);
+  }
+
+  function syncEstimatePayload(result) {
+    const estimate = result?.data?.estimate ?? {};
+    estimateNodes.Cells.textContent = String(estimate.cell_count ?? 0);
+    estimateNodes.Images.textContent = String(estimate.generated_image_count ?? 0);
+    estimateNodes.Steps.textContent = String(
+      estimate.total_step_estimate ?? estimate.total_steps ?? 0,
+    );
+    estimateNodes["Grid MP"].textContent = String(
+      estimate.projected_grid_megapixels ?? 0,
+    );
+    renderWarnings(warningsNode, result?.data?.warnings, result?.data?.warning_codes);
+  }
+
+  function stopPolling() {
+    if (state.pollTimer) {
+      clearTimeout(state.pollTimer);
+      state.pollTimer = null;
+    }
+  }
+
+  function schedulePoll() {
+    stopPolling();
+    if (!state.activeSessionId) {
+      return;
+    }
+    state.pollTimer = setTimeout(() => {
+      void refreshSessionDetail();
+    }, 1200);
+  }
+
+  function syncSessionPayload(session) {
+    const normalizedSession = session && typeof session === "object" ? session : {};
+    const summary = normalizedSession.summary ?? {};
+    state.activeSessionId = String(normalizedSession.session_id ?? state.activeSessionId ?? "").trim();
+    sessionStatusNode.textContent = `Status: ${String(normalizedSession.status ?? "idle")}`;
+    sessionSummaryNode.textContent = [
+      `Session: ${state.activeSessionId || "none"}`,
+      `Cells ${summary.completed_cells ?? 0}/${summary.total_cells ?? 0}`,
+      `Queued ${summary.queued_cells ?? 0}`,
+      `Failed ${summary.failed_cells ?? 0}`,
+    ].join(" | ");
+    const results = normalizedSession.results ?? {};
+    setPreview(String(results?.main_grid?.preview_data_url ?? ""));
+    resultSummaryNode.textContent = `Sub-grids: ${Array.isArray(results.sub_grids) ? results.sub_grids.length : 0} | Lone images: ${
+      Array.isArray(results.lone_images) ? results.lone_images.length : 0
+    }`;
+    renderWarnings(warningsNode, results?.warnings, []);
+    const status = String(normalizedSession.status ?? "");
+    cancelButton.disabled = !state.activeSessionId || ["completed", "failed", "cancelled"].includes(status);
+    if (["pending", "queued", "in_progress", "running"].includes(status)) {
+      schedulePoll();
+    } else {
+      stopPolling();
+    }
+  }
+
+  async function ensureAxisCatalogLoaded() {
+    if (state.axesLoaded || typeof bootstrapState?.fetchXYZPlotAxesRequest !== "function") {
+      return;
+    }
+    const result = await bootstrapState.fetchXYZPlotAxesRequest();
+    if (result?.data?.axes && typeof result.data.axes === "object") {
+      state.axisCatalog = normalizeAxisCatalog(result.data.axes, mode);
+      state.axesLoaded = true;
+    }
+  }
+
+  async function refreshSessionList() {
+    if (typeof bootstrapState?.fetchXYZPlotSessionsRequest !== "function") {
+      return;
+    }
+    const result = await bootstrapState.fetchXYZPlotSessionsRequest(String(bootstrapState?.clientId ?? "").trim());
+    const sessions = Array.isArray(result?.data?.sessions) ? result.data.sessions : [];
+    if (!state.activeSessionId && sessions[0]?.session_id) {
+      state.activeSessionId = String(sessions[0].session_id);
+    }
+  }
+
+  async function refreshSessionDetail() {
+    if (!state.activeSessionId || typeof bootstrapState?.fetchXYZPlotSessionDetailRequest !== "function") {
+      return;
+    }
+    const result = await bootstrapState.fetchXYZPlotSessionDetailRequest(
+      state.activeSessionId,
+      String(bootstrapState?.clientId ?? "").trim(),
+    );
+    if (result?.ok) {
+      syncSessionPayload(result.data.session);
+      onStatusMessage?.(`XYZ Plot session ${state.activeSessionId} refreshed`);
+      return;
+    }
+    sessionStatusNode.textContent = `Status: ${String(result?.data?.status ?? "error")}`;
+    stopPolling();
+  }
+
+  axisRows.forEach((row) => {
+    syncAxisRow(row);
+    row.select.addEventListener("change", () => {
+      syncAxisRow(row);
+    });
+    row.fillButton.addEventListener("click", () => {
+      const axis = axisLookup.get(String(row.select.value ?? "").trim());
+      row.values.value = buildFallbackValues(axis);
+      onStatusMessage?.(`Filled ${row.slot} axis values`);
+    });
+  });
+
+  swapButtons.forEach((entry) => {
+    entry.button.addEventListener("click", () => {
+      const leftRow = axisRows[entry.left];
+      const rightRow = axisRows[entry.right];
+      const leftAxis = leftRow.select.value;
+      const leftValues = leftRow.values.value;
+      leftRow.select.value = rightRow.select.value;
+      leftRow.values.value = rightRow.values.value;
+      rightRow.select.value = leftAxis;
+      rightRow.values.value = leftValues;
+      syncAxisRow(leftRow);
+      syncAxisRow(rightRow);
+      onStatusMessage?.(`Swapped ${leftRow.slot} and ${rightRow.slot} axes`);
+    });
+  });
+
+  estimateButton.addEventListener("click", async () => {
+    const payload = collectPayload();
+    if (!payload.axes.length) {
+      onStatusMessage?.("XYZ Plot requires at least one configured axis");
+      sessionStatusNode.textContent = "Status: configure at least one axis";
+      return;
+    }
+    const result = await bootstrapState?.estimateXYZPlotRequest?.(payload);
+    syncEstimatePayload(result);
+    onStatusMessage?.(result?.ok ? "XYZ Plot estimate updated" : "XYZ Plot estimate failed");
+  });
+
+  runButton.addEventListener("click", async () => {
+    const payload = collectPayload();
+    if (!payload.axes.length) {
+      onStatusMessage?.("XYZ Plot requires at least one configured axis");
+      sessionStatusNode.textContent = "Status: configure at least one axis";
+      return;
+    }
+    const result = await bootstrapState?.runXYZPlotRequest?.(payload);
+    if (!result?.ok) {
+      sessionStatusNode.textContent = `Status: ${String(result?.data?.status ?? "error")}`;
+      onStatusMessage?.("XYZ Plot run failed");
+      return;
+    }
+    syncSessionPayload(result.data.session);
+    onStatusMessage?.(`Started XYZ Plot session ${state.activeSessionId}`);
+  });
+
+  refreshButton.addEventListener("click", () => {
+    void refreshSessionDetail();
+  });
+
+  cancelButton.addEventListener("click", async () => {
+    if (!state.activeSessionId) {
+      return;
+    }
+    const result = await bootstrapState?.cancelXYZPlotSessionRequest?.(
+      state.activeSessionId,
+      String(bootstrapState?.clientId ?? "").trim(),
+    );
+    if (!result?.ok) {
+      onStatusMessage?.("XYZ Plot cancel failed");
+      return;
+    }
+    syncSessionPayload(result.data.session);
+    onStatusMessage?.(`Cancelled XYZ Plot session ${state.activeSessionId}`);
+  });
+
+  void ensureAxisCatalogLoaded();
+  void refreshSessionList().then(() => refreshSessionDetail());
+  return {
+    element: shell,
+    stopPolling,
+  };
+}
