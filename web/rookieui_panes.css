@@ -1390,6 +1390,16 @@
   background: color-mix(in srgb, var(--rookieui-bg-panel) 86%, white 14%);
 }
 
+.rookieui-shell__prompt-workbench[data-theme-style="rookieui_graphite"] {
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, black 8%);
+  border-color: color-mix(in srgb, var(--rookieui-border-strong) 68%, black 32%);
+}
+
+.rookieui-shell__prompt-workbench[data-theme-style="rookieui_paper"] {
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 76%, #fff8ea 24%);
+  border-color: color-mix(in srgb, var(--rookieui-border) 74%, #d7ba88 26%);
+}
+
 .rookieui-shell__prompt-workbench-header,
 .rookieui-shell__prompt-workbench-panel-rail,
 .rookieui-shell__prompt-workbench-actions {
@@ -1622,6 +1632,11 @@
 .rookieui-shell__prompt-workbench-rule {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+}
+
+.rookieui-shell__prompt-workbench-rule--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
 }
 
 .rookieui-shell__prompt-workbench-rule-label {

@@ -121,7 +121,18 @@ export function createPromptWorkbenchShell({
 
   const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
   configState.translation = configState.translation ?? { default_provider: "", providers: {} };
+  configState.ai_assist = configState.ai_assist ?? {
+    default_provider: "",
+    providers: {},
+    instruction_preset: "",
+  };
   const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [] });
+  const languageOptions = Array.isArray(bootstrapState?.promptWorkbench?.language_options)
+    ? bootstrapState.promptWorkbench.language_options
+    : [];
+  const themeStyleOptions = Array.isArray(bootstrapState?.promptWorkbench?.theme_style_options)
+    ? bootstrapState.promptWorkbench.theme_style_options
+    : [];
   const namespaceMap = {
     prompt: String(namespaces?.prompt ?? "").trim(),
     negative: String(namespaces?.negative ?? "").trim(),
@@ -142,6 +153,11 @@ export function createPromptWorkbenchShell({
   let activeScope = "prompt";
   let resourcesLoaded = false;
   let dragTokenId = "";
+  const assistState = {
+    imageDescription: "",
+    generatedPrompt: "",
+    generating: false,
+  };
 
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
@@ -222,7 +238,7 @@ export function createPromptWorkbenchShell({
   body.appendChild(panelRail);
 
   const panelButtons = new Map();
-  ["editor", "history", "favorites", "catalog", "format"].forEach((panelId) => {
+  ["editor", "history", "favorites", "catalog", "assist", "format"].forEach((panelId) => {
     const button = document.createElement("button");
     button.type = "button";
     button.id = `${idPrefix}-panel-${panelId}`;
@@ -292,6 +308,11 @@ export function createPromptWorkbenchShell({
   formatPane.id = `${idPrefix}-format-pane`;
   formatPane.className = "rookieui-shell__prompt-workbench-pane";
   panelContent.appendChild(formatPane);
+
+  const assistPane = document.createElement("section");
+  assistPane.id = `${idPrefix}-assist-pane`;
+  assistPane.className = "rookieui-shell__prompt-workbench-pane";
+  panelContent.appendChild(assistPane);
 
   const details = document.createElement("div");
   details.className = "rookieui-shell__prompt-workbench-details";
@@ -393,6 +414,12 @@ export function createPromptWorkbenchShell({
       : [];
   }
 
+  function getAiAssistProviders() {
+    return Array.isArray(providersPayload?.surfaces?.ai_assist?.providers)
+      ? providersPayload.surfaces.ai_assist.providers.filter((entry) => entry?.execution_state === "shipped")
+      : [];
+  }
+
   function appendPromptFragment(fragment, { replace = false, statusMessage = "" } = {}) {
     const normalizedFragment = String(fragment ?? "").trim();
     if (!normalizedFragment) {
@@ -413,6 +440,20 @@ export function createPromptWorkbenchShell({
       providers: configState.translation?.providers ?? {},
     };
     queueConfigPersist();
+  }
+
+  function persistAiAssistProviderSelection(providerId) {
+    configState.ai_assist = {
+      ...(configState.ai_assist ?? {}),
+      default_provider: String(providerId ?? "").trim(),
+      providers: configState.ai_assist?.providers ?? {},
+      instruction_preset: String(configState.ai_assist?.instruction_preset ?? ""),
+    };
+    queueConfigPersist();
+  }
+
+  function updateShellThemeStyle() {
+    shell.dataset.themeStyle = String(configState?.theme_style ?? "rookieui_classic").trim() || "rookieui_classic";
   }
 
   function translateActivePrompt(targetLanguage) {
@@ -471,6 +512,42 @@ export function createPromptWorkbenchShell({
       onStatusMessage?.(statusMessage);
       updateStatus(statusMessage);
     }
+  }
+
+  function requestAiAssistGeneration() {
+    const providerId = String(configState?.ai_assist?.default_provider ?? "").trim();
+    const instructionPreset = String(configState?.ai_assist?.instruction_preset ?? "").trim();
+    const imageDescription = String(assistState.imageDescription ?? "").trim();
+    if (!providerId) {
+      updateStatus("Select a shipped AI assist provider before generating");
+      return;
+    }
+    if (!imageDescription) {
+      updateStatus("AI Assist requires an image description");
+      return;
+    }
+    assistState.generating = true;
+    updateStatus("Generating prompt with AI Assist...");
+    syncUi();
+    void bootstrapState
+      ?.assistPromptWorkbenchRequest?.({
+        provider: providerId,
+        instruction_preset: instructionPreset,
+        image_description: imageDescription,
+        language: configState?.language ?? "en",
+        theme_style: configState?.theme_style ?? "rookieui_classic",
+      })
+      .then((result) => {
+        assistState.generatedPrompt = String(result?.data?.generated_prompt ?? "").trim();
+        updateStatus(assistState.generatedPrompt ? "AI Assist generated a prompt draft" : "AI Assist returned empty prompt text");
+      })
+      .catch(() => {
+        updateStatus("AI Assist request failed");
+      })
+      .finally(() => {
+        assistState.generating = false;
+        syncUi();
+      });
   }
 
   function rebuildPromptFromEditor(statusMessage) {
@@ -966,6 +1043,197 @@ export function createPromptWorkbenchShell({
     renderChipRow("LoRAs", loras, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
   }
 
+  function renderAssistPane() {
+    clearChildren(assistPane);
+    const heading = document.createElement("div");
+    heading.className = "rookieui-shell__prompt-workbench-pane-header";
+    assistPane.appendChild(heading);
+    appendTextElement(heading, "h6", "rookieui-shell__prompt-workbench-pane-title", "AI Assist and Delivery");
+
+    const settingsGrid = document.createElement("div");
+    settingsGrid.className = "rookieui-shell__prompt-workbench-format-grid";
+    assistPane.appendChild(settingsGrid);
+
+    const renderField = (label, fieldNode) => {
+      const row = document.createElement("label");
+      row.className = "rookieui-shell__prompt-workbench-rule rookieui-shell__prompt-workbench-rule--stacked";
+      appendTextElement(row, "span", "rookieui-shell__prompt-workbench-rule-label", label);
+      row.appendChild(fieldNode);
+      settingsGrid.appendChild(row);
+      return fieldNode;
+    };
+
+    const languageSelect = document.createElement("select");
+    languageSelect.id = `${idPrefix}-assist-language`;
+    languageSelect.className = "rookieui-shell__input";
+    (languageOptions.length ? languageOptions : [{ code: "en", title: "English" }]).forEach((entry) => {
+      const option = document.createElement("option");
+      option.value = String(entry?.code ?? "en");
+      option.textContent = `${String(entry?.code ?? "en")} - ${String(entry?.title ?? "English")}`;
+      languageSelect.appendChild(option);
+    });
+    languageSelect.value = String(configState?.language ?? "en");
+    languageSelect.addEventListener("change", () => {
+      configState.language = String(languageSelect.value ?? "en").trim() || "en";
+      queueConfigPersist();
+    });
+    renderField("Language", languageSelect);
+
+    const themeSelect = document.createElement("select");
+    themeSelect.id = `${idPrefix}-assist-theme`;
+    themeSelect.className = "rookieui-shell__input";
+    (themeStyleOptions.length
+      ? themeStyleOptions
+      : [{ id: "rookieui_classic", title: "RookieUI Classic", summary: "" }]).forEach((entry) => {
+      const option = document.createElement("option");
+      option.value = String(entry?.id ?? "rookieui_classic");
+      option.textContent = String(entry?.title ?? entry?.id ?? "RookieUI Classic");
+      themeSelect.appendChild(option);
+    });
+    themeSelect.value = String(configState?.theme_style ?? "rookieui_classic");
+    themeSelect.addEventListener("change", () => {
+      configState.theme_style = String(themeSelect.value ?? "rookieui_classic").trim() || "rookieui_classic";
+      queueConfigPersist();
+    });
+    renderField("Theme Style", themeSelect);
+
+    const providerSelect = document.createElement("select");
+    providerSelect.id = `${idPrefix}-assist-provider`;
+    providerSelect.className = "rookieui-shell__input rookieui-shell__prompt-workbench-provider-select";
+    const providerPlaceholder = document.createElement("option");
+    providerPlaceholder.value = "";
+    providerPlaceholder.textContent = "Select AI assist provider";
+    providerSelect.appendChild(providerPlaceholder);
+    getAiAssistProviders().forEach((entry) => {
+      const option = document.createElement("option");
+      option.value = String(entry?.provider_id ?? "");
+      option.textContent = String(entry?.title ?? entry?.provider_id ?? "");
+      providerSelect.appendChild(option);
+    });
+    providerSelect.value = String(configState?.ai_assist?.default_provider ?? "");
+    providerSelect.addEventListener("change", () => {
+      persistAiAssistProviderSelection(providerSelect.value);
+    });
+    renderField("Provider", providerSelect);
+
+    const providerDetails = getAiAssistProviders().find(
+      (entry) => String(entry?.provider_id ?? "") === String(configState?.ai_assist?.default_provider ?? ""),
+    );
+    const providerFields = Array.isArray(providerDetails?.config_fields) ? providerDetails.config_fields : [];
+    providerFields.forEach((fieldSpec) => {
+      const fieldKey = String(fieldSpec?.key ?? "").trim();
+      if (!fieldKey) {
+        return;
+      }
+      const providerStore = {
+        ...(configState.ai_assist?.providers ?? {}),
+      };
+      const providerConfig = {
+        ...(providerStore[providerSelect.value] ?? {}),
+      };
+      const input = document.createElement("input");
+      input.type = fieldSpec?.secret ? "password" : "text";
+      input.id = `${idPrefix}-assist-config-${fieldKey}`;
+      input.className = "rookieui-shell__input";
+      input.placeholder = String(fieldSpec?.placeholder ?? "");
+      input.value = String(providerConfig[fieldKey] ?? fieldSpec?.default ?? "");
+      input.addEventListener("change", () => {
+        const selectedProviderId = String(configState?.ai_assist?.default_provider ?? "").trim();
+        if (!selectedProviderId) {
+          return;
+        }
+        const nextProviders = {
+          ...(configState.ai_assist?.providers ?? {}),
+          [selectedProviderId]: {
+            ...(configState.ai_assist?.providers?.[selectedProviderId] ?? {}),
+            [fieldKey]: input.value,
+          },
+        };
+        configState.ai_assist = {
+          ...(configState.ai_assist ?? {}),
+          providers: nextProviders,
+          instruction_preset: String(configState.ai_assist?.instruction_preset ?? ""),
+        };
+        queueConfigPersist();
+      });
+      renderField(String(fieldSpec?.title ?? fieldKey), input);
+    });
+
+    const presetBlock = document.createElement("section");
+    presetBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
+    assistPane.appendChild(presetBlock);
+    appendTextElement(presetBlock, "h6", "rookieui-shell__prompt-workbench-pane-title", "Instruction Preset");
+
+    const presetInput = document.createElement("textarea");
+    presetInput.id = `${idPrefix}-assist-preset`;
+    presetInput.className = "rookieui-shell__textarea";
+    presetInput.rows = 4;
+    presetInput.value = String(configState?.ai_assist?.instruction_preset ?? "");
+    presetInput.addEventListener("change", () => {
+      configState.ai_assist = {
+        ...(configState.ai_assist ?? {}),
+        instruction_preset: presetInput.value,
+        providers: configState.ai_assist?.providers ?? {},
+      };
+      queueConfigPersist();
+    });
+    presetBlock.appendChild(presetInput);
+
+    const promptBlock = document.createElement("section");
+    promptBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
+    assistPane.appendChild(promptBlock);
+    appendTextElement(promptBlock, "h6", "rookieui-shell__prompt-workbench-pane-title", "Image Description");
+
+    const descriptionInput = document.createElement("textarea");
+    descriptionInput.id = `${idPrefix}-assist-description`;
+    descriptionInput.className = "rookieui-shell__textarea";
+    descriptionInput.rows = 4;
+    descriptionInput.placeholder = "Describe the image you want as prompt input";
+    descriptionInput.value = String(assistState.imageDescription ?? "");
+    descriptionInput.addEventListener("input", () => {
+      assistState.imageDescription = descriptionInput.value;
+    });
+    promptBlock.appendChild(descriptionInput);
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    assistPane.appendChild(toolbar);
+
+    const generateButton = createActionButton(
+      `${idPrefix}-assist-generate`,
+      assistState.generating ? "Generating..." : "Generate Prompt",
+    );
+    generateButton.disabled = assistState.generating;
+    generateButton.addEventListener("click", () => {
+      requestAiAssistGeneration();
+    });
+    toolbar.appendChild(generateButton);
+
+    const applyButton = createActionButton(`${idPrefix}-assist-apply`, "Apply Result");
+    applyButton.disabled = !String(assistState.generatedPrompt ?? "").trim();
+    applyButton.addEventListener("click", () => {
+      applyPromptTextToInput(assistState.generatedPrompt, {
+        updateEditor: true,
+        statusMessage: "Applied AI Assist prompt result",
+      });
+    });
+    toolbar.appendChild(applyButton);
+
+    const resultBlock = document.createElement("section");
+    resultBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
+    assistPane.appendChild(resultBlock);
+    appendTextElement(resultBlock, "h6", "rookieui-shell__prompt-workbench-pane-title", "Generated Prompt");
+    const resultInput = document.createElement("textarea");
+    resultInput.id = `${idPrefix}-assist-result`;
+    resultInput.className = "rookieui-shell__textarea";
+    resultInput.rows = 4;
+    resultInput.value = String(assistState.generatedPrompt ?? "");
+    resultInput.addEventListener("input", () => {
+      assistState.generatedPrompt = resultInput.value;
+    });
+    resultBlock.appendChild(resultInput);
+  }
+
   function renderFormatPane() {
     clearChildren(formatPane);
     const heading = document.createElement("div");
@@ -1083,10 +1351,15 @@ export function createPromptWorkbenchShell({
     historyPane.hidden = state.active_panel !== "history";
     favoritesPane.hidden = state.active_panel !== "favorites";
     catalogPane.hidden = state.active_panel !== "catalog";
+    assistPane.hidden = state.active_panel !== "assist";
     formatPane.hidden = state.active_panel !== "format";
 
+    updateShellThemeStyle();
     setText(summaryNodes.state, state.workbench_open ? "Persisted open" : "Collapsed");
-    setText(summaryNodes.providers, resourcesLoaded ? `${shippedProviders} shipped / ${language}` : "Lazy");
+    const assistShippedProviders = Array.isArray(providersPayload?.surfaces?.ai_assist?.shipped_provider_ids)
+      ? providersPayload.surfaces.ai_assist.shipped_provider_ids.length
+      : 0;
+    setText(summaryNodes.providers, resourcesLoaded ? `${shippedProviders} translate / ${assistShippedProviders} assist / ${language}` : "Lazy");
     setText(
       summaryNodes.catalogs,
       resourcesLoaded ? `${groupCount} groups / ${libraryCount} sections / ${extraNetworkCount} networks` : "Lazy",
@@ -1103,6 +1376,7 @@ export function createPromptWorkbenchShell({
     renderCollectionPane(historyPane, "history");
     renderCollectionPane(favoritesPane, "favorites");
     renderCatalogPane();
+    renderAssistPane();
     renderFormatPane();
   }
 

@@ -909,7 +909,7 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
     "/rookieui/prompt-tools/config",
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_config",
         route_family: "/rookieui/prompt-tools",
         state_schema_version: 1,
@@ -933,12 +933,29 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
           show_favorites: true,
         },
         translation: { default_provider: "", providers: {} },
-        ai_assist: { default_provider: "", providers: {} },
+        ai_assist: {
+          default_provider: "",
+          providers: {},
+          instruction_preset:
+            "Write a concise Stable Diffusion prompt from the user's image description. Keep the result comma-separated and production-ready. Preserve any explicit prompt syntax the user already includes. Do not add explanation, markdown, numbering, or surrounding quotes. Return prompt text only.",
+        },
       },
       blacklist: {
         enabled: false,
         entries: [],
       },
+      language_options: [
+        { code: "en", title: "English" },
+        { code: "zh-TW", title: "Traditional Chinese" },
+        { code: "zh-CN", title: "Simplified Chinese" },
+        { code: "ja", title: "Japanese" },
+        { code: "ko", title: "Korean" },
+      ],
+      theme_style_options: [
+        { id: "rookieui_classic", title: "RookieUI Classic", summary: "Default RookieUI framing with neutral panel contrast." },
+        { id: "rookieui_graphite", title: "Graphite Studio", summary: "Higher-contrast shell chrome for denser prompt editing sessions." },
+        { id: "rookieui_paper", title: "Paper Notes", summary: "Lighter note-card treatment for catalog and prompt drafting work." },
+      ],
     },
     fetchImpl,
   );
@@ -989,7 +1006,7 @@ export async function fetchRookieUIPromptWorkbenchState(namespace, fetchImpl = g
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/state", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_state",
       },
       namespace: normalizedNamespace,
@@ -1015,7 +1032,7 @@ export async function updateRookieUIPromptWorkbenchState(namespace, state, fetch
     },
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_state",
       },
       namespace: normalizedNamespace,
@@ -1038,7 +1055,7 @@ export async function fetchRookieUIPromptWorkbenchHistory(namespace, fetchImpl =
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/history", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_history",
       },
       namespace: normalizedNamespace,
@@ -1054,7 +1071,7 @@ export async function fetchRookieUIPromptWorkbenchFavorites(namespace, fetchImpl
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/favorites", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_favorites",
       },
       namespace: normalizedNamespace,
@@ -1069,7 +1086,7 @@ export async function fetchRookieUIPromptWorkbenchProviders(fetchImpl = globalTh
     "/rookieui/prompt-tools/providers",
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_providers",
       },
       surfaces: {
@@ -1092,7 +1109,7 @@ export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetch
     `/rookieui/prompt-tools/catalog${suffix}`,
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_catalog",
       },
       group_tags: { language: normalizedLanguage || "en", source: "fallback", groups: [] },
@@ -1109,7 +1126,7 @@ export async function translateRookieUIPromptWorkbench(payload, fetchImpl = glob
     payload ?? {},
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_translate",
       },
       provider_id: String(payload?.provider ?? ""),
@@ -1124,13 +1141,34 @@ export async function translateRookieUIPromptWorkbench(payload, fetchImpl = glob
   );
 }
 
+export async function assistRookieUIPromptWorkbench(payload, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/assist",
+    payload ?? {},
+    {
+      contract: {
+        version: "r123f114f115f116f120-20260417",
+        surface: "prompt_tools_assist",
+      },
+      provider_id: String(payload?.provider ?? ""),
+      provider_title: "",
+      language: String(payload?.language ?? "en"),
+      theme_style: String(payload?.theme_style ?? "rookieui_classic"),
+      instruction_preset: String(payload?.instruction_preset ?? ""),
+      image_description: String(payload?.image_description ?? ""),
+      generated_prompt: "",
+    },
+    fetchImpl,
+  );
+}
+
 export async function updateRookieUIPromptWorkbenchConfig(config, fetchImpl = globalThis.fetch) {
   return postRookieUIJson(
     "/rookieui/prompt-tools/config",
     { config: config ?? {} },
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_config",
       },
       config: config ?? {},
@@ -1145,7 +1183,7 @@ export async function fetchRookieUIPromptWorkbenchBlacklist(fetchImpl = globalTh
     "/rookieui/prompt-tools/blacklist",
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_blacklist",
       },
       blacklist: {
@@ -1163,7 +1201,7 @@ export async function updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImp
     { blacklist: blacklist ?? {} },
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_blacklist",
       },
       blacklist: blacklist ?? { enabled: false, entries: [] },
@@ -1184,7 +1222,7 @@ export async function updateRookieUIPromptWorkbenchHistory(namespace, action, pa
     },
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_history",
       },
       namespace: normalizedNamespace,
@@ -1206,7 +1244,7 @@ export async function updateRookieUIPromptWorkbenchFavorites(namespace, action, 
     },
     {
       contract: {
-        version: "r123f114f115f116-20260417",
+        version: "r123f114f115f116f120-20260417",
         surface: "prompt_tools_favorites",
       },
       namespace: normalizedNamespace,

@@ -46,6 +46,7 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/blacklist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/providers", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/translate", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/assist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/catalog", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/analyze", payload["routes"])
 

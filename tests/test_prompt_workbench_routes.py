@@ -146,6 +146,29 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(response["payload"]["provider_id"], "openai")
         self.assertEqual(response["payload"]["translated_text"], "translated prompt")
 
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_ai_assist")
+    def test_prompt_tools_assist_route_returns_execution_payload(self, mocked_execute: mock.Mock) -> None:
+        mocked_execute.return_value = {
+            "contract": {"surface": "prompt_tools_assist"},
+            "provider_id": "openai",
+            "provider_title": "OpenAI-Compatible Chat Translation",
+            "language": "en",
+            "theme_style": "rookieui_classic",
+            "instruction_preset": "Prompt preset",
+            "image_description": "city skyline",
+            "generated_prompt": "masterpiece, city skyline",
+        }
+
+        response = asyncio.run(
+            routes.prompt_tools_assist(
+                _FakeJsonRequest({"image_description": "city skyline"})
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["provider_id"], "openai")
+        self.assertEqual(response["payload"]["generated_prompt"], "masterpiece, city skyline")
+
     def test_prompt_tools_catalog_route_returns_catalog_payload(self) -> None:
         response = asyncio.run(routes.prompt_tools_catalog(_FakeJsonRequest(query={"language": "en"})))
 

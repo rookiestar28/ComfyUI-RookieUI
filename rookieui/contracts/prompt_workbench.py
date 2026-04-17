@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-PROMPT_WORKBENCH_CONTRACT_VERSION = "r123f114f115f116-20260417"
+PROMPT_WORKBENCH_CONTRACT_VERSION = "r123f114f115f116f120-20260417"
 PROMPT_WORKBENCH_STATE_SCHEMA_VERSION = 1
 PROMPT_WORKBENCH_ROUTE_FAMILY = "/rookieui/prompt-tools"
 PROMPT_WORKBENCH_NAMESPACES = (
@@ -22,7 +22,37 @@ PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS = (
 )
 PROMPT_WORKBENCH_PROVIDER_SURFACES = ("translation", "ai_assist")
 PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS = ("openai", "mymemory_free")
-PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS = ("openai",)
+PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS = ("openai",)
+PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS = ()
+DEFAULT_PROMPT_WORKBENCH_AI_ASSIST_PRESET = (
+    "Write a concise Stable Diffusion prompt from the user's image description. "
+    "Keep the result comma-separated and production-ready. Preserve any explicit prompt syntax the user already includes. "
+    "Do not add explanation, markdown, numbering, or surrounding quotes. Return prompt text only."
+)
+PROMPT_WORKBENCH_LANGUAGE_OPTIONS = (
+    {"code": "en", "title": "English"},
+    {"code": "zh-TW", "title": "Traditional Chinese"},
+    {"code": "zh-CN", "title": "Simplified Chinese"},
+    {"code": "ja", "title": "Japanese"},
+    {"code": "ko", "title": "Korean"},
+)
+PROMPT_WORKBENCH_THEME_STYLE_OPTIONS = (
+    {
+        "id": "rookieui_classic",
+        "title": "RookieUI Classic",
+        "summary": "Default RookieUI framing with neutral panel contrast.",
+    },
+    {
+        "id": "rookieui_graphite",
+        "title": "Graphite Studio",
+        "summary": "Higher-contrast shell chrome for denser prompt editing sessions.",
+    },
+    {
+        "id": "rookieui_paper",
+        "title": "Paper Notes",
+        "summary": "Lighter note-card treatment for catalog and prompt drafting work.",
+    },
+)
 PROMPT_WORKBENCH_REFERENCE_ONLY_PROVIDER_IDS = (
     "alibaba",
     "alibaba_free",
@@ -148,7 +178,7 @@ def _provider_catalog_entries() -> tuple[PromptWorkbenchProviderCatalogEntry, ..
             config_fields=_openai_provider_fields(),
             notes=(
                 "Translation execution ships in F115.",
-                "AI-assist execution remains deferred until F120.",
+                "AI-assist execution ships in F120 through the same OpenAI-compatible provider contract.",
             ),
         ),
         PromptWorkbenchProviderCatalogEntry(
@@ -345,6 +375,8 @@ def get_prompt_workbench_provider_execution_state(provider_id: object, *, surfac
         return "reference_only"
     if surface == "translation" and normalized_provider_id in PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS:
         return "shipped"
+    if surface == "ai_assist" and normalized_provider_id in PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS:
+        return "shipped"
     if surface == "ai_assist" and normalized_provider_id in PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS:
         return "deferred"
     if normalized_provider_id in PROMPT_WORKBENCH_REFERENCE_ONLY_PROVIDER_IDS:
@@ -425,7 +457,10 @@ def build_default_prompt_workbench_config() -> dict[str, Any]:
         "formatting_rules": _default_formatting_rules(),
         "ui_preferences": _default_ui_preferences(),
         "translation": _default_provider_settings(),
-        "ai_assist": _default_provider_settings(),
+        "ai_assist": {
+            **_default_provider_settings(),
+            "instruction_preset": DEFAULT_PROMPT_WORKBENCH_AI_ASSIST_PRESET,
+        },
     }
 
 
@@ -462,6 +497,8 @@ class PromptWorkbenchBootstrapSnapshot:
     contract: PromptWorkbenchRouteContract = field(default_factory=PromptWorkbenchRouteContract)
     config: dict[str, Any] = field(default_factory=build_default_prompt_workbench_config)
     blacklist: dict[str, Any] = field(default_factory=_default_blacklist_state)
+    language_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_LANGUAGE_OPTIONS
+    theme_style_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_THEME_STYLE_OPTIONS
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
