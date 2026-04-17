@@ -15,6 +15,10 @@ from rookieui.services.prompt_workbench_state import (
     update_prompt_workbench_config,
     update_prompt_workbench_surface_state,
 )
+from rookieui.services.prompt_workbench_translation import (
+    build_prompt_workbench_provider_payload,
+    translate_prompt_workbench_payload,
+)
 
 
 def build_prompt_workbench_config_payload() -> dict[str, Any]:
@@ -52,6 +56,10 @@ def build_prompt_workbench_favorites_payload(namespace: object) -> dict[str, Any
         "namespace": str(namespace),
         "items": get_prompt_workbench_favorites(namespace),
     }
+
+
+def build_prompt_workbench_provider_catalog_payload() -> dict[str, Any]:
+    return build_prompt_workbench_provider_payload()
 
 
 def apply_prompt_workbench_config_update(payload: object) -> dict[str, Any]:
@@ -92,3 +100,7 @@ def apply_prompt_workbench_favorites_update(namespace: object, *, action: object
         "namespace": str(namespace),
         "items": apply_prompt_workbench_favorite_action(namespace, action=action, payload=payload),
     }
+
+
+def execute_prompt_workbench_translate(payload: object) -> dict[str, Any]:
+    return translate_prompt_workbench_payload(payload).to_payload()

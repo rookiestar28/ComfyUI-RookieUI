@@ -16,6 +16,7 @@ from rookieui.contracts.prompt_workbench import (
     PromptWorkbenchBootstrapSnapshot,
     build_default_prompt_workbench_config,
     build_default_prompt_workbench_surface_state,
+    get_prompt_workbench_provider_catalog_entry,
 )
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
@@ -96,7 +97,36 @@ def _normalize_tag_list(value: object) -> list[str]:
     return tags
 
 
-def _normalize_provider_payload(value: object) -> dict[str, Any]:
+def _normalize_provider_field_value(field_spec: dict[str, Any], raw_value: object) -> Any:
+    value_type = str(field_spec.get("value_type", "string")).strip() or "string"
+    if value_type == "boolean":
+        if isinstance(raw_value, bool):
+            return raw_value
+        return bool(field_spec.get("default", False))
+    if value_type in {"integer", "number"}:
+        default = field_spec.get("default", 0)
+        if not isinstance(default, (int, float)) or isinstance(default, bool):
+            default = 0
+        if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
+            normalized_number: int | float = int(raw_value) if value_type == "integer" else float(raw_value)
+        else:
+            normalized_number = int(default) if value_type == "integer" else float(default)
+        min_value = field_spec.get("min_value")
+        max_value = field_spec.get("max_value")
+        if isinstance(min_value, (int, float)):
+            normalized_number = max(normalized_number, int(min_value) if value_type == "integer" else float(min_value))
+        if isinstance(max_value, (int, float)):
+            normalized_number = min(normalized_number, int(max_value) if value_type == "integer" else float(max_value))
+        return normalized_number
+
+    default = str(field_spec.get("default", "")).strip()
+    max_length = int(field_spec.get("max_length", 512) or 512)
+    if not isinstance(raw_value, str):
+        return default[:max_length]
+    return raw_value.strip()[:max_length]
+
+
+def _normalize_provider_payload(value: object, *, surface: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {"default_provider": "", "providers": {}}
 
@@ -105,23 +135,31 @@ def _normalize_provider_payload(value: object) -> dict[str, Any]:
     if isinstance(raw_providers, dict):
         for provider_id, provider_payload in raw_providers.items():
             normalized_provider_id = _normalize_text(provider_id, max_length=80)
-            if not normalized_provider_id or not isinstance(provider_payload, dict):
+            catalog_entry = get_prompt_workbench_provider_catalog_entry(normalized_provider_id)
+            if (
+                not normalized_provider_id
+                or catalog_entry is None
+                or surface not in catalog_entry.surface_scopes
+                or not isinstance(provider_payload, dict)
+            ):
                 continue
             normalized_provider: dict[str, Any] = {}
-            for key, raw_field_value in provider_payload.items():
-                normalized_key = _normalize_text(key, max_length=80)
-                if not normalized_key:
+            for field_spec in catalog_entry.to_payload()["config_fields"]:
+                field_key = str(field_spec.get("key", "")).strip()
+                if not field_key:
                     continue
-                if isinstance(raw_field_value, bool):
-                    normalized_provider[normalized_key] = raw_field_value
-                elif isinstance(raw_field_value, (int, float)) and not isinstance(raw_field_value, bool):
-                    normalized_provider[normalized_key] = raw_field_value
-                elif isinstance(raw_field_value, str):
-                    normalized_provider[normalized_key] = raw_field_value.strip()[:512]
+                normalized_provider[field_key] = _normalize_provider_field_value(
+                    field_spec,
+                    provider_payload.get(field_key),
+                )
             providers[normalized_provider_id] = normalized_provider
 
+    default_provider = _normalize_text(value.get("default_provider", ""), max_length=80)
+    if default_provider not in providers and get_prompt_workbench_provider_catalog_entry(default_provider) is None:
+        default_provider = ""
+
     return {
-        "default_provider": _normalize_text(value.get("default_provider", ""), max_length=80),
+        "default_provider": default_provider,
         "providers": providers,
     }
 
@@ -175,9 +213,9 @@ def _normalize_config_payload(existing: dict[str, Any], payload: object) -> dict
     if "ui_preferences" in payload:
         merged["ui_preferences"] = _normalize_ui_preferences(payload.get("ui_preferences"))
     if "translation" in payload:
-        merged["translation"] = _normalize_provider_payload(payload.get("translation"))
+        merged["translation"] = _normalize_provider_payload(payload.get("translation"), surface="translation")
     if "ai_assist" in payload:
-        merged["ai_assist"] = _normalize_provider_payload(payload.get("ai_assist"))
+        merged["ai_assist"] = _normalize_provider_payload(payload.get("ai_assist"), surface="ai_assist")
     return merged
 
 

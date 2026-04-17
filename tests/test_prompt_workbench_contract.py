@@ -11,6 +11,7 @@ from rookieui.contracts.prompt_workbench import (
     PromptWorkbenchBootstrapSnapshot,
     build_default_prompt_workbench_surface_state,
     build_prompt_workbench_contract_meta,
+    build_prompt_workbench_provider_catalog_payload,
 )
 
 
@@ -38,3 +39,22 @@ class PromptWorkbenchContractTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["provider_secret_field_keys"], PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS)
         self.assertEqual(payload["config"]["formatting_rules"]["dedupe_commas"], True)
         self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})
+
+    def test_provider_catalog_truthfully_marks_shipped_and_reference_only_entries(self) -> None:
+        payload = build_prompt_workbench_provider_catalog_payload()
+
+        translation_surface = payload["surfaces"]["translation"]
+        shipped_ids = translation_surface["shipped_provider_ids"]
+        reference_only_ids = translation_surface["reference_only_provider_ids"]
+        openai_entry = next(
+            provider for provider in translation_surface["providers"] if provider["provider_id"] == "openai"
+        )
+
+        self.assertIn("openai", shipped_ids)
+        self.assertIn("mymemory_free", shipped_ids)
+        self.assertIn("google_free", reference_only_ids)
+        self.assertEqual(openai_entry["title"], "OpenAI-Compatible Chat Translation")
+        self.assertEqual(
+            payload["surfaces"]["ai_assist"]["deferred_provider_ids"],
+            ["openai"],
+        )

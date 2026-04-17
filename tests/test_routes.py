@@ -44,6 +44,8 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/history", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/favorites", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/blacklist", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/providers", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/translate", payload["routes"])
 
     def test_adetailer_snapshot_exposes_contract_and_detector_catalog(self) -> None:
         payload = routes.build_adetailer_snapshot()
@@ -142,3 +144,10 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_config")
         self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})
+
+    def test_prompt_tools_provider_payload_exposes_catalog_contract(self) -> None:
+        payload = routes.build_prompt_workbench_provider_catalog_payload()
+
+        self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
+        self.assertEqual(payload["contract"]["surface"], "prompt_tools_providers")
+        self.assertIn("openai", payload["surfaces"]["translation"]["shipped_provider_ids"])

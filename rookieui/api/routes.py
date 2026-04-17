@@ -23,7 +23,9 @@ from rookieui.services.prompt_workbench import (
     build_prompt_workbench_config_payload,
     build_prompt_workbench_favorites_payload,
     build_prompt_workbench_history_payload,
+    build_prompt_workbench_provider_catalog_payload,
     build_prompt_workbench_surface_state_payload,
+    execute_prompt_workbench_translate,
 )
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.txt2img import normalize_txt2img_request
@@ -60,6 +62,8 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/providers",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/translate",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse",
     f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect",
     f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list",
@@ -545,6 +549,51 @@ async def prompt_tools_blacklist_update(request: Any) -> Any:
     )
 
 
+async def prompt_tools_providers(request: Any) -> Any:
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **build_prompt_workbench_provider_catalog_payload(),
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_translate(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = execute_prompt_workbench_translate(payload)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    except RuntimeError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("provider-error"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=502,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
 async def pnginfo_parse(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
@@ -803,6 +852,8 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites", prompt_tools_favorites_update)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist_update)
+    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/providers", prompt_tools_providers)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/translate", prompt_tools_translate)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)

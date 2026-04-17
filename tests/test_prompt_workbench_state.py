@@ -27,8 +27,9 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "default_provider": "openai",
                     "providers": {
                         "openai": {
-                            "api_key": "sk-live-secret",
-                            "endpoint": "https://example.test",
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
+                            "base_url": "https://example.test/v1",
+                            "model": "gpt-4.1-mini",
                         }
                     },
                 }
@@ -39,9 +40,32 @@ class PromptWorkbenchStateTests(unittest.TestCase):
 
         self.assertEqual(payload["config"]["translation"]["providers"]["openai"]["api_key"], "********")
         self.assertEqual(
-            payload["config"]["translation"]["providers"]["openai"]["endpoint"],
-            "https://example.test",
+            payload["config"]["translation"]["providers"]["openai"]["base_url"],
+            "https://example.test/v1",
         )
+        self.assertEqual(payload["config"]["translation"]["providers"]["openai"]["model"], "gpt-4.1-mini")
+
+    def test_provider_payload_is_catalog_aware_and_strips_unknown_fields(self) -> None:
+        updated = prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "unknown",
+                    "providers": {
+                        "openai": {
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
+                            "base_url": "https://example.test/v1",
+                            "model": "gpt-4.1-mini",
+                            "rogue_field": "drop-me",
+                        },
+                        "unsupported_provider": {"token": "ignored"},
+                    },
+                }
+            }
+        )
+
+        self.assertEqual(updated["translation"]["default_provider"], "")
+        self.assertNotIn("rogue_field", updated["translation"]["providers"]["openai"])
+        self.assertNotIn("unsupported_provider", updated["translation"]["providers"])
 
     def test_surface_state_update_persists_by_namespace(self) -> None:
         updated = prompt_workbench_state.update_prompt_workbench_surface_state(

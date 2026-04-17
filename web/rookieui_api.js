@@ -906,10 +906,10 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
 
 export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.fetch) {
   return fetchRookieUIResource(
-    "/rookieui/prompt-tools/config",
+        "/rookieui/prompt-tools/config",
     {
       contract: {
-        version: "r123f114-20260417",
+        version: "r123f114f115-20260417",
         surface: "prompt_tools_config",
         route_family: "/rookieui/prompt-tools",
         state_schema_version: 1,
