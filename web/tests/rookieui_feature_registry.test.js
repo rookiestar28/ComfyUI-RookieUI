@@ -35,6 +35,7 @@ describe("rookieui feature registry", () => {
       "xyz_plot",
       "prompt_workbench",
       "controlnet_catalog",
+      "model_family_registry",
     ]);
   });
 
@@ -71,7 +72,16 @@ describe("rookieui feature registry", () => {
     const bootstrapData = await loadRookieUIBootstrapData(() => {}, {
       clientId: "client-123",
       loaders: {
-        capabilities: async () => ({ source: "host", data: { service: "rookieui" } }),
+        capabilities: async () => ({
+          source: "host",
+          data: {
+            service: "rookieui",
+            model_families: {
+              contract_version: "f72-20260418",
+              entries: [{ id: "flux", text_encoder_visible: true }],
+            },
+          },
+        }),
         compatibility: async () => ({ data: { samplers: [] } }),
         models: async () => ({ data: { checkpoints: [] } }),
         presets: async () => ({ data: { presets: [] } }),
@@ -89,11 +99,13 @@ describe("rookieui feature registry", () => {
 
     expect(queueLoader).toHaveBeenCalledWith(expect.any(Function), { clientId: "client-123" });
     expect(bootstrapData.capabilitySource).toBe("host");
-    expect(bootstrapData.capabilities).toEqual({ service: "rookieui" });
+    expect(bootstrapData.capabilities).toMatchObject({ service: "rookieui" });
     expect(bootstrapData.queue).toEqual({ jobs: [], clientId: "client-123" });
     expect(bootstrapData.xyzPlot).toEqual({ axes: { steps: { axis_id: "steps" } } });
     expect(bootstrapData.promptWorkbench).toEqual({ config: { language: "en" } });
     expect(bootstrapData.controlnetCatalog.model_list).toEqual(["canny.safetensors"]);
+    expect(bootstrapData.modelFamilyRegistry.contract_version).toBe("f72-20260418");
+    expect(bootstrapData.modelFamilyRegistry.entries[0].id).toBe("flux");
     expect(bootstrapData.adetailerCatalog).toEqual({ detectors: [] });
   });
 });

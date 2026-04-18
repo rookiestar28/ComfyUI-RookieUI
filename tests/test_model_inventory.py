@@ -97,6 +97,10 @@ class ModelInventoryTests(unittest.TestCase):
             "diffusion_models",
         )
         self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["pony"],
+            "checkpoints",
+        )
+        self.assertEqual(
             payload["catalog"]["primary_model_category_by_family"]["wan"],
             "diffusion_models",
         )

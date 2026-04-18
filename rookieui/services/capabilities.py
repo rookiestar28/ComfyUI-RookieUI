@@ -67,6 +67,47 @@ def _normalize_runtime_payload(payload: object) -> dict[str, str]:
     }
 
 
+def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized = {
+        "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
+        "entries": [],
+    }
+    entries = payload.get("entries", [])
+    if not isinstance(entries, list):
+        return normalized
+
+    normalized_entries = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        normalized_entries.append(
+            {
+                "id": normalize_metadata_text(entry.get("id", "")),
+                "title": normalize_metadata_text(entry.get("title", "")),
+                "translation_base_family": normalize_metadata_text(entry.get("translation_base_family", "")),
+                "public_base_family": normalize_metadata_text(entry.get("public_base_family", "")),
+                "prompt_encoder": normalize_metadata_text(entry.get("prompt_encoder", "")),
+                "default_width": int(entry.get("default_width", 0) or 0),
+                "default_height": int(entry.get("default_height", 0) or 0),
+                "default_steps": int(entry.get("default_steps", 0) or 0),
+                "default_cfg_scale": float(entry.get("default_cfg_scale", 0.0) or 0.0),
+                "default_sampler": normalize_metadata_text(entry.get("default_sampler", "")),
+                "default_scheduler": normalize_metadata_text(entry.get("default_scheduler", "")),
+                "default_clip_skip": int(entry.get("default_clip_skip", 0) or 0),
+                "supports_clip_skip": bool(entry.get("supports_clip_skip", False)),
+                "primary_model_category": normalize_metadata_text(entry.get("primary_model_category", "")),
+                "text_encoder_visible": bool(entry.get("text_encoder_visible", False)),
+                "support_tier": normalize_metadata_text(entry.get("support_tier", "")),
+                "compatibility_summary": normalize_metadata_text(entry.get("compatibility_summary", "")),
+                "experimental": bool(entry.get("experimental", False)),
+                "aliases": _normalize_metadata_list(entry.get("aliases", [])),
+                "notes": _normalize_metadata_list(entry.get("notes", [])),
+            }
+        )
+    normalized["entries"] = normalized_entries
+    return normalized
+
+
 def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str, object]:
     normalized = {
         "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
@@ -211,6 +252,9 @@ def build_capabilities_payload(
                 ],
             },
         }
+    model_families = payload.get("model_families", {})
+    if isinstance(model_families, dict):
+        payload["model_families"] = _normalize_model_family_registry_payload(model_families)
     prompt_semantics = payload.get("prompt_semantics", {})
     if isinstance(prompt_semantics, dict):
         payload["prompt_semantics"] = _normalize_prompt_semantics_payload(prompt_semantics)

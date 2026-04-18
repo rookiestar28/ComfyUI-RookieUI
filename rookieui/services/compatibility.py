@@ -8,6 +8,7 @@ from rookieui.contracts.compatibility import (
     SamplerCatalogEntry,
     SchedulerCatalogEntry,
 )
+from rookieui.contracts.model_family_registry import list_model_family_registry_entries
 
 
 _FALLBACK_SAMPLERS = [
@@ -85,6 +86,17 @@ def _build_sampler_catalog() -> list[SamplerCatalogEntry]:
 
 
 def build_compatibility_payload() -> dict[str, object]:
+    newer_family_profiles = [
+        CompatibilityOption(
+            id=entry.id,
+            title=entry.title,
+            summary=entry.compatibility_summary,
+            experimental=entry.experimental,
+            aliases=list(entry.aliases),
+        )
+        for entry in list_model_family_registry_entries()
+        if entry.support_tier != "parity"
+    ]
     snapshot = CompatibilityCatalogSnapshot(
         samplers=_build_sampler_catalog(),
         schedulers=[
@@ -204,52 +216,6 @@ def build_compatibility_payload() -> dict[str, object]:
                 aliases=["float8-e5m2"],
             ),
         ],
-        newer_family_profiles=[
-            CompatibilityOption(
-                id="flux",
-                title="Flux",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-            ),
-            CompatibilityOption(
-                id="qwen_image",
-                title="Qwen-Image",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-                aliases=["qwen image"],
-            ),
-            CompatibilityOption(
-                id="klein",
-                title="Klein (Flux.2)",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-                aliases=["flux.2"],
-            ),
-            CompatibilityOption(
-                id="lumina",
-                title="Lumina",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-            ),
-            CompatibilityOption(
-                id="zit",
-                title="ZiT (Z-Image-Turbo)",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-                aliases=["z-image-turbo", "zit"],
-            ),
-            CompatibilityOption(
-                id="wan",
-                title="Wan",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-            ),
-            CompatibilityOption(
-                id="anima",
-                title="Anima",
-                summary="Experimental catalog entry for later complexity-gated newer-family support.",
-                experimental=True,
-            ),
-        ],
+        newer_family_profiles=newer_family_profiles,
     )
     return snapshot.to_payload()

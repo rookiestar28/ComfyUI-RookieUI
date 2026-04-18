@@ -1,227 +1,32 @@
 from __future__ import annotations
 
+from rookieui.contracts.model_family_registry import (
+    get_model_family_registry_entry,
+    list_model_family_registry_entries,
+)
 from rookieui.contracts.parity import A1111ParityProfile, SamplerAliasMap
 
+def _build_parity_profile(entry_id: str) -> A1111ParityProfile:
+    entry = get_model_family_registry_entry(entry_id)
+    return A1111ParityProfile(
+        id=entry.id,
+        title=entry.title,
+        base_family=entry.translation_base_family,
+        prompt_encoder=entry.prompt_encoder,
+        default_width=entry.default_width,
+        default_height=entry.default_height,
+        default_steps=entry.default_steps,
+        default_cfg_scale=entry.default_cfg_scale,
+        default_sampler=entry.default_sampler,
+        default_scheduler=entry.default_scheduler,
+        default_clip_skip=entry.default_clip_skip,
+        supports_clip_skip=entry.supports_clip_skip,
+        notes=list(entry.notes),
+    )
 
-_PARITY_PROFILES: tuple[A1111ParityProfile, ...] = (
-    A1111ParityProfile(
-        id="sd15",
-        title="Stable Diffusion 1.5",
-        base_family="sd15",
-        prompt_encoder="clip_text_encode",
-        default_width=512,
-        default_height=512,
-        default_steps=28,
-        default_cfg_scale=7.0,
-        default_sampler="euler_ancestral",
-        default_scheduler="normal",
-        default_clip_skip=1,
-        supports_clip_skip=True,
-        notes=[
-            "Primary A1111 baseline for classic Stable Diffusion checkpoints.",
-            "Uses standard CLIP text encoding and optional clip-skip projection.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="sdxl",
-        title="Stable Diffusion XL",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=28,
-        default_cfg_scale=7.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="karras",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Uses SDXL dual-text-encoder semantics through CLIPTextEncodeSDXL.",
-            "Acts as the baseline for SDXL-derived families in RookieUI parity lanes.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="pony",
-        title="Pony",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=28,
-        default_cfg_scale=7.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="karras",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "SDXL-derived parity lane with community-oriented defaults preserved as SDXL translation.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="illustrious",
-        title="Illustrious",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=28,
-        default_cfg_scale=7.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="karras",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "SDXL-derived parity lane retained as an explicit profile for A1111-style UX.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="noob",
-        title="Noob",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=28,
-        default_cfg_scale=7.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="karras",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "SDXL-derived parity lane retained as an explicit profile for rookie-safe defaults.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="flux",
-        title="Flux",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=896,
-        default_height=1152,
-        default_steps=20,
-        default_cfg_scale=1.0,
-        default_sampler="euler",
-        default_scheduler="beta",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane routed through current SDXL graph translation seam.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="qwen_image",
-        title="Qwen-Image",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        # CRITICAL: RookieUI baseline does not auto-enable Lightning/acceleration LoRA;
-        # keep Qwen defaults on the non-LoRA standard path to avoid low-quality/unstable outputs.
-        default_width=1328,
-        default_height=1328,
-        default_steps=50,
-        default_cfg_scale=4.0,
-        default_sampler="euler",
-        default_scheduler="simple",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane routed through current SDXL graph translation seam.",
-            "Uses non-Lightning baseline defaults; Lightning variants remain opt-in via explicit LoRA/model selection.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="klein",
-        title="Klein (Flux.2)",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=896,
-        default_height=1152,
-        default_steps=20,
-        default_cfg_scale=1.0,
-        default_sampler="euler",
-        default_scheduler="beta",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane following the current Flux-style adapter defaults.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="lumina",
-        title="Lumina",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=16,
-        default_cfg_scale=2.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="normal",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="zit",
-        title="ZiT (Z-Image-Turbo)",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=8,
-        default_cfg_scale=1.0,
-        default_sampler="res_multistep",
-        default_scheduler="simple",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary turbo-family lane with low-step defaults for rapid iteration.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="wan",
-        title="Wan",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=832,
-        default_height=1216,
-        default_steps=20,
-        # IMPORTANT: Wan Lightning 4-step paths use low cfg (around 1.0), but RookieUI default flow is non-Lightning.
-        default_cfg_scale=6.0,
-        default_sampler="euler",
-        default_scheduler="simple",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Uses non-Lightning baseline defaults; acceleration LoRA remains explicit opt-in.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
-    A1111ParityProfile(
-        id="anima",
-        title="Anima",
-        base_family="sdxl",
-        prompt_encoder="clip_text_encode_sdxl",
-        default_width=1024,
-        default_height=1024,
-        default_steps=20,
-        default_cfg_scale=2.0,
-        default_sampler="dpmpp_2m",
-        default_scheduler="karras",
-        default_clip_skip=1,
-        supports_clip_skip=False,
-        notes=[
-            "Secondary newer-family lane routed through the existing SDXL translation seam.",
-            "Keeps Text Encoder selector visible for family-specific host model routing.",
-        ],
-    ),
+
+_PARITY_PROFILES: tuple[A1111ParityProfile, ...] = tuple(
+    _build_parity_profile(entry.id) for entry in list_model_family_registry_entries()
 )
 
 _SAMPLER_ALIAS_MAP = SamplerAliasMap(
@@ -277,15 +82,7 @@ def build_parity_payload() -> dict[str, object]:
 
 
 def get_parity_profile(profile_name: str) -> A1111ParityProfile:
-    normalized = (profile_name or "").strip().lower()
-    if not normalized:
-        normalized = "sd15"
-
-    for profile in _PARITY_PROFILES:
-        if profile.id == normalized:
-            return profile
-
-    raise ValueError(f"Unsupported RookieUI parity profile: {profile_name}")
+    return _build_parity_profile(profile_name)
 
 
 def normalize_sampler_name(name: str | None) -> str:

@@ -67,6 +67,8 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
+    expect(result.data.model_families.contract_version).toBe("f72-20260418");
+    expect(result.data.model_families.entries[0].id).toBe("sd15");
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
@@ -183,6 +185,7 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(models.data.default_checkpoint).toBe("__host_default__");
+    expect(models.data.catalog.primary_model_category_by_family.pony).toBe("checkpoints");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);

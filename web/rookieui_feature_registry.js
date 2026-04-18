@@ -131,6 +131,11 @@ export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBoot
           loadedState.__controlnetTypes,
         ),
     },
+    {
+      featureId: "model_family_registry",
+      bootstrapKey: "modelFamilyRegistry",
+      compose: (loadedState) => loadedState.capabilities?.model_families ?? { contract_version: "", entries: [] },
+    },
   ];
 }
 
