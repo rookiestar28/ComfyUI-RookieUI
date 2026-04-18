@@ -6,6 +6,7 @@
   },
   "scripts": {
     "spike:vite": "node scripts/run_vite_spike.mjs",
+    "spike:vue": "node scripts/run_vue_spike.mjs",
     "test": "npm run test:unit && npm run test:e2e",
     "test:types": "tsc -p tsconfig.json --pretty false",
     "test:unit": "vitest run",
@@ -13,9 +14,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",
+    "@vitejs/plugin-vue": "^6.0.1",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "vue": "^3.5.22"
   }
 }
