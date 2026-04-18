@@ -5,6 +5,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "spike:vite": "node scripts/run_vite_spike.mjs",
     "test": "npm run test:unit && npm run test:e2e",
     "test:types": "tsc -p tsconfig.json --pretty false",
     "test:unit": "vitest run",
@@ -14,6 +15,7 @@
     "@playwright/test": "^1.54.1",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.3",
+    "vite": "^7.3.2",
     "vitest": "^3.2.4"
   }
 }
