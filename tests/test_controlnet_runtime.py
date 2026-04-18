@@ -240,6 +240,25 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         self.assertIn("prompt_server_last_prompt_id_shim_applied", result.diagnostics)
         self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
 
+    def test_prompt_server_last_prompt_id_shim_uses_refcounted_lifecycle(self) -> None:
+        fake_prompt_server_instance = types.SimpleNamespace()
+
+        with mock.patch.object(runtime, "_PROMPT_SERVER_SHIM_REFCOUNTS", {}):
+            with mock.patch.object(runtime, "_PROMPT_SERVER_SHIM_VALUES", {}):
+                applied_a, value_a = runtime._ensure_prompt_server_last_prompt_id(fake_prompt_server_instance)
+                applied_b, value_b = runtime._ensure_prompt_server_last_prompt_id(fake_prompt_server_instance)
+
+                self.assertTrue(applied_a)
+                self.assertTrue(applied_b)
+                self.assertEqual(value_a, value_b)
+                self.assertEqual(getattr(fake_prompt_server_instance, "last_prompt_id"), value_a)
+
+                runtime._restore_prompt_server_last_prompt_id(fake_prompt_server_instance, applied_a, value_a)
+                self.assertEqual(getattr(fake_prompt_server_instance, "last_prompt_id"), value_a)
+
+                runtime._restore_prompt_server_last_prompt_id(fake_prompt_server_instance, applied_b, value_b)
+                self.assertFalse(hasattr(fake_prompt_server_instance, "last_prompt_id"))
+
     def test_preprocess_controlnet_marks_host_success_with_near_empty_output_diagnostic(self) -> None:
         marker = object()
         with mock.patch.object(runtime, "_require_runtime_dependencies", return_value=None):
@@ -278,6 +297,25 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
         normalized = runtime._coerce_image_tensor(tensor)
         self.assertGreaterEqual(float(normalized.min().item()), 0.0)
         self.assertLessEqual(float(normalized.max().item()), 1.0)
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_normalize_image_value_range_divides_integer_uint8_like_values(self) -> None:
+        tensor = runtime.torch.tensor([[[[0.0, 64.0, 255.0]]]], dtype=runtime.torch.float32)
+
+        normalized = runtime._normalize_image_value_range(tensor)
+
+        self.assertAlmostEqual(float(normalized[0, 0, 0, 1].item()), 64.0 / 255.0, places=5)
+        self.assertAlmostEqual(float(normalized.max().item()), 1.0, places=5)
+
+    @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
+    def test_normalize_image_value_range_min_max_normalizes_fractional_low_range(self) -> None:
+        tensor = runtime.torch.tensor([[[[0.0, 0.5, 2.0], [1.5, 0.25, 1.0]]]], dtype=runtime.torch.float32)
+
+        normalized = runtime._normalize_image_value_range(tensor)
+
+        self.assertAlmostEqual(float(normalized.min().item()), 0.0, places=5)
+        self.assertAlmostEqual(float(normalized.max().item()), 1.0, places=5)
+        self.assertGreater(float(normalized[0, 0, 0, 1].item()), 0.2)
 
     @unittest.skipUnless(runtime.torch is not None, "torch is unavailable in this environment")
     def test_coerce_image_tensor_promotes_alpha_only_rgba_to_visible_rgb(self) -> None:

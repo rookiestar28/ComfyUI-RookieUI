@@ -6,7 +6,7 @@ from rookieui.api.routes import build_capabilities_snapshot
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 from rookieui.services.capabilities import build_capabilities_payload
-from rookieui.services.version import resolve_shell_version
+from rookieui.services.version import resolve_runtime_build_fingerprint, resolve_shell_version
 
 
 class CapabilitySnapshotTests(unittest.TestCase):
@@ -101,3 +101,9 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_uses_pyproject_shell_version(self) -> None:
         payload = build_capabilities_snapshot()
         self.assertEqual(payload["shell_version"], resolve_shell_version())
+
+    def test_capabilities_snapshot_exposes_runtime_build_fingerprint(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        self.assertEqual(payload["runtime"]["shell_version"], resolve_shell_version())
+        self.assertEqual(payload["runtime"]["build_fingerprint"], resolve_runtime_build_fingerprint())

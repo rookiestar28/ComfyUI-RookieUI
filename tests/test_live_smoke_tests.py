@@ -25,6 +25,80 @@ def _build_semantic_payload(
     }
 
 
+def _build_bootstrap_payload(*, build_fingerprint: str | None = None) -> dict[str, object]:
+    return {
+        "service": "rookieui",
+        "status": "bootstrap-ready",
+        "runtime": {
+            "shell_version": "0.1.0",
+            "build_fingerprint": build_fingerprint or live_smoke._LOCAL_RUNTIME_BUILD_FINGERPRINT,
+        },
+        "routes": [],
+    }
+
+
+class LiveSmokeFreshnessTests(unittest.TestCase):
+    def test_validate_live_host_freshness_reports_build_fingerprint_drift(self) -> None:
+        errors = live_smoke._validate_live_host_freshness(
+            live_smoke.LiveHostFreshnessContext(
+                host_build_fingerprint="sha256:stale-host",
+                local_build_fingerprint=live_smoke._LOCAL_RUNTIME_BUILD_FINGERPRINT,
+            )
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("sha256:stale-host", errors[0])
+        self.assertIn(live_smoke._LOCAL_RUNTIME_BUILD_FINGERPRINT, errors[0])
+
+    def test_main_report_only_returns_zero_on_stale_host_build_fingerprint(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(build_fingerprint="sha256:stale-host"),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                side_effect=AssertionError("stale host should stop before loading catalog payloads"),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 0)
+
+    def test_main_returns_failure_on_stale_host_build_fingerprint_without_report_only(self) -> None:
+        with (
+            mock.patch.object(
+                sys,
+                "argv",
+                ["run_live_smoke_tests.py"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(build_fingerprint="sha256:stale-host"),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_server_payloads",
+                side_effect=AssertionError("stale host should stop before loading catalog payloads"),
+            ),
+            contextlib.redirect_stdout(io.StringIO()),
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            result = live_smoke.main()
+
+        self.assertEqual(result, 1)
+
+
 class LiveSmokePromptParityTests(unittest.TestCase):
     def test_default_profiles_for_controlnet_use_sd_family_order(self) -> None:
         self.assertEqual(
@@ -222,6 +296,11 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             ),
             mock.patch.object(
                 live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
+            ),
+            mock.patch.object(
+                live_smoke,
                 "_load_server_payloads",
                 return_value=({"checkpoints": []}, {"presets": []}),
             ),
@@ -339,6 +418,11 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "prompt-workbench", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -500,6 +584,11 @@ class LiveSmokeXYZPlotTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "xyz-plot", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -973,6 +1062,11 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
             ),
             mock.patch.object(
                 live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
+            ),
+            mock.patch.object(
+                live_smoke,
                 "_load_server_payloads",
                 return_value=({"default_checkpoint": "SD15\\BravNew.safetensors"}, {"presets": []}),
             ),
@@ -999,6 +1093,11 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "full-pipeline", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -1038,6 +1137,11 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -1150,6 +1254,11 @@ class LiveSmokeAuxiliaryContractTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "auxiliary-contracts", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -1371,6 +1480,11 @@ class LiveSmokeControlNetTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "controlnet", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,
@@ -1606,6 +1720,11 @@ class LiveSmokeADetailerTests(unittest.TestCase):
                 sys,
                 "argv",
                 ["run_live_smoke_tests.py", "--validation-mode", "adetailer", "--report-only"],
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_load_bootstrap_payload",
+                return_value=_build_bootstrap_payload(),
             ),
             mock.patch.object(
                 live_smoke,

@@ -39,6 +39,7 @@ from rookieui.services.adetailer import (
 from rookieui.services.adetailer_runtime import ADETAILER_RUNTIME_READY
 from rookieui.services.parity_matrix import get_parity_profile
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
+from rookieui.services.version import resolve_runtime_build_fingerprint
 from tests.prompt_parity_fixtures import (
     ALL_PROMPT_FEATURES,
     ExpectedEmbeddingRef,
@@ -65,6 +66,7 @@ _LOCAL_ADETAILER_CONTRACT_VERSION = ADETAILER_INTEGRATED_CONTRACT_VERSION
 _LOCAL_PROMPT_CONTRACT_VERSION = str(build_prompt_capability_matrix_payload().get("contract_version", "")).strip()
 _LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION = PROMPT_WORKBENCH_CONTRACT_VERSION
 _LOCAL_XYZ_PLOT_CONTRACT_VERSION = XYZ_PLOT_CONTRACT_VERSION
+_LOCAL_RUNTIME_BUILD_FINGERPRINT = resolve_runtime_build_fingerprint()
 _CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 _CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
@@ -196,6 +198,12 @@ class XYZPlotHostContext:
     workflow_family: str
     host_contract_version: str
     local_contract_version: str
+
+
+@dataclass(frozen=True)
+class LiveHostFreshnessContext:
+    host_build_fingerprint: str
+    local_build_fingerprint: str
 
 
 def _env_flag(name: str, *, default: bool = False) -> bool:
@@ -486,6 +494,34 @@ def _read_nested_text(payload: object, *path: str) -> str:
     if current is None:
         return ""
     return str(current).strip()
+
+
+def _build_live_host_freshness_context(
+    bootstrap_payload: dict[str, Any],
+) -> tuple[LiveHostFreshnessContext | None, list[str]]:
+    runtime_payload = bootstrap_payload.get("runtime")
+    if not isinstance(runtime_payload, dict):
+        return None, ["live host /rookieui/bootstrap payload did not expose runtime metadata."]
+    return (
+        LiveHostFreshnessContext(
+            host_build_fingerprint=_read_nested_text(runtime_payload, "build_fingerprint"),
+            local_build_fingerprint=_LOCAL_RUNTIME_BUILD_FINGERPRINT,
+        ),
+        [],
+    )
+
+
+def _validate_live_host_freshness(context: LiveHostFreshnessContext) -> list[str]:
+    errors: list[str] = []
+    if not context.host_build_fingerprint:
+        errors.append("live host /rookieui/bootstrap payload did not expose runtime.build_fingerprint.")
+    elif context.host_build_fingerprint != context.local_build_fingerprint:
+        errors.append(
+            "live host runtime build fingerprint mismatch: "
+            f"host='{context.host_build_fingerprint}' workspace='{context.local_build_fingerprint}'. "
+            "Restart the ComfyUI host before accepting live-smoke evidence."
+        )
+    return errors
 
 
 def _build_auxiliary_contract_probes() -> list[LiveRouteContractProbe]:
@@ -3841,6 +3877,26 @@ def main() -> int:
     print(f"[live-smoke] validation_mode={args.validation_mode}")
     print(f"[live-smoke] execute={'on' if args.execute else 'off'}")
     print(f"[live-smoke] report_only={'on' if args.report_only else 'off'}")
+
+    try:
+        bootstrap_payload = _load_bootstrap_payload(base_url, args.request_timeout_seconds)
+    except Exception as exc:
+        print(f"[live-smoke] ERROR: failed to load /bootstrap: {exc}", file=sys.stderr)
+        return 0 if args.report_only else 1
+
+    freshness_context, freshness_context_errors = _build_live_host_freshness_context(bootstrap_payload)
+    if freshness_context_errors:
+        print("[live-smoke] WARNING: live-host freshness validation reported issues:", file=sys.stderr)
+        for error in freshness_context_errors:
+            print(f"  - {error}", file=sys.stderr)
+        return 0 if args.report_only else 1
+    elif freshness_context is not None:
+        freshness_errors = _validate_live_host_freshness(freshness_context)
+        if freshness_errors:
+            print("[live-smoke] WARNING: live-host freshness validation reported issues:", file=sys.stderr)
+            for error in freshness_errors:
+                print(f"  - {error}", file=sys.stderr)
+            return 0 if args.report_only else 1
 
     if args.validation_mode == "auxiliary-contracts":
         try:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import threading
 import types
 import unittest
+from collections import OrderedDict
 from unittest import mock
 
 from rookieui.contracts.models import ModelInventorySnapshot
@@ -112,3 +114,46 @@ class ADetailerRuntimeTests(unittest.TestCase):
         self.assertFalse(result.used_fallback)
         self.assertEqual(result.runtime_state, "native_runtime_ready")
         self.assertGreater(float(result.mask.sum().item()), 0.0)
+
+    def test_load_ultralytics_model_uses_bounded_lru_cache(self) -> None:
+        cache: OrderedDict[str, object] = OrderedDict()
+        load_calls: list[str] = []
+
+        class _FakeUltralyticsModule:
+            @staticmethod
+            def YOLO(model_path: str) -> object:
+                load_calls.append(model_path)
+                return {"model_path": model_path}
+
+        with mock.patch.object(adetailer_runtime, "_ULTRALYTICS_MODEL_CACHE", cache):
+            with mock.patch.object(adetailer_runtime, "_ULTRALYTICS_MODEL_CACHE_LOCK", threading.Lock()):
+                with mock.patch.object(adetailer_runtime, "_ULTRALYTICS_MODEL_CACHE_MAX_ITEMS", 2):
+                    with mock.patch(
+                        "rookieui.services.adetailer_runtime._import_optional_module",
+                        return_value=_FakeUltralyticsModule(),
+                    ):
+                        model_a = adetailer_runtime._load_ultralytics_model("a.pt")
+                        adetailer_runtime._load_ultralytics_model("b.pt")
+                        cached_a = adetailer_runtime._load_ultralytics_model("a.pt")
+                        adetailer_runtime._load_ultralytics_model("c.pt")
+
+        self.assertIs(model_a, cached_a)
+        self.assertEqual(load_calls, ["a.pt", "b.pt", "c.pt"])
+        self.assertEqual(list(cache.keys()), ["a.pt", "c.pt"])
+
+    def test_load_cv2_face_cascade_initializes_singleton_once(self) -> None:
+        init_paths: list[str] = []
+        cascade = types.SimpleNamespace(empty=lambda: False)
+        cv2_module = types.SimpleNamespace(
+            data=types.SimpleNamespace(haarcascades="C:\\opencv\\"),
+            CascadeClassifier=lambda path: init_paths.append(path) or cascade,
+        )
+
+        with mock.patch.object(adetailer_runtime, "_OPENCV_FACE_CASCADE", None):
+            with mock.patch.object(adetailer_runtime, "_OPENCV_FACE_CASCADE_LOCK", threading.Lock()):
+                loaded_a = adetailer_runtime._load_cv2_face_cascade(cv2_module)
+                loaded_b = adetailer_runtime._load_cv2_face_cascade(cv2_module)
+
+        self.assertIs(loaded_a, cascade)
+        self.assertIs(loaded_b, cascade)
+        self.assertEqual(init_paths, ["C:\\opencv\\haarcascade_frontalface_default.xml"])

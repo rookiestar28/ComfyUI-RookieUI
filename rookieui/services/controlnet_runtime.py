@@ -5,6 +5,7 @@ import io
 import logging
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,9 @@ except Exception:  # pragma: no cover - optional runtime dependency
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 _MISSING = object()
+_PROMPT_SERVER_SHIM_LOCK = threading.Lock()
+_PROMPT_SERVER_SHIM_REFCOUNTS: dict[int, int] = {}
+_PROMPT_SERVER_SHIM_VALUES: dict[int, str] = {}
 
 # Integrated preprocessor option catalog consumed by both backend payload validation and
 # workflow/runtime dispatch. Keep this list deterministic to preserve UI filter order.
@@ -588,28 +592,46 @@ def _resolve_prompt_server_instance() -> Any | None:
 
 
 def _ensure_prompt_server_last_prompt_id(server_instance: Any) -> tuple[bool, str]:
-    if server_instance is None or hasattr(server_instance, "last_prompt_id"):
+    if server_instance is None:
         return False, ""
-    synthetic_prompt_id = f"rookieui-controlnet-detect-{int(time.time() * 1000)}"
-    # DEBUG HOTSPOT: some host preprocessors read PromptServer.instance.last_prompt_id even outside queued prompt
-    # execution. Provide a scoped compatibility shim to keep detect routes host-compatible.
-    try:
-        setattr(server_instance, "last_prompt_id", synthetic_prompt_id)
-    except Exception:
-        return False, ""
-    return True, synthetic_prompt_id
+    server_key = id(server_instance)
+    with _PROMPT_SERVER_SHIM_LOCK:
+        synthetic_prompt_id = _PROMPT_SERVER_SHIM_VALUES.get(server_key)
+        if synthetic_prompt_id is not None:
+            _PROMPT_SERVER_SHIM_REFCOUNTS[server_key] = _PROMPT_SERVER_SHIM_REFCOUNTS.get(server_key, 0) + 1
+            return True, synthetic_prompt_id
+        if hasattr(server_instance, "last_prompt_id"):
+            return False, ""
+        synthetic_prompt_id = f"rookieui-controlnet-detect-{int(time.time() * 1000)}"
+        # IMPORTANT: keep shared PromptServer shim ownership serialized; overlapping detect requests share one host object.
+        try:
+            setattr(server_instance, "last_prompt_id", synthetic_prompt_id)
+        except Exception:
+            return False, ""
+        _PROMPT_SERVER_SHIM_VALUES[server_key] = synthetic_prompt_id
+        _PROMPT_SERVER_SHIM_REFCOUNTS[server_key] = _PROMPT_SERVER_SHIM_REFCOUNTS.get(server_key, 0) + 1
+        return True, synthetic_prompt_id
 
 
 def _restore_prompt_server_last_prompt_id(server_instance: Any, was_applied: bool, expected_value: str) -> None:
     if not was_applied or server_instance is None or not expected_value:
         return
-    current_value = getattr(server_instance, "last_prompt_id", _MISSING)
-    if current_value != expected_value:
-        return
-    try:
-        delattr(server_instance, "last_prompt_id")
-    except Exception:
-        return
+    server_key = id(server_instance)
+    with _PROMPT_SERVER_SHIM_LOCK:
+        current_refs = _PROMPT_SERVER_SHIM_REFCOUNTS.get(server_key, 0)
+        if current_refs <= 1:
+            _PROMPT_SERVER_SHIM_REFCOUNTS.pop(server_key, None)
+            _PROMPT_SERVER_SHIM_VALUES.pop(server_key, None)
+        else:
+            _PROMPT_SERVER_SHIM_REFCOUNTS[server_key] = current_refs - 1
+            return
+        current_value = getattr(server_instance, "last_prompt_id", _MISSING)
+        if current_value != expected_value:
+            return
+        try:
+            delattr(server_instance, "last_prompt_id")
+        except Exception:
+            return
 
 
 def _resolve_host_node_class_mappings() -> dict[str, Any]:
@@ -688,7 +710,8 @@ def _normalize_image_value_range(tensor: "torch.Tensor") -> "torch.Tensor":
     maximum = float(tensor.max().item())
     if minimum >= 0.0 and maximum <= 1.0:
         return tensor
-    if minimum >= 0.0 and maximum <= 255.0:
+    fractional_delta = float((tensor - tensor.round()).abs().max().item())
+    if minimum >= 0.0 and 1.0 < maximum <= 255.0 and fractional_delta <= 1e-4:
         return tensor / 255.0
     # IMPORTANT: host preprocessors may emit signed or non-8bit ranges; normalize by min/max to avoid black-frame previews.
     span = maximum - minimum

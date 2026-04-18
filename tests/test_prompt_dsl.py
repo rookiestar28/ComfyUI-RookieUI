@@ -227,3 +227,9 @@ class PromptDslTests(unittest.TestCase):
         normalized = normalize_prompt_attention_for_weighted_encode(r"literal \[brackets\] and \(parens\)")
 
         self.assertEqual(normalized, r"literal [brackets] and (parens)")
+
+    def test_normalize_prompt_attention_for_weighted_encode_rejects_pathological_nesting(self) -> None:
+        nested = "(" * 40 + "subject" + ")" * 40
+
+        with self.assertRaisesRegex(ValueError, "maximum depth 32"):
+            normalize_prompt_attention_for_weighted_encode(nested)

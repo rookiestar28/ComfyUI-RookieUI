@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import itertools
 import json
@@ -7,6 +8,7 @@ import os
 import secrets
 import threading
 import time
+import weakref
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,7 @@ from rookieui.security.request_guard import (
 from rookieui.services.coercion import coerce_bool, coerce_int
 from rookieui.services.xyz_plot_grid import build_xyz_plot_grid_results
 from rookieui.services.img2img import normalize_img2img_request
+from rookieui.services.state_persistence import atomic_write_json, quarantine_corrupt_json
 from rookieui.services.prompt_submission import submit_prompt_workflow
 from rookieui.services.queue_snapshot import build_queue_snapshot
 from rookieui.services.txt2img import normalize_txt2img_request
@@ -33,10 +36,24 @@ from rookieui.services.xyz_plot_estimate import XYZ_PLOT_MAX_TOTAL_CELLS
 from rookieui.services.xyz_plot_values import parse_xyz_axis_values
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
-_STATE_LOCK = threading.RLock()
+_ASYNC_STATE_LOCK_REGISTRY_LOCK = threading.Lock()
+_ASYNC_STATE_LOCKS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
 _XYZ_PLOT_SESSION_SCHEMA_VERSION = 2
 _XYZ_PLOT_MAX_PARALLEL = 4
 _XYZ_SLOT_LABELS = ("X", "Y", "Z")
+_XYZ_PLOT_TERMINAL_RETENTION_HOURS = 72
+_XYZ_PLOT_MAX_TERMINAL_SESSIONS = 64
+
+
+def _get_async_state_lock() -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    with _ASYNC_STATE_LOCK_REGISTRY_LOCK:
+        lock = _ASYNC_STATE_LOCKS.get(loop)
+        if lock is None:
+            # IMPORTANT: keep one asyncio lock per running loop; XYZ session mutations await host work and must be coroutine-safe.
+            lock = asyncio.Lock()
+            _ASYNC_STATE_LOCKS[loop] = lock
+        return lock
 
 
 def _xyz_plot_runtime_root() -> Path:
@@ -61,6 +78,59 @@ def _default_xyz_plot_store() -> dict[str, Any]:
     }
 
 
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = os.environ.get(name, "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _is_terminal_session(session: dict[str, Any]) -> bool:
+    return _derive_session_status(session) in {"completed", "failed", "cancelled"}
+
+
+def _prune_xyz_plot_sessions(store: dict[str, Any]) -> dict[str, Any]:
+    sessions = store.get("sessions", {})
+    if not isinstance(sessions, dict) or not sessions:
+        return store
+
+    retention_hours = _read_positive_int_env(
+        "ROOKIEUI_XYZ_PLOT_TERMINAL_RETENTION_HOURS",
+        _XYZ_PLOT_TERMINAL_RETENTION_HOURS,
+    )
+    max_terminal_sessions = _read_positive_int_env(
+        "ROOKIEUI_XYZ_PLOT_MAX_TERMINAL_SESSIONS",
+        _XYZ_PLOT_MAX_TERMINAL_SESSIONS,
+    )
+    terminal_cutoff_ms = int(time.time() * 1000) - int(retention_hours * 3600 * 1000)
+
+    kept_sessions: dict[str, Any] = {}
+    terminal_candidates: list[tuple[str, dict[str, Any]]] = []
+    for session_id, session in sessions.items():
+        if not isinstance(session, dict):
+            continue
+        if _is_terminal_session(session):
+            updated_at = int(session.get("updated_at", 0) or 0)
+            if updated_at and updated_at < terminal_cutoff_ms:
+                continue
+            terminal_candidates.append((str(session_id), session))
+            continue
+        kept_sessions[str(session_id)] = session
+
+    terminal_candidates.sort(
+        key=lambda entry: int(entry[1].get("updated_at", 0) or 0),
+        reverse=True,
+    )
+    for session_id, session in terminal_candidates[:max_terminal_sessions]:
+        kept_sessions[session_id] = session
+    store["sessions"] = kept_sessions
+    return store
+
+
 def _load_xyz_plot_store() -> dict[str, Any]:
     _ensure_xyz_plot_runtime_dir()
     state_path = _xyz_plot_state_path()
@@ -68,20 +138,26 @@ def _load_xyz_plot_store() -> dict[str, Any]:
         return _default_xyz_plot_store()
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError:
+        return _default_xyz_plot_store()
+    except json.JSONDecodeError:
+        quarantine_corrupt_json(state_path)
         return _default_xyz_plot_store()
     if not isinstance(payload, dict) or int(payload.get("schema_version", 0) or 0) != _XYZ_PLOT_SESSION_SCHEMA_VERSION:
         return _default_xyz_plot_store()
     sessions = payload.get("sessions", {})
-    return {
+    return _prune_xyz_plot_sessions(
+        {
         "schema_version": _XYZ_PLOT_SESSION_SCHEMA_VERSION,
         "sessions": sessions if isinstance(sessions, dict) else {},
-    }
+        }
+    )
 
 
 def _save_xyz_plot_store(store: dict[str, Any]) -> None:
     _ensure_xyz_plot_runtime_dir()
-    _xyz_plot_state_path().write_text(json.dumps(store, indent=2, ensure_ascii=True), encoding="utf-8")
+    store = _prune_xyz_plot_sessions(store)
+    atomic_write_json(_xyz_plot_state_path(), store)
 
 
 def _normalize_xyz_mode(raw_mode: object) -> str:
@@ -631,7 +707,7 @@ def _load_session_or_raise(store: dict[str, Any], session_id: object, *, client_
 
 
 async def execute_xyz_plot_run(payload: object, prompt_server: Any) -> dict[str, Any]:
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _normalize_session_request(payload)
         await _refresh_session_state(session, prompt_server)
@@ -642,7 +718,7 @@ async def execute_xyz_plot_run(payload: object, prompt_server: Any) -> dict[str,
 
 async def build_xyz_plot_session_list_payload(prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         sessions: list[dict[str, Any]] = []
         for session in store.get("sessions", {}).values():
@@ -662,7 +738,7 @@ async def build_xyz_plot_session_list_payload(prompt_server: Any, *, client_id: 
 
 async def build_xyz_plot_session_detail_payload(session_id: object, prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _load_session_or_raise(store, session_id, client_id=normalized_client_id)
         await _refresh_session_state(session, prompt_server)
@@ -672,7 +748,7 @@ async def build_xyz_plot_session_detail_payload(session_id: object, prompt_serve
 
 async def execute_xyz_plot_session_cancel(session_id: object, prompt_server: Any, *, client_id: object = None) -> dict[str, Any]:
     normalized_client_id = normalize_client_id(client_id)
-    with _STATE_LOCK:
+    async with _get_async_state_lock():
         store = _load_xyz_plot_store()
         session = _load_session_or_raise(store, session_id, client_id=normalized_client_id)
         session["cancel_requested"] = True
@@ -691,7 +767,8 @@ async def execute_xyz_plot_session_cancel(session_id: object, prompt_server: Any
 
 
 def reset_xyz_plot_session_store_for_tests() -> None:
-    with _STATE_LOCK:
-        state_path = _xyz_plot_state_path()
-        if state_path.exists():
-            state_path.unlink()
+    with _ASYNC_STATE_LOCK_REGISTRY_LOCK:
+        _ASYNC_STATE_LOCKS.clear()
+    state_path = _xyz_plot_state_path()
+    if state_path.exists():
+        state_path.unlink()

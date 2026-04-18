@@ -7,6 +7,7 @@ from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
+from rookieui.services.version import resolve_runtime_build_fingerprint, resolve_shell_version
 
 
 class RoutePayloadTests(unittest.TestCase):
@@ -20,6 +21,8 @@ class RoutePayloadTests(unittest.TestCase):
         payload = routes.build_bootstrap_payload()
         self.assertEqual(payload["service"], "rookieui")
         self.assertEqual(payload["status"], "bootstrap-ready")
+        self.assertEqual(payload["runtime"]["shell_version"], resolve_shell_version())
+        self.assertEqual(payload["runtime"]["build_fingerprint"], resolve_runtime_build_fingerprint())
         self.assertIn("/rookieui/health", payload["routes"])
         self.assertIn("/rookieui/bootstrap", payload["routes"])
         self.assertIn("/rookieui/capabilities", payload["routes"])

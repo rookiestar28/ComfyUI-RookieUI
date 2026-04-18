@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,8 +32,25 @@ ADETAILER_RUNTIME_MODEL_UNAVAILABLE = "native_runtime_model_unavailable"
 ADETAILER_RUNTIME_FALLBACK = "deterministic_mask_fallback"
 
 _ULTRALYTICS_FAMILIES = {"ultralytics_bbox", "ultralytics_segm"}
-_ULTRALYTICS_MODEL_CACHE: dict[str, Any] = {}
+_ULTRALYTICS_MODEL_CACHE_ENV = "ROOKIEUI_ADETAILER_MODEL_CACHE_MAX_ITEMS"
 _OPENCV_FACE_CASCADE = None
+_ULTRALYTICS_MODEL_CACHE: OrderedDict[str, Any] = OrderedDict()
+_ULTRALYTICS_MODEL_CACHE_LOCK = threading.Lock()
+_OPENCV_FACE_CASCADE_LOCK = threading.Lock()
+
+
+def _read_positive_int_env(name: str, default: int) -> int:
+    raw_value = str(os.getenv(name, str(default))).strip()
+    if not raw_value:
+        return default
+    try:
+        parsed_value = int(raw_value)
+    except ValueError:
+        return default
+    return parsed_value if parsed_value > 0 else default
+
+
+_ULTRALYTICS_MODEL_CACHE_MAX_ITEMS = _read_positive_int_env(_ULTRALYTICS_MODEL_CACHE_ENV, 4)
 
 
 @dataclass(slots=True)
@@ -184,17 +204,23 @@ def _resolve_ultralytics_model_path(detector: str, detector_family: str) -> str 
 
 
 def _load_ultralytics_model(model_path: str) -> Any:
-    cached = _ULTRALYTICS_MODEL_CACHE.get(model_path)
-    if cached is not None:
-        return cached
+    # IMPORTANT: keep cache mutation serialized; overlapping detector requests share this process-global runtime cache.
+    with _ULTRALYTICS_MODEL_CACHE_LOCK:
+        cached = _ULTRALYTICS_MODEL_CACHE.get(model_path)
+        if cached is not None:
+            _ULTRALYTICS_MODEL_CACHE.move_to_end(model_path)
+            return cached
 
-    ultralytics_module = _import_optional_module("ultralytics")
-    if ultralytics_module is None:
-        raise RuntimeError("ultralytics is unavailable.")
+        ultralytics_module = _import_optional_module("ultralytics")
+        if ultralytics_module is None:
+            raise RuntimeError("ultralytics is unavailable.")
 
-    model = ultralytics_module.YOLO(model_path)
-    _ULTRALYTICS_MODEL_CACHE[model_path] = model
-    return model
+        model = ultralytics_module.YOLO(model_path)
+        _ULTRALYTICS_MODEL_CACHE[model_path] = model
+        _ULTRALYTICS_MODEL_CACHE.move_to_end(model_path)
+        while len(_ULTRALYTICS_MODEL_CACHE) > _ULTRALYTICS_MODEL_CACHE_MAX_ITEMS:
+            _ULTRALYTICS_MODEL_CACHE.popitem(last=False)
+        return model
 
 
 def _parse_detector_class_filter(detector_classes: str) -> set[str]:
@@ -297,14 +323,18 @@ def _load_cv2_face_cascade(cv2_module: Any) -> Any | None:
     global _OPENCV_FACE_CASCADE
     if _OPENCV_FACE_CASCADE is not None:
         return _OPENCV_FACE_CASCADE
-    data_root = getattr(getattr(cv2_module, "data", None), "haarcascades", "")
-    if not data_root:
-        return None
-    cascade = cv2_module.CascadeClassifier(f"{data_root}haarcascade_frontalface_default.xml")
-    if cascade.empty():
-        return None
-    _OPENCV_FACE_CASCADE = cascade
-    return cascade
+    # IMPORTANT: keep singleton initialization under one lock so concurrent detect requests cannot observe partial setup.
+    with _OPENCV_FACE_CASCADE_LOCK:
+        if _OPENCV_FACE_CASCADE is not None:
+            return _OPENCV_FACE_CASCADE
+        data_root = getattr(getattr(cv2_module, "data", None), "haarcascades", "")
+        if not data_root:
+            return None
+        cascade = cv2_module.CascadeClassifier(f"{data_root}haarcascade_frontalface_default.xml")
+        if cascade.empty():
+            return None
+        _OPENCV_FACE_CASCADE = cascade
+        return cascade
 
 
 def _run_face_detection(image_tensor, *, confidence: float):
