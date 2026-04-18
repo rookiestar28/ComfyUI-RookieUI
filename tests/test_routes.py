@@ -52,6 +52,7 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/assist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/catalog", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/analyze", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/upsample", payload["routes"])
 
     def test_adetailer_snapshot_exposes_contract_and_detector_catalog(self) -> None:
         payload = routes.build_adetailer_snapshot()
@@ -150,6 +151,8 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_config")
         self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})
+        self.assertIn("danbooru_upsample", payload["host_actions"])
+        self.assertEqual(payload["host_actions"]["danbooru_upsample"]["route_path"], "/rookieui/prompt-tools/upsample")
 
     def test_prompt_tools_provider_payload_exposes_catalog_contract(self) -> None:
         payload = routes.build_prompt_workbench_provider_catalog_payload()

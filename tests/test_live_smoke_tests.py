@@ -354,6 +354,15 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
             },
             "language_options": [{"code": "en", "title": "English"}],
             "theme_style_options": [{"id": "rookieui_classic", "title": "RookieUI Classic"}],
+            "host_actions": {
+                "danbooru_upsample": {
+                    "action_id": "danbooru_upsample",
+                    "route_path": "/rookieui/prompt-tools/upsample",
+                    "available": True,
+                    "resolved_node_alias": "DanbooruTagsUpsampler",
+                    "availability": {"status": "ready", "detail": "ready"},
+                }
+            },
         }
         providers_payload = {
             "service": "rookieui",
@@ -395,6 +404,9 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
         self.assertEqual(context.translation_default_availability, "ready")
         self.assertEqual(context.ai_assist_default_provider, "")
         self.assertEqual(context.ai_assist_default_availability, "unconfigured")
+        self.assertTrue(context.danbooru_available)
+        self.assertEqual(context.danbooru_availability, "ready")
+        self.assertEqual(context.danbooru_resolved_node_alias, "DanbooruTagsUpsampler")
 
     def test_validate_prompt_workbench_host_sync_reports_contract_drift(self) -> None:
         errors = live_smoke._validate_prompt_workbench_host_sync(
@@ -406,6 +418,9 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
                 translation_default_availability="ready",
                 ai_assist_default_provider="",
                 ai_assist_default_availability="unconfigured",
+                danbooru_available=False,
+                danbooru_availability="host_missing",
+                danbooru_resolved_node_alias="",
             )
         )
 
@@ -456,6 +471,27 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
         self.assertEqual(execution_errors, [])
         self.assertEqual(len(combined_errors), 1)
         self.assertIn("/rookieui/prompt-tools/config", combined_errors[0])
+
+    def test_validate_prompt_workbench_upsample_payload_accepts_matching_contract(self) -> None:
+        errors = live_smoke._validate_prompt_workbench_upsample_payload(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "prompt_tools_upsample",
+                    "version": live_smoke._LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+                },
+                "action_id": "danbooru_upsample",
+                "final_prompt": "masterpiece, city skyline, enhanced tags",
+                "generated_suffix": "enhanced tags",
+                "host_node_alias": "DanbooruTagsUpsampler",
+                "availability": {"status": "ready"},
+                "warnings": [],
+                "warning_codes": [],
+            }
+        )
+
+        self.assertEqual(errors, [])
 
 
 class LiveSmokeXYZPlotTests(unittest.TestCase):
@@ -599,6 +635,11 @@ class LiveSmokeXYZPlotTests(unittest.TestCase):
                 live_smoke,
                 "_run_xyz_plot_validation_lane",
                 return_value=(["xyz error"], []),
+            ),
+            mock.patch.object(
+                live_smoke,
+                "_run_prompt_workbench_validation_lane",
+                return_value=(["prompt-workbench error"], []),
             ),
             contextlib.redirect_stdout(io.StringIO()),
             contextlib.redirect_stderr(io.StringIO()),

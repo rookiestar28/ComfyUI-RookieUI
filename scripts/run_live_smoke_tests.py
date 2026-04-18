@@ -190,6 +190,9 @@ class PromptWorkbenchHostContext:
     translation_default_availability: str
     ai_assist_default_provider: str
     ai_assist_default_availability: str
+    danbooru_available: bool
+    danbooru_availability: str
+    danbooru_resolved_node_alias: str
 
 
 @dataclass(frozen=True)
@@ -744,6 +747,19 @@ def _build_prompt_workbench_host_context(
         for entry in theme_style_options
     ):
         errors.append("prompt-workbench config payload missing expected theme style 'rookieui_classic'.")
+    host_actions = config_payload.get("host_actions")
+    if not isinstance(host_actions, dict):
+        return None, errors + ["prompt-workbench config payload missing host_actions."]
+    danbooru_action = host_actions.get("danbooru_upsample")
+    if not isinstance(danbooru_action, dict):
+        return None, errors + ["prompt-workbench config payload missing danbooru_upsample host action."]
+    if str(danbooru_action.get("route_path", "")).strip() != "/rookieui/prompt-tools/upsample":
+        errors.append("prompt-workbench Danbooru host action route_path drifted from /rookieui/prompt-tools/upsample.")
+    if str(danbooru_action.get("action_id", "")).strip() != "danbooru_upsample":
+        errors.append("prompt-workbench Danbooru host action_id drifted from danbooru_upsample.")
+    danbooru_availability_payload = danbooru_action.get("availability")
+    if not isinstance(danbooru_availability_payload, dict):
+        errors.append("prompt-workbench Danbooru host action missing availability object.")
 
     surfaces = providers_payload.get("surfaces")
     if not isinstance(surfaces, dict):
@@ -789,6 +805,11 @@ def _build_prompt_workbench_host_context(
             translation_default_availability=_provider_availability(translation_surface, translation_default_provider),
             ai_assist_default_provider=ai_assist_default_provider,
             ai_assist_default_availability=_provider_availability(ai_surface, ai_assist_default_provider),
+            danbooru_available=bool(danbooru_action.get("available")),
+            danbooru_availability=str(danbooru_availability_payload.get("status", "")).strip()
+            if isinstance(danbooru_availability_payload, dict)
+            else "",
+            danbooru_resolved_node_alias=str(danbooru_action.get("resolved_node_alias", "")).strip(),
         ),
         errors,
     )
@@ -802,6 +823,10 @@ def _validate_prompt_workbench_host_sync(context: PromptWorkbenchHostContext) ->
         errors.append(
             "live host prompt-workbench contract mismatch: "
             f"host='{context.host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    if context.danbooru_available and context.danbooru_availability != "ready":
+        errors.append(
+            "prompt-workbench Danbooru host action reported available=true without ready availability status."
         )
     return errors
 
@@ -933,6 +958,25 @@ def _validate_prompt_workbench_assist_payload(payload: dict[str, Any]) -> list[s
         errors.append("prompt-workbench AI assist did not execute through openai.")
     if not str(payload.get("generated_prompt", "")).strip():
         errors.append("prompt-workbench AI assist returned empty generated_prompt.")
+    return errors
+
+
+def _validate_prompt_workbench_upsample_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_upsample",
+        route_path="/rookieui/prompt-tools/upsample",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("action_id", "")).strip() != "danbooru_upsample":
+        errors.append("prompt-workbench upsample payload action_id drifted from danbooru_upsample.")
+    if not str(payload.get("final_prompt", "")).strip():
+        errors.append("prompt-workbench upsample returned empty final_prompt.")
+    availability = payload.get("availability")
+    if not isinstance(availability, dict):
+        errors.append("prompt-workbench upsample payload missing availability object.")
+    elif str(availability.get("status", "")).strip() != "ready":
+        errors.append("prompt-workbench upsample ready path lost availability.status=ready.")
     return errors
 
 
@@ -1280,6 +1324,14 @@ def _run_prompt_workbench_validation_lane(
             ],
             [],
         )
+    if "/rookieui/prompt-tools/upsample" not in routes:
+        return (
+            [
+                "prompt-workbench live-host bootstrap did not expose /rookieui/prompt-tools/upsample; "
+                "restart or re-sync the ComfyUI host before closure acceptance."
+            ],
+            [],
+        )
     config_payload = _request_prompt_workbench_json(
         base_url,
         "config",
@@ -1473,6 +1525,42 @@ def _run_prompt_workbench_validation_lane(
                 timeout_seconds=request_timeout_seconds,
             )
             execution_errors.extend(_validate_prompt_workbench_translate_payload(translate_payload))
+
+            upsample_payload = {
+                "prompt": "masterpiece, city skyline",
+                "negative_prompt_tags": "blurry",
+                "ban_tags": "lowres",
+            }
+            if context.danbooru_availability == "ready":
+                danbooru_payload = _request_prompt_workbench_json(
+                    base_url,
+                    "upsample",
+                    method="POST",
+                    payload=upsample_payload,
+                    timeout_seconds=request_timeout_seconds,
+                )
+                execution_errors.extend(_validate_prompt_workbench_upsample_payload(danbooru_payload))
+                if context.danbooru_resolved_node_alias:
+                    if str(danbooru_payload.get("host_node_alias", "")).strip() != context.danbooru_resolved_node_alias:
+                        execution_errors.append("prompt-workbench upsample host_node_alias drifted from config host action.")
+            elif context.danbooru_availability == "host_missing":
+                status_code, danbooru_payload = _request_prompt_workbench_json_with_status(
+                    base_url,
+                    "upsample",
+                    method="POST",
+                    payload=upsample_payload,
+                    timeout_seconds=request_timeout_seconds,
+                )
+                if status_code != 503:
+                    execution_errors.append(
+                        f"prompt-workbench upsample expected 503 for host-missing action but got {status_code}."
+                    )
+                if _read_nested_text(danbooru_payload, "status") != "host-unavailable":
+                    execution_errors.append("prompt-workbench upsample host-missing path lost host-unavailable truthfulness.")
+            else:
+                execution_errors.append(
+                    f"prompt-workbench Danbooru action availability '{context.danbooru_availability}' is not covered by the live lane."
+                )
 
             if not context.ai_assist_default_provider:
                 status_code, assist_payload = _request_prompt_workbench_json_with_status(
@@ -4253,6 +4341,35 @@ def main() -> int:
                 return 0 if args.report_only else 1
             else:
                 print("[live-smoke] full-pipeline xyz execute checks passed.")
+
+        try:
+            prompt_workbench_errors, prompt_workbench_execute_errors = _run_prompt_workbench_validation_lane(
+                base_url,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline prompt-workbench lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if prompt_workbench_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline prompt-workbench lane reported issues:", file=sys.stderr)
+            for error in prompt_workbench_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline prompt-workbench route checks passed.")
+        if args.execute:
+            if prompt_workbench_errors:
+                print("[live-smoke] full-pipeline prompt-workbench execute skipped because route checks were not green.")
+            elif prompt_workbench_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline prompt-workbench execute lane failed:", file=sys.stderr)
+                for error in prompt_workbench_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline prompt-workbench execute checks passed.")
 
         if pipeline_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")

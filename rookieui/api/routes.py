@@ -29,6 +29,11 @@ from rookieui.services.prompt_workbench import (
     execute_prompt_workbench_ai_assist,
     execute_prompt_workbench_analysis,
     execute_prompt_workbench_translate,
+    execute_prompt_workbench_upsample,
+)
+from rookieui.services.prompt_workbench_danbooru import (
+    PromptWorkbenchDanbooruExecutionError,
+    PromptWorkbenchDanbooruHostUnavailableError,
 )
 from rookieui.services.xyz_plot import (
     build_xyz_plot_axes_snapshot,
@@ -79,6 +84,7 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/upsample",
     f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes",
     f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate",
     f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/run",
@@ -689,6 +695,50 @@ async def prompt_tools_analyze(request: Any) -> Any:
     )
 
 
+async def prompt_tools_upsample(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = await execute_prompt_workbench_upsample(payload)
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    except PromptWorkbenchDanbooruHostUnavailableError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("host-unavailable"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=503,
+            request=request,
+        )
+    except PromptWorkbenchDanbooruExecutionError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("host-action-error"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=502,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
+        },
+        request=request,
+    )
+
+
 async def pnginfo_parse(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
@@ -1099,6 +1149,7 @@ def register_routes(prompt_server: Any) -> None:
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist", prompt_tools_assist)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog", prompt_tools_catalog)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze", prompt_tools_analyze)
+    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/upsample", prompt_tools_upsample)
     registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes", xyz_plot_axes)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate", xyz_plot_estimate)
     registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/run", xyz_plot_run)

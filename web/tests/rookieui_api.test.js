@@ -28,6 +28,7 @@ import {
   assistRookieUIPromptWorkbench,
   cancelRookieUIXYZPlotSession,
   translateRookieUIPromptWorkbench,
+  upsampleRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
   updateRookieUIPromptWorkbenchFavorites,
@@ -223,13 +224,14 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.data.contract.version).toBe("r123f114f115f116f120-20260417");
+    expect(result.data.contract.version).toBe("r145f141f142-20260418");
     expect(result.data.contract.surface).toBe("prompt_tools_config");
     expect(result.data.config.translation.providers).toEqual({});
     expect(result.data.config.ai_assist.instruction_preset).toContain("Stable Diffusion prompt");
     expect(result.data.language_options[0].code).toBe("en");
     expect(result.data.theme_style_options[0].id).toBe("rookieui_classic");
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+    expect(result.data.host_actions.danbooru_upsample.route_path).toBe("/rookieui/prompt-tools/upsample");
   });
 
   test("loads prompt-workbench namespace state with a fallback payload", async () => {
@@ -345,6 +347,41 @@ describe("fetchRookieUICapabilities", () => {
         },
       },
     });
+  });
+
+  test("submits Danbooru prompt-workbench upsample payloads to the backend", async () => {
+    const calls = [];
+    const result = await upsampleRookieUIPromptWorkbench(
+      { prompt: "masterpiece, city skyline", negative_prompt_tags: "blurry", ban_tags: "lowres" },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: { surface: "prompt_tools_upsample" },
+              action_id: "danbooru_upsample",
+              final_prompt: "masterpiece, city skyline, enhanced tags",
+              generated_suffix: "enhanced tags",
+              host_node_alias: "DanbooruTagsUpsampler",
+              availability: { status: "ready" },
+              warnings: [],
+              warning_codes: [],
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/upsample");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      prompt: "masterpiece, city skyline",
+      negative_prompt_tags: "blurry",
+      ban_tags: "lowres",
+    });
+    expect(result.data.final_prompt).toContain("enhanced tags");
   });
 
   test("updates prompt-workbench blacklist through the backend", async () => {

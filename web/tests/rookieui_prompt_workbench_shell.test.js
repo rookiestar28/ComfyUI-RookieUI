@@ -54,6 +54,19 @@ function createBootstrapState(overrides = {}) {
         ui_preferences: { default_open: false },
       },
       blacklist: { enabled: false, entries: [] },
+      host_actions: {
+        danbooru_upsample: {
+          action_id: "danbooru_upsample",
+          title: "Upsample Tags",
+          route_path: "/rookieui/prompt-tools/upsample",
+          available: true,
+          resolved_node_alias: "DanbooruTagsUpsampler",
+          availability: {
+            status: "ready",
+            detail: "Host-installed Danbooru upsampler node 'DanbooruTagsUpsampler' is ready.",
+          },
+        },
+      },
       language_options: [
         { code: "en", title: "English" },
         { code: "zh-TW", title: "Traditional Chinese" },
@@ -151,6 +164,18 @@ function createBootstrapState(overrides = {}) {
         instruction_preset: payload?.instruction_preset ?? "",
         image_description: payload?.image_description ?? "",
         generated_prompt: "masterpiece, city skyline, dusk lighting",
+      },
+    })),
+    upsamplePromptWorkbenchRequest: vi.fn(async (payload) => ({
+      ok: true,
+      data: {
+        action_id: "danbooru_upsample",
+        final_prompt: `${String(payload?.prompt ?? "")}, enhanced tags`,
+        generated_suffix: "enhanced tags",
+        host_node_alias: "DanbooruTagsUpsampler",
+        availability: { status: "ready" },
+        warnings: [],
+        warning_codes: [],
       },
     })),
     updatePromptWorkbenchStateRequest: vi.fn(async (_namespace, state) => ({
@@ -470,6 +495,110 @@ describe("prompt workbench shell", () => {
 
     document.getElementById("catalog-workbench-loras-0").click();
     expect(prompt.value).toContain("<lora:detail_tweaker.safetensors:0.8>");
+  });
+
+  test("applies Danbooru upsampled tags back into the active prompt", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    prompt.value = "masterpiece, city skyline";
+    negative.value = "blurry";
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "upsample-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("upsample-workbench-upsample-tags").click();
+    await flushPromises();
+
+    expect(bootstrapState.upsamplePromptWorkbenchRequest).toHaveBeenCalledWith({
+      prompt: "masterpiece, city skyline",
+      negative_prompt_tags: "blurry",
+      ban_tags: "",
+    });
+    expect(prompt.value).toBe("masterpiece, city skyline, enhanced tags");
+  });
+
+  test("shows truthful disabled detail when Danbooru host action is unavailable", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "en",
+          theme_style: "rookieui_classic",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: { default_provider: "", providers: {} },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+          ui_preferences: { default_open: false },
+        },
+        blacklist: { enabled: false, entries: [] },
+        host_actions: {
+          danbooru_upsample: {
+            action_id: "danbooru_upsample",
+            title: "Upsample Tags",
+            route_path: "/rookieui/prompt-tools/upsample",
+            available: false,
+            resolved_node_alias: "",
+            availability: {
+              status: "host_missing",
+              detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+            },
+          },
+        },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+        ],
+        theme_style_options: [
+          { id: "rookieui_classic", title: "RookieUI Classic" },
+          { id: "rookieui_graphite", title: "Graphite Studio" },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "upsample-disabled",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const button = document.getElementById("upsample-disabled-upsample-tags");
+    const detail = document.getElementById("upsample-disabled-upsample-detail");
+    expect(button.disabled).toBe(true);
+    expect(detail.textContent).toContain("Host-installed Danbooru upsampler node");
   });
 
   test("supports ai assist generation plus language and theme persistence", async () => {

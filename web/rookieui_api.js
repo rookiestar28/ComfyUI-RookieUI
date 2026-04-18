@@ -1,5 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
+const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
+
 const DEFAULT_CAPABILITIES = Object.freeze({
   service: "rookieui",
   visibility: "internal",
@@ -990,7 +992,7 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
     "/rookieui/prompt-tools/config",
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_config",
         route_family: "/rookieui/prompt-tools",
         state_schema_version: 1,
@@ -1024,6 +1026,22 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
       blacklist: {
         enabled: false,
         entries: [],
+      },
+      host_actions: {
+        danbooru_upsample: {
+          action_id: "danbooru_upsample",
+          title: "Upsample Tags",
+          route_path: "/rookieui/prompt-tools/upsample",
+          available: false,
+          fixed_profile: "host_node_defaults",
+          node_aliases: ["DanbooruTagsUpsampler", "DanbooruTagsUpsamplerNodeRay"],
+          resolved_node_alias: "",
+          availability: {
+            status: "host_missing",
+            detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+          },
+          input_fields: ["prompt", "negative_prompt_tags", "ban_tags"],
+        },
       },
       language_options: [
         { code: "en", title: "English" },
@@ -1087,7 +1105,7 @@ export async function fetchRookieUIPromptWorkbenchState(namespace, fetchImpl = g
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/state", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_state",
       },
       namespace: normalizedNamespace,
@@ -1113,7 +1131,7 @@ export async function updateRookieUIPromptWorkbenchState(namespace, state, fetch
     },
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_state",
       },
       namespace: normalizedNamespace,
@@ -1136,7 +1154,7 @@ export async function fetchRookieUIPromptWorkbenchHistory(namespace, fetchImpl =
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/history", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_history",
       },
       namespace: normalizedNamespace,
@@ -1152,7 +1170,7 @@ export async function fetchRookieUIPromptWorkbenchFavorites(namespace, fetchImpl
     buildPromptWorkbenchNamespacePath("/rookieui/prompt-tools/favorites", normalizedNamespace),
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_favorites",
       },
       namespace: normalizedNamespace,
@@ -1167,7 +1185,7 @@ export async function fetchRookieUIPromptWorkbenchProviders(fetchImpl = globalTh
     "/rookieui/prompt-tools/providers",
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_providers",
       },
       surfaces: {
@@ -1190,7 +1208,7 @@ export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetch
     `/rookieui/prompt-tools/catalog${suffix}`,
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_catalog",
       },
       group_tags: { language: normalizedLanguage || "en", source: "fallback", groups: [] },
@@ -1207,7 +1225,7 @@ export async function translateRookieUIPromptWorkbench(payload, fetchImpl = glob
     payload ?? {},
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_translate",
       },
       provider_id: String(payload?.provider ?? ""),
@@ -1228,7 +1246,7 @@ export async function assistRookieUIPromptWorkbench(payload, fetchImpl = globalT
     payload ?? {},
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_assist",
       },
       provider_id: String(payload?.provider ?? ""),
@@ -1243,13 +1261,37 @@ export async function assistRookieUIPromptWorkbench(payload, fetchImpl = globalT
   );
 }
 
+export async function upsampleRookieUIPromptWorkbench(payload, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/upsample",
+    payload ?? {},
+    {
+      contract: {
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
+        surface: "prompt_tools_upsample",
+      },
+      action_id: "danbooru_upsample",
+      final_prompt: String(payload?.prompt ?? ""),
+      generated_suffix: "",
+      host_node_alias: "",
+      availability: {
+        status: "host_missing",
+        detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+      },
+      warnings: [],
+      warning_codes: [],
+    },
+    fetchImpl,
+  );
+}
+
 export async function updateRookieUIPromptWorkbenchConfig(config, fetchImpl = globalThis.fetch) {
   return postRookieUIJson(
     "/rookieui/prompt-tools/config",
     { config: config ?? {} },
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_config",
       },
       config: config ?? {},
@@ -1264,7 +1306,7 @@ export async function fetchRookieUIPromptWorkbenchBlacklist(fetchImpl = globalTh
     "/rookieui/prompt-tools/blacklist",
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_blacklist",
       },
       blacklist: {
@@ -1472,7 +1514,7 @@ export async function updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImp
     { blacklist: blacklist ?? {} },
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_blacklist",
       },
       blacklist: blacklist ?? { enabled: false, entries: [] },
@@ -1493,7 +1535,7 @@ export async function updateRookieUIPromptWorkbenchHistory(namespace, action, pa
     },
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_history",
       },
       namespace: normalizedNamespace,
@@ -1515,7 +1557,7 @@ export async function updateRookieUIPromptWorkbenchFavorites(namespace, action, 
     },
     {
       contract: {
-        version: "r123f114f115f116f120-20260417",
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_favorites",
       },
       namespace: normalizedNamespace,
