@@ -137,11 +137,11 @@ Invoke-Checked "npm run test:types" { npm run test:types }
 Invoke-Checked "npm test" { npm test }
 
 if ($env:ROOKIEUI_RUN_LIVE_SMOKE -eq "1") {
-  Write-Host "[tests] 5/5 optional live host smoke lane"
-  Invoke-Checked "live smoke" { & $venvPython scripts\run_live_smoke_tests.py }
+  Write-Host "[tests] 5/5 optional host-embedded E2E lane"
+  Invoke-Checked "host-embedded E2E" { & $venvPython scripts\run_host_embedded_e2e.py }
 }
 else {
-  Write-Host "[tests] 5/5 optional live host smoke lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
+  Write-Host "[tests] 5/5 optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
 }
 
 Write-Host "[tests] PASS: full test gate completed."

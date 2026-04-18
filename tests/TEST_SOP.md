@@ -27,9 +27,9 @@ Required minimum gate:
 3. backend unit tests (`scripts/run_unittests.py`)
 4. frontend tests (`npm test`)
 5. targeted frontend type validation for TS-first seams (`npm run test:types`) when the change touches the typed frontend foundation
-Optional (recommended for newer-family loader/runtime changes):
+Optional (recommended for runtime/host-integration changes):
 
-6. live host smoke lane (`scripts/run_live_smoke_tests.py`)
+6. host-embedded E2E lane (`scripts/run_host_embedded_e2e.py`, which delegates to `scripts/run_live_smoke_tests.py`)
 
 ### Bugfix/Hotfix Rule (Reproduce -> Pin -> Sweep)
 
@@ -69,7 +69,7 @@ powershell -File scripts/run_full_tests_windows.ps1
 bash scripts/run_full_tests_linux.sh
 ```
 
-Enable optional live host smoke lane in either wrapper script:
+Enable optional host-embedded E2E lane in either wrapper script:
 
 - PowerShell:
 
@@ -133,22 +133,22 @@ npm run test:types
 npm test
 ```
 
-5. Optional live host smoke lane (recommended for profile/model-loader changes):
+5. Optional host-embedded E2E lane (recommended for runtime/host-integration changes):
 
 ```bash
-python scripts/run_live_smoke_tests.py
+python scripts/run_host_embedded_e2e.py
 ```
 
-Optional execute mode (real txt2img submission + queue polling):
+Strict report-only contract pass:
 
 ```bash
-ROOKIEUI_LIVE_SMOKE_EXECUTE=1 python scripts/run_live_smoke_tests.py
+python scripts/run_host_embedded_e2e.py --skip-execute
 ```
 
 Optional base URL override:
 
 ```bash
-ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_live_smoke_tests.py
+ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_host_embedded_e2e.py
 ```
 
 ## Environment Guardrails
