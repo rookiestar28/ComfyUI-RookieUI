@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Prompt Workbench Danbooru host-action integration (new functionality/stability)</strong></summary>
+
+- Added a truthful `Upsample Tags` editor-toolbar action to `Prompt Workbench`, backed by a dedicated RookieUI `/rookieui/prompt-tools/upsample` route and host-node detection against the active ComfyUI registry.
+- The new action applies returned prompt text back into the active `Prompt Workbench` draft and bound prompt input without changing existing translation, AI-assist, history/favorites, or formatting behavior.
+- When the host-side Danbooru upsampler node is missing or unavailable, RookieUI now reports explicit disabled-state and route-level `host-unavailable` behavior instead of implying the action is always present.
+- Prompt Workbench live-host validation now covers the Danbooru host-action path, and restarted-host `full-pipeline` report/execute acceptance now includes the prompt-workbench lane.
+
+</details>
+
+<details>
+
 <summary><strong>Stateful-surface durability and live-host freshness hardening (stability/tooling)</strong></summary>
 
 - Hardened `Prompt Workbench` and `XYZ Plot` persisted state with atomic JSON writes and corrupt-state quarantine instead of silent reset-on-parse-failure behavior.
@@ -268,6 +279,7 @@ Current extension seams:
 - [Feature Overview](#feature-overview)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
+    - [Prompt Workbench Danbooru Upsampler Action](#prompt-workbench-danbooru-upsampler-action)
   - [XYZ Plot](#xyz-plot)
   - [ControlNet Support](#controlnet-support)
   - [ADetailer Support](#adetailer-support)
@@ -335,6 +347,7 @@ If your host or Manager install path does not automatically install custom-node 
 - persisted `prompt` / `negative` namespace state, history, and favorites
 - quick-insert catalogs for group tags, prompt-library entries, embeddings, and LoRA references
 - translation, prompt analysis, AI assist delivery, and blacklist-aware formatting tools
+- truthful Danbooru host-action support for `Upsample Tags` when the host-side upsampler node is installed and available
 - provider truthfulness for shipped, deferred, reference-only, and misconfigured Prompt Workbench provider states
 
 ### XYZ Plot
@@ -406,7 +419,8 @@ Simple usage:
 2. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit, then use `Capture Current Text` if you want to pull the current field value into the workbench explicitly.
 3. Use the `Editor`, `History`, `Favorites`, `Catalog`, `Assist`, and `Format` panels as needed; token insertion, formatting cleanup, blacklist application, translation, and AI assist all operate on the active scope.
 4. Choose a configured shipped translation or AI-assist provider before running translation/assist actions, then apply the returned text back into the active RookieUI prompt field.
-5. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
+5. Use `Upsample Tags` when you want the active prompt expanded through the host-installed Danbooru upsampler node; the returned text writes back into the current Prompt Workbench draft and prompt field.
+6. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
 
 Behavior and compatibility:
 
@@ -415,7 +429,23 @@ Behavior and compatibility:
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, deferred, reference-only, or otherwise unavailable on the current host/setup.
 - The current shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist currently uses the OpenAI-compatible provider contract.
-- The shipped live-host smoke lane validates config/state payloads, provider/catalog/analyze responses, history/favorites/blacklist persistence, translation behavior, and AI-assist truthfulness against the current host.
+- The shipped live-host smoke lane validates config/state payloads, provider/catalog/analyze responses, history/favorites/blacklist persistence, translation behavior, AI-assist truthfulness, and the Danbooru host-action path against the current host.
+
+#### Prompt Workbench Danbooru Upsampler Action
+
+Simple usage:
+
+1. Install the host-side `ComfyUI-Danbooru-Tags-Upsampler` node in the same ComfyUI environment as RookieUI, then restart ComfyUI so the node is visible in the active host registry.
+2. Open `txt2img` or `img2img`, click `Open Workbench`, and stay on the primary `Prompt` scope.
+3. Prepare the current prompt text, then click `Upsample Tags`.
+4. RookieUI sends the current prompt through the host Danbooru upsampler route and applies the returned text back into the active workbench draft and bound prompt field.
+
+Behavior and compatibility:
+
+- `Upsample Tags` is a host action, not a translation provider or AI-assist provider.
+- The action is currently limited to the primary `Prompt` scope; it is intentionally disabled on the `Negative` scope.
+- RookieUI only enables the action when the active ComfyUI host exposes a compatible Danbooru upsampler node alias.
+- If the host node is missing or unavailable, the toolbar remains truthful through disabled-state messaging and the backend route returns explicit `host-unavailable` status instead of pretending the feature exists.
 
 ---
 
@@ -546,12 +576,12 @@ Freshness note:
 Current live-host coverage:
 
 - `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
-- `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, and AI-assist delivery semantics.
+- `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, AI-assist delivery semantics, and the Danbooru `Upsample Tags` host-action path.
 - `xyz-plot`: validates axis/estimate contracts plus queue-backed session execution, terminal results, and assembled grid asset delivery.
 - `controlnet`: validates host-context compatibility, detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure.
 - `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
 - `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
-- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, and `xyz-plot` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
+- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, `xyz-plot`, and `prompt-workbench` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
 
 ### Default Model Read Paths (Host ComfyUI)
 
