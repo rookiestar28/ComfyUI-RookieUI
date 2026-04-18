@@ -211,6 +211,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "zImageTurboNSFW_21BF16AIO.safetensors",
     "wan2_2b.safetensors",
     "animaPencilXL_v500.safetensors",
+    "ernie-image.safetensors",
   ];
   const diffusionProfileDefaults = {
     flux: "flux1-dev.safetensors",
@@ -220,6 +221,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     zit: "zImageTurboNSFW_21BF16AIO.safetensors",
     wan: "wan2_2b.safetensors",
     anima: "animaPencilXL_v500.safetensors",
+    ernie_image: "ernie-image.safetensors",
   };
   const clipSkipPresetMatrix = [
     { id: "sd15", textEncoderVisible: false, ignoredHint: false },
@@ -231,6 +233,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     { id: "zit", textEncoderVisible: true, ignoredHint: true },
     { id: "wan", textEncoderVisible: true, ignoredHint: true },
     { id: "anima", textEncoderVisible: true, ignoredHint: true },
+    { id: "ernie_image", textEncoderVisible: true, ignoredHint: true },
   ];
 
   for (const row of clipSkipPresetMatrix) {

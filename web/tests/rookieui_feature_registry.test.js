@@ -77,8 +77,8 @@ describe("rookieui feature registry", () => {
           data: {
             service: "rookieui",
             model_families: {
-              contract_version: "f72-20260418",
-              entries: [{ id: "flux", text_encoder_visible: true }],
+              contract_version: "f72-20260418b",
+              entries: [{ id: "ernie_image", text_encoder_visible: true }],
             },
           },
         }),
@@ -104,8 +104,8 @@ describe("rookieui feature registry", () => {
     expect(bootstrapData.xyzPlot).toEqual({ axes: { steps: { axis_id: "steps" } } });
     expect(bootstrapData.promptWorkbench).toEqual({ config: { language: "en" } });
     expect(bootstrapData.controlnetCatalog.model_list).toEqual(["canny.safetensors"]);
-    expect(bootstrapData.modelFamilyRegistry.contract_version).toBe("f72-20260418");
-    expect(bootstrapData.modelFamilyRegistry.entries[0].id).toBe("flux");
+    expect(bootstrapData.modelFamilyRegistry.contract_version).toBe("f72-20260418b");
+    expect(bootstrapData.modelFamilyRegistry.entries[0].id).toBe("ernie_image");
     expect(bootstrapData.adetailerCatalog).toEqual({ detectors: [] });
   });
 });

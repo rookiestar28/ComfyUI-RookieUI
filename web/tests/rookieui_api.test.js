@@ -68,7 +68,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f72-20260418");
+    expect(result.data.model_families.contract_version).toBe("f72-20260418b");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
@@ -189,6 +189,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(models.data.catalog.primary_model_category_by_family.pony).toBe("checkpoints");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.ernie_image).toBe("diffusion_models");
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);
     expect(compatibility.data.samplers[0].id).toBe("euler_ancestral");
     expect(compatibility.data.schedulers[0].id).toBe("normal");
@@ -200,6 +201,7 @@ describe("fetchRookieUICapabilities", () => {
       "zit",
       "wan",
       "anima",
+      "ernie_image",
     ]);
     expect(presets.data.presets[0].id).toBe("sd15");
     expect(presets.data.presets.map((preset) => preset.id)).toEqual([
@@ -212,9 +214,11 @@ describe("fetchRookieUICapabilities", () => {
       "zit",
       "wan",
       "anima",
+      "ernie_image",
     ]);
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
+    expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
     expect(queue.data.queue_remaining).toBe(0);
   });
 
