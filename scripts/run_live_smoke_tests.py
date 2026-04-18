@@ -20,6 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.contracts.adetailer import ADETAILER_INTEGRATED_CONTRACT_VERSION
@@ -38,6 +39,10 @@ from rookieui.services.adetailer import (
 )
 from rookieui.services.adetailer_runtime import ADETAILER_RUNTIME_READY
 from rookieui.services.parity_matrix import get_parity_profile
+from rookieui.services.model_inventory import (
+    resolve_text_encoder_selector_context,
+    resolve_vae_selector_context,
+)
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from rookieui.services.version import resolve_runtime_build_fingerprint
 from tests.prompt_parity_fixtures import (
@@ -56,6 +61,7 @@ _NON_SD_DIFFUSION_PROFILES: tuple[str, ...] = (
     "zit",
     "wan",
     "anima",
+    "ernie_image",
 )
 _CONTROLNET_VALIDATION_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _ADETAILER_VALIDATION_PROFILES: tuple[str, ...] = _CONTROLNET_VALIDATION_PROFILES
@@ -2914,6 +2920,11 @@ def _validate_catalog_contract(
         for model in models_payload.get("diffusion_models", [])
         if isinstance(model, str) and str(model).strip()
     ]
+    vae_models = [
+        str(model).strip()
+        for model in models_payload.get("vae", [])
+        if isinstance(model, str) and str(model).strip()
+    ]
     text_encoders = [
         str(model).strip()
         for model in models_payload.get("text_encoders", [])
@@ -2943,6 +2954,13 @@ def _validate_catalog_contract(
             errors.append(
                 f"profile '{profile_id}' checkpoint '{checkpoint_name}' not found in /rookieui/models.diffusion_models."
             )
+        lowered_checkpoint = checkpoint_name.lower()
+
+        vae_name = str(preset.get("vae_name", "")).strip()
+        if vae_name and vae_name not in vae_models:
+            errors.append(
+                f"profile '{profile_id}' vae '{vae_name}' not found in /rookieui/models.vae."
+            )
 
         text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
         if text_encoder_name and text_encoder_name not in text_encoders:
@@ -2951,12 +2969,32 @@ def _validate_catalog_contract(
             )
 
         lowered_text_encoder = text_encoder_name.lower()
-        # CRITICAL: non-Qwen diffusion profiles must not inherit Qwen text encoders; this exact mismatch caused runtime crashes.
+        # CRITICAL: newer-family diffusion presets must keep the host-native text-encoder family aligned; mismatches crash execution.
         if profile_id == "qwen_image":
             if "qwen" not in lowered_text_encoder:
                 errors.append(
                     f"profile '{profile_id}' expected a Qwen text encoder but got '{text_encoder_name}'."
                 )
+        elif profile_id == "ernie_image":
+            if "ernie" not in lowered_checkpoint:
+                errors.append(
+                    f"profile '{profile_id}' expected an ERNIE diffusion-model checkpoint but got '{checkpoint_name}'."
+                )
+            if not any("ernie" in model.lower() for model in diffusion_models):
+                errors.append("profile 'ernie_image' host diffusion model catalog did not expose any ERNIE selector.")
+            if not any("ernie" in model.lower() for model in vae_models):
+                errors.append("profile 'ernie_image' host VAE catalog did not expose any ERNIE selector.")
+            if not any("ernie" in model.lower() or "ministral" in model.lower() for model in text_encoders):
+                errors.append(
+                    "profile 'ernie_image' host text encoder catalog did not expose any ERNIE/Ministral selector."
+                )
+            if lowered_text_encoder and "ernie" not in lowered_text_encoder and "ministral" not in lowered_text_encoder:
+                errors.append(
+                    f"profile '{profile_id}' expected an ERNIE/Ministral text encoder but got '{text_encoder_name}'."
+                )
+            lowered_vae = vae_name.lower()
+            if lowered_vae and "ernie" not in lowered_vae:
+                errors.append(f"profile '{profile_id}' expected an ERNIE VAE but got '{vae_name}'.")
         elif "qwen" in lowered_text_encoder:
             errors.append(
                 f"profile '{profile_id}' must not default to a Qwen text encoder ('{text_encoder_name}')."
@@ -2965,14 +3003,64 @@ def _validate_catalog_contract(
     return errors, presets_by_id
 
 
-def _build_txt2img_payload(profile_id: str, preset: dict[str, Any], client_id: str) -> dict[str, Any]:
+def _build_inventory_snapshot_from_models_payload(models_payload: dict[str, Any]) -> ModelInventorySnapshot:
+    def _list_field(field_name: str) -> list[str]:
+        values = models_payload.get(field_name, [])
+        return [str(value).strip() for value in values if isinstance(value, str) and str(value).strip()]
+
+    checkpoints = _list_field("checkpoints")
+    vae = _list_field("vae")
+    text_encoders = _list_field("text_encoders")
+    return ModelInventorySnapshot(
+        source=str(models_payload.get("source", "host")).strip() or "host",
+        checkpoints=checkpoints,
+        clip=_list_field("clip"),
+        clip_vision=_list_field("clip_vision"),
+        controlnet=_list_field("controlnet"),
+        diffusion_models=_list_field("diffusion_models"),
+        vae=vae,
+        text_encoders=text_encoders,
+        embeddings=_list_field("embeddings"),
+        loras=_list_field("loras"),
+        ultralytics=_list_field("ultralytics"),
+        ultralytics_bbox=_list_field("ultralytics_bbox"),
+        ultralytics_segm=_list_field("ultralytics_segm"),
+        unet=_list_field("unet"),
+        upscale_models=_list_field("upscale_models"),
+        default_checkpoint=str(models_payload.get("default_checkpoint", checkpoints[0] if checkpoints else "__host_default__")),
+        default_vae=str(models_payload.get("default_vae", vae[0] if vae else "Automatic")),
+        default_text_encoder=str(
+            models_payload.get("default_text_encoder", text_encoders[0] if text_encoders else "Automatic")
+        ),
+    )
+
+
+def _build_txt2img_payload(
+    profile_id: str,
+    preset: dict[str, Any],
+    client_id: str,
+    *,
+    models_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    vae_name = str(preset.get("vae_name", "Automatic")).strip() or "Automatic"
+    text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
+    if models_payload is not None:
+        inventory = _build_inventory_snapshot_from_models_payload(models_payload)
+        if vae_name == "Automatic":
+            resolved_vae = resolve_vae_selector_context(profile_id, inventory)
+            if resolved_vae:
+                vae_name = resolved_vae
+        if not text_encoder_name or text_encoder_name == "Automatic":
+            resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, inventory)
+            if resolved_text_encoder and resolved_text_encoder != "Automatic":
+                text_encoder_name = resolved_text_encoder
     return {
         "prompt": f"[rookieui live smoke] {profile_id}",
         "negative_prompt": "",
         "profile": profile_id,
         "checkpoint_name": str(preset.get("checkpoint_name", "")).strip(),
-        "vae_name": str(preset.get("vae_name", "Automatic")).strip() or "Automatic",
-        "text_encoder_name": str(preset.get("text_encoder_name", "")).strip(),
+        "vae_name": vae_name,
+        "text_encoder_name": text_encoder_name,
         "width": int(preset.get("width", 1024)),
         "height": int(preset.get("height", 1024)),
         "steps": 1,
@@ -3743,6 +3831,7 @@ def _poll_queue_job_until_terminal(
 def _run_execute_smoke(
     base_url: str,
     profiles: list[str],
+    models_payload: dict[str, Any],
     presets_by_id: dict[str, dict[str, Any]],
     *,
     request_timeout_seconds: float,
@@ -3756,7 +3845,12 @@ def _run_execute_smoke(
             errors.append(f"profile '{profile_id}' missing preset; execute lane skipped.")
             continue
         client_id = f"rookieui-live-smoke-{profile_id}"
-        request_payload = _build_txt2img_payload(profile_id, preset, client_id)
+        request_payload = _build_txt2img_payload(
+            profile_id,
+            preset,
+            client_id,
+            models_payload=models_payload,
+        )
         submit_result = _request_json(
             "POST",
             f"{base_url}/rookieui/generate/txt2img",
@@ -4460,6 +4554,7 @@ def main() -> int:
             execution_errors = _run_execute_smoke(
                 base_url,
                 profiles,
+                models_payload,
                 presets_by_id,
                 request_timeout_seconds=args.request_timeout_seconds,
                 poll_timeout_seconds=args.poll_timeout_seconds,

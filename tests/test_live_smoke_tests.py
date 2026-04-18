@@ -127,6 +127,12 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             "sd15,pony,illustrious,noob,sdxl",
         )
 
+    def test_default_profiles_for_catalog_include_ernie_image(self) -> None:
+        self.assertEqual(
+            live_smoke._default_profiles_for_mode("catalog"),
+            "flux,qwen_image,klein,lumina,zit,wan,anima,ernie_image",
+        )
+
     def test_build_prompt_parity_host_context_selects_healthy_sd_family_selectors(self) -> None:
         models_payload = {
             "checkpoints": [
@@ -407,6 +413,130 @@ class LiveSmokePromptWorkbenchTests(unittest.TestCase):
         self.assertTrue(context.danbooru_available)
         self.assertEqual(context.danbooru_availability, "ready")
         self.assertEqual(context.danbooru_resolved_node_alias, "DanbooruTagsUpsampler")
+
+
+class LiveSmokeCatalogTests(unittest.TestCase):
+    def test_build_txt2img_payload_resolves_profile_aware_ernie_selectors_from_models_payload(self) -> None:
+        payload = live_smoke._build_txt2img_payload(
+            "ernie_image",
+            {
+                "checkpoint_name": "ernie\\ernie-image.safetensors",
+                "vae_name": "Automatic",
+                "text_encoder_name": "",
+            },
+            "client-1",
+            models_payload={
+                "source": "host",
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["ernie\\ernie-image.safetensors"],
+                "vae": ["ernie_vae.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "default_checkpoint": "realvisxl.safetensors",
+                "default_vae": "ernie_vae.safetensors",
+                "default_text_encoder": "Ministral3_3B_fp16.safetensors",
+            },
+        )
+
+        self.assertEqual(payload["text_encoder_name"], "Ministral3_3B_fp16.safetensors")
+        self.assertEqual(payload["vae_name"], "ernie_vae.safetensors")
+
+    def test_validate_catalog_contract_accepts_ernie_image_with_blank_text_encoder_selector(self) -> None:
+        errors, presets_by_id = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["ernie\\ernie-image.safetensors"],
+                "vae": ["ernie_vae.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "ernie_image",
+                        "checkpoint_name": "ernie\\ernie-image.safetensors",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                    }
+                ]
+            },
+            ["ernie_image"],
+        )
+
+        self.assertEqual(errors, [])
+        self.assertIn("ernie_image", presets_by_id)
+
+    def test_validate_catalog_contract_accepts_ernie_image_with_ministral_text_encoder(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["ernie\\ernie-image.safetensors"],
+                "vae": ["ernie_vae.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "ernie_image",
+                        "checkpoint_name": "ernie\\ernie-image.safetensors",
+                        "vae_name": "ernie_vae.safetensors",
+                        "text_encoder_name": "Ministral3_3B_fp16.safetensors",
+                    }
+                ]
+            },
+            ["ernie_image"],
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_catalog_contract_reports_non_ernie_text_encoder_for_ernie_image(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["ernie\\ernie-image.safetensors"],
+                "vae": ["ernie_vae.safetensors"],
+                "text_encoders": ["clip_l.safetensors", "Ministral3_3B_fp16.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "ernie_image",
+                        "checkpoint_name": "ernie\\ernie-image.safetensors",
+                        "vae_name": "ernie_vae.safetensors",
+                        "text_encoder_name": "clip_l.safetensors",
+                    }
+                ]
+            },
+            ["ernie_image"],
+        )
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn("ERNIE/Ministral", errors[0])
+
+    def test_validate_catalog_contract_reports_missing_ernie_host_assets(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Anima\\animaCatTower_v02.safetensors"],
+                "vae": ["Flux-Krea-vae.safetensors"],
+                "text_encoders": ["clip_l.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "ernie_image",
+                        "checkpoint_name": "Anima\\animaCatTower_v02.safetensors",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                    }
+                ]
+            },
+            ["ernie_image"],
+        )
+
+        self.assertEqual(len(errors), 4)
+        self.assertIn("expected an ERNIE diffusion-model checkpoint", errors[0])
+        self.assertIn("host diffusion model catalog", errors[1])
+        self.assertIn("host VAE catalog", errors[2])
+        self.assertIn("host text encoder catalog", errors[3])
 
     def test_validate_prompt_workbench_host_sync_reports_contract_drift(self) -> None:
         errors = live_smoke._validate_prompt_workbench_host_sync(
