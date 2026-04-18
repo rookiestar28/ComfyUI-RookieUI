@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Stateful-surface durability and live-host freshness hardening (stability/tooling)</strong></summary>
+
+- Hardened `Prompt Workbench` and `XYZ Plot` persisted state with atomic JSON writes and corrupt-state quarantine instead of silent reset-on-parse-failure behavior.
+- Added `XYZ Plot` async session-state coordination and bounded stale-session pruning so long-running hosts keep queue-backed sweep state consistent without unbounded retained history.
+- Added backend runtime build fingerprint metadata on RookieUI bootstrap/capability payloads and a live-host freshness hard gate in `scripts/run_live_smoke_tests.py`.
+- Live-host acceptance now refuses stale or not-yet-restarted ComfyUI processes before any validation lane executes, then revalidates `full-pipeline` report/execute on the restarted in-sync host.
+
+</details>
+
+<details>
+
 <summary><strong>Prompt Workbench and XYZ Plot delivery (new functionality/stability)</strong></summary>
 
 - Shipped an integrated `Prompt Workbench` in the `txt2img` and `img2img` prompt band, with persisted prompt/negative namespaces, quick-insert catalogs, translation tooling, AI assist delivery, history/favorites, and blacklist-aware formatting.
@@ -526,6 +537,11 @@ Runtime and validation notes:
 ### Live-Host Validation Coverage
 
 RookieUI now ships internal live-host smoke lanes in [`scripts/run_live_smoke_tests.py`](scripts/run_live_smoke_tests.py) for acceptance against a restarted ComfyUI host. These lanes are developer/acceptance tooling rather than end-user UI toggles, but they document the current level of host-embedded proof behind the shipped surfaces.
+
+Freshness note:
+
+- Live-host validation is now hard-gated by backend runtime fingerprint metadata exposed from the active ComfyUI process.
+- If the host has not restarted onto the current RookieUI code, the smoke runner fails before any validation lane executes instead of treating stale-host results as valid acceptance evidence.
 
 Current live-host coverage:
 
