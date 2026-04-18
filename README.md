@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Official non-SD template preset expansion and truthful host gating (new functionality/stability)</strong></summary>
+
+- Expanded RookieUI's non-SD preset matrix to the official ComfyUI text-to-image templates currently tracked in `reference/workflow_templates`, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
+- Tightened live-host catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
+- Completed restarted-host catalog/execute proof for the current asset-ready official non-SD subset: `Anima`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Z-Image`, and `Z-Image Turbo`.
+
+</details>
+
+<details>
+
 <summary><strong>Prompt Workbench Danbooru host-action integration (new functionality/stability)</strong></summary>
 
 - Added a truthful `Upsample Tags` editor-toolbar action to `Prompt Workbench`, backed by a dedicated RookieUI `/rookieui/prompt-tools/upsample` route and host-node detection against the active ComfyUI registry.
@@ -277,6 +288,7 @@ Current extension seams:
 - [Last Update](#last-update---click-to-expand)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
+  - [Official Non-SD Template Presets](#official-non-sd-template-presets)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
     - [Prompt Workbench Danbooru Upsampler Action](#prompt-workbench-danbooru-upsampler-action)
@@ -327,7 +339,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 - A1111-like compact tab rail and control panel layout
 - Hero `Generate` rail with compact action icons
-- Family-aware preset behavior (SD-family first) with Flux/Qwen preset lanes
+- Family-aware preset behavior with SD-family parity lanes plus official non-SD template-backed preset/profile lanes
 - Progress text and queue/history integration in sidebar flow
 - Live preview panel with runtime updates and flicker-mitigated rendering
 - Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
@@ -339,6 +351,7 @@ If your host or Manager install path does not automatically install custom-node 
 - `img2img` mode surface: `img2img`, `sketch`, `inpaint`, `inpaint_sketch`, `inpaint_upload`, `batch`
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
 - Stable Diffusion family prompt semantics parity for `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, and embeddings / textual inversion tokens
+- Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
 ### Prompt Workbench
@@ -384,19 +397,25 @@ If your host or Manager install path does not automatically install custom-node 
 ### Model Controls
 
 - SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics and inventory-aware embeddings / textual inversion handling
-- Flux and Qwen-Image expose selectable text encoder controls
+- Official non-SD template presets now surface family-specific controls only when the upstream workflow exposes them, including `Shift`, `Flux Guidance`, and `Prompt Enhancement`
+- Fixed template-owned encoder bundles keep `Text Encoder` controls hidden on the shipped official non-SD preset matrix instead of implying a user-selectable pairing that the official template does not expose
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
+
+### Official Non-SD Template Presets
+
+- RookieUI now ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- These presets follow official template defaults for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
+- Family-specific controls are now preserved where the official workflows require them:
+  - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
+  - `Flux Guidance`: `Longcat BF16`
+  - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
+- Official `Edit` workflows are being added incrementally through a later `img2img` / edit chain. `Edit`-marked templates, plus `Flux.2 Dev` because its official graph includes `LoadImage` / `VAEEncode`, are intentionally deferred from the current txt2img preset rollout.
 
 ### Model Support
 
 - Stable Diffusion family
-- Flux family (expanded coverage)
-- Qwen-Image family (expanded coverage)
-- Wan family
-- ZiT family
-- Klein family
-- Lumina family
-- Anima family
+- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1` / `Flux.2 Klein`, `HiDream i1`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
+- `Z-Image` also covers the current Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
 
 Prompt semantics note:
 
@@ -575,6 +594,7 @@ Freshness note:
 
 Current live-host coverage:
 
+- `catalog`: validates preset/bootstrap truth plus official non-SD family/template readiness; hosts that are missing required template assets are reported as host-prerequisite gaps instead of repo regressions or silent fallback passes.
 - `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
 - `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, AI-assist delivery semantics, and the Danbooru `Upsample Tags` host-action path.
 - `xyz-plot`: validates axis/estimate contracts plus queue-backed session execution, terminal results, and assembled grid asset delivery.
@@ -582,6 +602,17 @@ Current live-host coverage:
 - `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
 - `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
 - `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, `xyz-plot`, and `prompt-workbench` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
+
+Current official non-SD execute-proven subset on the acceptance host:
+
+- `anima`
+- `ernie_image`
+- `ernie_image_turbo`
+- `flux`
+- `z_image`
+- `z_image_turbo`
+
+Other official non-SD presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, LoRA, or other template asset is installed in that specific ComfyUI environment.
 
 ### Default Model Read Paths (Host ComfyUI)
 
