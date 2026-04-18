@@ -127,10 +127,14 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             "sd15,pony,illustrious,noob,sdxl",
         )
 
-    def test_default_profiles_for_catalog_include_ernie_image(self) -> None:
+    def test_default_profiles_for_catalog_include_official_non_sd_matrix(self) -> None:
         self.assertEqual(
             live_smoke._default_profiles_for_mode("catalog"),
-            "flux,qwen_image,klein,lumina,zit,wan,anima,ernie_image",
+            (
+                "anima,chroma,ernie_image,ernie_image_turbo,flux,klein_4b_distilled,klein_4b,"
+                "klein_9b_distilled,klein_9b,hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
+                "longcat_image,qwen_image,z_image,z_image_turbo"
+            ),
         )
 
     def test_build_prompt_parity_host_context_selects_healthy_sd_family_selectors(self) -> None:
@@ -423,29 +427,31 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                 "checkpoint_name": "ernie\\ernie-image.safetensors",
                 "vae_name": "Automatic",
                 "text_encoder_name": "",
+                "prompt_enhancement_enabled": True,
             },
             "client-1",
             models_payload={
                 "source": "host",
                 "checkpoints": ["realvisxl.safetensors"],
                 "diffusion_models": ["ernie\\ernie-image.safetensors"],
-                "vae": ["ernie_vae.safetensors"],
-                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "vae": ["flux2-vae.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
                 "default_checkpoint": "realvisxl.safetensors",
-                "default_vae": "ernie_vae.safetensors",
+                "default_vae": "flux2-vae.safetensors",
                 "default_text_encoder": "Ministral3_3B_fp16.safetensors",
             },
         )
 
         self.assertEqual(payload["text_encoder_name"], "Ministral3_3B_fp16.safetensors")
-        self.assertEqual(payload["vae_name"], "ernie_vae.safetensors")
+        self.assertEqual(payload["vae_name"], "flux2-vae.safetensors")
+        self.assertTrue(payload["prompt_enhancement_enabled"])
 
     def test_validate_catalog_contract_accepts_ernie_image_with_blank_text_encoder_selector(self) -> None:
         errors, presets_by_id = live_smoke._validate_catalog_contract(
             {
                 "diffusion_models": ["ernie\\ernie-image.safetensors"],
                 "vae": ["ernie_vae.safetensors"],
-                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
                 "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
             },
             {
@@ -455,6 +461,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                         "checkpoint_name": "ernie\\ernie-image.safetensors",
                         "vae_name": "",
                         "text_encoder_name": "",
+                        "prompt_enhancement_enabled": True,
                     }
                 ]
             },
@@ -469,7 +476,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
             {
                 "diffusion_models": ["ernie\\ernie-image.safetensors"],
                 "vae": ["ernie_vae.safetensors"],
-                "text_encoders": ["Ministral3_3B_fp16.safetensors"],
+                "text_encoders": ["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
                 "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
             },
             {
@@ -479,6 +486,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                         "checkpoint_name": "ernie\\ernie-image.safetensors",
                         "vae_name": "ernie_vae.safetensors",
                         "text_encoder_name": "Ministral3_3B_fp16.safetensors",
+                        "prompt_enhancement_enabled": True,
                     }
                 ]
             },
@@ -492,7 +500,11 @@ class LiveSmokeCatalogTests(unittest.TestCase):
             {
                 "diffusion_models": ["ernie\\ernie-image.safetensors"],
                 "vae": ["ernie_vae.safetensors"],
-                "text_encoders": ["clip_l.safetensors", "Ministral3_3B_fp16.safetensors"],
+                "text_encoders": [
+                    "clip_l.safetensors",
+                    "Ministral3_3B_fp16.safetensors",
+                    "ernie-image-prompt-enhancer.safetensors",
+                ],
                 "catalog": {"primary_model_category_by_family": {"ernie_image": "diffusion_models"}},
             },
             {
@@ -502,14 +514,16 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                         "checkpoint_name": "ernie\\ernie-image.safetensors",
                         "vae_name": "ernie_vae.safetensors",
                         "text_encoder_name": "clip_l.safetensors",
+                        "prompt_enhancement_enabled": True,
                     }
                 ]
             },
             ["ernie_image"],
         )
 
-        self.assertEqual(len(errors), 1)
-        self.assertIn("ERNIE/Ministral", errors[0])
+        joined_errors = "\n".join(errors)
+        self.assertIn("family-aligned text encoder", joined_errors)
+        self.assertIn("ERNIE/Ministral", joined_errors)
 
     def test_validate_catalog_contract_reports_missing_ernie_host_assets(self) -> None:
         errors, _ = live_smoke._validate_catalog_contract(
@@ -526,17 +540,71 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                         "checkpoint_name": "Anima\\animaCatTower_v02.safetensors",
                         "vae_name": "",
                         "text_encoder_name": "",
+                        "prompt_enhancement_enabled": False,
                     }
                 ]
             },
             ["ernie_image"],
         )
 
-        self.assertEqual(len(errors), 4)
-        self.assertIn("expected an ERNIE diffusion-model checkpoint", errors[0])
-        self.assertIn("host diffusion model catalog", errors[1])
-        self.assertIn("host VAE catalog", errors[2])
-        self.assertIn("host text encoder catalog", errors[3])
+        self.assertGreaterEqual(len(errors), 5)
+        joined_errors = "\n".join(errors)
+        self.assertIn("expected an ERNIE diffusion-model checkpoint", joined_errors)
+        self.assertIn("host diffusion model catalog", joined_errors)
+        self.assertIn("host VAE catalog", joined_errors)
+        self.assertIn("host text encoder catalog", joined_errors)
+        self.assertIn("prompt_enhancement_enabled=True", joined_errors)
+
+    def test_validate_catalog_contract_accepts_flux_with_official_encoder_sequence(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Flux\\flux1-dev.safetensors"],
+                "vae": ["ae.safetensors"],
+                "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"flux": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "flux",
+                        "checkpoint_name": "Flux\\flux1-dev.safetensors",
+                        "vae_name": "ae.safetensors",
+                        "text_encoder_name": "clip_l.safetensors|t5xxl_fp8_e4m3fn.safetensors",
+                        "prompt_enhancement_enabled": False,
+                    }
+                ]
+            },
+            ["flux"],
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_catalog_contract_reports_wrong_chroma_family_fallback(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Anima\\animaCatTower_v02.safetensors"],
+                "vae": ["Flux-Krea-vae.safetensors"],
+                "text_encoders": ["t5xxl_fp8_e4m3fn.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"chroma": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "chroma",
+                        "checkpoint_name": "Anima\\animaCatTower_v02.safetensors",
+                        "vae_name": "Flux-Krea-vae.safetensors",
+                        "text_encoder_name": "t5xxl_fp8_e4m3fn.safetensors",
+                        "shift": 1.0,
+                        "prompt_enhancement_enabled": False,
+                    }
+                ]
+            },
+            ["chroma"],
+        )
+
+        joined_errors = "\n".join(errors)
+        self.assertIn("family-aligned diffusion-model checkpoint", joined_errors)
+        self.assertIn("host diffusion model catalog did not expose the expected family selector", joined_errors)
 
     def test_validate_prompt_workbench_host_sync_reports_contract_drift(self) -> None:
         errors = live_smoke._validate_prompt_workbench_host_sync(
