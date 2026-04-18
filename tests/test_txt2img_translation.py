@@ -377,8 +377,12 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 source="host",
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["ernie\\ernie-image.safetensors"],
-                vae=["ernie_vae.safetensors"],
-                text_encoders=["Ministral3_3B_fp16.safetensors", "QwenImageTEModel_.safetensors"],
+                vae=["flux2-vae.safetensors", "ernie_vae.safetensors"],
+                text_encoders=[
+                    "Ministral3_3B_fp16.safetensors",
+                    "ernie-image-prompt-enhancer.safetensors",
+                    "QwenImageTEModel_.safetensors",
+                ],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="qwen_image_vae.safetensors",
@@ -397,7 +401,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(normalized.text_encoder_name, "Ministral3_3B_fp16.safetensors")
-        self.assertEqual(normalized.vae_name, "ernie_vae.safetensors")
+        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
+        self.assertEqual(normalized.vae_name, "flux2-vae.safetensors")
 
     def test_normalize_txt2img_request_uses_profile_aware_selectors_for_official_non_sd_templates(self) -> None:
         mocked_inventory = mock.Mock(
@@ -431,6 +436,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "clip_l.safetensors",
                 "clip_l_hidream.safetensors",
                 "clip_g_hidream.safetensors",
+                "ernie-image-prompt-enhancer.safetensors",
                 "llama_3.1_8b_instruct_fp8_scaled.safetensors",
                 "ministral-3-3b.safetensors",
                 "qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -440,14 +446,14 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "t5xxl_fp16.safetensors",
                 "t5xxl_fp8_e4m3fn_scaled.safetensors",
             ],
-            loras=[],
+            loras=["Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"],
             default_checkpoint="SDXL\\realvisxl.safetensors",
             default_vae="qwen_image_vae.safetensors",
             default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
             controlnet=[],
         )
         expectations = {
-            "flux": ("flux\\flux1-dev.safetensors", "clip_l.safetensors", "ae.safetensors"),
+            "flux": ("flux\\flux1-dev.safetensors", "clip_l.safetensors|t5xxl_fp16.safetensors", "ae.safetensors"),
             "qwen_image": (
                 "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
                 "qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -469,9 +475,24 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             "chroma": ("chroma\\Chroma1-HD-fp8mixed.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors", "ae.safetensors"),
             "ernie_image": ("ernie\\ernie-image.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
             "ernie_image_turbo": ("ernie\\ernie-image-turbo.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
-            "hidream_i1_dev_fp8": ("hidream\\hidream_i1_dev_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
-            "hidream_i1_fast": ("hidream\\hidream_i1_fast_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
-            "hidream_i1_full": ("hidream\\hidream_i1_full_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
+            "hidream_i1_dev_fp8": (
+                "hidream\\hidream_i1_dev_fp8.safetensors",
+                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
+                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
+                "ae.safetensors",
+            ),
+            "hidream_i1_fast": (
+                "hidream\\hidream_i1_fast_fp8.safetensors",
+                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
+                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
+                "ae.safetensors",
+            ),
+            "hidream_i1_full": (
+                "hidream\\hidream_i1_full_fp8.safetensors",
+                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
+                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
+                "ae.safetensors",
+            ),
             "longcat_image": ("longcat\\longcat_image_bf16.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "ae.safetensors"),
             "z_image": ("zimage\\z_image_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
             "z_image_turbo": ("zimage\\z_image_turbo_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
@@ -494,6 +515,13 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     self.assertEqual(normalized.checkpoint_name, expected_checkpoint)
                     self.assertEqual(normalized.text_encoder_name, expected_text_encoder)
                     self.assertEqual(normalized.vae_name, expected_vae)
+                    if profile_id in {"ernie_image", "ernie_image_turbo"}:
+                        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
+                    if profile_id == "qwen_image":
+                        self.assertEqual(
+                            normalized.template_lora_name,
+                            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                        )
 
     def test_translate_txt2img_request_chains_inline_and_selected_loras(self) -> None:
         normalized = normalize_txt2img_request(
@@ -680,11 +708,11 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["flux\\flux1-dev.safetensors"],
                 vae=["flux_vae.safetensors"],
-                text_encoders=["flux_text_encoder.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors", "flux_text_encoder.safetensors"],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="flux_vae.safetensors",
-                default_text_encoder="flux_text_encoder.safetensors",
+                default_text_encoder="clip_l.safetensors",
                 controlnet=[],
             ),
         ):
@@ -699,7 +727,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
         self.assertEqual(request.primary_model_category, "diffusion_models")
         self.assertEqual(request.vae_name, "flux_vae.safetensors")
-        self.assertEqual(request.text_encoder_name, "flux_text_encoder.safetensors")
+        self.assertEqual(request.text_encoder_name, "clip_l.safetensors|t5xxl_fp16.safetensors")
 
     def test_translate_txt2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
         with mock.patch(
@@ -709,7 +737,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["flux\\flux1-dev.safetensors"],
                 vae=["flux_vae.safetensors"],
-                text_encoders=["clip_l.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="flux_vae.safetensors",
@@ -722,7 +750,6 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     "prompt": "fashion editorial",
                     "profile": "flux",
                     "checkpoint_name": "flux/flux1-dev.safetensors",
-                    "text_encoder_name": "clip_l.safetensors",
                     "vae_name": "flux_vae.safetensors",
                 }
             )
@@ -730,25 +757,26 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         result = translate_txt2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
         self.assertIn("UNETLoader", class_types)
-        self.assertIn("CLIPLoader", class_types)
+        self.assertIn("DualCLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
         self.assertIn("CLIPTextEncode", class_types)
+        self.assertIn("ConditioningZeroOut", class_types)
         self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
-    def test_translate_txt2img_request_uses_single_clip_loader_for_ernie_image(self) -> None:
+    def test_translate_txt2img_request_uses_official_prompt_enhancement_chain_for_ernie_image(self) -> None:
         with mock.patch(
             "rookieui.services.txt2img.discover_model_inventory",
             return_value=mock.Mock(
                 source="host",
                 checkpoints=["SDXL\\realvisxl.safetensors"],
                 diffusion_models=["ernie\\ernie-image.safetensors"],
-                vae=["ernie_vae.safetensors"],
-                text_encoders=["Ministral3_3B_fp16.safetensors"],
+                vae=["flux2-vae.safetensors"],
+                text_encoders=["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
                 loras=[],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="ernie_vae.safetensors",
+                default_vae="flux2-vae.safetensors",
                 default_text_encoder="Ministral3_3B_fp16.safetensors",
                 controlnet=[],
             ),
@@ -759,16 +787,20 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     "profile": "ernie_image",
                     "checkpoint_name": "ernie/ernie-image.safetensors",
                     "text_encoder_name": "Ministral3_3B_fp16.safetensors",
-                    "vae_name": "ernie_vae.safetensors",
+                    "vae_name": "flux2-vae.safetensors",
                 }
             )
 
         result = translate_txt2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
+        self.assertEqual(result["workflow_kind"], "txt2img-ernie_image")
         self.assertIn("UNETLoader", class_types)
         self.assertIn("CLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
         self.assertIn("CLIPTextEncode", class_types)
+        self.assertIn("TextGenerate", class_types)
+        self.assertIn("ComfySwitchNode", class_types)
+        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
 
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:

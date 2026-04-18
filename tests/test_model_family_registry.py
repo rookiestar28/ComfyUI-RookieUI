@@ -26,11 +26,20 @@ class ModelFamilyRegistryTests(unittest.TestCase):
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
         flux_entry = get_model_family_registry_entry("flux")
         z_turbo_entry = get_model_family_registry_entry("zit")
+        chroma_entry = get_model_family_registry_entry("chroma")
+        ernie_entry = get_model_family_registry_entry("ernie_image")
+        longcat_entry = get_model_family_registry_entry("longcat_image")
 
         self.assertEqual(flux_entry.translation_base_family, "sdxl")
         self.assertEqual(flux_entry.public_base_family, "flux")
         self.assertFalse(flux_entry.text_encoder_visible)
         self.assertEqual(flux_entry.primary_model_category, "diffusion_models")
+        self.assertTrue(chroma_entry.shift_visible)
+        self.assertEqual(chroma_entry.default_shift, 1.0)
+        self.assertTrue(ernie_entry.prompt_enhancement_visible)
+        self.assertTrue(ernie_entry.default_prompt_enhancement_enabled)
+        self.assertTrue(longcat_entry.flux_guidance_visible)
+        self.assertEqual(longcat_entry.default_flux_guidance, 4.0)
         self.assertEqual(z_turbo_entry.id, "z_image_turbo")
         self.assertEqual(z_turbo_entry.public_base_family, "z_image")
 
@@ -62,7 +71,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
 
         self.assertEqual(flux_preset["profile"], "flux")
         self.assertEqual(flux_preset["base_family"], "flux")
+        self.assertIsNone(flux_preset["shift"])
         self.assertEqual(ernie_preset["profile"], "ernie_image")
         self.assertEqual(ernie_preset["base_family"], "ernie_image")
+        self.assertTrue(ernie_preset["prompt_enhancement_enabled"])
         self.assertEqual(z_turbo_preset["profile"], "z_image_turbo")
         self.assertEqual(z_turbo_preset["base_family"], "z_image")

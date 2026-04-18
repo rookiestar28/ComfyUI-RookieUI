@@ -8,7 +8,9 @@ from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
     ensure_native_ultralytics_model_paths,
+    resolve_aux_text_encoder_selector_context,
     resolve_primary_model_selector_context,
+    resolve_template_lora_selector_context,
     resolve_text_encoder_selector_context,
     resolve_vae_selector_context,
 )
@@ -351,15 +353,19 @@ class ModelInventoryTests(unittest.TestCase):
                     "qwen_3_8b_fp8mixed.safetensors",
                     "qwen_3_06b_base.safetensors",
                     "clip_l_hidream.safetensors",
+                    "clip_g_hidream.safetensors",
+                    "llama_3.1_8b_instruct_fp8_scaled.safetensors",
                     "Ministral3_3B_fp16.safetensors",
+                    "ernie-image-prompt-enhancer.safetensors",
                 ],
+                "loras": ["Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
         expectations = {
             "flux": {
                 "model": "flux\\flux1-dev.safetensors",
-                "text_encoder": "clip_l.safetensors",
+                "text_encoder": "clip_l.safetensors|t5xxl_fp16.safetensors",
                 "vae": "ae.safetensors",
             },
             "qwen_image": {
@@ -379,7 +385,10 @@ class ModelInventoryTests(unittest.TestCase):
             },
             "hidream_i1_full": {
                 "model": "hidream\\hidream_i1_full_fp8.safetensors",
-                "text_encoder": "clip_l_hidream.safetensors",
+                "text_encoder": (
+                    "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
+                    "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors"
+                ),
                 "vae": "ae.safetensors",
             },
             "longcat_image": {
@@ -416,11 +425,19 @@ class ModelInventoryTests(unittest.TestCase):
                 self.assertIn(default_model, selectors)
                 self.assertEqual(default_model, expectation["model"])
                 resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, snapshot)
-                self.assertIn(resolved_text_encoder, snapshot.text_encoders)
                 resolved_vae = resolve_vae_selector_context(profile_id, snapshot)
                 self.assertIn(resolved_vae, snapshot.vae)
                 self.assertEqual(resolved_text_encoder, expectation["text_encoder"])
                 self.assertEqual(resolved_vae, expectation["vae"])
+
+        self.assertEqual(
+            resolve_aux_text_encoder_selector_context("ernie_image", snapshot),
+            "ernie-image-prompt-enhancer.safetensors",
+        )
+        self.assertEqual(
+            resolve_template_lora_selector_context("qwen_image", snapshot),
+            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+        )
 
     def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
         module = types.SimpleNamespace(

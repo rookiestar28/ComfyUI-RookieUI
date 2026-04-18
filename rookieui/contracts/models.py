@@ -182,6 +182,9 @@ class PresetDefinition:
     sampler_name: str
     scheduler_name: str
     clip_skip: int
+    shift: float | None = None
+    flux_guidance: float | None = None
+    prompt_enhancement_enabled: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

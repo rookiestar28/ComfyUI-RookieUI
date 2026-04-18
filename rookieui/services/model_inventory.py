@@ -108,6 +108,53 @@ _PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "z_image": (("qwen_3_4b",), ("z_image",), ("z-image",), ("lumina",), ("qwen",)),
     "z_image_turbo": (("qwen_3_4b",), ("z_image", "turbo"), ("z-image", "turbo"), ("lumina",), ("qwen",)),
 }
+_PROFILE_TEXT_ENCODER_SEQUENCE_PRIORITY_HINTS: dict[str, tuple[tuple[tuple[str, ...], ...], ...]] = {
+    "flux": (
+        (("clip_l",), ("t5xxl", "fp16")),
+        (("clip_l",), ("t5xxl",)),
+    ),
+    "hidream_i1_dev_fp8": (
+        (
+            ("clip_l_hidream",),
+            ("clip_g_hidream",),
+            ("t5xxl", "fp8"),
+            ("llama", "8b", "instruct"),
+        ),
+    ),
+    "hidream_i1_fast": (
+        (
+            ("clip_l_hidream",),
+            ("clip_g_hidream",),
+            ("t5xxl", "fp8"),
+            ("llama", "8b", "instruct"),
+        ),
+    ),
+    "hidream_i1_full": (
+        (
+            ("clip_l_hidream",),
+            ("clip_g_hidream",),
+            ("t5xxl", "fp8"),
+            ("llama", "8b", "instruct"),
+        ),
+    ),
+}
+_PROFILE_AUX_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "ernie_image": (
+        ("ernie", "prompt", "enhancer"),
+        ("prompt", "enhancer"),
+    ),
+    "ernie_image_turbo": (
+        ("ernie", "prompt", "enhancer"),
+        ("prompt", "enhancer"),
+    ),
+}
+_PROFILE_TEMPLATE_LORA_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "qwen_image": (
+        ("wuli", "qwen", "image", "2512", "turbo", "lora"),
+        ("qwen", "image", "2512", "turbo", "lora"),
+        ("qwen", "image", "2512", "lora"),
+    ),
+}
 _PROFILE_VAE_HINTS: dict[str, tuple[str, ...]] = {
     "anima": ("anima",),
     "chroma": ("ae", "chroma"),
@@ -435,6 +482,44 @@ def _resolve_profile_text_encoder_default(
     return ""
 
 
+def _find_text_encoder_sequence(
+    profile_id: str,
+    selectors: list[str],
+) -> list[str]:
+    sequence_hint_groups = _PROFILE_TEXT_ENCODER_SEQUENCE_PRIORITY_HINTS.get(profile_id, ())
+    if not sequence_hint_groups:
+        return []
+
+    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    if not candidate_selectors:
+        return []
+
+    normalized_candidates = [
+        (_normalize_selector_token(selector), selector)
+        for selector in candidate_selectors
+    ]
+    for sequence_hints in sequence_hint_groups:
+        resolved_sequence: list[str] = []
+        used_selectors: set[str] = set()
+        for hint_group in sequence_hints:
+            normalized_hints = tuple(hint.strip().lower() for hint in hint_group if hint and hint.strip())
+            matched_selector = ""
+            for folded_selector, original_selector in normalized_candidates:
+                if original_selector in used_selectors:
+                    continue
+                if all(hint in folded_selector for hint in normalized_hints):
+                    matched_selector = original_selector
+                    break
+            if not matched_selector:
+                resolved_sequence = []
+                break
+            used_selectors.add(matched_selector)
+            resolved_sequence.append(matched_selector)
+        if resolved_sequence:
+            return resolved_sequence
+    return []
+
+
 def resolve_text_encoder_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
@@ -446,6 +531,9 @@ def resolve_text_encoder_selector_context(
     normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models":
         # CRITICAL: diffusion families require family-bound text encoder pairing; never fall back to a global/default selector.
+        resolved_sequence = _find_text_encoder_sequence(normalized_profile_id, selectors)
+        if resolved_sequence:
+            return "|".join(resolved_sequence)
         return _resolve_profile_text_encoder_default(normalized_profile_id, selectors)
 
     fallback_default = (
@@ -454,6 +542,23 @@ def resolve_text_encoder_selector_context(
         else selectors[0]
     )
     return fallback_default
+
+
+def resolve_aux_text_encoder_selector_context(
+    profile_id: str,
+    inventory: ModelInventorySnapshot,
+) -> str:
+    selectors = [value for value in (inventory.text_encoders or []) if isinstance(value, str) and value.strip()]
+    if not selectors:
+        return ""
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
+    if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) != "diffusion_models":
+        return ""
+    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    return _find_selector_by_priority(
+        candidate_selectors,
+        _PROFILE_AUX_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
+    )
 
 
 def _resolve_profile_vae_default(
@@ -502,6 +607,20 @@ def resolve_vae_selector_context(
 
     # CRITICAL: diffusion families require family-bound VAE pairing; never fall back to global/default selectors.
     return _resolve_profile_vae_default(normalized_profile_id, selectors)
+
+
+def resolve_template_lora_selector_context(
+    profile_id: str,
+    inventory: ModelInventorySnapshot,
+) -> str:
+    selectors = [value for value in (inventory.loras or []) if isinstance(value, str) and value.strip()]
+    if not selectors:
+        return ""
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
+    return _find_selector_by_priority(
+        selectors,
+        _PROFILE_TEMPLATE_LORA_PRIORITY_HINTS.get(normalized_profile_id, ()),
+    )
 
 
 def resolve_primary_model_selector_context(

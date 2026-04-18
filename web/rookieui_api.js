@@ -544,6 +544,25 @@ const DEFAULT_PARITY_PROFILES = Object.freeze(
   })),
 );
 
+const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
+  chroma: { shift_visible: true, default_shift: 1.0 },
+  ernie_image: {
+    prompt_enhancement_visible: true,
+    default_prompt_enhancement_enabled: true,
+  },
+  ernie_image_turbo: {
+    prompt_enhancement_visible: true,
+    default_prompt_enhancement_enabled: true,
+  },
+  hidream_i1_dev_fp8: { shift_visible: true, default_shift: 6.0 },
+  hidream_i1_fast: { shift_visible: true, default_shift: 3.0 },
+  hidream_i1_full: { shift_visible: true, default_shift: 3.0 },
+  longcat_image: { flux_guidance_visible: true, default_flux_guidance: 4.0 },
+  qwen_image: { shift_visible: true, default_shift: 3.0 },
+  z_image: { shift_visible: true, default_shift: 3.0 },
+  z_image_turbo: { shift_visible: true, default_shift: 3.0 },
+});
+
 const DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY = Object.freeze(
   DEFAULT_MODEL_FAMILY_ENTRIES.reduce((categoryMap, entry) => {
     const keys = new Set([entry.id, entry.public_base_family, ...entry.aliases]);
@@ -569,9 +588,13 @@ const DEFAULT_PRESETS = Object.freeze(
     height: entry.default_height,
     steps: entry.default_steps,
     cfg_scale: entry.default_cfg_scale,
+    shift: DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_shift ?? null,
+    flux_guidance: DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_flux_guidance ?? null,
     sampler_name: entry.default_sampler,
     scheduler_name: entry.default_scheduler,
     clip_skip: entry.default_clip_skip,
+    prompt_enhancement_enabled:
+      DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_prompt_enhancement_enabled ?? false,
   })),
 );
 
@@ -635,8 +658,17 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     },
   },
   model_families: {
-    contract_version: "f150-20260418",
-    entries: DEFAULT_MODEL_FAMILY_ENTRIES,
+    contract_version: "f151-20260418",
+    entries: DEFAULT_MODEL_FAMILY_ENTRIES.map((entry) => ({
+      shift_visible: false,
+      default_shift: null,
+      flux_guidance_visible: false,
+      default_flux_guidance: null,
+      prompt_enhancement_visible: false,
+      default_prompt_enhancement_enabled: false,
+      ...entry,
+      ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
+    })),
   },
   prompt_semantics: {
     contract_version: "r55-20260411",

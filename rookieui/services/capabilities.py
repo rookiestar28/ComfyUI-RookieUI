@@ -97,6 +97,22 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "supports_clip_skip": bool(entry.get("supports_clip_skip", False)),
                 "primary_model_category": normalize_metadata_text(entry.get("primary_model_category", "")),
                 "text_encoder_visible": bool(entry.get("text_encoder_visible", False)),
+                "shift_visible": bool(entry.get("shift_visible", False)),
+                "default_shift": (
+                    float(entry.get("default_shift"))
+                    if entry.get("default_shift") not in (None, "")
+                    else None
+                ),
+                "flux_guidance_visible": bool(entry.get("flux_guidance_visible", False)),
+                "default_flux_guidance": (
+                    float(entry.get("default_flux_guidance"))
+                    if entry.get("default_flux_guidance") not in (None, "")
+                    else None
+                ),
+                "prompt_enhancement_visible": bool(entry.get("prompt_enhancement_visible", False)),
+                "default_prompt_enhancement_enabled": bool(
+                    entry.get("default_prompt_enhancement_enabled", False)
+                ),
                 "support_tier": normalize_metadata_text(entry.get("support_tier", "")),
                 "compatibility_summary": normalize_metadata_text(entry.get("compatibility_summary", "")),
                 "experimental": bool(entry.get("experimental", False)),

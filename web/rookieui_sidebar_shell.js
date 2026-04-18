@@ -339,6 +339,12 @@ function buildProfileLookup(capabilities) {
       base_family: entry.translation_base_family || entry.public_base_family || "",
       public_base_family: entry.public_base_family || "",
       text_encoder_visible: Boolean(entry.text_encoder_visible),
+      shift_visible: Boolean(entry.shift_visible),
+      default_shift: entry.default_shift ?? null,
+      flux_guidance_visible: Boolean(entry.flux_guidance_visible),
+      default_flux_guidance: entry.default_flux_guidance ?? null,
+      prompt_enhancement_visible: Boolean(entry.prompt_enhancement_visible),
+      default_prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
       primary_model_category: entry.primary_model_category || "",
       support_tier: entry.support_tier || "",
       experimental: Boolean(entry.experimental),
@@ -539,9 +545,12 @@ function updateFormFromPreset(presetLookup, presetId, elements, profileLookup, m
   setElementValue(elements.height, preset.height);
   setElementValue(elements.steps, preset.steps);
   setElementValue(elements.cfgScale, preset.cfg_scale);
+  setElementValue(elements.shift, preset.shift ?? "");
+  setElementValue(elements.fluxGuidance, preset.flux_guidance ?? "");
   setElementValue(elements.sampler, preset.sampler_name);
   setElementValue(elements.scheduler, preset.scheduler_name);
   setElementValue(elements.clipSkip, preset.clip_skip);
+  setElementValue(elements.promptEnhancementEnabled, preset.prompt_enhancement_enabled);
 
   // CRITICAL: never hard-disable Clip Skip on preset switch; users must be able to adjust values even when the profile may ignore them at execution.
   syncClipSkipAvailability(profileLookup, preset.profile, elements.clipSkip, elements.clipSkipSlider);
@@ -558,9 +567,12 @@ function updateFormFromProfile(profileLookup, profileId, elements) {
   setElementValue(elements.height, profile.default_height);
   setElementValue(elements.steps, profile.default_steps);
   setElementValue(elements.cfgScale, profile.default_cfg_scale);
+  setElementValue(elements.shift, profile.default_shift ?? "");
+  setElementValue(elements.fluxGuidance, profile.default_flux_guidance ?? "");
   setElementValue(elements.sampler, profile.default_sampler);
   setElementValue(elements.scheduler, profile.default_scheduler);
   setElementValue(elements.clipSkip, profile.default_clip_skip);
+  setElementValue(elements.promptEnhancementEnabled, profile.default_prompt_enhancement_enabled);
   // IMPORTANT: keep profile default sync and editability sync together to avoid stale disabled state after profile transitions.
   syncClipSkipAvailability(profileLookup, profile.id, elements.clipSkip, elements.clipSkipSlider);
   syncBoundControls(Object.values(elements));
@@ -618,6 +630,33 @@ function syncFamilyAwareModuleQuicksetting(profileLookup, profileId, quicksettin
   }
 }
 
+function syncFamilyAwareAdvancedParameterFields(profileLookup, profileId, controls) {
+  const profile = profileLookup.get(profileId);
+  const setVisibility = (fieldNode, inputNode, visible) => {
+    if (!fieldNode || !inputNode) {
+      return;
+    }
+    fieldNode.hidden = !visible;
+    inputNode.disabled = !visible;
+  };
+  setVisibility(controls.shiftField, controls.shiftInput, Boolean(profile?.shift_visible));
+  setVisibility(
+    controls.fluxGuidanceField,
+    controls.fluxGuidanceInput,
+    Boolean(profile?.flux_guidance_visible),
+  );
+  setVisibility(
+    controls.promptEnhancementField,
+    controls.promptEnhancementInput,
+    Boolean(profile?.prompt_enhancement_visible),
+  );
+}
+
+function readOptionalNumericControl(input) {
+  const rawValue = String(input?.value ?? "").trim();
+  return rawValue ? Number(rawValue) : null;
+}
+
 function readTxt2ImgPayload(elements) {
   return {
     prompt: elements.prompt.value,
@@ -631,8 +670,11 @@ function readTxt2ImgPayload(elements) {
     height: Number(elements.height.value),
     steps: Number(elements.steps.value),
     cfg_scale: Number(elements.cfgScale.value),
+    shift: elements.shift ? readOptionalNumericControl(elements.shift) : null,
+    flux_guidance: elements.fluxGuidance ? readOptionalNumericControl(elements.fluxGuidance) : null,
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
+    prompt_enhancement_enabled: elements.promptEnhancementEnabled?.checked ?? false,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,
     batch_size: Number(elements.batchSize.value),
@@ -705,8 +747,11 @@ function readImg2ImgPayload(elements) {
     resize_mode: elements.resizeMode.value,
     steps: Number(elements.steps.value),
     cfg_scale: Number(elements.cfgScale.value),
+    shift: elements.shift ? readOptionalNumericControl(elements.shift) : null,
+    flux_guidance: elements.fluxGuidance ? readOptionalNumericControl(elements.fluxGuidance) : null,
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
+    prompt_enhancement_enabled: elements.promptEnhancementEnabled?.checked ?? false,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,
     batch_size: Number(elements.batchSize.value),
@@ -1174,6 +1219,7 @@ function buildPaneModuleContext() {
     activateShellTab,
     updateFormFromPreset,
     syncFamilyAwareModuleQuicksetting,
+    syncFamilyAwareAdvancedParameterFields,
     syncClipSkipAvailability,
     syncMaskField,
     resolveImg2ImgExecutionMode,

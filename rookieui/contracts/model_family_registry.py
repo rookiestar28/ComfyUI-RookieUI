@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f150-20260418"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f151-20260418"
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,12 @@ class ModelFamilyRegistryEntry:
     supports_clip_skip: bool
     primary_model_category: str
     text_encoder_visible: bool
+    shift_visible: bool
+    default_shift: float | None
+    flux_guidance_visible: bool
+    default_flux_guidance: float | None
+    prompt_enhancement_visible: bool
+    default_prompt_enhancement_enabled: bool
     support_tier: str
     compatibility_summary: str
     experimental: bool = False
@@ -66,6 +72,12 @@ def _parity_entry(
         supports_clip_skip=supports_clip_skip,
         primary_model_category="checkpoints",
         text_encoder_visible=False,
+        shift_visible=False,
+        default_shift=None,
+        flux_guidance_visible=False,
+        default_flux_guidance=None,
+        prompt_enhancement_visible=False,
+        default_prompt_enhancement_enabled=False,
         support_tier="parity",
         compatibility_summary=compatibility_summary,
         notes=notes,
@@ -86,6 +98,12 @@ def _template_entry(
     compatibility_summary: str,
     aliases: tuple[str, ...] = (),
     notes: tuple[str, ...] = (),
+    shift_visible: bool = False,
+    default_shift: float | None = None,
+    flux_guidance_visible: bool = False,
+    default_flux_guidance: float | None = None,
+    prompt_enhancement_visible: bool = False,
+    default_prompt_enhancement_enabled: bool = False,
 ) -> ModelFamilyRegistryEntry:
     return ModelFamilyRegistryEntry(
         id=id,
@@ -103,6 +121,12 @@ def _template_entry(
         supports_clip_skip=False,
         primary_model_category="diffusion_models",
         text_encoder_visible=False,
+        shift_visible=shift_visible,
+        default_shift=default_shift,
+        flux_guidance_visible=flux_guidance_visible,
+        default_flux_guidance=default_flux_guidance,
+        prompt_enhancement_visible=prompt_enhancement_visible,
+        default_prompt_enhancement_enabled=default_prompt_enhancement_enabled,
         support_tier="family-adapted",
         compatibility_summary=compatibility_summary,
         experimental=True,
@@ -226,6 +250,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official Chroma text-to-image template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed T5 encoder pairing.",
         ),
+        shift_visible=True,
+        default_shift=1.0,
     ),
     _template_entry(
         id="ernie_image",
@@ -243,6 +269,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official ERNIE-Image template defaults.",
             "Text Encoder selector stays hidden because the official template owns both the Ministral and prompt-enhancer pairing.",
         ),
+        prompt_enhancement_visible=True,
+        default_prompt_enhancement_enabled=True,
     ),
     _template_entry(
         id="ernie_image_turbo",
@@ -260,6 +288,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official ERNIE-Image Turbo template defaults.",
             "Text Encoder selector stays hidden because the official template owns both the Ministral and prompt-enhancer pairing.",
         ),
+        prompt_enhancement_visible=True,
+        default_prompt_enhancement_enabled=True,
     ),
     _template_entry(
         id="flux",
@@ -362,6 +392,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official HiDream i1 Dev FP8 template defaults.",
             "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
         ),
+        shift_visible=True,
+        default_shift=6.0,
     ),
     _template_entry(
         id="hidream_i1_fast",
@@ -379,6 +411,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official HiDream i1 fast template defaults.",
             "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
         ),
+        shift_visible=True,
+        default_shift=3.0,
     ),
     _template_entry(
         id="hidream_i1_full",
@@ -396,6 +430,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official HiDream i1 full template defaults.",
             "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
         ),
+        shift_visible=True,
+        default_shift=3.0,
     ),
     _template_entry(
         id="longcat_image",
@@ -413,6 +449,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official Longcat BF16 template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing.",
         ),
+        flux_guidance_visible=True,
+        default_flux_guidance=4.0,
     ),
     _template_entry(
         id="qwen_image",
@@ -430,6 +468,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official Qwen-Image 2512 template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing and template-baked LoRA.",
         ),
+        shift_visible=True,
+        default_shift=3.0,
     ),
     _template_entry(
         id="z_image",
@@ -447,6 +487,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official Z-Image template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
         ),
+        shift_visible=True,
+        default_shift=3.0,
     ),
     _template_entry(
         id="z_image_turbo",
@@ -464,6 +506,8 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
             "Matches the official Z-Image Turbo template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
         ),
+        shift_visible=True,
+        default_shift=3.0,
     ),
 )
 

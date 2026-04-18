@@ -24,8 +24,11 @@ class Txt2ImgRequest:
     height: int | None = None
     steps: int | None = None
     cfg_scale: float | None = None
+    shift: float | None = None
+    flux_guidance: float | None = None
     sampler_name: str | None = None
     scheduler_name: str | None = None
+    prompt_enhancement_enabled: bool | None = None
     seed: int = -1
     seed_extra: bool = False
     batch_size: int = 1
@@ -67,8 +70,11 @@ class Img2ImgRequest:
     resize_mode: str = "crop_and_resize"
     steps: int | None = None
     cfg_scale: float | None = None
+    shift: float | None = None
+    flux_guidance: float | None = None
     sampler_name: str | None = None
     scheduler_name: str | None = None
+    prompt_enhancement_enabled: bool | None = None
     seed: int = -1
     seed_extra: bool = False
     batch_size: int = 1
@@ -115,12 +121,17 @@ class NormalizedTxt2ImgRequest:
     checkpoint_name: str
     vae_name: str
     text_encoder_name: str
+    aux_text_encoder_name: str
+    template_lora_name: str
     width: int
     height: int
     steps: int
     cfg_scale: float
+    shift: float | None
+    flux_guidance: float | None
     sampler_name: str
     scheduler_name: str
+    prompt_enhancement_enabled: bool
     seed: int
     execution_seed: int
     seed_extra: bool
@@ -162,6 +173,8 @@ class NormalizedImg2ImgRequest:
     checkpoint_name: str
     vae_name: str
     text_encoder_name: str
+    aux_text_encoder_name: str
+    template_lora_name: str
     image_asset: str
     mask_asset: str
     mode: str
@@ -172,8 +185,11 @@ class NormalizedImg2ImgRequest:
     resize_mode: str
     steps: int
     cfg_scale: float
+    shift: float | None
+    flux_guidance: float | None
     sampler_name: str
     scheduler_name: str
+    prompt_enhancement_enabled: bool
     seed: int
     execution_seed: int
     seed_extra: bool

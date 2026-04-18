@@ -30,9 +30,12 @@ def build_preset_payload() -> dict[str, object]:
                 height=entry.default_height,
                 steps=entry.default_steps,
                 cfg_scale=entry.default_cfg_scale,
+                shift=entry.default_shift,
+                flux_guidance=entry.default_flux_guidance,
                 sampler_name=entry.default_sampler,
                 scheduler_name=entry.default_scheduler,
                 clip_skip=entry.default_clip_skip,
+                prompt_enhancement_enabled=entry.default_prompt_enhancement_enabled,
             ).to_payload()
         )
     return {

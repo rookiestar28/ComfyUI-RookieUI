@@ -68,8 +68,17 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f150-20260418");
+    expect(result.data.model_families.contract_version).toBe("f151-20260418");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
+    const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
+    const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
+    const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
+    expect(chromaEntry.shift_visible).toBe(true);
+    expect(chromaEntry.default_shift).toBe(1);
+    expect(ernieEntry.prompt_enhancement_visible).toBe(true);
+    expect(ernieEntry.default_prompt_enhancement_enabled).toBe(true);
+    expect(longcatEntry.flux_guidance_visible).toBe(true);
+    expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
@@ -237,8 +246,11 @@ describe("fetchRookieUICapabilities", () => {
       "z_image_turbo",
     ]);
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
+    expect(presets.data.presets.find((preset) => preset.id === "chroma")?.shift).toBe(1);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
+    expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
+    expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);
     expect(presets.data.presets.find((preset) => preset.id === "z_image_turbo")?.base_family).toBe("z_image");
     expect(queue.data.queue_remaining).toBe(0);
   });
