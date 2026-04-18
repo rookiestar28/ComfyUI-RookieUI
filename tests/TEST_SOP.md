@@ -6,6 +6,7 @@ Use it before push and before marking any implementation as accepted.
 ## Scope
 
 - Frontend Playwright harness E2E and frontend unit tests via `npm test`
+- Frontend static type validation via `npm run test:types`
 - Backend Python unit tests via `scripts/run_unittests.py`
 - Repository hygiene checks via `pre-commit`
 
@@ -25,10 +26,10 @@ Required minimum gate:
 2. `pre-commit run --all-files --show-diff-on-failure`
 3. backend unit tests (`scripts/run_unittests.py`)
 4. frontend tests (`npm test`)
-
+5. targeted frontend type validation for TS-first seams (`npm run test:types`) when the change touches the typed frontend foundation
 Optional (recommended for newer-family loader/runtime changes):
 
-5. live host smoke lane (`scripts/run_live_smoke_tests.py`)
+6. live host smoke lane (`scripts/run_live_smoke_tests.py`)
 
 ### Bugfix/Hotfix Rule (Reproduce -> Pin -> Sweep)
 
@@ -128,6 +129,7 @@ MOLTBOT_STATE_DIR="$(pwd)/moltbot_state/_local_unit" \
 node -v
 npm install
 npx playwright install chromium
+npm run test:types
 npm test
 ```
 

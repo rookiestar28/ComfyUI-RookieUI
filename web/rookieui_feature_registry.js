@@ -12,6 +12,8 @@ import {
   fetchRookieUIXYZPlotAxes,
 } from "./rookieui_extension_deps.js";
 
+/** @typedef {import("./types/rookieui_frontend").RookieUIBootstrapLoaders} RookieUIBootstrapLoaders */
+
 function toStringArray(rawValue) {
   return Array.isArray(rawValue)
     ? rawValue.map((value) => String(value ?? "").trim()).filter(Boolean)
@@ -48,6 +50,7 @@ export function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
 }
 
 function buildDefaultBootstrapLoaders() {
+  /** @type {RookieUIBootstrapLoaders} */
   return {
     capabilities: (fetchImpl) => fetchRookieUICapabilities(fetchImpl),
     compatibility: (fetchImpl) => fetchRookieUICompatibility(fetchImpl),
@@ -145,6 +148,7 @@ export async function loadRookieUIBootstrapData(
 ) {
   const registry = buildRookieUIFeatureBootstrapRegistry(loaders);
   const directEntries = registry.filter((entry) => typeof entry.load === "function");
+  /** @type {Record<string, any>} */
   const loadedState = {};
   const results = await Promise.all(
     directEntries.map((entry) => entry.load(fetchImpl, { clientId })),

@@ -132,7 +132,8 @@ Write-Host "[tests] 3/4 backend unit tests"
 $env:MOLTBOT_STATE_DIR = "$root\moltbot_state\_local_unit"
 Invoke-Checked "unit tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_*.py" }
 
-Write-Host "[tests] 4/5 frontend test suite (npm test)"
+Write-Host "[tests] 4/5 frontend type validation + test suite"
+Invoke-Checked "npm run test:types" { npm run test:types }
 Invoke-Checked "npm test" { npm test }
 
 if ($env:ROOKIEUI_RUN_LIVE_SMOKE -eq "1") {

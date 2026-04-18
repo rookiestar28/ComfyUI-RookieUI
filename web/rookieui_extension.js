@@ -20,6 +20,8 @@ import {
 import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
 import { loadRookieUIBootstrapData } from "./rookieui_feature_registry.js";
 
+/** @typedef {import("./types/rookieui_frontend").RookieUIRegisterExtensionOptions} RookieUIRegisterExtensionOptions */
+
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
 
 function normalizeClientId(rawClientId) {
@@ -58,8 +60,9 @@ function enforceSidebarMinWidth(container) {
   const applyMinWidth = () => {
     // CRITICAL: SplitterPanel controls the actual sidebar width; inner content min-width alone still clips.
     const sidePanel = container.closest(".side-bar-panel");
-    const splitterPanel = sidePanel || container.closest(".p-splitterpanel");
-    if (splitterPanel?.style) {
+    const closestSplitterPanel = container.closest(".p-splitterpanel");
+    const splitterPanel = sidePanel instanceof HTMLElement ? sidePanel : closestSplitterPanel;
+    if (splitterPanel instanceof HTMLElement) {
       splitterPanel.style.minWidth = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
       if (splitterPanel.getBoundingClientRect?.().width < ROOKIEUI_SIDEBAR_MIN_WIDTH_PX) {
         // IMPORTANT: Min-width alone does not reliably expand an already-mounted ComfyUI Splitter panel.
@@ -69,7 +72,7 @@ function enforceSidebarMinWidth(container) {
     }
 
     const sidebarContent = container.closest(".sidebar-content-container");
-    if (sidebarContent?.style) {
+    if (sidebarContent instanceof HTMLElement) {
       sidebarContent.style.minWidth = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
       if (sidebarContent.getBoundingClientRect?.().width < ROOKIEUI_SIDEBAR_MIN_WIDTH_PX) {
         sidebarContent.style.width = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
@@ -125,6 +128,10 @@ function installLegacyLauncher(documentRef, bootstrapState) {
   documentRef.body.appendChild(panel);
 }
 
+/**
+ * @param {RookieUIRegisterExtensionOptions} options
+ * @returns {unknown}
+ */
 export function registerRookieUIBootstrapExtension({
   app,
   windowRef = globalThis.window,
