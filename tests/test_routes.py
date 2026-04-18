@@ -52,6 +52,7 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/assist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/catalog", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/analyze", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/upsample", payload["routes"])
 
     def test_adetailer_snapshot_exposes_contract_and_detector_catalog(self) -> None:
         payload = routes.build_adetailer_snapshot()
@@ -105,18 +106,24 @@ class RoutePayloadTests(unittest.TestCase):
         preset_ids = [preset["id"] for preset in payload["presets"]]
         self.assertIn("sd15", preset_ids)
         self.assertIn("sdxl", preset_ids)
+        self.assertIn("chroma", preset_ids)
         self.assertIn("flux", preset_ids)
         self.assertIn("qwen_image", preset_ids)
-        self.assertIn("klein", preset_ids)
-        self.assertIn("lumina", preset_ids)
-        self.assertIn("zit", preset_ids)
-        self.assertIn("wan", preset_ids)
+        self.assertIn("klein_4b", preset_ids)
+        self.assertIn("hidream_i1_full", preset_ids)
+        self.assertIn("longcat_image", preset_ids)
+        self.assertIn("z_image", preset_ids)
+        self.assertIn("z_image_turbo", preset_ids)
         self.assertIn("anima", preset_ids)
+        self.assertIn("ernie_image", preset_ids)
+        self.assertIn("ernie_image_turbo", preset_ids)
         preset_lookup = {preset["id"]: preset for preset in payload["presets"]}
         self.assertEqual(preset_lookup["flux"]["profile"], "flux")
         self.assertEqual(preset_lookup["qwen_image"]["profile"], "qwen_image")
-        self.assertEqual(preset_lookup["klein"]["profile"], "klein")
-        self.assertEqual(preset_lookup["zit"]["profile"], "zit")
+        self.assertEqual(preset_lookup["klein_4b"]["profile"], "klein_4b")
+        self.assertEqual(preset_lookup["z_image_turbo"]["profile"], "z_image_turbo")
+        self.assertEqual(preset_lookup["z_image_turbo"]["base_family"], "z_image")
+        self.assertEqual(preset_lookup["ernie_image"]["profile"], "ernie_image")
 
     def test_queue_snapshot_payload_exposes_contract_envelope(self) -> None:
         payload = routes.build_queue_snapshot_payload()
@@ -150,6 +157,8 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_config")
         self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})
+        self.assertIn("danbooru_upsample", payload["host_actions"])
+        self.assertEqual(payload["host_actions"]["danbooru_upsample"]["route_path"], "/rookieui/prompt-tools/upsample")
 
     def test_prompt_tools_provider_payload_exposes_catalog_contract(self) -> None:
         payload = routes.build_prompt_workbench_provider_catalog_payload()

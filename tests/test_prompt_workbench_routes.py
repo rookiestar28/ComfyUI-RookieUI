@@ -8,6 +8,10 @@ from unittest import mock
 
 from rookieui.api import routes
 from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_CONTRACT_VERSION
+from rookieui.services.prompt_workbench_danbooru import (
+    PromptWorkbenchDanbooruExecutionError,
+    PromptWorkbenchDanbooruHostUnavailableError,
+)
 
 
 class _FakeJsonRequest:
@@ -194,3 +198,54 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["contract"]["surface"], "prompt_tools_analyze")
         self.assertEqual(response["payload"]["analysis_mode"], "syntax_inventory")
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_upsample", new_callable=mock.AsyncMock)
+    def test_prompt_tools_upsample_route_returns_execution_payload(self, mocked_execute: mock.AsyncMock) -> None:
+        mocked_execute.return_value = {
+            "contract": {"surface": "prompt_tools_upsample"},
+            "action_id": "danbooru_upsample",
+            "final_prompt": "masterpiece, city skyline, enhanced tags",
+            "generated_suffix": "enhanced tags",
+            "host_node_alias": "DanbooruTagsUpsampler",
+            "availability": {"status": "ready"},
+            "warnings": [],
+            "warning_codes": [],
+        }
+
+        response = asyncio.run(
+            routes.prompt_tools_upsample(
+                _FakeJsonRequest({"prompt": "masterpiece, city skyline"})
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["status"], "ok")
+        self.assertEqual(response["payload"]["action_id"], "danbooru_upsample")
+        self.assertEqual(response["payload"]["generated_suffix"], "enhanced tags")
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_upsample", new_callable=mock.AsyncMock)
+    def test_prompt_tools_upsample_route_maps_host_unavailable(self, mocked_execute: mock.AsyncMock) -> None:
+        mocked_execute.side_effect = PromptWorkbenchDanbooruHostUnavailableError("Host node missing")
+
+        response = asyncio.run(routes.prompt_tools_upsample(_FakeJsonRequest({"prompt": "masterpiece"})))
+
+        self.assertEqual(response["status"], 503)
+        self.assertEqual(response["payload"]["status"], "host-unavailable")
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_upsample", new_callable=mock.AsyncMock)
+    def test_prompt_tools_upsample_route_maps_host_action_error(self, mocked_execute: mock.AsyncMock) -> None:
+        mocked_execute.side_effect = PromptWorkbenchDanbooruExecutionError("Execution failed")
+
+        response = asyncio.run(routes.prompt_tools_upsample(_FakeJsonRequest({"prompt": "masterpiece"})))
+
+        self.assertEqual(response["status"], 502)
+        self.assertEqual(response["payload"]["status"], "host-action-error")
+
+    @mock.patch("rookieui.api.routes.execute_prompt_workbench_upsample", new_callable=mock.AsyncMock)
+    def test_prompt_tools_upsample_route_maps_invalid_request(self, mocked_execute: mock.AsyncMock) -> None:
+        mocked_execute.side_effect = ValueError("Prompt text required")
+
+        response = asyncio.run(routes.prompt_tools_upsample(_FakeJsonRequest({"prompt": ""})))
+
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(response["payload"]["status"], "invalid-request")

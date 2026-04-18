@@ -18,14 +18,23 @@ from rookieui.services.prompt_workbench_state import (
 from rookieui.services.prompt_workbench_analysis import analyze_prompt_workbench_payload
 from rookieui.services.prompt_workbench_assist import assist_prompt_workbench_payload
 from rookieui.services.prompt_workbench_catalog import build_prompt_workbench_catalog_payload
+from rookieui.services.prompt_workbench_danbooru import (
+    build_prompt_workbench_danbooru_host_action_payload,
+    execute_prompt_workbench_danbooru_request_async,
+)
 from rookieui.services.prompt_workbench_translation import (
     build_prompt_workbench_provider_payload,
     translate_prompt_workbench_payload,
 )
+from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_DANBOORU_ACTION_ID
 
 
 def build_prompt_workbench_config_payload() -> dict[str, Any]:
     payload = get_prompt_workbench_bootstrap_payload()
+    payload["host_actions"] = {
+        **(payload.get("host_actions", {}) if isinstance(payload.get("host_actions"), dict) else {}),
+        PROMPT_WORKBENCH_DANBOORU_ACTION_ID: build_prompt_workbench_danbooru_host_action_payload(),
+    }
     payload["contract"] = build_prompt_workbench_contract_meta(surface="prompt_tools_config")
     return payload
 
@@ -119,3 +128,7 @@ def execute_prompt_workbench_ai_assist(payload: object) -> dict[str, Any]:
 
 def execute_prompt_workbench_analysis(payload: object) -> dict[str, Any]:
     return analyze_prompt_workbench_payload(payload)
+
+
+async def execute_prompt_workbench_upsample(payload: object) -> dict[str, Any]:
+    return await execute_prompt_workbench_danbooru_request_async(payload)

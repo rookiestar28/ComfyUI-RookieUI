@@ -132,15 +132,16 @@ Write-Host "[tests] 3/4 backend unit tests"
 $env:MOLTBOT_STATE_DIR = "$root\moltbot_state\_local_unit"
 Invoke-Checked "unit tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_*.py" }
 
-Write-Host "[tests] 4/5 frontend test suite (npm test)"
+Write-Host "[tests] 4/5 frontend type validation + test suite"
+Invoke-Checked "npm run test:types" { npm run test:types }
 Invoke-Checked "npm test" { npm test }
 
 if ($env:ROOKIEUI_RUN_LIVE_SMOKE -eq "1") {
-  Write-Host "[tests] 5/5 optional live host smoke lane"
-  Invoke-Checked "live smoke" { & $venvPython scripts\run_live_smoke_tests.py }
+  Write-Host "[tests] 5/5 optional host-embedded E2E lane"
+  Invoke-Checked "host-embedded E2E" { & $venvPython scripts\run_host_embedded_e2e.py }
 }
 else {
-  Write-Host "[tests] 5/5 optional live host smoke lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
+  Write-Host "[tests] 5/5 optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
 }
 
 Write-Host "[tests] PASS: full test gate completed."

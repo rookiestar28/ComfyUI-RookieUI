@@ -83,7 +83,7 @@ def _append_prompt_encode_node(
     *,
     allocator: NodeIdAllocator,
     clip_source: list[object],
-    text: str,
+    text: str | list[object],
     prompt_encoder: str,
     use_rookieui_prompt_encoder: bool = False,
     width: int | None = None,

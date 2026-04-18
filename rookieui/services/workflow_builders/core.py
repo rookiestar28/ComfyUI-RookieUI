@@ -58,12 +58,12 @@ def _build_unet_loader_node(unet_name: str) -> dict[str, object]:
     }
 
 
-def _build_clip_loader_node(clip_name: str) -> dict[str, object]:
+def _build_clip_loader_node(clip_name: str, *, clip_type: str = "stable_diffusion") -> dict[str, object]:
     return {
         "class_type": "CLIPLoader",
         "inputs": {
             "clip_name": clip_name,
-            "type": "stable_diffusion",
+            "type": clip_type,
             "device": "default",
         },
     }
@@ -73,9 +73,8 @@ def _build_dual_clip_loader_node(
     *,
     clip_name_1: str,
     clip_name_2: str,
-    profile: str,
+    clip_type: str,
 ) -> dict[str, object]:
-    clip_type = "flux" if profile in {"flux", "klein"} else "sdxl"
     return {
         "class_type": "DualCLIPLoader",
         "inputs": {
@@ -83,6 +82,24 @@ def _build_dual_clip_loader_node(
             "clip_name2": clip_name_2,
             "type": clip_type,
             "device": "default",
+        },
+    }
+
+
+def _build_quadruple_clip_loader_node(
+    *,
+    clip_name_1: str,
+    clip_name_2: str,
+    clip_name_3: str,
+    clip_name_4: str,
+) -> dict[str, object]:
+    return {
+        "class_type": "QuadrupleCLIPLoader",
+        "inputs": {
+            "clip_name1": clip_name_1,
+            "clip_name2": clip_name_2,
+            "clip_name3": clip_name_3,
+            "clip_name4": clip_name_4,
         },
     }
 
@@ -148,6 +165,28 @@ def _require_explicit_diffusion_selector(value: str, field_name: str) -> str:
     return selector
 
 
+def _resolve_clip_loader_type(profile_id: str) -> str:
+    normalized_profile = str(profile_id or "").strip().lower()
+    if normalized_profile == "chroma":
+        return "chroma"
+    if normalized_profile in {
+        "ernie_image",
+        "ernie_image_turbo",
+        "klein_4b_distilled",
+        "klein_4b",
+        "klein_9b_distilled",
+        "klein_9b",
+    }:
+        return "flux2"
+    if normalized_profile == "qwen_image":
+        return "qwen_image"
+    if normalized_profile in {"z_image", "z_image_turbo"}:
+        return "lumina2"
+    if normalized_profile == "longcat_image":
+        return "longcat_image"
+    return "stable_diffusion"
+
+
 def _resolve_diffusion_model_sources(
     workflow: dict[str, object],
     *,
@@ -167,19 +206,29 @@ def _resolve_diffusion_model_sources(
         raise ValueError(
             "text_encoder_name must include at least one selector when primary_model_category is diffusion_models."
         )
-    if len(text_encoder_values) > 2:
+    if len(text_encoder_values) not in {1, 2, 4}:
         raise ValueError(
-            "text_encoder_name supports up to two selectors for diffusion_models path (single or dual CLIP)."
+            "text_encoder_name supports one, two, or four selectors for diffusion_models path."
         )
 
     clip_loader_id = allocator.next()
     if len(text_encoder_values) == 1:
-        workflow[clip_loader_id] = _build_clip_loader_node(text_encoder_values[0])
-    else:
+        workflow[clip_loader_id] = _build_clip_loader_node(
+            text_encoder_values[0],
+            clip_type=_resolve_clip_loader_type(request.profile),
+        )
+    elif len(text_encoder_values) == 2:
         workflow[clip_loader_id] = _build_dual_clip_loader_node(
             clip_name_1=text_encoder_values[0],
             clip_name_2=text_encoder_values[1],
-            profile=request.profile,
+            clip_type="flux",
+        )
+    else:
+        workflow[clip_loader_id] = _build_quadruple_clip_loader_node(
+            clip_name_1=text_encoder_values[0],
+            clip_name_2=text_encoder_values[1],
+            clip_name_3=text_encoder_values[2],
+            clip_name_4=text_encoder_values[3],
         )
     clip_source: list[object] = [clip_loader_id, 0]
 

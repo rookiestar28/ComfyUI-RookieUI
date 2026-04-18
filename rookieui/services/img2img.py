@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
+from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.aliases import (
     DEFAULT_INPAINT_AREA as _DEFAULT_INPAINT_AREA,
     DEFAULT_MASKED_CONTENT as _DEFAULT_INPAINT_CONTENT,
@@ -29,7 +30,9 @@ from rookieui.services.coercion import (
 )
 from rookieui.services.model_inventory import (
     discover_model_inventory,
+    resolve_aux_text_encoder_selector_context,
     resolve_primary_model_selector_context,
+    resolve_template_lora_selector_context,
     resolve_text_encoder_selector_context,
     resolve_vae_selector_context,
 )
@@ -48,7 +51,10 @@ from rookieui.services.txt2img import (
     _coerce_hires_steps,
     _coerce_lora_selector,
     _coerce_lora_strength,
+    _coerce_optional_profile_float,
+    _coerce_prompt_enhancement_enabled,
     _coerce_steps,
+    _resolve_diffusion_text_encoder_selector,
 )
 
 _MIN_DENOISE = 0.0
@@ -63,6 +69,10 @@ _MAX_HIRES_STEPS = 150
 _DEFAULT_HIRES_SCALE = 1.5
 _DEFAULT_HIRES_DENOISE = 0.35
 _DEFAULT_HIRES_UPSCALE_METHOD = "bislerp"
+_MIN_SHIFT = 0.0
+_MAX_SHIFT = 20.0
+_MIN_FLUX_GUIDANCE = 0.0
+_MAX_FLUX_GUIDANCE = 20.0
 
 _IMG2IMG_MODE_ALIASES = {
     "img2img": "img2img",
@@ -148,6 +158,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     negative_prompt = normalize_prompt_text(request.negative_prompt, "negative_prompt")
 
     profile = get_parity_profile(normalize_option_label(request.profile, "profile", max_length=32))
+    profile_entry = get_model_family_registry_entry(profile.id)
     inventory = discover_model_inventory()
     inventory_is_host = inventory.source == "host"
     applied_defaults: list[str] = []
@@ -239,6 +250,22 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     )
 
     cfg_scale = _coerce_cfg_scale(request.cfg_scale, profile.default_cfg_scale, applied_defaults)
+    shift = _coerce_optional_profile_float(
+        request.shift,
+        profile_entry.default_shift,
+        applied_defaults,
+        field_name="shift",
+        minimum=_MIN_SHIFT,
+        maximum=_MAX_SHIFT,
+    )
+    flux_guidance = _coerce_optional_profile_float(
+        request.flux_guidance,
+        profile_entry.default_flux_guidance,
+        applied_defaults,
+        field_name="flux_guidance",
+        minimum=_MIN_FLUX_GUIDANCE,
+        maximum=_MAX_FLUX_GUIDANCE,
+    )
 
     sampler_input = normalize_option_label(request.sampler_name, "sampler_name")
     if not sampler_input:
@@ -393,11 +420,14 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         inventory_selectors=inventory.vae,
         strict_match=inventory_is_host,
     )
+    text_encoder_default = resolve_text_encoder_selector_context(profile.id, inventory)
+    aux_text_encoder_name = resolve_aux_text_encoder_selector_context(profile.id, inventory)
+    template_lora_name = resolve_template_lora_selector_context(profile.id, inventory)
     text_encoder_name = resolve_inventory_selector(
         raw_text_encoder_selector,
         "text_encoder_name",
         # IMPORTANT: keep diffusion-model profile defaults aligned to a compatible text encoder on normalization fallback.
-        default_value=resolve_text_encoder_selector_context(profile.id, inventory),
+        default_value=text_encoder_default,
         inventory_selectors=inventory.text_encoders,
         strict_match=inventory_is_host,
     )
@@ -405,6 +435,12 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         # IMPORTANT: SD1.5 and SDXL img2img/inpaint should not depend on a separate text-encoder selector in the RookieUI surface.
         text_encoder_name = ""
     if primary_model_category == "diffusion_models":
+        text_encoder_name = _resolve_diffusion_text_encoder_selector(
+            raw_text_encoder_selector,
+            inventory_selectors=inventory.text_encoders,
+            default_value=text_encoder_default,
+            strict_match=inventory_is_host,
+        )
         # CRITICAL: diffusion families do not support global text encoder/VAE defaults; unresolved/Automatic selectors must fail fast instead of producing mismatched decode artifacts.
         if _is_unresolved_inventory_selector(text_encoder_name):
             raise ValueError(
@@ -414,10 +450,21 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
             raise ValueError(
                 f"vae_name requires a family-specific host selector for profile '{profile.id}'."
             )
+        if profile.id in {"ernie_image", "ernie_image_turbo"} and not aux_text_encoder_name:
+            raise ValueError(
+                f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
+            )
+        if profile.id == "qwen_image" and not template_lora_name:
+            raise ValueError("template_lora_name requires the official Qwen-Image template LoRA in host inventory.")
 
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)
     seed_extra = _coerce_bool(request.seed_extra, "seed_extra")
+    prompt_enhancement_enabled = _coerce_prompt_enhancement_enabled(
+        request.prompt_enhancement_enabled,
+        profile_entry.default_prompt_enhancement_enabled,
+        applied_defaults,
+    )
 
     return NormalizedImg2ImgRequest(
         prompt=prompt,
@@ -433,6 +480,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         checkpoint_name=checkpoint_name,
         vae_name=vae_name,
         text_encoder_name=text_encoder_name,
+        aux_text_encoder_name=aux_text_encoder_name,
+        template_lora_name=template_lora_name,
         image_asset=image_asset,
         mask_asset=mask_asset,
         mode=mode,
@@ -443,8 +492,11 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         resize_mode=resize_mode,
         steps=steps,
         cfg_scale=cfg_scale,
+        shift=shift,
+        flux_guidance=flux_guidance,
         sampler_name=sampler_name,
         scheduler_name=scheduler_name,
+        prompt_enhancement_enabled=prompt_enhancement_enabled,
         seed=seed,
         execution_seed=execution_seed,
         seed_extra=seed_extra,

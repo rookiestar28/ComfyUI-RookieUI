@@ -20,6 +20,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.contracts.adetailer import ADETAILER_INTEGRATED_CONTRACT_VERSION
@@ -38,6 +39,12 @@ from rookieui.services.adetailer import (
 )
 from rookieui.services.adetailer_runtime import ADETAILER_RUNTIME_READY
 from rookieui.services.parity_matrix import get_parity_profile
+from rookieui.services.model_inventory import (
+    resolve_aux_text_encoder_selector_context,
+    resolve_text_encoder_selector_context,
+    resolve_template_lora_selector_context,
+    resolve_vae_selector_context,
+)
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from rookieui.services.version import resolve_runtime_build_fingerprint
 from tests.prompt_parity_fixtures import (
@@ -49,14 +56,103 @@ from tests.prompt_parity_fixtures import (
 
 
 _NON_SD_DIFFUSION_PROFILES: tuple[str, ...] = (
-    "flux",
-    "qwen_image",
-    "klein",
-    "lumina",
-    "zit",
-    "wan",
     "anima",
+    "chroma",
+    "ernie_image",
+    "ernie_image_turbo",
+    "flux",
+    "klein_4b_distilled",
+    "klein_4b",
+    "klein_9b_distilled",
+    "klein_9b",
+    "hidream_i1_dev_fp8",
+    "hidream_i1_fast",
+    "hidream_i1_full",
+    "longcat_image",
+    "qwen_image",
+    "z_image",
+    "z_image_turbo",
 )
+_NON_SD_SHIFT_EXPECTATIONS: dict[str, float] = {
+    "chroma": 1.0,
+    "hidream_i1_dev_fp8": 6.0,
+    "hidream_i1_fast": 3.0,
+    "hidream_i1_full": 3.0,
+    "qwen_image": 3.0,
+    "z_image": 3.0,
+    "z_image_turbo": 3.0,
+}
+_NON_SD_FLUX_GUIDANCE_EXPECTATIONS: dict[str, float] = {
+    "longcat_image": 4.0,
+}
+_NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS: dict[str, bool] = {
+    "ernie_image": True,
+    "ernie_image_turbo": True,
+}
+_NON_SD_CHECKPOINT_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "anima": (("anima",),),
+    "chroma": (("chroma",),),
+    "ernie_image": (("ernie", "image"), ("ernie",)),
+    "ernie_image_turbo": (("ernie", "image", "turbo"), ("ernie", "turbo"), ("ernie",)),
+    "flux": (("flux",),),
+    "klein_4b_distilled": (("klein", "4b", "distill"), ("klein", "4b")),
+    "klein_4b": (("klein", "4b"),),
+    "klein_9b_distilled": (("klein", "9b", "distill"), ("klein", "9b")),
+    "klein_9b": (("klein", "9b"),),
+    "hidream_i1_dev_fp8": (("hidream", "dev"),),
+    "hidream_i1_fast": (("hidream", "fast"),),
+    "hidream_i1_full": (("hidream", "full"), ("hidream", "i1")),
+    "longcat_image": (("longcat",),),
+    "qwen_image": (("qwen", "image", "2512"), ("qwen", "2512")),
+    "z_image": (("z_image",), ("z-image",), ("z", "image")),
+    "z_image_turbo": (("z_image", "turbo"), ("z-image", "turbo"), ("zit", "turbo")),
+}
+_NON_SD_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "anima": (("qwen_3_06b",), ("qwen", "3", "06b")),
+    "chroma": (("t5xxl",), ("chroma",)),
+    "ernie_image": (("ministral", "3", "3b"), ("ministral3_3b",), ("ernie",)),
+    "ernie_image_turbo": (("ministral", "3", "3b"), ("ministral3_3b",), ("ernie",)),
+    "klein_4b_distilled": (("qwen_3_4b",), ("qwen", "3", "4b")),
+    "klein_4b": (("qwen_3_4b",), ("qwen", "3", "4b")),
+    "klein_9b_distilled": (("qwen_3_8b",), ("qwen", "3", "8b")),
+    "klein_9b": (("qwen_3_8b",), ("qwen", "3", "8b")),
+    "longcat_image": (("qwen_2.5_vl_7b",), ("qwen", "2.5", "vl"), ("longcat",)),
+    "qwen_image": (("qwen_2.5_vl_7b",), ("qwen", "2.5", "vl"), ("qwen", "image")),
+    "z_image": (("qwen_3_4b",), ("qwen", "3", "4b")),
+    "z_image_turbo": (("qwen_3_4b",), ("qwen", "3", "4b")),
+}
+_NON_SD_TEXT_ENCODER_SEQUENCE_HINTS: dict[str, tuple[tuple[tuple[str, ...], ...], ...]] = {
+    "flux": (
+        (("clip_l",), ("t5xxl",)),
+    ),
+    "hidream_i1_dev_fp8": (
+        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+    ),
+    "hidream_i1_fast": (
+        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+    ),
+    "hidream_i1_full": (
+        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+    ),
+}
+_NON_SD_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "anima": (("qwen_image", "vae"), ("qwen", "image", "vae"), ("anima",)),
+    "chroma": (("ae",), ("chroma",)),
+    "ernie_image": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+    "ernie_image_turbo": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+    "flux": (("ae",), ("flux", "vae"), ("flux",)),
+    "hidream_i1_dev_fp8": (("ae",), ("hidream",)),
+    "hidream_i1_fast": (("ae",), ("hidream",)),
+    "hidream_i1_full": (("ae",), ("hidream",)),
+    "klein_4b_distilled": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    "klein_4b": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    "klein_9b_distilled": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    "klein_9b": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    "longcat_image": (("ae",), ("longcat",)),
+    "qwen_image": (("qwen", "vae"), ("qwen", "image"), ("qwen",)),
+    "z_image": (("ae",), ("z_image",), ("z-image",)),
+    "z_image_turbo": (("ae",), ("z_image", "turbo"), ("z-image", "turbo"), ("z_image",), ("z-image",)),
+}
 _CONTROLNET_VALIDATION_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _ADETAILER_VALIDATION_PROFILES: tuple[str, ...] = _CONTROLNET_VALIDATION_PROFILES
 _SD_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
@@ -80,6 +176,40 @@ _CONTROLNET_ALLOWED_DETECT_BACKENDS = {
     "rookieui_internal_disabled",
     "rookieui_internal_unavailable",
 }
+
+
+def _normalize_selector_token(value: str) -> str:
+    return str(value or "").replace("\\", "/").strip().lower()
+
+
+def _selector_matches_priority(selector: str, priority_hints: tuple[tuple[str, ...], ...]) -> bool:
+    normalized_selector = _normalize_selector_token(selector)
+    for hint_group in priority_hints:
+        normalized_hints = tuple(str(hint).strip().lower() for hint in hint_group if str(hint).strip())
+        if normalized_hints and all(hint in normalized_selector for hint in normalized_hints):
+            return True
+    return False
+
+
+def _selectors_include_priority(selectors: list[str], priority_hints: tuple[tuple[str, ...], ...]) -> bool:
+    return any(_selector_matches_priority(selector, priority_hints) for selector in selectors)
+
+
+def _selector_sequence_matches_priority(
+    selectors: list[str],
+    sequence_hints: tuple[tuple[tuple[str, ...], ...], ...],
+) -> bool:
+    if not selectors:
+        return False
+    for hint_sequence in sequence_hints:
+        if len(selectors) != len(hint_sequence):
+            continue
+        if all(
+            _selector_matches_priority(selector, (hint_group,))
+            for selector, hint_group in zip(selectors, hint_sequence, strict=False)
+        ):
+            return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -190,6 +320,9 @@ class PromptWorkbenchHostContext:
     translation_default_availability: str
     ai_assist_default_provider: str
     ai_assist_default_availability: str
+    danbooru_available: bool
+    danbooru_availability: str
+    danbooru_resolved_node_alias: str
 
 
 @dataclass(frozen=True)
@@ -744,6 +877,19 @@ def _build_prompt_workbench_host_context(
         for entry in theme_style_options
     ):
         errors.append("prompt-workbench config payload missing expected theme style 'rookieui_classic'.")
+    host_actions = config_payload.get("host_actions")
+    if not isinstance(host_actions, dict):
+        return None, errors + ["prompt-workbench config payload missing host_actions."]
+    danbooru_action = host_actions.get("danbooru_upsample")
+    if not isinstance(danbooru_action, dict):
+        return None, errors + ["prompt-workbench config payload missing danbooru_upsample host action."]
+    if str(danbooru_action.get("route_path", "")).strip() != "/rookieui/prompt-tools/upsample":
+        errors.append("prompt-workbench Danbooru host action route_path drifted from /rookieui/prompt-tools/upsample.")
+    if str(danbooru_action.get("action_id", "")).strip() != "danbooru_upsample":
+        errors.append("prompt-workbench Danbooru host action_id drifted from danbooru_upsample.")
+    danbooru_availability_payload = danbooru_action.get("availability")
+    if not isinstance(danbooru_availability_payload, dict):
+        errors.append("prompt-workbench Danbooru host action missing availability object.")
 
     surfaces = providers_payload.get("surfaces")
     if not isinstance(surfaces, dict):
@@ -789,6 +935,11 @@ def _build_prompt_workbench_host_context(
             translation_default_availability=_provider_availability(translation_surface, translation_default_provider),
             ai_assist_default_provider=ai_assist_default_provider,
             ai_assist_default_availability=_provider_availability(ai_surface, ai_assist_default_provider),
+            danbooru_available=bool(danbooru_action.get("available")),
+            danbooru_availability=str(danbooru_availability_payload.get("status", "")).strip()
+            if isinstance(danbooru_availability_payload, dict)
+            else "",
+            danbooru_resolved_node_alias=str(danbooru_action.get("resolved_node_alias", "")).strip(),
         ),
         errors,
     )
@@ -802,6 +953,10 @@ def _validate_prompt_workbench_host_sync(context: PromptWorkbenchHostContext) ->
         errors.append(
             "live host prompt-workbench contract mismatch: "
             f"host='{context.host_contract_version}' workspace='{context.local_contract_version}'."
+        )
+    if context.danbooru_available and context.danbooru_availability != "ready":
+        errors.append(
+            "prompt-workbench Danbooru host action reported available=true without ready availability status."
         )
     return errors
 
@@ -933,6 +1088,25 @@ def _validate_prompt_workbench_assist_payload(payload: dict[str, Any]) -> list[s
         errors.append("prompt-workbench AI assist did not execute through openai.")
     if not str(payload.get("generated_prompt", "")).strip():
         errors.append("prompt-workbench AI assist returned empty generated_prompt.")
+    return errors
+
+
+def _validate_prompt_workbench_upsample_payload(payload: dict[str, Any]) -> list[str]:
+    probe = LiveRouteContractProbe(
+        surface="prompt_tools_upsample",
+        route_path="/rookieui/prompt-tools/upsample",
+        local_contract_version=_LOCAL_PROMPT_WORKBENCH_CONTRACT_VERSION,
+    )
+    errors = _validate_route_contract_payload(probe, payload)
+    if str(payload.get("action_id", "")).strip() != "danbooru_upsample":
+        errors.append("prompt-workbench upsample payload action_id drifted from danbooru_upsample.")
+    if not str(payload.get("final_prompt", "")).strip():
+        errors.append("prompt-workbench upsample returned empty final_prompt.")
+    availability = payload.get("availability")
+    if not isinstance(availability, dict):
+        errors.append("prompt-workbench upsample payload missing availability object.")
+    elif str(availability.get("status", "")).strip() != "ready":
+        errors.append("prompt-workbench upsample ready path lost availability.status=ready.")
     return errors
 
 
@@ -1280,6 +1454,14 @@ def _run_prompt_workbench_validation_lane(
             ],
             [],
         )
+    if "/rookieui/prompt-tools/upsample" not in routes:
+        return (
+            [
+                "prompt-workbench live-host bootstrap did not expose /rookieui/prompt-tools/upsample; "
+                "restart or re-sync the ComfyUI host before closure acceptance."
+            ],
+            [],
+        )
     config_payload = _request_prompt_workbench_json(
         base_url,
         "config",
@@ -1473,6 +1655,42 @@ def _run_prompt_workbench_validation_lane(
                 timeout_seconds=request_timeout_seconds,
             )
             execution_errors.extend(_validate_prompt_workbench_translate_payload(translate_payload))
+
+            upsample_payload = {
+                "prompt": "masterpiece, city skyline",
+                "negative_prompt_tags": "blurry",
+                "ban_tags": "lowres",
+            }
+            if context.danbooru_availability == "ready":
+                danbooru_payload = _request_prompt_workbench_json(
+                    base_url,
+                    "upsample",
+                    method="POST",
+                    payload=upsample_payload,
+                    timeout_seconds=request_timeout_seconds,
+                )
+                execution_errors.extend(_validate_prompt_workbench_upsample_payload(danbooru_payload))
+                if context.danbooru_resolved_node_alias:
+                    if str(danbooru_payload.get("host_node_alias", "")).strip() != context.danbooru_resolved_node_alias:
+                        execution_errors.append("prompt-workbench upsample host_node_alias drifted from config host action.")
+            elif context.danbooru_availability == "host_missing":
+                status_code, danbooru_payload = _request_prompt_workbench_json_with_status(
+                    base_url,
+                    "upsample",
+                    method="POST",
+                    payload=upsample_payload,
+                    timeout_seconds=request_timeout_seconds,
+                )
+                if status_code != 503:
+                    execution_errors.append(
+                        f"prompt-workbench upsample expected 503 for host-missing action but got {status_code}."
+                    )
+                if _read_nested_text(danbooru_payload, "status") != "host-unavailable":
+                    execution_errors.append("prompt-workbench upsample host-missing path lost host-unavailable truthfulness.")
+            else:
+                execution_errors.append(
+                    f"prompt-workbench Danbooru action availability '{context.danbooru_availability}' is not covered by the live lane."
+                )
 
             if not context.ai_assist_default_provider:
                 status_code, assist_payload = _request_prompt_workbench_json_with_status(
@@ -2826,9 +3044,19 @@ def _validate_catalog_contract(
         for model in models_payload.get("diffusion_models", [])
         if isinstance(model, str) and str(model).strip()
     ]
+    vae_models = [
+        str(model).strip()
+        for model in models_payload.get("vae", [])
+        if isinstance(model, str) and str(model).strip()
+    ]
     text_encoders = [
         str(model).strip()
         for model in models_payload.get("text_encoders", [])
+        if isinstance(model, str) and str(model).strip()
+    ]
+    loras = [
+        str(model).strip()
+        for model in models_payload.get("loras", [])
         if isinstance(model, str) and str(model).strip()
     ]
     category_by_family = (
@@ -2838,6 +3066,11 @@ def _validate_catalog_contract(
     )
     if not isinstance(category_by_family, dict):
         category_by_family = {}
+
+    def _split_selectors(value: str) -> list[str]:
+        return [token.strip() for token in value.split("|") if token.strip()]
+
+    inventory_snapshot = _build_inventory_snapshot_from_models_payload(models_payload)
 
     for profile_id in target_profiles:
         preset = presets_by_id.get(profile_id)
@@ -2855,42 +3088,219 @@ def _validate_catalog_contract(
             errors.append(
                 f"profile '{profile_id}' checkpoint '{checkpoint_name}' not found in /rookieui/models.diffusion_models."
             )
+        expected_checkpoint_hints = _NON_SD_CHECKPOINT_PRIORITY_HINTS.get(profile_id, ())
+        if expected_checkpoint_hints:
+            if not _selector_matches_priority(checkpoint_name, expected_checkpoint_hints):
+                errors.append(
+                    f"profile '{profile_id}' expected a family-aligned diffusion-model checkpoint but got '{checkpoint_name}'."
+                )
+            if not _selectors_include_priority(diffusion_models, expected_checkpoint_hints):
+                errors.append(
+                    f"profile '{profile_id}' host diffusion model catalog did not expose the expected family selector."
+                )
+        lowered_checkpoint = checkpoint_name.lower()
+
+        vae_name = str(preset.get("vae_name", "")).strip()
+        if vae_name and vae_name not in vae_models:
+            errors.append(
+                f"profile '{profile_id}' vae '{vae_name}' not found in /rookieui/models.vae."
+            )
+        expected_vae_hints = _NON_SD_VAE_PRIORITY_HINTS.get(profile_id, ())
+        if expected_vae_hints:
+            if vae_name and not _selector_matches_priority(vae_name, expected_vae_hints):
+                errors.append(
+                    f"profile '{profile_id}' expected a family-aligned VAE selector but got '{vae_name}'."
+                )
+            if not _selectors_include_priority(vae_models, expected_vae_hints):
+                errors.append(
+                    f"profile '{profile_id}' host VAE catalog did not expose the expected family selector."
+                )
 
         text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
-        if text_encoder_name and text_encoder_name not in text_encoders:
+        text_encoder_selectors = _split_selectors(text_encoder_name)
+        missing_text_encoders = [selector for selector in text_encoder_selectors if selector not in text_encoders]
+        if missing_text_encoders:
             errors.append(
-                f"profile '{profile_id}' text encoder '{text_encoder_name}' not found in /rookieui/models.text_encoders."
+                f"profile '{profile_id}' text encoder selector(s) missing from /rookieui/models.text_encoders: "
+                f"{', '.join(missing_text_encoders)}."
             )
+        expected_sequence_hints = _NON_SD_TEXT_ENCODER_SEQUENCE_HINTS.get(profile_id, ())
+        if expected_sequence_hints:
+            if not _selector_sequence_matches_priority(text_encoder_selectors, expected_sequence_hints):
+                errors.append(
+                    f"profile '{profile_id}' expected the official text-encoder sequence but got '{text_encoder_name}'."
+                )
+            for hint_sequence in expected_sequence_hints:
+                if all(
+                    _selectors_include_priority(text_encoders, (hint_group,))
+                    for hint_group in hint_sequence
+                ):
+                    break
+            else:
+                errors.append(
+                    f"profile '{profile_id}' host text encoder catalog did not expose the full official encoder sequence."
+                )
+        else:
+            expected_text_encoder_hints = _NON_SD_TEXT_ENCODER_PRIORITY_HINTS.get(profile_id, ())
+            if expected_text_encoder_hints:
+                if text_encoder_name and not _selector_matches_priority(text_encoder_name, expected_text_encoder_hints):
+                    errors.append(
+                        f"profile '{profile_id}' expected a family-aligned text encoder but got '{text_encoder_name}'."
+                    )
+                if not _selectors_include_priority(text_encoders, expected_text_encoder_hints):
+                    errors.append(
+                        f"profile '{profile_id}' host text encoder catalog did not expose the expected family selector."
+                    )
 
         lowered_text_encoder = text_encoder_name.lower()
-        # CRITICAL: non-Qwen diffusion profiles must not inherit Qwen text encoders; this exact mismatch caused runtime crashes.
+        # CRITICAL: newer-family diffusion presets must keep the host-native text-encoder family aligned; mismatches crash execution.
         if profile_id == "qwen_image":
             if "qwen" not in lowered_text_encoder:
                 errors.append(
                     f"profile '{profile_id}' expected a Qwen text encoder but got '{text_encoder_name}'."
                 )
-        elif "qwen" in lowered_text_encoder:
-            errors.append(
-                f"profile '{profile_id}' must not default to a Qwen text encoder ('{text_encoder_name}')."
-            )
+            if not resolve_template_lora_selector_context(profile_id, inventory_snapshot):
+                errors.append(
+                    "profile 'qwen_image' host LoRA catalog did not expose the official Qwen-Image template LoRA."
+                )
+        elif profile_id in {"ernie_image", "ernie_image_turbo"}:
+            if "ernie" not in lowered_checkpoint:
+                errors.append(
+                    f"profile '{profile_id}' expected an ERNIE diffusion-model checkpoint but got '{checkpoint_name}'."
+                )
+            if not any("ernie" in model.lower() for model in diffusion_models):
+                errors.append("profile 'ernie_image' host diffusion model catalog did not expose any ERNIE selector.")
+            if not any("flux2" in model.lower() or "ernie" in model.lower() for model in vae_models):
+                errors.append("profile 'ernie_image' host VAE catalog did not expose any ERNIE/Flux2 selector.")
+            if not any("ernie" in model.lower() or "ministral" in model.lower() for model in text_encoders):
+                errors.append(
+                    "profile 'ernie_image' host text encoder catalog did not expose any ERNIE/Ministral selector."
+                )
+            if not resolve_aux_text_encoder_selector_context(profile_id, inventory_snapshot):
+                errors.append(
+                    "profile 'ernie_image' host text encoder catalog did not expose the official prompt-enhancer selector."
+                )
+            if lowered_text_encoder and "ernie" not in lowered_text_encoder and "ministral" not in lowered_text_encoder:
+                errors.append(
+                    f"profile '{profile_id}' expected an ERNIE/Ministral text encoder but got '{text_encoder_name}'."
+                )
+            lowered_vae = vae_name.lower()
+            if lowered_vae and "ernie" not in lowered_vae and "flux2" not in lowered_vae:
+                errors.append(f"profile '{profile_id}' expected an ERNIE/Flux2 VAE but got '{vae_name}'.")
+
+        expected_shift = _NON_SD_SHIFT_EXPECTATIONS.get(profile_id)
+        if expected_shift is not None:
+            actual_shift = preset.get("shift")
+            try:
+                if actual_shift is None or float(actual_shift) != expected_shift:
+                    errors.append(
+                        f"profile '{profile_id}' expected preset shift={expected_shift} but got '{actual_shift}'."
+                    )
+            except (TypeError, ValueError):
+                errors.append(f"profile '{profile_id}' expected numeric preset shift but got '{actual_shift}'.")
+
+        expected_flux_guidance = _NON_SD_FLUX_GUIDANCE_EXPECTATIONS.get(profile_id)
+        if expected_flux_guidance is not None:
+            actual_flux_guidance = preset.get("flux_guidance")
+            try:
+                if actual_flux_guidance is None or float(actual_flux_guidance) != expected_flux_guidance:
+                    errors.append(
+                        f"profile '{profile_id}' expected preset flux_guidance={expected_flux_guidance} "
+                        f"but got '{actual_flux_guidance}'."
+                    )
+            except (TypeError, ValueError):
+                errors.append(
+                    f"profile '{profile_id}' expected numeric preset flux_guidance but got '{actual_flux_guidance}'."
+                )
+
+        if profile_id in _NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS:
+            expected_enabled = _NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS[profile_id]
+            actual_enabled = bool(preset.get("prompt_enhancement_enabled"))
+            if actual_enabled != expected_enabled:
+                errors.append(
+                    f"profile '{profile_id}' expected preset prompt_enhancement_enabled={expected_enabled} "
+                    f"but got '{actual_enabled}'."
+                )
 
     return errors, presets_by_id
 
 
-def _build_txt2img_payload(profile_id: str, preset: dict[str, Any], client_id: str) -> dict[str, Any]:
+def _build_inventory_snapshot_from_models_payload(models_payload: dict[str, Any]) -> ModelInventorySnapshot:
+    def _list_field(field_name: str) -> list[str]:
+        values = models_payload.get(field_name, [])
+        return [str(value).strip() for value in values if isinstance(value, str) and str(value).strip()]
+
+    checkpoints = _list_field("checkpoints")
+    vae = _list_field("vae")
+    text_encoders = _list_field("text_encoders")
+    return ModelInventorySnapshot(
+        source=str(models_payload.get("source", "host")).strip() or "host",
+        checkpoints=checkpoints,
+        clip=_list_field("clip"),
+        clip_vision=_list_field("clip_vision"),
+        controlnet=_list_field("controlnet"),
+        diffusion_models=_list_field("diffusion_models"),
+        vae=vae,
+        text_encoders=text_encoders,
+        embeddings=_list_field("embeddings"),
+        loras=_list_field("loras"),
+        ultralytics=_list_field("ultralytics"),
+        ultralytics_bbox=_list_field("ultralytics_bbox"),
+        ultralytics_segm=_list_field("ultralytics_segm"),
+        unet=_list_field("unet"),
+        upscale_models=_list_field("upscale_models"),
+        default_checkpoint=str(models_payload.get("default_checkpoint", checkpoints[0] if checkpoints else "__host_default__")),
+        default_vae=str(models_payload.get("default_vae", vae[0] if vae else "Automatic")),
+        default_text_encoder=str(
+            models_payload.get("default_text_encoder", text_encoders[0] if text_encoders else "Automatic")
+        ),
+    )
+
+
+def _build_txt2img_payload(
+    profile_id: str,
+    preset: dict[str, Any],
+    client_id: str,
+    *,
+    models_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    vae_name = str(preset.get("vae_name", "Automatic")).strip() or "Automatic"
+    text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
+    shift = preset.get("shift")
+    flux_guidance = preset.get("flux_guidance")
+    prompt_enhancement_enabled = bool(preset.get("prompt_enhancement_enabled", False))
+    if models_payload is not None:
+        inventory = _build_inventory_snapshot_from_models_payload(models_payload)
+        if vae_name == "Automatic":
+            resolved_vae = resolve_vae_selector_context(profile_id, inventory)
+            if resolved_vae:
+                vae_name = resolved_vae
+        if not text_encoder_name or text_encoder_name == "Automatic" or "|" in text_encoder_name:
+            resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, inventory)
+            if resolved_text_encoder and resolved_text_encoder != "Automatic" and "|" not in resolved_text_encoder:
+                text_encoder_name = resolved_text_encoder
+            elif "|" in str(resolved_text_encoder or ""):
+                text_encoder_name = ""
+        if shift in {None, ""}:
+            shift = preset.get("shift")
+        if flux_guidance in {None, ""}:
+            flux_guidance = preset.get("flux_guidance")
     return {
         "prompt": f"[rookieui live smoke] {profile_id}",
         "negative_prompt": "",
         "profile": profile_id,
         "checkpoint_name": str(preset.get("checkpoint_name", "")).strip(),
-        "vae_name": str(preset.get("vae_name", "Automatic")).strip() or "Automatic",
-        "text_encoder_name": str(preset.get("text_encoder_name", "")).strip(),
+        "vae_name": vae_name,
+        "text_encoder_name": text_encoder_name,
         "width": int(preset.get("width", 1024)),
         "height": int(preset.get("height", 1024)),
         "steps": 1,
         "cfg_scale": float(preset.get("cfg_scale", 1.0)),
+        "shift": None if shift in {None, ""} else float(shift),
+        "flux_guidance": None if flux_guidance in {None, ""} else float(flux_guidance),
         "sampler_name": str(preset.get("sampler_name", "euler")).strip() or "euler",
         "scheduler_name": str(preset.get("scheduler_name", "normal")).strip() or "normal",
+        "prompt_enhancement_enabled": prompt_enhancement_enabled,
         "batch_count": 1,
         "seed": 1,
         "hires_enabled": False,
@@ -3655,6 +4065,7 @@ def _poll_queue_job_until_terminal(
 def _run_execute_smoke(
     base_url: str,
     profiles: list[str],
+    models_payload: dict[str, Any],
     presets_by_id: dict[str, dict[str, Any]],
     *,
     request_timeout_seconds: float,
@@ -3668,7 +4079,12 @@ def _run_execute_smoke(
             errors.append(f"profile '{profile_id}' missing preset; execute lane skipped.")
             continue
         client_id = f"rookieui-live-smoke-{profile_id}"
-        request_payload = _build_txt2img_payload(profile_id, preset, client_id)
+        request_payload = _build_txt2img_payload(
+            profile_id,
+            preset,
+            client_id,
+            models_payload=models_payload,
+        )
         submit_result = _request_json(
             "POST",
             f"{base_url}/rookieui/generate/txt2img",
@@ -4254,6 +4670,35 @@ def main() -> int:
             else:
                 print("[live-smoke] full-pipeline xyz execute checks passed.")
 
+        try:
+            prompt_workbench_errors, prompt_workbench_execute_errors = _run_prompt_workbench_validation_lane(
+                base_url,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: full-pipeline prompt-workbench lane failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+        if prompt_workbench_errors:
+            pipeline_errors = True
+            print("[live-smoke] WARNING: full-pipeline prompt-workbench lane reported issues:", file=sys.stderr)
+            for error in prompt_workbench_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] full-pipeline prompt-workbench route checks passed.")
+        if args.execute:
+            if prompt_workbench_errors:
+                print("[live-smoke] full-pipeline prompt-workbench execute skipped because route checks were not green.")
+            elif prompt_workbench_execute_errors:
+                print("[live-smoke] ERROR: full-pipeline prompt-workbench execute lane failed:", file=sys.stderr)
+                for error in prompt_workbench_execute_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] full-pipeline prompt-workbench execute checks passed.")
+
         if pipeline_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")
         else:
@@ -4343,6 +4788,7 @@ def main() -> int:
             execution_errors = _run_execute_smoke(
                 base_url,
                 profiles,
+                models_payload,
                 presets_by_id,
                 request_timeout_seconds=args.request_timeout_seconds,
                 poll_timeout_seconds=args.poll_timeout_seconds,

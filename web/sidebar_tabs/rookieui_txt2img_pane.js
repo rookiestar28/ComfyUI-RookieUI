@@ -57,6 +57,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     appendTextElement,
     updateFormFromPreset,
     syncFamilyAwareModuleQuicksetting,
+    syncFamilyAwareAdvancedParameterFields,
     syncClipSkipAvailability,
     transferPreviewToImg2Img,
     activateShellTab,
@@ -218,6 +219,18 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       inputMode: "decimal",
     }),
     cfgScaleSlider: createRangeInput("rookieui-cfg-scale-slider", "7", { step: 0.1, min: 1, max: 30 }),
+    shift: createInput("number", "rookieui-shift", "", {
+      step: 0.1,
+      min: 0,
+      max: 20,
+      inputMode: "decimal",
+    }),
+    fluxGuidance: createInput("number", "rookieui-flux-guidance", "", {
+      step: 0.1,
+      min: 0,
+      max: 20,
+      inputMode: "decimal",
+    }),
     sampler: createSelect(
       "rookieui-sampler",
       samplerCatalog.map((entry) => ({ value: entry.id, label: entry.title })),
@@ -228,6 +241,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       schedulerCatalog.map((entry) => ({ value: entry.id, label: entry.title })),
       initialScheduler,
     ),
+    promptEnhancementEnabled: createCheckbox("rookieui-prompt-enhancement-enabled", false),
     seed: createInput("number", "rookieui-seed", "-1", { step: 1 }),
     seedExtra: createCheckbox("rookieui-seed-extra", false),
     batchSize: createInput("number", "rookieui-batch-size", "1", { step: 1, min: 1, max: 8 }),
@@ -286,6 +300,18 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   elements.prompt.placeholder = "Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
   elements.negativePrompt.placeholder =
     "Negative Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
+  const readOptionalNumeric = (input) => {
+    const rawValue = String(input?.value ?? "").trim();
+    return rawValue ? Number(rawValue) : null;
+  };
+  const advancedParameterControls = {
+    shiftField: null,
+    shiftInput: elements.shift,
+    fluxGuidanceField: null,
+    fluxGuidanceInput: elements.fluxGuidance,
+    promptEnhancementField: null,
+    promptEnhancementInput: elements.promptEnhancementEnabled,
+  };
 
   const buildXYZBaseRequest = () => ({
     prompt: elements.prompt.value,
@@ -299,8 +325,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     height: Number(elements.height.value),
     steps: Number(elements.steps.value),
     cfg_scale: Number(elements.cfgScale.value),
+    shift: readOptionalNumeric(elements.shift),
+    flux_guidance: readOptionalNumeric(elements.fluxGuidance),
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
+    prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,
     batch_size: Number(elements.batchSize.value),
@@ -457,6 +486,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     modulesQuicksettingLabel,
     elements.textEncoder,
   );
+  syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
@@ -466,6 +496,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       modulesQuicksettingLabel,
       elements.textEncoder,
     );
+    syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   });
 
   const subtabHost = document.createElement("div");
@@ -498,12 +529,24 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         createField(samplingGrid, "Schedule Type", elements.scheduler);
         createSliderField(samplingGrid, "Sampling Steps", elements.steps, elements.stepsSlider, "rookieui-steps-field");
         createSliderField(samplingGrid, "CFG Scale", elements.cfgScale, elements.cfgScaleSlider, "rookieui-cfg-scale-field");
+        advancedParameterControls.shiftField = createField(samplingGrid, "Shift", elements.shift);
+        advancedParameterControls.fluxGuidanceField = createField(
+          samplingGrid,
+          "Flux Guidance",
+          elements.fluxGuidance,
+        );
         createSliderField(samplingGrid, "Width", elements.width, elements.widthSlider, "rookieui-width-field");
         createSliderField(samplingGrid, "Height", elements.height, elements.heightSlider, "rookieui-height-field");
         createSliderField(samplingGrid, "Batch Count", elements.batchCount, elements.batchCountSlider, "rookieui-batch-count-field");
         createSliderField(samplingGrid, "Batch Size", elements.batchSize, elements.batchSizeSlider, "rookieui-batch-size-field");
         createSliderField(samplingGrid, "Clip Skip", elements.clipSkip, elements.clipSkipSlider, "rookieui-clip-skip-field");
+        advancedParameterControls.promptEnhancementField = createInlineCheckboxField(
+          samplingGrid,
+          "Prompt Enhancement",
+          elements.promptEnhancementEnabled,
+        );
         createSeedControlField(samplingGrid, "Seed", elements.seed, elements.seedExtra, "rookieui-seed-field");
+        syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
 
         const advancedGrid = createHiresFixSection(
           samplingSection,
@@ -778,6 +821,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       modulesQuicksettingLabel,
       elements.textEncoder,
     );
+    syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   });
 
   formRegistry.txt2img = {
@@ -794,8 +838,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         height: "height",
         steps: "steps",
         cfg_scale: "cfgScale",
+        shift: "shift",
+        flux_guidance: "fluxGuidance",
         sampler_name: "sampler",
         scheduler_name: "scheduler",
+        prompt_enhancement_enabled: "promptEnhancementEnabled",
         seed: "seed",
         seed_extra: "seedExtra",
         batch_count: "batchCount",
@@ -831,6 +878,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         modulesQuicksettingLabel,
         elements.textEncoder,
       );
+      syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
       syncBoundControls(Object.values(elements));
       txt2imgStateLock.capture();
     },

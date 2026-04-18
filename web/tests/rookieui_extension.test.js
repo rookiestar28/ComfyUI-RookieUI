@@ -130,7 +130,7 @@ describe("registerRookieUIBootstrapExtension", () => {
           status: 200,
           async json() {
             return {
-              contract: { version: "r123f114f115f116f120-20260417", surface: "prompt_tools_state" },
+              contract: { version: "r145f141f142-20260418", surface: "prompt_tools_state" },
               namespace,
               state: {
                 namespace,
@@ -555,7 +555,7 @@ describe("registerRookieUIBootstrapExtension", () => {
           async json() {
             return {
               contract: {
-                version: "r123f114f115f116f120-20260417",
+                version: "r145f141f142-20260418",
                 surface: "prompt_tools_config",
                 route_family: "/rookieui/prompt-tools",
               },
@@ -585,6 +585,18 @@ describe("registerRookieUIBootstrapExtension", () => {
               blacklist: {
                 enabled: false,
                 entries: [],
+              },
+              host_actions: {
+                danbooru_upsample: {
+                  action_id: "danbooru_upsample",
+                  route_path: "/rookieui/prompt-tools/upsample",
+                  available: false,
+                  resolved_node_alias: "",
+                  availability: {
+                    status: "host_missing",
+                    detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+                  },
+                },
               },
               language_options: [{ code: "en", title: "English" }],
               theme_style_options: [{ id: "rookieui_classic", title: "RookieUI Classic" }],

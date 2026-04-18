@@ -1,16 +1,6 @@
-import {
-  fetchRookieUIADetailerCatalog,
-  fetchRookieUICapabilities,
-  fetchRookieUICompatibility,
-  fetchRookieUIControlNetModels,
-  fetchRookieUIControlNetModules,
-  fetchRookieUIControlNetTypes,
-  fetchRookieUIModels,
-  fetchRookieUIPromptWorkbenchConfig,
-  fetchRookieUIPresets,
-  fetchRookieUIQueue,
-  fetchRookieUIXYZPlotAxes,
-} from "./rookieui_extension_deps.js";
+/** @typedef {import("./types/rookieui_frontend").RookieUIBootstrapLoaders} RookieUIBootstrapLoaders */
+
+import { buildDefaultBootstrapLoaders } from "./rookieui_feature_registry_loaders.js";
 
 function toStringArray(rawValue) {
   return Array.isArray(rawValue)
@@ -47,23 +37,10 @@ export function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
   };
 }
 
-function buildDefaultBootstrapLoaders() {
-  return {
-    capabilities: (fetchImpl) => fetchRookieUICapabilities(fetchImpl),
-    compatibility: (fetchImpl) => fetchRookieUICompatibility(fetchImpl),
-    models: (fetchImpl) => fetchRookieUIModels(fetchImpl),
-    presets: (fetchImpl) => fetchRookieUIPresets(fetchImpl),
-    controlnetModels: (fetchImpl) => fetchRookieUIControlNetModels(fetchImpl),
-    controlnetModules: (fetchImpl) => fetchRookieUIControlNetModules(fetchImpl),
-    controlnetTypes: (fetchImpl) => fetchRookieUIControlNetTypes(fetchImpl),
-    adetailerCatalog: (fetchImpl) => fetchRookieUIADetailerCatalog(fetchImpl),
-    promptWorkbench: (fetchImpl) => fetchRookieUIPromptWorkbenchConfig(fetchImpl),
-    xyzPlot: (fetchImpl) => fetchRookieUIXYZPlotAxes(fetchImpl),
-    queue: (fetchImpl, { clientId }) => fetchRookieUIQueue(fetchImpl, { clientId }),
-  };
-}
-
-export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBootstrapLoaders()) {
+/**
+ * @param {RookieUIBootstrapLoaders} loaders
+ */
+export function buildRookieUIFeatureBootstrapRegistry(loaders) {
   return [
     {
       featureId: "capabilities",
@@ -131,15 +108,22 @@ export function buildRookieUIFeatureBootstrapRegistry(loaders = buildDefaultBoot
           loadedState.__controlnetTypes,
         ),
     },
+    {
+      featureId: "model_family_registry",
+      bootstrapKey: "modelFamilyRegistry",
+      compose: (loadedState) => loadedState.capabilities?.model_families ?? { contract_version: "", entries: [] },
+    },
   ];
 }
 
 export async function loadRookieUIBootstrapData(
   fetchImpl,
-  { clientId = "", loaders = buildDefaultBootstrapLoaders() } = {},
+  { clientId = "", loaders = null } = {},
 ) {
-  const registry = buildRookieUIFeatureBootstrapRegistry(loaders);
+  const resolvedLoaders = loaders ?? (await buildDefaultBootstrapLoaders());
+  const registry = buildRookieUIFeatureBootstrapRegistry(resolvedLoaders);
   const directEntries = registry.filter((entry) => typeof entry.load === "function");
+  /** @type {Record<string, any>} */
   const loadedState = {};
   const results = await Promise.all(
     directEntries.map((entry) => entry.load(fetchImpl, { clientId })),

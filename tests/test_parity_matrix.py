@@ -23,13 +23,22 @@ class ParityMatrixTests(unittest.TestCase):
                 "pony",
                 "illustrious",
                 "noob",
-                "flux",
-                "qwen_image",
-                "klein",
-                "lumina",
-                "zit",
-                "wan",
                 "anima",
+                "chroma",
+                "ernie_image",
+                "ernie_image_turbo",
+                "flux",
+                "klein_4b_distilled",
+                "klein_4b",
+                "klein_9b_distilled",
+                "klein_9b",
+                "hidream_i1_dev_fp8",
+                "hidream_i1_fast",
+                "hidream_i1_full",
+                "longcat_image",
+                "qwen_image",
+                "z_image",
+                "z_image_turbo",
             ],
         )
 
@@ -49,6 +58,7 @@ class ParityMatrixTests(unittest.TestCase):
         profile = get_parity_profile("zit")
 
         self.assertEqual(profile.base_family, "sdxl")
+        self.assertEqual(profile.id, "z_image_turbo")
         self.assertEqual(profile.default_steps, 8)
         self.assertEqual(profile.default_sampler, "res_multistep")
         self.assertEqual(profile.default_scheduler, "simple")
@@ -58,16 +68,28 @@ class ParityMatrixTests(unittest.TestCase):
 
         self.assertEqual(profile.default_width, 1328)
         self.assertEqual(profile.default_height, 1328)
-        self.assertEqual(profile.default_steps, 50)
-        self.assertEqual(profile.default_cfg_scale, 4.0)
+        self.assertEqual(profile.default_steps, 2)
+        self.assertEqual(profile.default_cfg_scale, 1.0)
         self.assertEqual(profile.default_sampler, "euler")
         self.assertEqual(profile.default_scheduler, "simple")
 
-    def test_get_parity_profile_uses_non_lightning_wan_baseline_defaults(self) -> None:
-        profile = get_parity_profile("wan")
+    def test_get_parity_profile_maps_legacy_lumina_alias_to_z_image_defaults(self) -> None:
+        profile = get_parity_profile("lumina")
 
-        self.assertEqual(profile.default_steps, 20)
-        self.assertEqual(profile.default_cfg_scale, 6.0)
+        self.assertEqual(profile.id, "z_image")
+        self.assertEqual(profile.default_steps, 25)
+        self.assertEqual(profile.default_cfg_scale, 4.0)
+        self.assertEqual(profile.default_sampler, "res_multistep")
+        self.assertEqual(profile.default_scheduler, "simple")
+
+    def test_get_parity_profile_uses_ernie_host_defaults(self) -> None:
+        profile = get_parity_profile("ernie_image")
+
+        self.assertEqual(profile.base_family, "sdxl")
+        self.assertEqual(profile.default_width, 1024)
+        self.assertEqual(profile.default_height, 1024)
+        self.assertEqual(profile.default_steps, 40)
+        self.assertEqual(profile.default_cfg_scale, 4.0)
         self.assertEqual(profile.default_sampler, "euler")
         self.assertEqual(profile.default_scheduler, "simple")
 

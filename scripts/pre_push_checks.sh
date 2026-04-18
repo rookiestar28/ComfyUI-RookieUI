@@ -269,14 +269,15 @@ echo "[pre-push] Step 3/4: backend unit tests"
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
   "$VENV_PY" scripts/run_unittests.py --start-dir tests --pattern "test_*.py"
 
-echo "[pre-push] Step 4/5: frontend test suite (npm test)"
+echo "[pre-push] Step 4/5: frontend type validation + test suite"
+npm run test:types
 npm test
 
 if [ "${ROOKIEUI_RUN_LIVE_SMOKE:-0}" = "1" ]; then
-  echo "[pre-push] Step 5/5: optional live host smoke lane"
-  "$VENV_PY" scripts/run_live_smoke_tests.py
+  echo "[pre-push] Step 5/5: optional host-embedded E2E lane"
+  "$VENV_PY" scripts/run_host_embedded_e2e.py
 else
-  echo "[pre-push] Step 5/5: optional live host smoke lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
+  echo "[pre-push] Step 5/5: optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
 fi
 
 echo "[pre-push] PASS: all required checks completed."

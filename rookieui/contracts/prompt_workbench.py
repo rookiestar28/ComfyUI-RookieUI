@@ -3,9 +3,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-PROMPT_WORKBENCH_CONTRACT_VERSION = "r123f114f115f116f120-20260417"
+PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418"
 PROMPT_WORKBENCH_STATE_SCHEMA_VERSION = 1
 PROMPT_WORKBENCH_ROUTE_FAMILY = "/rookieui/prompt-tools"
+PROMPT_WORKBENCH_DANBOORU_ACTION_ID = "danbooru_upsample"
+PROMPT_WORKBENCH_DANBOORU_ROUTE_PATH = f"{PROMPT_WORKBENCH_ROUTE_FAMILY}/upsample"
+PROMPT_WORKBENCH_DANBOORU_NODE_ALIASES = (
+    "DanbooruTagsUpsampler",
+    "DanbooruTagsUpsamplerNodeRay",
+)
 PROMPT_WORKBENCH_NAMESPACES = (
     "txt2img_prompt",
     "txt2img_negative",
@@ -464,6 +470,24 @@ def build_default_prompt_workbench_config() -> dict[str, Any]:
     }
 
 
+def build_default_prompt_workbench_host_actions() -> dict[str, Any]:
+    return {
+        PROMPT_WORKBENCH_DANBOORU_ACTION_ID: {
+            "action_id": PROMPT_WORKBENCH_DANBOORU_ACTION_ID,
+            "title": "Upsample Tags",
+            "route_path": PROMPT_WORKBENCH_DANBOORU_ROUTE_PATH,
+            "available": False,
+            "fixed_profile": "host_node_defaults",
+            "node_aliases": list(PROMPT_WORKBENCH_DANBOORU_NODE_ALIASES),
+            "availability": {
+                "status": "host_missing",
+                "detail": "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+            },
+            "input_fields": ["prompt", "negative_prompt_tags", "ban_tags"],
+        }
+    }
+
+
 def build_default_prompt_workbench_surface_state(namespace: str) -> dict[str, Any]:
     return {
         "namespace": namespace,
@@ -497,6 +521,7 @@ class PromptWorkbenchBootstrapSnapshot:
     contract: PromptWorkbenchRouteContract = field(default_factory=PromptWorkbenchRouteContract)
     config: dict[str, Any] = field(default_factory=build_default_prompt_workbench_config)
     blacklist: dict[str, Any] = field(default_factory=_default_blacklist_state)
+    host_actions: dict[str, Any] = field(default_factory=build_default_prompt_workbench_host_actions)
     language_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_LANGUAGE_OPTIONS
     theme_style_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_THEME_STYLE_OPTIONS
 

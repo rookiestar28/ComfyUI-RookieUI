@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "web/rookieui_asset_revision.js",
+    "web/rookieui_extension.js",
+    "web/rookieui_feature_registry.js",
+    "web/rookieui_host_surface.js",
+    "web/types/**/*.d.ts"
+  ]
+}

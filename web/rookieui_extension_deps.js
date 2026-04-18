@@ -37,6 +37,7 @@ export const {
   assistRookieUIPromptWorkbench,
   cancelRookieUIXYZPlotSession,
   translateRookieUIPromptWorkbench,
+  upsampleRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
   updateRookieUIPromptWorkbenchFavorites,
@@ -55,6 +56,7 @@ export function createPromptWorkbenchRequestBindings(fetchImpl) {
     fetchPromptWorkbenchCatalogRequest: (language) => fetchRookieUIPromptWorkbenchCatalog(language, fetchImpl),
     translatePromptWorkbenchRequest: (payload) => translateRookieUIPromptWorkbench(payload, fetchImpl),
     assistPromptWorkbenchRequest: (payload) => assistRookieUIPromptWorkbench(payload, fetchImpl),
+    upsamplePromptWorkbenchRequest: (payload) => upsampleRookieUIPromptWorkbench(payload, fetchImpl),
     fetchPromptWorkbenchBlacklistRequest: () => fetchRookieUIPromptWorkbenchBlacklist(fetchImpl),
     updatePromptWorkbenchBlacklistRequest: (blacklist) =>
       updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImpl),

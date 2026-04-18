@@ -41,6 +41,32 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertIn("sd15", profile_ids)
         self.assertIn("pony", profile_ids)
 
+    def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
+        payload = build_capabilities_snapshot()
+
+        self.assertEqual(payload["model_families"]["contract_version"], "f151-20260418")
+        family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
+        self.assertIn("sd15", family_ids)
+        self.assertIn("chroma", family_ids)
+        self.assertIn("flux", family_ids)
+        self.assertIn("ernie_image", family_ids)
+        self.assertIn("z_image_turbo", family_ids)
+        flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
+        ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
+        z_turbo_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "z_image_turbo")
+        self.assertEqual(flux_entry["translation_base_family"], "sdxl")
+        self.assertEqual(flux_entry["public_base_family"], "flux")
+        self.assertFalse(flux_entry["text_encoder_visible"])
+        self.assertFalse(flux_entry["shift_visible"])
+        self.assertEqual(ernie_entry["translation_base_family"], "sdxl")
+        self.assertEqual(ernie_entry["public_base_family"], "ernie_image")
+        self.assertFalse(ernie_entry["text_encoder_visible"])
+        self.assertTrue(ernie_entry["prompt_enhancement_visible"])
+        chroma_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "chroma")
+        self.assertTrue(chroma_entry["shift_visible"])
+        self.assertEqual(chroma_entry["default_shift"], 1.0)
+        self.assertEqual(z_turbo_entry["public_base_family"], "z_image")
+
     def test_build_capabilities_payload_normalizes_host_surfaces(self) -> None:
         payload = build_capabilities_payload(
             routes=["/rookieui/capabilities"],

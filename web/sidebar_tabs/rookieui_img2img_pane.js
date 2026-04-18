@@ -86,6 +86,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     activateShellTab,
     updateFormFromPreset,
     syncFamilyAwareModuleQuicksetting,
+    syncFamilyAwareAdvancedParameterFields,
     syncClipSkipAvailability,
     syncMaskField,
     resolveImg2ImgExecutionMode,
@@ -289,6 +290,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       inputMode: "decimal",
     }),
     cfgScaleSlider: createRangeInput("rookieui-img2img-cfg-scale-slider", "7", { step: 0.1, min: 1, max: 30 }),
+    shift: createInput("number", "rookieui-img2img-shift", "", {
+      step: 0.1,
+      min: 0,
+      max: 20,
+      inputMode: "decimal",
+    }),
+    fluxGuidance: createInput("number", "rookieui-img2img-flux-guidance", "", {
+      step: 0.1,
+      min: 0,
+      max: 20,
+      inputMode: "decimal",
+    }),
     sampler: createSelect(
       "rookieui-img2img-sampler",
       samplerCatalog.map((entry) => ({ value: entry.id, label: entry.title })),
@@ -299,6 +312,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       schedulerCatalog.map((entry) => ({ value: entry.id, label: entry.title })),
       initialScheduler,
     ),
+    promptEnhancementEnabled: createCheckbox("rookieui-img2img-prompt-enhancement-enabled", false),
     seed: createInput("number", "rookieui-img2img-seed", "-1", { step: 1 }),
     seedExtra: createCheckbox("rookieui-img2img-seed-extra", false),
     batchSize: createInput("number", "rookieui-img2img-batch-size", "1", { step: 1, min: 1, max: 8 }),
@@ -468,6 +482,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     "Negative Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
   elements.imageAsset.placeholder = "required";
   elements.maskAsset.placeholder = "optional";
+  const readOptionalNumeric = (input) => {
+    const rawValue = String(input?.value ?? "").trim();
+    return rawValue ? Number(rawValue) : null;
+  };
+  const advancedParameterControls = {
+    shiftField: null,
+    shiftInput: elements.shift,
+    fluxGuidanceField: null,
+    fluxGuidanceInput: elements.fluxGuidance,
+    promptEnhancementField: null,
+    promptEnhancementInput: elements.promptEnhancementEnabled,
+  };
 
   const buildXYZBaseRequest = () => ({
     prompt: elements.prompt.value,
@@ -488,8 +514,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     resize_mode: elements.resizeMode.value,
     steps: Number(elements.steps.value),
     cfg_scale: Number(elements.cfgScale.value),
+    shift: readOptionalNumeric(elements.shift),
+    flux_guidance: readOptionalNumeric(elements.fluxGuidance),
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
+    prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,
     batch_size: Number(elements.batchSize.value),
@@ -675,6 +704,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     modulesQuicksettingLabel,
     elements.textEncoder,
   );
+  syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   const inpaintModeControls = [
     elements.maskBlur,
     elements.maskBlurSlider,
@@ -739,6 +769,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       modulesQuicksettingLabel,
       elements.textEncoder,
     );
+    syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   });
   elements.mode.addEventListener("change", () => {
     img2imgModeRouter.syncFromModeValue();
@@ -827,6 +858,12 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           elements.cfgScaleSlider,
           "rookieui-img2img-cfg-scale-field",
         );
+        advancedParameterControls.shiftField = createField(generationGrid, "Shift", elements.shift);
+        advancedParameterControls.fluxGuidanceField = createField(
+          generationGrid,
+          "Flux Guidance",
+          elements.fluxGuidance,
+        );
         createSliderField(
           generationGrid,
           "Denoise",
@@ -855,6 +892,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           elements.clipSkipSlider,
           "rookieui-img2img-clip-skip-field",
         );
+        advancedParameterControls.promptEnhancementField = createInlineCheckboxField(
+          generationGrid,
+          "Prompt Enhancement",
+          elements.promptEnhancementEnabled,
+        );
         createSeedControlField(
           generationGrid,
           "Seed",
@@ -862,6 +904,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           elements.seedExtra,
           "rookieui-img2img-seed-field",
         );
+        syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
 
         const hiresGrid = createHiresFixSection(
           generationSection,
@@ -1759,6 +1802,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       modulesQuicksettingLabel,
       elements.textEncoder,
     );
+    syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     syncImg2ImgModeSurface();
   });
 
@@ -1782,8 +1826,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         mask_data: "maskData",
         steps: "steps",
         cfg_scale: "cfgScale",
+        shift: "shift",
+        flux_guidance: "fluxGuidance",
         sampler_name: "sampler",
         scheduler_name: "scheduler",
+        prompt_enhancement_enabled: "promptEnhancementEnabled",
         seed: "seed",
         seed_extra: "seedExtra",
         batch_size: "batchSize",
@@ -1837,6 +1884,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         modulesQuicksettingLabel,
         elements.textEncoder,
       );
+      syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
       img2imgModeRouter.syncFromModeValue();
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();

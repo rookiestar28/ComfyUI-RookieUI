@@ -127,6 +127,7 @@ export function createPromptWorkbenchShell({
     instruction_preset: "",
   };
   const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [] });
+  const hostActions = structuredClone(bootstrapState?.promptWorkbench?.host_actions ?? {});
   const languageOptions = Array.isArray(bootstrapState?.promptWorkbench?.language_options)
     ? bootstrapState.promptWorkbench.language_options
     : [];
@@ -157,6 +158,9 @@ export function createPromptWorkbenchShell({
     imageDescription: "",
     generatedPrompt: "",
     generating: false,
+  };
+  const upsampleState = {
+    running: false,
   };
 
   const header = document.createElement("div");
@@ -420,6 +424,24 @@ export function createPromptWorkbenchShell({
       : [];
   }
 
+  function getDanbooruUpsampleAction() {
+    const action = hostActions?.danbooru_upsample;
+    if (action && typeof action === "object") {
+      return action;
+    }
+    return {
+      action_id: "danbooru_upsample",
+      title: "Upsample Tags",
+      route_path: "/rookieui/prompt-tools/upsample",
+      available: false,
+      resolved_node_alias: "",
+      availability: {
+        status: "host_missing",
+        detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+      },
+    };
+  }
+
   function appendPromptFragment(fragment, { replace = false, statusMessage = "" } = {}) {
     const normalizedFragment = String(fragment ?? "").trim();
     if (!normalizedFragment) {
@@ -488,6 +510,67 @@ export function createPromptWorkbenchShell({
       })
       .catch(() => {
         updateStatus("Prompt translation failed");
+      });
+  }
+
+  function requestDanbooruUpsample() {
+    const action = getDanbooruUpsampleAction();
+    const availability = action?.availability ?? {};
+    const availabilityStatus = String(availability?.status ?? "").trim() || "host_missing";
+    const promptText = String(getActiveState().draft_prompt || getActiveInput()?.value || "").trim();
+    const negativePromptText = String(inputMap.negative?.value ?? stateCache.get(namespaceMap.negative)?.draft_prompt ?? "").trim();
+    if (activeScope !== "prompt") {
+      updateStatus("Upsample Tags is only available for the primary prompt scope");
+      return;
+    }
+    if (!promptText) {
+      updateStatus("No prompt text is available for tag upsampling");
+      return;
+    }
+    if (!Boolean(action?.available) || availabilityStatus !== "ready") {
+      updateStatus(String(availability?.detail ?? "Danbooru upsampler host action is unavailable."));
+      return;
+    }
+    upsampleState.running = true;
+    updateStatus("Upsampling prompt tags through the host Danbooru node...");
+    syncUi();
+    const requestPromise = bootstrapState?.upsamplePromptWorkbenchRequest?.({
+        prompt: promptText,
+        negative_prompt_tags: negativePromptText,
+        ban_tags: "",
+      });
+    if (!requestPromise || typeof requestPromise.then !== "function") {
+      upsampleState.running = false;
+      updateStatus("Danbooru upsampler request binding is unavailable");
+      syncUi();
+      return;
+    }
+    void requestPromise
+      .then((result) => {
+        if (result?.ok === false) {
+          const errorDetail =
+            String(result?.data?.detail ?? "").trim() ||
+            String(result?.data?.availability?.detail ?? "").trim() ||
+            "Danbooru upsampler request did not complete successfully";
+          updateStatus(errorDetail);
+          return;
+        }
+        const finalPrompt = String(result?.data?.final_prompt ?? "").trim();
+        if (!finalPrompt) {
+          updateStatus("Danbooru upsampler returned empty prompt text");
+          return;
+        }
+        applyPromptTextToInput(finalPrompt, {
+          updateEditor: true,
+          statusMessage: "Applied Danbooru upsampled tags",
+        });
+      })
+      .catch(() => {
+        updateStatus("Danbooru upsampler request failed");
+      })
+      .finally(() => {
+        upsampleState.running = false;
+        syncUi();
       });
   }
 
@@ -734,6 +817,32 @@ export function createPromptWorkbenchShell({
       });
       translateRow.appendChild(translateLocalButton);
     }
+
+    const danbooruAction = getDanbooruUpsampleAction();
+    const upsampleAvailability = danbooruAction?.availability ?? {};
+    const upsampleStatus = String(upsampleAvailability?.status ?? "").trim() || "host_missing";
+    const upsampleRow = document.createElement("div");
+    upsampleRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    editorPane.appendChild(upsampleRow);
+
+    const upsampleButton = createActionButton(
+      `${idPrefix}-upsample-tags`,
+      upsampleState.running ? "Upsampling..." : String(danbooruAction?.title ?? "Upsample Tags"),
+    );
+    upsampleButton.disabled = upsampleState.running || activeScope !== "prompt" || !Boolean(danbooruAction?.available) || upsampleStatus !== "ready";
+    upsampleButton.addEventListener("click", () => {
+      requestDanbooruUpsample();
+    });
+    upsampleRow.appendChild(upsampleButton);
+
+    const upsampleDetail = document.createElement("span");
+    upsampleDetail.id = `${idPrefix}-upsample-detail`;
+    upsampleDetail.className = "rookieui-shell__prompt-workbench-detail";
+    upsampleDetail.textContent =
+      activeScope !== "prompt"
+        ? "Upsample Tags is limited to the primary prompt editor."
+        : String(upsampleAvailability?.detail ?? "Danbooru upsampler host action is unavailable.");
+    upsampleRow.appendChild(upsampleDetail);
 
     const tokens = ensureEditorTokens(getActiveNamespace());
     const list = document.createElement("div");

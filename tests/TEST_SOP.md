@@ -6,6 +6,7 @@ Use it before push and before marking any implementation as accepted.
 ## Scope
 
 - Frontend Playwright harness E2E and frontend unit tests via `npm test`
+- Frontend static type validation via `npm run test:types`
 - Backend Python unit tests via `scripts/run_unittests.py`
 - Repository hygiene checks via `pre-commit`
 
@@ -25,10 +26,10 @@ Required minimum gate:
 2. `pre-commit run --all-files --show-diff-on-failure`
 3. backend unit tests (`scripts/run_unittests.py`)
 4. frontend tests (`npm test`)
+5. targeted frontend type validation for TS-first seams (`npm run test:types`) when the change touches the typed frontend foundation
+Optional (recommended for runtime/host-integration changes):
 
-Optional (recommended for newer-family loader/runtime changes):
-
-5. live host smoke lane (`scripts/run_live_smoke_tests.py`)
+6. host-embedded E2E lane (`scripts/run_host_embedded_e2e.py`, which delegates to `scripts/run_live_smoke_tests.py`)
 
 ### Bugfix/Hotfix Rule (Reproduce -> Pin -> Sweep)
 
@@ -68,7 +69,7 @@ powershell -File scripts/run_full_tests_windows.ps1
 bash scripts/run_full_tests_linux.sh
 ```
 
-Enable optional live host smoke lane in either wrapper script:
+Enable optional host-embedded E2E lane in either wrapper script:
 
 - PowerShell:
 
@@ -128,25 +129,26 @@ MOLTBOT_STATE_DIR="$(pwd)/moltbot_state/_local_unit" \
 node -v
 npm install
 npx playwright install chromium
+npm run test:types
 npm test
 ```
 
-5. Optional live host smoke lane (recommended for profile/model-loader changes):
+5. Optional host-embedded E2E lane (recommended for runtime/host-integration changes):
 
 ```bash
-python scripts/run_live_smoke_tests.py
+python scripts/run_host_embedded_e2e.py
 ```
 
-Optional execute mode (real txt2img submission + queue polling):
+Strict report-only contract pass:
 
 ```bash
-ROOKIEUI_LIVE_SMOKE_EXECUTE=1 python scripts/run_live_smoke_tests.py
+python scripts/run_host_embedded_e2e.py --skip-execute
 ```
 
 Optional base URL override:
 
 ```bash
-ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_live_smoke_tests.py
+ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_host_embedded_e2e.py
 ```
 
 ## Environment Guardrails

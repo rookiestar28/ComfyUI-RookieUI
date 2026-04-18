@@ -8,7 +8,9 @@ from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
     ensure_native_ultralytics_model_paths,
+    resolve_aux_text_encoder_selector_context,
     resolve_primary_model_selector_context,
+    resolve_template_lora_selector_context,
     resolve_text_encoder_selector_context,
     resolve_vae_selector_context,
 )
@@ -97,7 +99,19 @@ class ModelInventoryTests(unittest.TestCase):
             "diffusion_models",
         )
         self.assertEqual(
-            payload["catalog"]["primary_model_category_by_family"]["wan"],
+            payload["catalog"]["primary_model_category_by_family"]["pony"],
+            "checkpoints",
+        )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["klein"],
+            "diffusion_models",
+        )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["hidream"],
+            "diffusion_models",
+        )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["ernie_image"],
             "diffusion_models",
         )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
@@ -130,18 +144,25 @@ class ModelInventoryTests(unittest.TestCase):
                 "checkpoints": ["realvisxl.safetensors"],
                 "diffusion_models": [
                     "flux1-dev.safetensors",
-                    "qwen-image.safetensors",
-                    "lumina2.safetensors",
-                    "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
+                    "qwen_image_2512_fp8_e4m3fn.safetensors",
+                    "z_image_bf16.safetensors",
+                    "z_image_turbo_bf16.safetensors",
+                    "Chroma1-HD-fp8mixed.safetensors",
+                    "ernie\\ernie-image.safetensors",
+                    "ernie\\ernie-image-turbo.safetensors",
                 ],
                 "vae": [
                     "qwen_image_vae.safetensors",
-                    "lumina_vae.safetensors",
+                    "ae.safetensors",
+                    "flux2-vae.safetensors",
+                    "ernie_vae.safetensors",
                 ],
                 "text_encoders": [
-                    "QwenImageTEModel_.safetensors",
+                    "qwen_2.5_vl_7b_fp8_scaled.safetensors",
                     "clip_l.safetensors",
-                    "LuminaTEModel.safetensors",
+                    "qwen_3_4b.safetensors",
+                    "t5xxl_fp8_e4m3fn_scaled.safetensors",
+                    "Ministral3_3B_fp16.safetensors",
                 ],
             }.get(folder_name, [])
         )
@@ -154,35 +175,56 @@ class ModelInventoryTests(unittest.TestCase):
 
         preset_lookup = {preset["id"]: preset for preset in payload["presets"]}
         self.assertEqual(preset_lookup["flux"]["checkpoint_name"], "flux1-dev.safetensors")
-        self.assertEqual(preset_lookup["qwen_image"]["checkpoint_name"], "qwen-image.safetensors")
-        self.assertEqual(preset_lookup["lumina"]["checkpoint_name"], "lumina2.safetensors")
+        self.assertEqual(preset_lookup["qwen_image"]["checkpoint_name"], "qwen_image_2512_fp8_e4m3fn.safetensors")
+        self.assertEqual(preset_lookup["z_image"]["checkpoint_name"], "z_image_bf16.safetensors")
         self.assertEqual(
-            preset_lookup["zit"]["checkpoint_name"],
-            "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
+            preset_lookup["z_image_turbo"]["checkpoint_name"],
+            "z_image_turbo_bf16.safetensors",
         )
+        self.assertEqual(preset_lookup["chroma"]["checkpoint_name"], "Chroma1-HD-fp8mixed.safetensors")
         self.assertEqual(
             preset_lookup["qwen_image"]["vae_name"],
             "qwen_image_vae.safetensors",
         )
         self.assertEqual(
-            preset_lookup["lumina"]["vae_name"],
-            "lumina_vae.safetensors",
+            preset_lookup["z_image"]["vae_name"],
+            "ae.safetensors",
         )
         self.assertEqual(
-            preset_lookup["zit"]["vae_name"],
-            "lumina_vae.safetensors",
+            preset_lookup["z_image_turbo"]["vae_name"],
+            "ae.safetensors",
         )
         self.assertEqual(
             preset_lookup["qwen_image"]["text_encoder_name"],
-            "QwenImageTEModel_.safetensors",
+            "qwen_2.5_vl_7b_fp8_scaled.safetensors",
         )
         self.assertEqual(
-            preset_lookup["lumina"]["text_encoder_name"],
-            "LuminaTEModel.safetensors",
+            preset_lookup["z_image"]["text_encoder_name"],
+            "qwen_3_4b.safetensors",
         )
         self.assertEqual(
-            preset_lookup["zit"]["text_encoder_name"],
-            "LuminaTEModel.safetensors",
+            preset_lookup["z_image_turbo"]["text_encoder_name"],
+            "qwen_3_4b.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["chroma"]["text_encoder_name"],
+            "t5xxl_fp8_e4m3fn_scaled.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["checkpoint_name"],
+            "ernie\\ernie-image.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["vae_name"],
+            "flux2-vae.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["text_encoder_name"],
+            "Ministral3_3B_fp16.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image_turbo"]["checkpoint_name"],
+            "ernie\\ernie-image-turbo.safetensors",
         )
 
     def test_resolve_primary_model_selector_context_uses_profile_mapped_category(self) -> None:
@@ -221,63 +263,63 @@ class ModelInventoryTests(unittest.TestCase):
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["realvisxl.safetensors"],
-                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "diffusion_models": ["z_image_bf16.safetensors", "qwen_image_2512_fp8_e4m3fn.safetensors"],
                 "vae": ["Automatic"],
-                "text_encoders": ["QwenImageTEModel_.safetensors", "LuminaTEModel.safetensors"],
+                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_3_4b.safetensors"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
 
         qwen_selector = resolve_text_encoder_selector_context("qwen_image", snapshot)
-        zit_selector = resolve_text_encoder_selector_context("zit", snapshot)
+        z_image_selector = resolve_text_encoder_selector_context("lumina", snapshot)
 
-        self.assertEqual(qwen_selector, "QwenImageTEModel_.safetensors")
-        self.assertEqual(zit_selector, "LuminaTEModel.safetensors")
+        self.assertEqual(qwen_selector, "qwen_2.5_vl_7b_fp8_scaled.safetensors")
+        self.assertEqual(z_image_selector, "qwen_3_4b.safetensors")
 
     def test_resolve_vae_selector_context_avoids_qwen_default_for_non_qwen_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["realvisxl.safetensors"],
-                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
-                "vae": ["qwen_image_vae.safetensors", "lumina_vae.safetensors"],
+                "diffusion_models": ["z_image_bf16.safetensors", "qwen_image_2512_fp8_e4m3fn.safetensors"],
+                "vae": ["qwen_image_vae.safetensors", "ae.safetensors"],
                 "text_encoders": ["Automatic"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
 
         qwen_selector = resolve_vae_selector_context("qwen_image", snapshot)
-        zit_selector = resolve_vae_selector_context("zit", snapshot)
+        z_image_selector = resolve_vae_selector_context("lumina", snapshot)
 
         self.assertEqual(qwen_selector, "qwen_image_vae.safetensors")
-        self.assertEqual(zit_selector, "lumina_vae.safetensors")
+        self.assertEqual(z_image_selector, "ae.safetensors")
 
     def test_resolve_text_encoder_selector_context_disables_global_default_for_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["realvisxl.safetensors"],
-                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "diffusion_models": ["z_image_bf16.safetensors", "qwen_image_2512_fp8_e4m3fn.safetensors"],
                 "vae": ["Automatic"],
                 "text_encoders": ["Automatic"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
 
-        zit_selector = resolve_text_encoder_selector_context("zit", snapshot)
-        self.assertEqual(zit_selector, "")
+        z_image_selector = resolve_text_encoder_selector_context("lumina", snapshot)
+        self.assertEqual(z_image_selector, "")
 
     def test_resolve_vae_selector_context_disables_global_default_for_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["realvisxl.safetensors"],
-                "diffusion_models": ["lumina2.safetensors", "qwen-image.safetensors"],
+                "diffusion_models": ["z_image_bf16.safetensors", "qwen_image_2512_fp8_e4m3fn.safetensors"],
                 "vae": ["Automatic"],
                 "text_encoders": ["Automatic"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
 
-        zit_selector = resolve_vae_selector_context("zit", snapshot)
-        self.assertEqual(zit_selector, "")
+        z_image_selector = resolve_vae_selector_context("lumina", snapshot)
+        self.assertEqual(z_image_selector, "")
 
     def test_profile_matrix_uses_family_aligned_defaults_for_all_non_sd_diffusion_profiles(self) -> None:
         module = types.SimpleNamespace(
@@ -285,50 +327,117 @@ class ModelInventoryTests(unittest.TestCase):
                 "checkpoints": ["realvisxl.safetensors"],
                 "diffusion_models": [
                     "flux\\flux1-dev.safetensors",
-                    "qwen\\qwen-image.safetensors",
-                    "klein\\flux2_klein.safetensors",
-                    "lumina\\lumina2.safetensors",
-                    "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
-                    "wan\\wan2_2b.safetensors",
-                    "anima\\animaPencilXL_v500.safetensors",
+                    "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                    "klein\\flux-2-klein-base-4b.safetensors",
+                    "klein\\flux-2-klein-9b-fp8.safetensors",
+                    "chroma\\Chroma1-HD-fp8mixed.safetensors",
+                    "hidream\\hidream_i1_full_fp8.safetensors",
+                    "longcat\\longcat_image_bf16.safetensors",
+                    "z\\z_image_bf16.safetensors",
+                    "z\\z_image_turbo_bf16.safetensors",
+                    "anima\\anima-preview3-base.safetensors",
+                    "ernie\\ernie-image.safetensors",
                 ],
                 "vae": [
                     "qwen_image_vae.safetensors",
-                    "flux_vae.safetensors",
-                    "klein_vae.safetensors",
-                    "lumina_vae.safetensors",
-                    "wan_vae.safetensors",
-                    "anima_vae.safetensors",
+                    "ae.safetensors",
+                    "flux2-vae.safetensors",
+                    "full_encoder_small_decoder.safetensors",
                 ],
                 "text_encoders": [
-                    "QwenImageTEModel_.safetensors",
-                    "FluxT5XXL.safetensors",
-                    "KleinT5XXL.safetensors",
-                    "LuminaTEModel.safetensors",
-                    "WanTextEncoder.safetensors",
-                    "AnimaTextEncoder.safetensors",
+                    "clip_l.safetensors",
+                    "t5xxl_fp16.safetensors",
+                    "t5xxl_fp8_e4m3fn_scaled.safetensors",
+                    "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                    "qwen_3_4b.safetensors",
+                    "qwen_3_8b_fp8mixed.safetensors",
+                    "qwen_3_06b_base.safetensors",
+                    "clip_l_hidream.safetensors",
+                    "clip_g_hidream.safetensors",
+                    "llama_3.1_8b_instruct_fp8_scaled.safetensors",
+                    "Ministral3_3B_fp16.safetensors",
+                    "ernie-image-prompt-enhancer.safetensors",
                 ],
+                "loras": ["Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
-        non_sd_profiles = ["flux", "qwen_image", "klein", "lumina", "zit", "wan", "anima"]
+        expectations = {
+            "flux": {
+                "model": "flux\\flux1-dev.safetensors",
+                "text_encoder": "clip_l.safetensors|t5xxl_fp16.safetensors",
+                "vae": "ae.safetensors",
+            },
+            "qwen_image": {
+                "model": "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+            },
+            "klein": {
+                "model": "klein\\flux-2-klein-base-4b.safetensors",
+                "text_encoder": "qwen_3_4b.safetensors",
+                "vae": "flux2-vae.safetensors",
+            },
+            "chroma": {
+                "model": "chroma\\Chroma1-HD-fp8mixed.safetensors",
+                "text_encoder": "t5xxl_fp8_e4m3fn_scaled.safetensors",
+                "vae": "ae.safetensors",
+            },
+            "hidream_i1_full": {
+                "model": "hidream\\hidream_i1_full_fp8.safetensors",
+                "text_encoder": (
+                    "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
+                    "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors"
+                ),
+                "vae": "ae.safetensors",
+            },
+            "longcat_image": {
+                "model": "longcat\\longcat_image_bf16.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "ae.safetensors",
+            },
+            "lumina": {
+                "model": "z\\z_image_bf16.safetensors",
+                "text_encoder": "qwen_3_4b.safetensors",
+                "vae": "ae.safetensors",
+            },
+            "zit": {
+                "model": "z\\z_image_turbo_bf16.safetensors",
+                "text_encoder": "qwen_3_4b.safetensors",
+                "vae": "ae.safetensors",
+            },
+            "anima": {
+                "model": "anima\\anima-preview3-base.safetensors",
+                "text_encoder": "qwen_3_06b_base.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+            },
+            "ernie_image": {
+                "model": "ernie\\ernie-image.safetensors",
+                "text_encoder": "Ministral3_3B_fp16.safetensors",
+                "vae": "flux2-vae.safetensors",
+            },
+        }
 
-        for profile_id in non_sd_profiles:
+        for profile_id, expectation in expectations.items():
             with self.subTest(profile_id=profile_id):
                 category_id, selectors, default_model = resolve_primary_model_selector_context(profile_id, snapshot)
                 self.assertEqual(category_id, "diffusion_models")
                 self.assertIn(default_model, selectors)
-
+                self.assertEqual(default_model, expectation["model"])
                 resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, snapshot)
-                self.assertIn(resolved_text_encoder, snapshot.text_encoders)
                 resolved_vae = resolve_vae_selector_context(profile_id, snapshot)
                 self.assertIn(resolved_vae, snapshot.vae)
-                if profile_id == "qwen_image":
-                    self.assertIn("qwen", resolved_text_encoder.lower())
-                    self.assertIn("qwen", resolved_vae.lower())
-                else:
-                    self.assertNotIn("qwen", resolved_text_encoder.lower())
-                    self.assertNotIn("qwen", resolved_vae.lower())
+                self.assertEqual(resolved_text_encoder, expectation["text_encoder"])
+                self.assertEqual(resolved_vae, expectation["vae"])
+
+        self.assertEqual(
+            resolve_aux_text_encoder_selector_context("ernie_image", snapshot),
+            "ernie-image-prompt-enhancer.safetensors",
+        )
+        self.assertEqual(
+            resolve_template_lora_selector_context("qwen_image", snapshot),
+            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+        )
 
     def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
         module = types.SimpleNamespace(
@@ -353,28 +462,28 @@ class ModelInventoryTests(unittest.TestCase):
         text_encoder = resolve_text_encoder_selector_context("qwen_image", snapshot)
         self.assertEqual(text_encoder, "qwen_2.5_vl_7b_fp8_scaled.safetensors")
 
-    def test_resolve_primary_model_selector_prefers_non_lightning_wan_default(self) -> None:
+    def test_resolve_primary_model_selector_prefers_non_distilled_legacy_klein_alias_default(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["realvisxl.safetensors"],
                 "diffusion_models": [
-                    "wan\\wan2.2_t2v_lightx2v_4steps.safetensors",
-                    "wan\\wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
-                    "wan\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+                    "klein\\flux-2-klein-4b.safetensors",
+                    "klein\\flux-2-klein-base-4b.safetensors",
+                    "klein\\flux-2-klein-base-9b-fp8.safetensors",
                 ],
-                "vae": ["Automatic"],
-                "text_encoders": ["wan_text_encoder.safetensors", "umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+                "vae": ["flux2-vae.safetensors", "full_encoder_small_decoder.safetensors"],
+                "text_encoders": ["qwen_3_4b.safetensors", "qwen_3_8b_fp8mixed.safetensors"],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
 
-        category_id, selectors, default_model = resolve_primary_model_selector_context("wan", snapshot)
+        category_id, selectors, default_model = resolve_primary_model_selector_context("klein", snapshot)
         self.assertEqual(category_id, "diffusion_models")
         self.assertIn(default_model, selectors)
-        self.assertEqual(default_model, "wan\\wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors")
+        self.assertEqual(default_model, "klein\\flux-2-klein-base-4b.safetensors")
 
-        text_encoder = resolve_text_encoder_selector_context("wan", snapshot)
-        self.assertEqual(text_encoder, "umt5_xxl_fp8_e4m3fn_scaled.safetensors")
+        text_encoder = resolve_text_encoder_selector_context("klein", snapshot)
+        self.assertEqual(text_encoder, "qwen_3_4b.safetensors")
 
     def test_discover_model_inventory_uses_ttl_cache_for_host_lookup(self) -> None:
         call_count = 0

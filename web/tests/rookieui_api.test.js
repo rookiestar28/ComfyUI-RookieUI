@@ -28,6 +28,7 @@ import {
   assistRookieUIPromptWorkbench,
   cancelRookieUIXYZPlotSession,
   translateRookieUIPromptWorkbench,
+  upsampleRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,
   updateRookieUIPromptWorkbenchConfig,
   updateRookieUIPromptWorkbenchFavorites,
@@ -67,6 +68,17 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
+    expect(result.data.model_families.contract_version).toBe("f151-20260418");
+    expect(result.data.model_families.entries[0].id).toBe("sd15");
+    const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
+    const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
+    const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
+    expect(chromaEntry.shift_visible).toBe(true);
+    expect(chromaEntry.default_shift).toBe(1);
+    expect(ernieEntry.prompt_enhancement_visible).toBe(true);
+    expect(ernieEntry.default_prompt_enhancement_enabled).toBe(true);
+    expect(longcatEntry.flux_guidance_visible).toBe(true);
+    expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
@@ -183,34 +195,63 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(models.data.default_checkpoint).toBe("__host_default__");
+    expect(models.data.catalog.primary_model_category_by_family.pony).toBe("checkpoints");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.ernie_image).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.zit).toBe("diffusion_models");
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);
     expect(compatibility.data.samplers[0].id).toBe("euler_ancestral");
     expect(compatibility.data.schedulers[0].id).toBe("normal");
     expect(compatibility.data.newer_family_profiles.map((profile) => profile.id)).toEqual([
-      "flux",
-      "qwen_image",
-      "klein",
-      "lumina",
-      "zit",
-      "wan",
       "anima",
+      "chroma",
+      "ernie_image",
+      "ernie_image_turbo",
+      "flux",
+      "klein_4b_distilled",
+      "klein_4b",
+      "klein_9b_distilled",
+      "klein_9b",
+      "hidream_i1_dev_fp8",
+      "hidream_i1_fast",
+      "hidream_i1_full",
+      "longcat_image",
+      "qwen_image",
+      "z_image",
+      "z_image_turbo",
     ]);
     expect(presets.data.presets[0].id).toBe("sd15");
     expect(presets.data.presets.map((preset) => preset.id)).toEqual([
       "sd15",
       "sdxl",
-      "flux",
-      "qwen_image",
-      "klein",
-      "lumina",
-      "zit",
-      "wan",
+      "pony",
+      "illustrious",
+      "noob",
       "anima",
+      "chroma",
+      "ernie_image",
+      "ernie_image_turbo",
+      "flux",
+      "klein_4b_distilled",
+      "klein_4b",
+      "klein_9b_distilled",
+      "klein_9b",
+      "hidream_i1_dev_fp8",
+      "hidream_i1_fast",
+      "hidream_i1_full",
+      "longcat_image",
+      "qwen_image",
+      "z_image",
+      "z_image_turbo",
     ]);
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
+    expect(presets.data.presets.find((preset) => preset.id === "chroma")?.shift).toBe(1);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
+    expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
+    expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
+    expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);
+    expect(presets.data.presets.find((preset) => preset.id === "z_image_turbo")?.base_family).toBe("z_image");
     expect(queue.data.queue_remaining).toBe(0);
   });
 
@@ -220,13 +261,14 @@ describe("fetchRookieUICapabilities", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.data.contract.version).toBe("r123f114f115f116f120-20260417");
+    expect(result.data.contract.version).toBe("r145f141f142-20260418");
     expect(result.data.contract.surface).toBe("prompt_tools_config");
     expect(result.data.config.translation.providers).toEqual({});
     expect(result.data.config.ai_assist.instruction_preset).toContain("Stable Diffusion prompt");
     expect(result.data.language_options[0].code).toBe("en");
     expect(result.data.theme_style_options[0].id).toBe("rookieui_classic");
     expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+    expect(result.data.host_actions.danbooru_upsample.route_path).toBe("/rookieui/prompt-tools/upsample");
   });
 
   test("loads prompt-workbench namespace state with a fallback payload", async () => {
@@ -342,6 +384,41 @@ describe("fetchRookieUICapabilities", () => {
         },
       },
     });
+  });
+
+  test("submits Danbooru prompt-workbench upsample payloads to the backend", async () => {
+    const calls = [];
+    const result = await upsampleRookieUIPromptWorkbench(
+      { prompt: "masterpiece, city skyline", negative_prompt_tags: "blurry", ban_tags: "lowres" },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: { surface: "prompt_tools_upsample" },
+              action_id: "danbooru_upsample",
+              final_prompt: "masterpiece, city skyline, enhanced tags",
+              generated_suffix: "enhanced tags",
+              host_node_alias: "DanbooruTagsUpsampler",
+              availability: { status: "ready" },
+              warnings: [],
+              warning_codes: [],
+            };
+          },
+        };
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/upsample");
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      prompt: "masterpiece, city skyline",
+      negative_prompt_tags: "blurry",
+      ban_tags: "lowres",
+    });
+    expect(result.data.final_prompt).toContain("enhanced tags");
   });
 
   test("updates prompt-workbench blacklist through the backend", async () => {
