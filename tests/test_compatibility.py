@@ -35,6 +35,7 @@ class CompatibilityCatalogTests(unittest.TestCase):
         self.assertIn("zit", family_ids)
         self.assertIn("wan", family_ids)
         self.assertIn("anima", family_ids)
+        self.assertIn("ernie_image", family_ids)
 
     def test_compatibility_route_returns_catalog_payload(self) -> None:
         response = asyncio.run(routes.compatibility(_FakeJsonRequest()))

@@ -113,11 +113,13 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("zit", preset_ids)
         self.assertIn("wan", preset_ids)
         self.assertIn("anima", preset_ids)
+        self.assertIn("ernie_image", preset_ids)
         preset_lookup = {preset["id"]: preset for preset in payload["presets"]}
         self.assertEqual(preset_lookup["flux"]["profile"], "flux")
         self.assertEqual(preset_lookup["qwen_image"]["profile"], "qwen_image")
         self.assertEqual(preset_lookup["klein"]["profile"], "klein")
         self.assertEqual(preset_lookup["zit"]["profile"], "zit")
+        self.assertEqual(preset_lookup["ernie_image"]["profile"], "ernie_image")
 
     def test_queue_snapshot_payload_exposes_contract_envelope(self) -> None:
         payload = routes.build_queue_snapshot_payload()

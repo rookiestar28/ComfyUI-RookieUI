@@ -44,14 +44,19 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f72-20260418")
+        self.assertEqual(payload["model_families"]["contract_version"], "f72-20260418b")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("flux", family_ids)
+        self.assertIn("ernie_image", family_ids)
         flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
+        ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
         self.assertEqual(flux_entry["translation_base_family"], "sdxl")
         self.assertEqual(flux_entry["public_base_family"], "flux")
         self.assertTrue(flux_entry["text_encoder_visible"])
+        self.assertEqual(ernie_entry["translation_base_family"], "sdxl")
+        self.assertEqual(ernie_entry["public_base_family"], "ernie_image")
+        self.assertTrue(ernie_entry["text_encoder_visible"])
 
     def test_build_capabilities_payload_normalizes_host_surfaces(self) -> None:
         payload = build_capabilities_payload(

@@ -104,6 +104,10 @@ class ModelInventoryTests(unittest.TestCase):
             payload["catalog"]["primary_model_category_by_family"]["wan"],
             "diffusion_models",
         )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["ernie_image"],
+            "diffusion_models",
+        )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
         self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
@@ -137,15 +141,18 @@ class ModelInventoryTests(unittest.TestCase):
                     "qwen-image.safetensors",
                     "lumina2.safetensors",
                     "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
+                    "ernie\\ernie-image.safetensors",
                 ],
                 "vae": [
                     "qwen_image_vae.safetensors",
                     "lumina_vae.safetensors",
+                    "ernie_vae.safetensors",
                 ],
                 "text_encoders": [
                     "QwenImageTEModel_.safetensors",
                     "clip_l.safetensors",
                     "LuminaTEModel.safetensors",
+                    "Ministral3_3B_fp16.safetensors",
                 ],
             }.get(folder_name, [])
         )
@@ -187,6 +194,18 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(
             preset_lookup["zit"]["text_encoder_name"],
             "LuminaTEModel.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["checkpoint_name"],
+            "ernie\\ernie-image.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["vae_name"],
+            "ernie_vae.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["ernie_image"]["text_encoder_name"],
+            "Ministral3_3B_fp16.safetensors",
         )
 
     def test_resolve_primary_model_selector_context_uses_profile_mapped_category(self) -> None:
@@ -295,6 +314,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
                     "wan\\wan2_2b.safetensors",
                     "anima\\animaPencilXL_v500.safetensors",
+                    "ernie\\ernie-image.safetensors",
                 ],
                 "vae": [
                     "qwen_image_vae.safetensors",
@@ -303,6 +323,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "lumina_vae.safetensors",
                     "wan_vae.safetensors",
                     "anima_vae.safetensors",
+                    "ernie_vae.safetensors",
                 ],
                 "text_encoders": [
                     "QwenImageTEModel_.safetensors",
@@ -311,11 +332,12 @@ class ModelInventoryTests(unittest.TestCase):
                     "LuminaTEModel.safetensors",
                     "WanTextEncoder.safetensors",
                     "AnimaTextEncoder.safetensors",
+                    "Ministral3_3B_fp16.safetensors",
                 ],
             }.get(folder_name, [])
         )
         snapshot = discover_model_inventory(folder_paths_module=module)
-        non_sd_profiles = ["flux", "qwen_image", "klein", "lumina", "zit", "wan", "anima"]
+        non_sd_profiles = ["flux", "qwen_image", "klein", "lumina", "zit", "wan", "anima", "ernie_image"]
 
         for profile_id in non_sd_profiles:
             with self.subTest(profile_id=profile_id):
@@ -333,6 +355,9 @@ class ModelInventoryTests(unittest.TestCase):
                 else:
                     self.assertNotIn("qwen", resolved_text_encoder.lower())
                     self.assertNotIn("qwen", resolved_vae.lower())
+                if profile_id == "ernie_image":
+                    self.assertIn("ministral", resolved_text_encoder.lower())
+                    self.assertIn("ernie", resolved_vae.lower())
 
     def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
         module = types.SimpleNamespace(

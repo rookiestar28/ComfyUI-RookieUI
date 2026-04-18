@@ -30,6 +30,7 @@ class ParityMatrixTests(unittest.TestCase):
                 "zit",
                 "wan",
                 "anima",
+                "ernie_image",
             ],
         )
 
@@ -70,6 +71,17 @@ class ParityMatrixTests(unittest.TestCase):
         self.assertEqual(profile.default_cfg_scale, 6.0)
         self.assertEqual(profile.default_sampler, "euler")
         self.assertEqual(profile.default_scheduler, "simple")
+
+    def test_get_parity_profile_uses_ernie_host_defaults(self) -> None:
+        profile = get_parity_profile("ernie_image")
+
+        self.assertEqual(profile.base_family, "sdxl")
+        self.assertEqual(profile.default_width, 1024)
+        self.assertEqual(profile.default_height, 1024)
+        self.assertEqual(profile.default_steps, 20)
+        self.assertEqual(profile.default_cfg_scale, 1.0)
+        self.assertEqual(profile.default_sampler, "euler")
+        self.assertEqual(profile.default_scheduler, "beta")
 
     def test_normalize_sampler_name_handles_a1111_aliases(self) -> None:
         self.assertEqual(normalize_sampler_name("Euler a"), "euler_ancestral")

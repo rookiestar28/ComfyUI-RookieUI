@@ -19,6 +19,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(payload["contract_version"], MODEL_FAMILY_REGISTRY_CONTRACT_VERSION)
         self.assertEqual(payload["entries"][0]["id"], "sd15")
         self.assertIn("flux", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("ernie_image", [entry["id"] for entry in payload["entries"]])
 
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
         flux_entry = get_model_family_registry_entry("flux")
@@ -33,17 +34,23 @@ class ModelFamilyRegistryTests(unittest.TestCase):
 
         self.assertEqual(category_map["pony"], "checkpoints")
         self.assertEqual(category_map["wan"], "diffusion_models")
+        self.assertEqual(category_map["ernie_image"], "diffusion_models")
 
     def test_compatibility_newer_family_profiles_are_registry_derived(self) -> None:
         payload = build_compatibility_payload()
         qwen_entry = next(entry for entry in payload["newer_family_profiles"] if entry["id"] == "qwen_image")
+        ernie_entry = next(entry for entry in payload["newer_family_profiles"] if entry["id"] == "ernie_image")
 
         self.assertTrue(qwen_entry["experimental"])
         self.assertIn("non-Lightning", qwen_entry["summary"])
+        self.assertIn("ERNIE-Image", ernie_entry["summary"])
 
     def test_presets_use_public_family_identity_for_newer_families(self) -> None:
         payload = build_preset_payload()
         flux_preset = next(preset for preset in payload["presets"] if preset["id"] == "flux")
+        ernie_preset = next(preset for preset in payload["presets"] if preset["id"] == "ernie_image")
 
         self.assertEqual(flux_preset["profile"], "flux")
         self.assertEqual(flux_preset["base_family"], "flux")
+        self.assertEqual(ernie_preset["profile"], "ernie_image")
+        self.assertEqual(ernie_preset["base_family"], "ernie_image")

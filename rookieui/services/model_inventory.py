@@ -36,6 +36,7 @@ _PROFILE_DIFFUSION_MODEL_HINTS: dict[str, tuple[str, ...]] = {
     "zit": ("zit", "z-image", "zimage", "turbo"),
     "wan": ("wan",),
     "anima": ("anima",),
+    "ernie_image": ("ernie",),
 }
 _PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "flux": (("flux2", "dev"), ("flux2",), ("flux",)),
@@ -45,6 +46,7 @@ _PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] 
     "zit": (("z_image_turbo",), ("z-image-turbo",), ("zimageturbo",), ("zit",), ("z-image",)),
     "wan": (("wan2.2", "high_noise"), ("wan2.2",), ("wan", "high_noise"), ("wan",)),
     "anima": (("anima",),),
+    "ernie_image": (("ernie", "image"), ("ernie",)),
 }
 _PROFILE_DIFFUSION_MODEL_DENY_HINTS: dict[str, tuple[str, ...]] = {
     "qwen_image": ("lightning", "lora", "2step", "4step", "8step", "distill", "distilled"),
@@ -58,6 +60,7 @@ _PROFILE_TEXT_ENCODER_HINTS: dict[str, tuple[str, ...]] = {
     "zit": ("zit", "z-image", "zimage", "lumina"),
     "wan": ("wan",),
     "anima": ("anima",),
+    "ernie_image": ("ernie", "ministral", "3_3b", "ministral3"),
 }
 _PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "flux": (("mistral_3_small_flux2",), ("flux", "t5"), ("flux",), ("t5",)),
@@ -67,6 +70,7 @@ _PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "zit": (("qwen_3_4b",), ("lumina",), ("qwen",)),
     "wan": (("umt5",), ("wan",), ("t5",)),
     "anima": (("qwen_3_06b",), ("anima",), ("qwen",)),
+    "ernie_image": (("ministral3_3b",), ("ministral_3_3b",), ("ministral", "3", "3b"), ("ernie",)),
 }
 _PROFILE_VAE_HINTS: dict[str, tuple[str, ...]] = {
     "flux": ("flux", "ae"),
@@ -76,6 +80,7 @@ _PROFILE_VAE_HINTS: dict[str, tuple[str, ...]] = {
     "zit": ("zit", "z-image", "zimage", "turbo", "lumina"),
     "wan": ("wan",),
     "anima": ("anima",),
+    "ernie_image": ("ernie",),
 }
 _PROFILE_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     "flux": (("flux", "vae"), ("flux",), ("ae",)),
@@ -93,6 +98,7 @@ _PROFILE_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
     ),
     "wan": (("wan2.2", "vae"), ("wan", "vae"), ("wan2.2",), ("wan",)),
     "anima": (("anima", "vae"), ("anima",)),
+    "ernie_image": (("ernie", "vae"), ("ernie",)),
 }
 _PROFILE_VAE_DENY_HINTS: dict[str, tuple[str, ...]] = {
     "flux": ("qwen",),

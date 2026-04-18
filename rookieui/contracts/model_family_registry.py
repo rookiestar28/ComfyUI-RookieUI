@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f72-20260418"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f72-20260418b"
 
 
 @dataclass(frozen=True)
@@ -311,6 +311,31 @@ _MODEL_FAMILY_REGISTRY: tuple[ModelFamilyRegistryEntry, ...] = (
         notes=(
             "Secondary newer-family lane routed through the existing SDXL translation seam.",
             "Keeps Text Encoder selector visible for family-specific host model routing.",
+        ),
+    ),
+    ModelFamilyRegistryEntry(
+        id="ernie_image",
+        title="ERNIE-Image",
+        translation_base_family="sdxl",
+        public_base_family="ernie_image",
+        prompt_encoder="clip_text_encode_sdxl",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="beta",
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        primary_model_category="diffusion_models",
+        text_encoder_visible=True,
+        support_tier="family-adapted",
+        compatibility_summary="Experimental newer-family catalog entry for host-native ERNIE-Image support on the current diffusion-model workflow seam.",
+        experimental=True,
+        aliases=("ernie-image", "ernie image"),
+        notes=(
+            "Uses the host-native ERNIE / Ministral3 text encoder path rather than claiming A1111 prompt parity.",
+            "Keeps Text Encoder selector visible because ERNIE-Image routing depends on explicit host text encoder pairing.",
         ),
     ),
 )
