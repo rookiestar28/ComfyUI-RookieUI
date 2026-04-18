@@ -68,7 +68,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f72-20260418b");
+    expect(result.data.model_families.contract_version).toBe("f150-20260418");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
@@ -190,35 +190,56 @@ describe("fetchRookieUICapabilities", () => {
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.ernie_image).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.zit).toBe("diffusion_models");
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);
     expect(compatibility.data.samplers[0].id).toBe("euler_ancestral");
     expect(compatibility.data.schedulers[0].id).toBe("normal");
     expect(compatibility.data.newer_family_profiles.map((profile) => profile.id)).toEqual([
-      "flux",
-      "qwen_image",
-      "klein",
-      "lumina",
-      "zit",
-      "wan",
       "anima",
+      "chroma",
       "ernie_image",
+      "ernie_image_turbo",
+      "flux",
+      "klein_4b_distilled",
+      "klein_4b",
+      "klein_9b_distilled",
+      "klein_9b",
+      "hidream_i1_dev_fp8",
+      "hidream_i1_fast",
+      "hidream_i1_full",
+      "longcat_image",
+      "qwen_image",
+      "z_image",
+      "z_image_turbo",
     ]);
     expect(presets.data.presets[0].id).toBe("sd15");
     expect(presets.data.presets.map((preset) => preset.id)).toEqual([
       "sd15",
       "sdxl",
-      "flux",
-      "qwen_image",
-      "klein",
-      "lumina",
-      "zit",
-      "wan",
+      "pony",
+      "illustrious",
+      "noob",
       "anima",
+      "chroma",
       "ernie_image",
+      "ernie_image_turbo",
+      "flux",
+      "klein_4b_distilled",
+      "klein_4b",
+      "klein_9b_distilled",
+      "klein_9b",
+      "hidream_i1_dev_fp8",
+      "hidream_i1_fast",
+      "hidream_i1_full",
+      "longcat_image",
+      "qwen_image",
+      "z_image",
+      "z_image_turbo",
     ]);
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
+    expect(presets.data.presets.find((preset) => preset.id === "z_image_turbo")?.base_family).toBe("z_image");
     expect(queue.data.queue_remaining).toBe(0);
   });
 

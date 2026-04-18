@@ -30,10 +30,11 @@ class CompatibilityCatalogTests(unittest.TestCase):
         payload = build_compatibility_payload()
 
         family_ids = [entry["id"] for entry in payload["newer_family_profiles"]]
-        self.assertIn("klein", family_ids)
-        self.assertIn("lumina", family_ids)
-        self.assertIn("zit", family_ids)
-        self.assertIn("wan", family_ids)
+        self.assertIn("chroma", family_ids)
+        self.assertIn("klein_4b", family_ids)
+        self.assertIn("hidream_i1_full", family_ids)
+        self.assertIn("longcat_image", family_ids)
+        self.assertIn("z_image_turbo", family_ids)
         self.assertIn("anima", family_ids)
         self.assertIn("ernie_image", family_ids)
 

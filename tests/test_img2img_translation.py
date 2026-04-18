@@ -508,7 +508,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.text_encoder_name, "Ministral3_3B_fp16.safetensors")
         self.assertEqual(normalized.vae_name, "ernie_vae.safetensors")
 
-    def test_normalize_img2img_request_profile_matrix_avoids_qwen_fallback_for_all_non_qwen_diffusion_profiles(
+    def test_normalize_img2img_request_uses_profile_aware_selectors_for_official_non_sd_templates(
         self,
     ) -> None:
         mocked_inventory = mock.Mock(
@@ -516,74 +516,96 @@ class Img2ImgTranslationTests(unittest.TestCase):
             checkpoints=["SDXL\\realvisxl.safetensors"],
             diffusion_models=[
                 "flux\\flux1-dev.safetensors",
-                "qwen\\qwen-image.safetensors",
-                "klein\\flux2_klein.safetensors",
-                "lumina\\lumina2.safetensors",
-                "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
-                "wan\\wan2_2b.safetensors",
-                "anima\\animaPencilXL_v500.safetensors",
+                "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                "klein\\flux-2-klein-4b.safetensors",
+                "klein\\flux-2-klein-base-4b.safetensors",
+                "klein\\flux-2-klein-9b-fp8.safetensors",
+                "klein\\flux-2-klein-base-9b-fp8.safetensors",
+                "anima\\anima-preview3-base.safetensors",
+                "chroma\\Chroma1-HD-fp8mixed.safetensors",
                 "ernie\\ernie-image.safetensors",
+                "ernie\\ernie-image-turbo.safetensors",
+                "hidream\\hidream_i1_dev_fp8.safetensors",
+                "hidream\\hidream_i1_fast_fp8.safetensors",
+                "hidream\\hidream_i1_full_fp8.safetensors",
+                "longcat\\longcat_image_bf16.safetensors",
+                "zimage\\z_image_bf16.safetensors",
+                "zimage\\z_image_turbo_bf16.safetensors",
             ],
             vae=[
                 "qwen_image_vae.safetensors",
-                "flux_vae.safetensors",
-                "klein_vae.safetensors",
-                "lumina_vae.safetensors",
-                "wan_vae.safetensors",
-                "anima_vae.safetensors",
-                "ernie_vae.safetensors",
+                "ae.safetensors",
+                "flux2-vae.safetensors",
+                "full_encoder_small_decoder.safetensors",
             ],
             text_encoders=[
-                "QwenImageTEModel_.safetensors",
-                "FluxT5XXL.safetensors",
-                "KleinT5XXL.safetensors",
-                "LuminaTEModel.safetensors",
-                "WanTextEncoder.safetensors",
-                "AnimaTextEncoder.safetensors",
-                "Ministral3_3B_fp16.safetensors",
+                "clip_l.safetensors",
+                "clip_l_hidream.safetensors",
+                "clip_g_hidream.safetensors",
+                "llama_3.1_8b_instruct_fp8_scaled.safetensors",
+                "ministral-3-3b.safetensors",
+                "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "qwen_3_06b_base.safetensors",
+                "qwen_3_4b.safetensors",
+                "qwen_3_8b_fp8mixed.safetensors",
+                "t5xxl_fp16.safetensors",
+                "t5xxl_fp8_e4m3fn_scaled.safetensors",
             ],
             loras=[],
             default_checkpoint="SDXL\\realvisxl.safetensors",
             default_vae="qwen_image_vae.safetensors",
-            default_text_encoder="QwenImageTEModel_.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
             controlnet=[],
         )
-        profiles = ["flux", "qwen_image", "klein", "lumina", "zit", "wan", "anima", "ernie_image"]
-        checkpoint_by_profile = {
-            "flux": "flux\\flux1-dev.safetensors",
-            "qwen_image": "qwen\\qwen-image.safetensors",
-            "klein": "klein\\flux2_klein.safetensors",
-            "lumina": "lumina\\lumina2.safetensors",
-            "zit": "zit\\zImageTurboNSFW_21BF16AIO.safetensors",
-            "wan": "wan\\wan2_2b.safetensors",
-            "anima": "anima\\animaPencilXL_v500.safetensors",
-            "ernie_image": "ernie\\ernie-image.safetensors",
+        expectations = {
+            "flux": ("flux\\flux1-dev.safetensors", "clip_l.safetensors", "ae.safetensors"),
+            "qwen_image": (
+                "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "qwen_image_vae.safetensors",
+            ),
+            "klein_4b_distilled": ("klein\\flux-2-klein-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
+            "klein_4b": ("klein\\flux-2-klein-base-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
+            "klein_9b_distilled": (
+                "klein\\flux-2-klein-9b-fp8.safetensors",
+                "qwen_3_8b_fp8mixed.safetensors",
+                "full_encoder_small_decoder.safetensors",
+            ),
+            "klein_9b": (
+                "klein\\flux-2-klein-base-9b-fp8.safetensors",
+                "qwen_3_8b_fp8mixed.safetensors",
+                "full_encoder_small_decoder.safetensors",
+            ),
+            "anima": ("anima\\anima-preview3-base.safetensors", "qwen_3_06b_base.safetensors", "qwen_image_vae.safetensors"),
+            "chroma": ("chroma\\Chroma1-HD-fp8mixed.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors", "ae.safetensors"),
+            "ernie_image": ("ernie\\ernie-image.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
+            "ernie_image_turbo": ("ernie\\ernie-image-turbo.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
+            "hidream_i1_dev_fp8": ("hidream\\hidream_i1_dev_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
+            "hidream_i1_fast": ("hidream\\hidream_i1_fast_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
+            "hidream_i1_full": ("hidream\\hidream_i1_full_fp8.safetensors", "clip_l_hidream.safetensors", "ae.safetensors"),
+            "longcat_image": ("longcat\\longcat_image_bf16.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "ae.safetensors"),
+            "z_image": ("zimage\\z_image_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
+            "z_image_turbo": ("zimage\\z_image_turbo_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
         }
         with mock.patch(
             "rookieui.services.img2img.discover_model_inventory",
             return_value=mocked_inventory,
         ):
-            for profile_id in profiles:
+            for profile_id, (expected_checkpoint, expected_text_encoder, expected_vae) in expectations.items():
                 with self.subTest(profile_id=profile_id):
                     normalized = normalize_img2img_request(
                         {
                             "prompt": "matrix smoke",
                             "image_asset": "portrait-input",
                             "profile": profile_id,
-                            "checkpoint_name": checkpoint_by_profile[profile_id],
+                            "checkpoint_name": expected_checkpoint,
                             "text_encoder_name": "",
                             "vae_name": "",
                         }
                     )
-                    if profile_id == "qwen_image":
-                        self.assertIn("qwen", normalized.text_encoder_name.lower())
-                        self.assertIn("qwen", normalized.vae_name.lower())
-                    else:
-                        self.assertNotIn("qwen", normalized.text_encoder_name.lower())
-                        self.assertNotIn("qwen", normalized.vae_name.lower())
-                    if profile_id == "ernie_image":
-                        self.assertIn("ministral", normalized.text_encoder_name.lower())
-                        self.assertIn("ernie", normalized.vae_name.lower())
+                    self.assertEqual(normalized.checkpoint_name, expected_checkpoint)
+                    self.assertEqual(normalized.text_encoder_name, expected_text_encoder)
+                    self.assertEqual(normalized.vae_name, expected_vae)
 
     def test_normalize_img2img_request_resolves_host_checkpoint_selector(self) -> None:
         with mock.patch(

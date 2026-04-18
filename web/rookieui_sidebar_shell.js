@@ -323,9 +323,36 @@ function readFileAsDataUrl(file) {
 
 function buildProfileLookup(capabilities) {
   const profiles = capabilities.parity?.profiles ?? [];
+  const familyEntries = capabilities.model_families?.entries ?? [];
   const lookup = new Map();
   profiles.forEach((profile) => {
     lookup.set(profile.id, profile);
+  });
+  familyEntries.forEach((entry) => {
+    if (!entry || !entry.id) {
+      return;
+    }
+    const merged = {
+      ...(lookup.get(entry.id) ?? {}),
+      id: entry.id,
+      title: entry.title,
+      base_family: entry.translation_base_family || entry.public_base_family || "",
+      public_base_family: entry.public_base_family || "",
+      text_encoder_visible: Boolean(entry.text_encoder_visible),
+      primary_model_category: entry.primary_model_category || "",
+      support_tier: entry.support_tier || "",
+      experimental: Boolean(entry.experimental),
+      compatibility_summary: entry.compatibility_summary || "",
+      aliases: Array.isArray(entry.aliases) ? entry.aliases : [],
+    };
+    lookup.set(entry.id, merged);
+    const aliases = Array.isArray(entry.aliases) ? entry.aliases : [];
+    aliases.forEach((alias) => {
+      const normalizedAlias = String(alias ?? "").trim().toLowerCase();
+      if (normalizedAlias) {
+        lookup.set(normalizedAlias, merged);
+      }
+    });
   });
   return lookup;
 }
@@ -573,9 +600,12 @@ function syncClipSkipAvailability(profileLookup, profileId, clipSkipInput, clipS
 function syncFamilyAwareModuleQuicksetting(profileLookup, profileId, quicksettingCard, labelNode, textEncoderControl) {
   const profile = profileLookup.get(profileId);
   const baseFamily = profile?.base_family ?? "";
-  // CRITICAL: profile id drives Text Encoder visibility; Flux/Qwen route through SDXL graphs but must keep selector visible.
+  // CRITICAL: Text Encoder visibility must follow backend family-registry truth; hardcoded profile lists drift when official template-backed presets expand.
   const profileKey = String(profile?.id ?? profileId ?? "").trim().toLowerCase();
-  const showTextEncoder = !["sd15", "sdxl", "pony", "illustrious", "noob"].includes(profileKey);
+  const showTextEncoder =
+    typeof profile?.text_encoder_visible === "boolean"
+      ? profile.text_encoder_visible
+      : !["sd15", "sdxl", "pony", "illustrious", "noob"].includes(profileKey);
   if (labelNode) {
     labelNode.textContent = showTextEncoder ? "VAE / Text Encoder" : "VAE";
   }

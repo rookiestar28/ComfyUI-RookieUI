@@ -7,6 +7,7 @@ import threading
 import time
 from typing import Any
 
+from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
 
 _HOST_MODEL_FOLDERS = (
@@ -29,84 +30,131 @@ _inventory_cache_snapshot: ModelInventorySnapshot | None = None
 _inventory_cache_at: float = 0.0
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 _PROFILE_DIFFUSION_MODEL_HINTS: dict[str, tuple[str, ...]] = {
-    "flux": ("flux",),
-    "qwen_image": ("qwen",),
-    "klein": ("klein", "flux.2", "flux2"),
-    "lumina": ("lumina",),
-    "zit": ("zit", "z-image", "zimage", "turbo"),
-    "wan": ("wan",),
     "anima": ("anima",),
-    "ernie_image": ("ernie",),
+    "chroma": ("chroma",),
+    "ernie_image": ("ernie", "image"),
+    "ernie_image_turbo": ("ernie", "turbo"),
+    "flux": ("flux",),
+    "hidream_i1_dev_fp8": ("hidream", "dev"),
+    "hidream_i1_fast": ("hidream", "fast"),
+    "hidream_i1_full": ("hidream", "full"),
+    "klein_4b_distilled": ("klein", "4b"),
+    "klein_4b": ("klein", "4b"),
+    "klein_9b_distilled": ("klein", "9b"),
+    "klein_9b": ("klein", "9b"),
+    "longcat_image": ("longcat",),
+    "qwen_image": ("qwen", "2512"),
+    "z_image": ("z-image", "z_image", "zimage"),
+    "z_image_turbo": ("z-image", "z_image", "zimage", "turbo"),
 }
 _PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "flux": (("flux2", "dev"), ("flux2",), ("flux",)),
-    "qwen_image": (("qwen", "2512", "fp8"), ("qwen", "2512"), ("qwen", "image"), ("qwen",)),
-    "klein": (("klein", "base"), ("flux2", "klein"), ("klein",)),
-    "lumina": (("lumina2",), ("lumina",)),
-    "zit": (("z_image_turbo",), ("z-image-turbo",), ("zimageturbo",), ("zit",), ("z-image",)),
-    "wan": (("wan2.2", "high_noise"), ("wan2.2",), ("wan", "high_noise"), ("wan",)),
     "anima": (("anima",),),
+    "chroma": (("chroma1",), ("chroma",)),
     "ernie_image": (("ernie", "image"), ("ernie",)),
+    "ernie_image_turbo": (("ernie", "image", "turbo"), ("ernie", "turbo"), ("ernie",)),
+    "flux": (("flux1", "dev"), ("flux1",), ("flux", "dev"), ("flux",)),
+    "hidream_i1_dev_fp8": (("hidream", "dev", "fp8"), ("hidream", "i1", "dev"), ("hidream", "dev")),
+    "hidream_i1_fast": (("hidream", "fast"), ("hidream", "i1", "fast")),
+    "hidream_i1_full": (("hidream", "full"), ("hidream", "i1", "full"), ("hidream", "i1")),
+    "klein_4b_distilled": (("flux", "2", "klein", "4b"), ("klein", "4b")),
+    "klein_4b": (("klein", "base", "4b"), ("flux", "2", "klein", "base", "4b"), ("klein", "4b")),
+    "klein_9b_distilled": (("flux", "2", "klein", "9b"), ("klein", "9b")),
+    "klein_9b": (("klein", "base", "9b"), ("flux", "2", "klein", "base", "9b"), ("klein", "9b")),
+    "longcat_image": (("longcat",),),
+    "qwen_image": (("qwen", "image", "2512"), ("qwen", "2512", "fp8"), ("qwen", "2512"), ("qwen", "image")),
+    "z_image": (("z_image",), ("z-image",), ("z", "image")),
+    "z_image_turbo": (("z_image", "turbo"), ("z-image", "turbo"), ("z", "image", "turbo")),
 }
 _PROFILE_DIFFUSION_MODEL_DENY_HINTS: dict[str, tuple[str, ...]] = {
+    "klein_4b_distilled": ("base", "9b"),
+    "klein_4b": ("distill", "distilled", "9b"),
+    "klein_9b_distilled": ("base", "4b"),
+    "klein_9b": ("distill", "distilled", "4b"),
     "qwen_image": ("lightning", "lora", "2step", "4step", "8step", "distill", "distilled"),
-    "wan": ("lightning", "lightx2v", "lora", "2step", "4step"),
 }
 _PROFILE_TEXT_ENCODER_HINTS: dict[str, tuple[str, ...]] = {
-    "flux": ("flux", "t5"),
-    "qwen_image": ("qwen",),
-    "klein": ("klein", "flux.2", "flux2"),
-    "lumina": ("lumina",),
-    "zit": ("zit", "z-image", "zimage", "lumina"),
-    "wan": ("wan",),
     "anima": ("anima",),
+    "chroma": ("t5", "chroma"),
     "ernie_image": ("ernie", "ministral", "3_3b", "ministral3"),
+    "ernie_image_turbo": ("ernie", "ministral", "3_3b", "ministral3"),
+    "flux": ("clip_l", "t5"),
+    "hidream_i1_dev_fp8": ("hidream", "clip"),
+    "hidream_i1_fast": ("hidream", "clip"),
+    "hidream_i1_full": ("hidream", "clip"),
+    "klein_4b_distilled": ("qwen", "4b", "klein"),
+    "klein_4b": ("qwen", "4b", "klein"),
+    "klein_9b_distilled": ("qwen", "8b", "klein"),
+    "klein_9b": ("qwen", "8b", "klein"),
+    "longcat_image": ("longcat", "qwen", "2.5", "vl"),
+    "qwen_image": ("qwen", "2.5", "vl"),
+    "z_image": ("qwen", "3", "4b", "z"),
+    "z_image_turbo": ("qwen", "3", "4b", "z"),
 }
 _PROFILE_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "flux": (("mistral_3_small_flux2",), ("flux", "t5"), ("flux",), ("t5",)),
-    "qwen_image": (("qwen_2.5_vl",), ("qwenimagete",), ("qwen",)),
-    "klein": (("qwen_3_4b",), ("klein",), ("flux2",), ("t5",)),
-    "lumina": (("lumina",), ("qwen_3_4b",), ("qwen",)),
-    "zit": (("qwen_3_4b",), ("lumina",), ("qwen",)),
-    "wan": (("umt5",), ("wan",), ("t5",)),
     "anima": (("qwen_3_06b",), ("anima",), ("qwen",)),
+    "chroma": (("t5xxl", "fp8"), ("t5xxl",), ("chroma",), ("t5",)),
     "ernie_image": (("ministral3_3b",), ("ministral_3_3b",), ("ministral", "3", "3b"), ("ernie",)),
+    "ernie_image_turbo": (("ministral3_3b",), ("ministral_3_3b",), ("ministral", "3", "3b"), ("ernie",)),
+    "flux": (("clip_l",), ("clip", "l"), ("t5xxl",), ("flux",), ("t5",)),
+    "hidream_i1_dev_fp8": (("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+    "hidream_i1_fast": (("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+    "hidream_i1_full": (("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+    "klein_4b_distilled": (("qwen_3_4b",), ("klein", "4b"), ("klein",), ("qwen",)),
+    "klein_4b": (("qwen_3_4b",), ("klein", "4b"), ("klein",), ("qwen",)),
+    "klein_9b_distilled": (("qwen_3_8b",), ("klein", "9b"), ("klein",), ("qwen",)),
+    "klein_9b": (("qwen_3_8b",), ("klein", "9b"), ("klein",), ("qwen",)),
+    "longcat_image": (("qwen_2.5_vl_7b",), ("longcat",), ("qwen", "vl"), ("qwen",)),
+    "qwen_image": (("qwen_2.5_vl_7b",), ("qwen_2.5_vl",), ("qwen", "image"), ("qwen",)),
+    "z_image": (("qwen_3_4b",), ("z_image",), ("z-image",), ("lumina",), ("qwen",)),
+    "z_image_turbo": (("qwen_3_4b",), ("z_image", "turbo"), ("z-image", "turbo"), ("lumina",), ("qwen",)),
 }
 _PROFILE_VAE_HINTS: dict[str, tuple[str, ...]] = {
-    "flux": ("flux", "ae"),
-    "qwen_image": ("qwen", "qwen-image", "qwen_image"),
-    "klein": ("klein", "flux.2", "flux2"),
-    "lumina": ("lumina",),
-    "zit": ("zit", "z-image", "zimage", "turbo", "lumina"),
-    "wan": ("wan",),
     "anima": ("anima",),
-    "ernie_image": ("ernie",),
+    "chroma": ("ae", "chroma"),
+    "ernie_image": ("ernie", "flux2"),
+    "ernie_image_turbo": ("ernie", "flux2"),
+    "flux": ("flux", "ae"),
+    "hidream_i1_dev_fp8": ("ae", "hidream"),
+    "hidream_i1_fast": ("ae", "hidream"),
+    "hidream_i1_full": ("ae", "hidream"),
+    "klein_4b_distilled": ("flux2", "vae", "klein", "4b"),
+    "klein_4b": ("flux2", "vae", "klein", "4b"),
+    "klein_9b_distilled": ("encoder", "decoder", "9b", "klein"),
+    "klein_9b": ("encoder", "decoder", "9b", "klein"),
+    "longcat_image": ("ae", "longcat"),
+    "qwen_image": ("qwen", "qwen-image", "qwen_image"),
+    "z_image": ("ae", "z-image", "z_image"),
+    "z_image_turbo": ("ae", "z-image", "z_image", "turbo"),
 }
 _PROFILE_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "flux": (("flux", "vae"), ("flux",), ("ae",)),
+    "anima": (("qwen_image", "vae"), ("qwen", "image", "vae"), ("anima", "vae"), ("anima",)),
+    "chroma": (("ae",), ("chroma",)),
+    "ernie_image": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+    "ernie_image_turbo": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+    "flux": (("ae",), ("flux", "vae"), ("flux",)),
+    "hidream_i1_dev_fp8": (("ae",), ("hidream",)),
+    "hidream_i1_fast": (("ae",), ("hidream",)),
+    "hidream_i1_full": (("ae",), ("hidream",)),
+    "klein_4b_distilled": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    "klein_4b": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    "klein_9b_distilled": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    "klein_9b": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    "longcat_image": (("ae",), ("longcat",)),
     "qwen_image": (("qwen", "vae"), ("qwen", "image"), ("qwen",)),
-    "klein": (("klein", "vae"), ("klein",), ("flux2", "vae"), ("flux2",)),
-    "lumina": (("lumina", "vae"), ("lumina",)),
-    "zit": (
-        ("z_image_turbo", "vae"),
-        ("z-image-turbo", "vae"),
-        ("zit", "vae"),
-        ("lumina", "vae"),
-        ("lumina",),
-        ("zimage",),
-        ("zit",),
-    ),
-    "wan": (("wan2.2", "vae"), ("wan", "vae"), ("wan2.2",), ("wan",)),
-    "anima": (("anima", "vae"), ("anima",)),
-    "ernie_image": (("ernie", "vae"), ("ernie",)),
+    "z_image": (("ae",), ("z-image",), ("z_image",)),
+    "z_image_turbo": (("ae",), ("z-image", "turbo"), ("z_image", "turbo"), ("z-image",), ("z_image",)),
 }
 _PROFILE_VAE_DENY_HINTS: dict[str, tuple[str, ...]] = {
+    "chroma": ("qwen",),
+    "ernie_image": ("qwen",),
+    "ernie_image_turbo": ("qwen",),
     "flux": ("qwen",),
-    "klein": ("qwen",),
-    "lumina": ("qwen",),
-    "zit": ("qwen",),
-    "wan": ("qwen",),
-    "anima": ("qwen",),
+    "hidream_i1_dev_fp8": ("qwen",),
+    "hidream_i1_fast": ("qwen",),
+    "hidream_i1_full": ("qwen",),
+    "longcat_image": ("qwen",),
+    "z_image": ("qwen",),
+    "z_image_turbo": ("qwen",),
 }
 _NATIVE_ULTRALYTICS_MODEL_FOLDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ultralytics", ("ultralytics",)),
@@ -273,6 +321,16 @@ def _normalize_selector_token(value: str) -> str:
     return str(value or "").replace("\\", "/").strip().lower()
 
 
+def _canonicalize_profile_id(profile_id: str) -> str:
+    normalized_profile_id = str(profile_id or "").strip().lower()
+    if not normalized_profile_id:
+        return normalized_profile_id
+    try:
+        return get_model_family_registry_entry(normalized_profile_id).id
+    except ValueError:
+        return normalized_profile_id
+
+
 def _find_selector_by_hints(selectors: list[str], hints: tuple[str, ...]) -> str:
     if not hints:
         return ""
@@ -363,7 +421,7 @@ def _resolve_profile_text_encoder_default(
     if not candidate_selectors:
         return ""
 
-    normalized_profile_id = str(profile_id or "").strip().lower()
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
     matched_by_priority = _find_selector_by_priority(
         candidate_selectors,
         _PROFILE_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
@@ -385,7 +443,7 @@ def resolve_text_encoder_selector_context(
     if not selectors:
         return inventory.default_text_encoder
 
-    normalized_profile_id = str(profile_id or "").strip().lower()
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models":
         # CRITICAL: diffusion families require family-bound text encoder pairing; never fall back to a global/default selector.
         return _resolve_profile_text_encoder_default(normalized_profile_id, selectors)
@@ -405,7 +463,7 @@ def _resolve_profile_vae_default(
     if not selectors:
         return ""
 
-    normalized_profile_id = str(profile_id or "").strip().lower()
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
     candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
     if not candidate_selectors:
         return ""
@@ -438,7 +496,7 @@ def resolve_vae_selector_context(
         return inventory.default_vae
 
     fallback_default = inventory.default_vae if inventory.default_vae in selectors else selectors[0]
-    normalized_profile_id = str(profile_id or "").strip().lower()
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) != "diffusion_models":
         return fallback_default
 
@@ -450,7 +508,7 @@ def resolve_primary_model_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
 ) -> tuple[str, list[str], str]:
-    normalized_profile_id = str(profile_id or "").strip().lower()
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
     category_id = PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id, "checkpoints")
     category_values = list(getattr(inventory, category_id, []) or [])
 
