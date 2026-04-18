@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.security.asset_guard import normalize_metadata_text
+from rookieui.services.version import build_runtime_metadata_payload
 
 
 def _normalize_metadata_list(values: object) -> list[str]:
@@ -52,6 +53,18 @@ def _normalize_loose_mapping(payload: object) -> dict[str, object]:
             if nested:
                 normalized[normalized_key] = nested
     return normalized
+
+
+def _normalize_runtime_payload(payload: object) -> dict[str, str]:
+    if not isinstance(payload, dict):
+        return {
+            "shell_version": "",
+            "build_fingerprint": "",
+        }
+    return {
+        "shell_version": normalize_metadata_text(payload.get("shell_version", "")),
+        "build_fingerprint": normalize_metadata_text(payload.get("build_fingerprint", "")),
+    }
 
 
 def _normalize_prompt_semantics_payload(payload: dict[str, object]) -> dict[str, object]:
@@ -136,6 +149,7 @@ def build_capabilities_payload(
     payload["service"] = normalize_metadata_text(payload["service"])
     payload["visibility"] = normalize_metadata_text(payload["visibility"])
     payload["shell_version"] = normalize_metadata_text(payload["shell_version"])
+    payload["runtime"] = _normalize_runtime_payload(build_runtime_metadata_payload())
     payload["host_surfaces"] = [
         normalize_metadata_text(surface)
         for surface in payload.get("host_surfaces", [])

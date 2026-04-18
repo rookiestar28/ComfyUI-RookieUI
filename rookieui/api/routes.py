@@ -47,6 +47,7 @@ from rookieui.services.workflow_translation import (
 from rookieui.services.coercion import coerce_bool
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.compatibility import build_compatibility_payload
+from rookieui.services.version import build_runtime_metadata_payload
 from rookieui.services.controlnet import (
     build_controlnet_control_types_payload,
     build_controlnet_detect_payload,
@@ -110,6 +111,10 @@ def build_bootstrap_payload() -> dict[str, Any]:
         "service": normalize_metadata_text("rookieui"),
         "status": normalize_metadata_text("bootstrap-ready"),
         "visibility": normalize_metadata_text("internal"),
+        "runtime": {
+            "shell_version": normalize_metadata_text(build_runtime_metadata_payload()["shell_version"]),
+            "build_fingerprint": normalize_metadata_text(build_runtime_metadata_payload()["build_fingerprint"]),
+        },
         "routes": list(INTERNAL_ROUTE_PATHS),
     }
 
