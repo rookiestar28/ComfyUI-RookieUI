@@ -218,6 +218,10 @@ ensure_python_command_for_playwright() {
   exit 1
 }
 
+resolve_e2e_port() {
+  "$VENV_PY" scripts/e2e_harness_env.py --candidate-ports 4173 4300 4310 4320 4500
+}
+
 assert_node_version() {
   local node_major
   node_major="$(node -p "process.versions.node.split('.')[0]")"
@@ -248,6 +252,14 @@ fi
 assert_node_version
 ensure_npm_deps
 ensure_python_command_for_playwright
+export ROOKIEUI_E2E_PYTHON="$VENV_PY"
+if [ -z "${ROOKIEUI_E2E_PORT:-}" ]; then
+  # CRITICAL: pick a bindable loopback port here so `npm test` inside pre-push matches
+  # the repo's Windows full-gate contract instead of failing on a busy/denied default port.
+  export ROOKIEUI_E2E_PORT="$(resolve_e2e_port)"
+fi
+echo "[pre-push] Playwright harness python: $ROOKIEUI_E2E_PYTHON"
+echo "[pre-push] Playwright harness port: $ROOKIEUI_E2E_PORT"
 
 echo "[pre-push] Step 1/4: detect-secrets"
 "$VENV_PY" -m pre_commit run detect-secrets --all-files

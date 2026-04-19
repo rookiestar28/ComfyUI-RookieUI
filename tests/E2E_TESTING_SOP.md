@@ -39,6 +39,7 @@ For the repo-standard Windows full gate, `scripts/run_full_tests_windows.ps1` no
 
 - pins Playwright's harness server to the project-local `.venv` Python via `ROOKIEUI_E2E_PYTHON`
 - auto-selects a bindable localhost port if `4173` is unavailable
+- the Git-Bash repository pre-push path (`.githooks/pre-push -> scripts/pre_push_checks.sh`) now mirrors the same Python/port guardrails before `npm test`
 
 ## WSL2 (bash)
 
