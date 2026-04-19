@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Official img2img/edit flow split and template-owned LoRA truthfulness (new functionality/stability)</strong></summary>
+
+- Split RookieUI's image-input workspace into truthful flow-aware surfaces: generic `img2img` now hides unaligned official non-SD presets, while shipped official edit workflows move onto a dedicated edit-aware path instead of falling back to the legacy SD-style i2i graph.
+- Added the first shipped official edit preset, `Qwen-Image Edit`, following the official ComfyUI `imageEdit` template as a no-mask image-edit workflow rather than an inpaint-first surface.
+- Official templates that preload a fixed LoRA are now exposed as template-owned defaults instead of silent hidden dependencies: RookieUI explicitly shows the official default, allows override with parity-drift messaging, and validates host readiness against the official LoRA asset.
+- The current shipped template-owned LoRA handling applies to `Flux.1 Dev FP8`, `Qwen-Image 2512`, and `Qwen-Image Edit`.
+
+</details>
+
+<details>
+
 <summary><strong>Official non-SD template preset expansion and truthful host gating (new functionality/stability)</strong></summary>
 
 - Expanded RookieUI's non-SD preset matrix to the official ComfyUI text-to-image templates currently tracked in `reference/workflow_templates`, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
@@ -289,6 +300,7 @@ Current extension seams:
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
+  - [Official Edit Presets and Template-Owned LoRAs](#official-edit-presets-and-template-owned-loras)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
     - [Prompt Workbench Danbooru Upsampler Action](#prompt-workbench-danbooru-upsampler-action)
@@ -409,7 +421,22 @@ If your host or Manager install path does not automatically install custom-node 
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
-- Official `Edit` workflows are being added incrementally through a later `img2img` / edit chain. `Edit`-marked templates, plus `Flux.2 Dev` because its official graph includes `LoadImage` / `VAEEncode`, are intentionally deferred from the current txt2img preset rollout.
+- Official `Edit` workflows are now being added through a dedicated image-edit surface rather than the generic `img2img` preset list. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
+
+### Official Edit Presets and Template-Owned LoRAs
+
+- RookieUI now ships the first official ComfyUI `imageEdit` preset, `Qwen-Image Edit`, on a dedicated edit-aware image-input path.
+- Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The current shipped edit path does not require mask input.
+- Generic `img2img` now hides official non-SD presets that are not yet aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
+- Official templates that preload a fixed LoRA are treated as template-owned dependencies rather than silent hidden assets:
+  - RookieUI shows the official default explicitly
+  - allows manual override
+  - and warns when a custom override no longer matches the official ComfyUI template exactly
+- The current shipped template-owned LoRA pattern applies to:
+  - `Flux.1 Dev FP8`
+  - `Qwen-Image 2512`
+  - `Qwen-Image Edit`
+- Additional official edit models are planned incrementally, including single-image and multi-reference-image workflows. Multiple-reference edit flows will land on a richer edit-specific payload/runtime path rather than being squeezed into the current single-image `img2img` contract.
 
 ### Model Support
 
@@ -608,11 +635,10 @@ Current official non-SD execute-proven subset on the acceptance host:
 - `anima`
 - `ernie_image`
 - `ernie_image_turbo`
-- `flux`
 - `z_image`
 - `z_image_turbo`
 
-Other official non-SD presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, LoRA, or other template asset is installed in that specific ComfyUI environment.
+Other official non-SD or edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
 
 ### Default Model Read Paths (Host ComfyUI)
 
