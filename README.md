@@ -25,6 +25,16 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Non-SD official template inline LoRA chaining (new functionality/stability)</strong></summary>
+
+- RookieUI now supports prompt-inline `<lora:model_name:weight>` chaining on shipped official non-SD template workflows instead of limiting those families to hidden template defaults only.
+- When an official non-SD preset already owns a template LoRA, RookieUI keeps the official default first and appends user prompt-inline LoRAs after it so the submitted ComfyUI graph matches the intended chained `Load LoRA` model path.
+- The shipped non-SD inline LoRA path applies model-only LoRA nodes; when a prompt requests distinct clip/text-encoder strength, RookieUI now reports truthful drift messaging and uses the model-side strength only.
+
+</details>
+
+<details>
+
 <summary><strong>Official img2img/edit flow split and template-owned LoRA truthfulness (new functionality/stability)</strong></summary>
 
 - Split RookieUI's image-input workspace into truthful flow-aware surfaces: generic `img2img` now hides unaligned official non-SD presets, while shipped official edit workflows move onto a dedicated edit-aware path instead of falling back to the legacy SD-style i2i graph.
@@ -301,6 +311,7 @@ Current extension seams:
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
   - [Official Edit Presets and Template-Owned LoRAs](#official-edit-presets-and-template-owned-loras)
+  - [Official Non-SD Inline LoRA Support](#official-non-sd-inline-lora-support)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
     - [Prompt Workbench Danbooru Upsampler Action](#prompt-workbench-danbooru-upsampler-action)
@@ -437,6 +448,28 @@ If your host or Manager install path does not automatically install custom-node 
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
 - Additional official edit models are planned incrementally, including single-image and multi-reference-image workflows. Multiple-reference edit flows will land on a richer edit-specific payload/runtime path rather than being squeezed into the current single-image `img2img` contract.
+
+### Official Non-SD Inline LoRA Support
+
+- Shipped official non-SD template workflows now accept prompt-inline LoRA syntax such as `<lora:model_name:1>` on their native template runtime path instead of treating inline LoRAs as Stable Diffusion-only behavior.
+- RookieUI extracts inline LoRA activations from the prompt, creates model-only `Load LoRA` nodes, and chains them immediately after the official `Load Diffusion Model` path before submitting the final ComfyUI workflow JSON to the host.
+- When a preset already owns an official template LoRA, RookieUI preserves the official default first and appends prompt-inline LoRAs after it. This means the effective order is:
+  - `Load Diffusion Model`
+  - template-owned `Load LoRA` nodes
+  - prompt-inline `Load LoRA` nodes
+- This support is intended for shipped official non-SD template txt2img/edit builders such as the current `Flux.1 Dev FP8`, `Qwen-Image 2512`, and `Qwen-Image Edit` paths.
+
+Simple usage:
+
+1. Select a shipped official non-SD preset.
+2. Type prompt-inline LoRA syntax directly in the prompt, for example `<lora:example_model:1>`.
+3. Generate normally; RookieUI will append the corresponding model-only `Load LoRA` nodes automatically before the host run.
+
+Behavior and limits:
+
+- On non-SD official templates, inline LoRAs are currently treated as model-only LoRAs.
+- If the prompt requests different model-side and clip/text-encoder-side strengths, RookieUI warns about parity drift and applies the model-side strength only.
+- Template-owned official defaults remain the source of truth for official-template parity. Adding extra inline LoRAs is treated as extending the official template, not as strict unchanged parity.
 
 ### Model Support
 
