@@ -171,6 +171,27 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(len(sampler_nodes), 1)
         self.assertEqual(sampler_nodes[0]["inputs"]["model"], ["90", 0])
 
+    def test_translate_img2img_request_chains_inline_and_selected_loras(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup <lora:detail_tweaker.safetensors:0.8> <lora:cinematic_helper.safetensors:0.5>",
+                "image_asset": "portrait-input",
+                "lora_name": "hero_boost.safetensors",
+                "lora_strength_model": 0.7,
+                "lora_strength_clip": 0.6,
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+
+        self.assertEqual(result["workflow"]["90"]["class_type"], "LoraLoader")
+        self.assertEqual(result["workflow"]["90"]["inputs"]["lora_name"], "detail_tweaker.safetensors")
+        self.assertEqual(result["workflow"]["91"]["inputs"]["lora_name"], "cinematic_helper.safetensors")
+        self.assertEqual(result["workflow"]["92"]["inputs"]["lora_name"], "hero_boost.safetensors")
+        sampler_nodes = [node for node in result["workflow"].values() if node["class_type"] == "KSampler"]
+        self.assertEqual(len(sampler_nodes), 1)
+        self.assertEqual(sampler_nodes[0]["inputs"]["model"], ["92", 0])
+
     def test_normalize_img2img_request_requires_mask_for_inpaint(self) -> None:
         with self.assertRaisesRegex(ValueError, "mask_asset or mask_data is required"):
             normalize_img2img_request(
