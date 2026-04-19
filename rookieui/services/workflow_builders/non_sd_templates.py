@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
+from rookieui.contracts.family_template_manifest import (
+    build_non_sd_runtime_adapter_map,
+    build_non_sd_txt2img_profile_ids,
+)
 from rookieui.contracts.generation import NormalizedTxt2ImgRequest
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
@@ -21,27 +27,12 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
 _QWEN_TEMPLATE_LORA_NAME = "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"
+_OFFICIAL_NON_SD_TXT2IMG_PROFILES = frozenset(build_non_sd_txt2img_profile_ids())
+_NON_SD_RUNTIME_ADAPTER_BY_PROFILE = build_non_sd_runtime_adapter_map()
 
 
 def is_official_non_sd_txt2img_profile(profile_id: str) -> bool:
-    return str(profile_id or "").strip().lower() in {
-        "anima",
-        "chroma",
-        "ernie_image",
-        "ernie_image_turbo",
-        "flux",
-        "hidream_i1_dev_fp8",
-        "hidream_i1_fast",
-        "hidream_i1_full",
-        "klein_4b_distilled",
-        "klein_4b",
-        "klein_9b_distilled",
-        "klein_9b",
-        "longcat_image",
-        "qwen_image",
-        "z_image",
-        "z_image_turbo",
-    }
+    return str(profile_id or "").strip().lower() in _OFFICIAL_NON_SD_TXT2IMG_PROFILES
 
 
 def _append_empty_latent_node(
@@ -1082,30 +1073,35 @@ def _build_ernie_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -> 
     return workflow
 
 
+def _build_z_image_workflow_for_profile(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    return _build_z_image_workflow(request, turbo=str(request.profile or "").strip().lower() == "z_image_turbo")
+
+
+def _build_ernie_workflow_for_profile(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    return _build_ernie_workflow(
+        request,
+        turbo=str(request.profile or "").strip().lower() == "ernie_image_turbo",
+    )
+
+
+_NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[str, object]]] = {
+    "anima": _build_anima_workflow,
+    "flux": _build_flux_workflow,
+    "hidream": _build_hidream_workflow,
+    "chroma": _build_chroma_workflow,
+    "klein": lambda request: _build_klein_workflow(request, distilled=False),
+    "klein_distilled": lambda request: _build_klein_workflow(request, distilled=True),
+    "qwen_image": _build_qwen_image_workflow,
+    "longcat": _build_longcat_workflow,
+    "z_image": _build_z_image_workflow_for_profile,
+    "ernie": _build_ernie_workflow_for_profile,
+}
+
+
 def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     profile_id = str(request.profile or "").strip().lower()
-    if profile_id == "anima":
-        return _build_anima_workflow(request)
-    if profile_id == "flux":
-        return _build_flux_workflow(request)
-    if profile_id == "chroma":
-        return _build_chroma_workflow(request)
-    if profile_id in {"klein_4b_distilled", "klein_9b_distilled"}:
-        return _build_klein_workflow(request, distilled=True)
-    if profile_id in {"klein_4b", "klein_9b"}:
-        return _build_klein_workflow(request, distilled=False)
-    if profile_id == "qwen_image":
-        return _build_qwen_image_workflow(request)
-    if profile_id == "longcat_image":
-        return _build_longcat_workflow(request)
-    if profile_id == "z_image":
-        return _build_z_image_workflow(request, turbo=False)
-    if profile_id == "z_image_turbo":
-        return _build_z_image_workflow(request, turbo=True)
-    if profile_id == "ernie_image":
-        return _build_ernie_workflow(request, turbo=False)
-    if profile_id == "ernie_image_turbo":
-        return _build_ernie_workflow(request, turbo=True)
-    if profile_id in {"hidream_i1_dev_fp8", "hidream_i1_fast", "hidream_i1_full"}:
-        return _build_hidream_workflow(request)
-    raise ValueError(f"Unsupported official non-SD txt2img profile: {request.profile}")
+    adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
+    builder = _NON_SD_RUNTIME_BUILDERS.get(adapter_id)
+    if builder is None:
+        raise ValueError(f"Unsupported official non-SD txt2img profile: {request.profile}")
+    return builder(request)
