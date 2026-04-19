@@ -44,7 +44,11 @@ from rookieui.services.parity_matrix import (
     normalize_sampler_name,
     normalize_scheduler_name,
 )
-from rookieui.services.prompt_dsl import merge_lora_activations, preprocess_prompt_bundle
+from rookieui.services.prompt_dsl import (
+    collect_model_only_lora_drift_warnings,
+    merge_lora_activations,
+    preprocess_prompt_bundle,
+)
 from rookieui.services.adetailer import normalize_adetailer_payload
 from rookieui.services.controlnet import normalize_controlnet_units
 from rookieui.services.txt2img import (
@@ -491,6 +495,13 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         applied_defaults,
     )
 
+    prompt_warnings = list(prompt_preprocess.prompt_warnings)
+    prompt_warning_codes = list(prompt_preprocess.warning_codes)
+    if primary_model_category == "diffusion_models" and lora_activations:
+        model_only_warnings, model_only_warning_codes = collect_model_only_lora_drift_warnings(lora_activations)
+        prompt_warnings.extend(model_only_warnings)
+        prompt_warning_codes.extend(model_only_warning_codes)
+
     return NormalizedImg2ImgRequest(
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -549,8 +560,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         hires_upscale_method=hires_upscale_method,
         adetailer=adetailer,
         lora_activations=lora_activations,
-        prompt_warnings=prompt_preprocess.prompt_warnings,
-        prompt_warning_codes=prompt_preprocess.warning_codes,
+        prompt_warnings=list(dict.fromkeys(prompt_warnings)),
+        prompt_warning_codes=list(dict.fromkeys(prompt_warning_codes)),
         controlnet_units=controlnet_units,
         controlnet_warnings=controlnet_warnings,
         controlnet_warning_codes=controlnet_warning_codes,

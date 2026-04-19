@@ -630,6 +630,56 @@ class Img2ImgTranslationTests(unittest.TestCase):
             2,
         )
 
+    def test_translate_img2img_request_appends_inline_lora_after_template_owned_lora_for_qwen_edit(self) -> None:
+        inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[
+                "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                "Qwen-Image\\RetailRefresh.safetensors",
+            ],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage <lora:Qwen-Image/RetailRefresh.safetensors:0.6>",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "edit",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        lora_nodes = {
+            node_id: node for node_id, node in workflow.items() if node["class_type"] == "LoraLoaderModelOnly"
+        }
+
+        self.assertEqual(len(lora_nodes), 2)
+        template_node_id = next(
+            node_id
+            for node_id, node in lora_nodes.items()
+            if node["inputs"]["lora_name"] == "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"
+        )
+        inline_node_id = next(
+            node_id
+            for node_id, node in lora_nodes.items()
+            if node["inputs"]["lora_name"] == "Qwen-Image\\RetailRefresh.safetensors"
+        )
+        self.assertEqual(lora_nodes[template_node_id]["inputs"]["model"], ["8", 0])
+        self.assertEqual(lora_nodes[inline_node_id]["inputs"]["model"], [template_node_id, 0])
+        self.assertEqual(lora_nodes[inline_node_id]["inputs"]["strength_model"], 0.6)
+        model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
+        self.assertEqual(model_sampling_node["inputs"]["model"], [inline_node_id, 0])
+
     def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
         normalized = normalize_img2img_request(
             {

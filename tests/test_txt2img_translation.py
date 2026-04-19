@@ -837,6 +837,90 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
 
+    def test_translate_txt2img_request_appends_inline_lora_after_template_owned_lora_for_flux(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
+                loras=[
+                    "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
+                    "Flux\\CinematicBoost.safetensors",
+                ],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial <lora:Flux/CinematicBoost.safetensors:0.55>",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "vae_name": "flux_vae.safetensors",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        lora_nodes = {
+            node_id: node for node_id, node in workflow.items() if node["class_type"] == "LoraLoaderModelOnly"
+        }
+
+        self.assertEqual(len(lora_nodes), 2)
+        template_node_id = next(
+            node_id
+            for node_id, node in lora_nodes.items()
+            if node["inputs"]["lora_name"] == "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"
+        )
+        inline_node_id = next(
+            node_id
+            for node_id, node in lora_nodes.items()
+            if node["inputs"]["lora_name"] == "Flux\\CinematicBoost.safetensors"
+        )
+        self.assertEqual(lora_nodes[template_node_id]["inputs"]["model"], ["1", 0])
+        self.assertEqual(lora_nodes[inline_node_id]["inputs"]["model"], [template_node_id, 0])
+        self.assertEqual(lora_nodes[inline_node_id]["inputs"]["strength_model"], 0.55)
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+        self.assertEqual(sampler_node["inputs"]["model"], [inline_node_id, 0])
+
+    def test_normalize_txt2img_request_warns_when_non_sd_inline_lora_clip_strength_drifts(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
+                loras=[
+                    "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
+                    "Flux\\CinematicBoost.safetensors",
+                ],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial <lora:Flux/CinematicBoost.safetensors:0.55:0.8>",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "vae_name": "flux_vae.safetensors",
+                }
+            )
+
+        self.assertIn("PROMPT_NON_SD_INLINE_LORA_CLIP_STRENGTH_IGNORED", normalized.prompt_warning_codes)
+        self.assertTrue(
+            any("model-only" in warning.lower() and "CinematicBoost".lower() in warning.lower() for warning in normalized.prompt_warnings)
+        )
+
     def test_translate_txt2img_request_uses_official_prompt_enhancement_chain_for_ernie_image(self) -> None:
         with mock.patch(
             "rookieui.services.txt2img.discover_model_inventory",
@@ -874,6 +958,45 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("ComfySwitchNode", class_types)
         self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
+
+    def test_translate_txt2img_request_appends_inline_lora_for_non_template_ernie_builder(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["ernie\\ernie-image.safetensors"],
+                vae=["flux2-vae.safetensors"],
+                text_encoders=["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
+                loras=["Ernie\\PainterlyLift.safetensors"],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux2-vae.safetensors",
+                default_text_encoder="Ministral3_3B_fp16.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial <lora:Ernie/PainterlyLift.safetensors:0.4>",
+                    "profile": "ernie_image",
+                    "checkpoint_name": "ernie/ernie-image.safetensors",
+                    "text_encoder_name": "Ministral3_3B_fp16.safetensors",
+                    "vae_name": "flux2-vae.safetensors",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        lora_node_id, lora_node = next(
+            (node_id, node)
+            for node_id, node in workflow.items()
+            if node["class_type"] == "LoraLoaderModelOnly"
+        )
+        self.assertEqual(lora_node["inputs"]["model"], ["1", 0])
+        self.assertEqual(lora_node["inputs"]["lora_name"], "Ernie\\PainterlyLift.safetensors")
+        self.assertEqual(lora_node["inputs"]["strength_model"], 0.4)
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+        self.assertEqual(sampler_node["inputs"]["model"], [lora_node_id, 0])
 
     def test_normalize_txt2img_request_applies_hires_defaults(self) -> None:
         request = normalize_txt2img_request(

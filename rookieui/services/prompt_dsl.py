@@ -33,6 +33,7 @@ PROMPT_WARNING_GUARD_SCHEDULE_SLICE_LIMIT = "PROMPT_GUARD_SCHEDULE_SLICE_LIMIT"
 PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD = "PROMPT_SCHEDULE_INVALID_THRESHOLD"
 PROMPT_WARNING_EXTRA_NETWORK_UNSUPPORTED_REMOVED = "PROMPT_EXTRA_NETWORK_UNSUPPORTED_REMOVED"
 PROMPT_WARNING_LEGACY_FALLBACK_ENABLED = "PROMPT_LEGACY_FALLBACK_ENABLED"
+PROMPT_WARNING_NON_SD_INLINE_LORA_CLIP_STRENGTH_IGNORED = "PROMPT_NON_SD_INLINE_LORA_CLIP_STRENGTH_IGNORED"
 
 PROMPT_DSL_LEGACY_ENV = "ROOKIEUI_PROMPT_DSL_LEGACY"
 
@@ -72,6 +73,7 @@ _WARNING_MESSAGES = {
     PROMPT_WARNING_SCHEDULE_INVALID_THRESHOLD: "Prompt scheduling threshold was invalid and fell back to linear full-range slice.",
     PROMPT_WARNING_EXTRA_NETWORK_UNSUPPORTED_REMOVED: "Unsupported A1111 extra network was removed from the prompt.",
     PROMPT_WARNING_LEGACY_FALLBACK_ENABLED: "Prompt semantic parser/compiler rollback switch is active (legacy mode).",
+    PROMPT_WARNING_NON_SD_INLINE_LORA_CLIP_STRENGTH_IGNORED: "Official non-SD template paths apply inline LoRA as model-only nodes; clip/TE LoRA strength drift was ignored.",
 }
 
 
@@ -870,6 +872,22 @@ def merge_lora_activations(
 
     merged.append(explicit_activation)
     return merged
+
+
+def collect_model_only_lora_drift_warnings(
+    activations: list[PromptLoraActivation],
+) -> tuple[list[str], list[str]]:
+    warnings: list[str] = []
+    warning_codes: list[str] = []
+    for activation in activations:
+        if round(float(activation.strength_model), 3) == round(float(activation.strength_clip), 3):
+            continue
+        warning_codes.append(PROMPT_WARNING_NON_SD_INLINE_LORA_CLIP_STRENGTH_IGNORED)
+        warnings.append(
+            "Official non-SD template paths use model-only LoRA loading; "
+            f"clip/TE strength override was ignored for '{activation.name}'."
+        )
+    return warnings, warning_codes
 
 
 def _warning_messages_from_codes(codes: list[str]) -> list[str]:

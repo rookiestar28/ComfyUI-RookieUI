@@ -8,6 +8,7 @@ from rookieui.contracts.family_template_manifest import (
     build_non_sd_txt2img_profile_ids,
 )
 from rookieui.contracts.generation import NormalizedImg2ImgRequest, NormalizedTxt2ImgRequest
+from rookieui.contracts.prompt_dsl import PromptLoraActivation
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
     _build_clip_loader_node,
@@ -291,6 +292,33 @@ def _append_lora_loader_model_only_node(
     return [node_id, 0]
 
 
+def _append_model_only_lora_chain(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    model_source: list[object],
+    template_lora_name: str = "",
+    inline_lora_activations: list[PromptLoraActivation] | None = None,
+) -> list[object]:
+    chained_model_source = model_source
+    if template_lora_name:
+        chained_model_source = _append_lora_loader_model_only_node(
+            workflow,
+            allocator=allocator,
+            model_source=chained_model_source,
+            lora_name=template_lora_name,
+        )
+    for activation in inline_lora_activations or []:
+        chained_model_source = _append_lora_loader_model_only_node(
+            workflow,
+            allocator=allocator,
+            model_source=chained_model_source,
+            lora_name=activation.name,
+            strength_model=activation.strength_model,
+        )
+    return chained_model_source
+
+
 def _append_string_replace_node(
     workflow: dict[str, object],
     *,
@@ -549,6 +577,12 @@ def _build_anima_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -581,7 +615,7 @@ def _build_anima_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object
         latent_id=latent_id,
         request=request,
         denoise=1.0,
-        model_source=[unet_id, 0],
+        model_source=model_source,
     )
     decode_id = allocator.next()
     save_id = allocator.next()
@@ -603,11 +637,12 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         raise ValueError("Flux official template requires two ordered text encoders.")
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
-    model_source = _append_lora_loader_model_only_node(
+    model_source = _append_model_only_lora_chain(
         workflow,
         allocator=allocator,
         model_source=[unet_id, 0],
-        lora_name=request.template_lora_name or _FLUX_TEMPLATE_LORA_NAME,
+        template_lora_name=request.template_lora_name or _FLUX_TEMPLATE_LORA_NAME,
+        inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_flux_dual_clip_source(
         workflow,
@@ -663,6 +698,12 @@ def _build_hidream_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         raise ValueError("HiDream official template requires four ordered text encoders.")
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    base_model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_hidream_quad_clip_source(workflow, allocator=allocator, clip_names=encoder_values)
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
@@ -670,7 +711,7 @@ def _build_hidream_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         workflow,
         allocator=allocator,
         class_type="ModelSamplingSD3",
-        model_source=[unet_id, 0],
+        model_source=base_model_source,
         shift=float(request.shift or 0.0),
     )
     positive_id, negative_id = _build_basic_positive_negative(
@@ -716,6 +757,12 @@ def _build_chroma_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, objec
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    base_model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -729,7 +776,7 @@ def _build_chroma_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, objec
         workflow,
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
-        model_source=[unet_id, 0],
+        model_source=base_model_source,
         shift=float(request.shift or 0.0),
     )
     positive_id, negative_id = _build_basic_positive_negative(
@@ -794,6 +841,12 @@ def _build_klein_workflow(request: NormalizedTxt2ImgRequest, *, distilled: bool)
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -822,7 +875,7 @@ def _build_klein_workflow(request: NormalizedTxt2ImgRequest, *, distilled: bool)
         workflow,
         allocator=allocator,
         cfg_scale=request.cfg_scale,
-        model_source=[unet_id, 0],
+        model_source=model_source,
         positive_id=positive_id,
         negative_id=negative_id,
     )
@@ -864,6 +917,13 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        template_lora_name=request.template_lora_name or _QWEN_TEMPLATE_LORA_NAME,
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -872,12 +932,6 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
     )
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
-    model_source = _append_lora_loader_model_only_node(
-        workflow,
-        allocator=allocator,
-        model_source=[unet_id, 0],
-        lora_name=request.template_lora_name or _QWEN_TEMPLATE_LORA_NAME,
-    )
     model_source = _append_model_sampling_node(
         workflow,
         allocator=allocator,
@@ -928,6 +982,12 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    base_model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -940,7 +1000,7 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
         workflow,
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
-        model_source=[unet_id, 0],
+        model_source=base_model_source,
         shift=float(request.shift or 0.0),
     )
     positive_id, negative_id = _build_basic_positive_negative(
@@ -986,6 +1046,12 @@ def _build_longcat_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
     workflow: dict[str, object] = {}
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    base_model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -1016,7 +1082,7 @@ def _build_longcat_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
     model_source = _append_cfg_norm_node(
         workflow,
         allocator=allocator,
-        model_source=[unet_id, 0],
+        model_source=base_model_source,
     )
     latent_id = _append_empty_latent_node(
         workflow,
@@ -1056,6 +1122,12 @@ def _build_ernie_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -> 
         raise ValueError(f"Profile '{request.profile}' requires an auxiliary prompt-enhancer text encoder.")
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
     main_clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -1148,7 +1220,7 @@ def _build_ernie_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -> 
         latent_id=latent_id,
         request=request,
         denoise=1.0,
-        model_source=[unet_id, 0],
+        model_source=model_source,
     )
     decode_id = allocator.next()
     save_id = allocator.next()
@@ -1233,11 +1305,12 @@ def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[s
     )
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
-    model_source = _append_lora_loader_model_only_node(
+    model_source = _append_model_only_lora_chain(
         workflow,
         allocator=allocator,
         model_source=[unet_id, 0],
-        lora_name=request.template_lora_name,
+        template_lora_name=request.template_lora_name,
+        inline_lora_activations=request.lora_activations,
     )
     model_source = _append_model_sampling_node(
         workflow,
