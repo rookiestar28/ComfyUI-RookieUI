@@ -46,10 +46,11 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Official non-SD template preset expansion and truthful host gating (new functionality/stability)</strong></summary>
+<summary><strong>Official non-SD template preset expansion, inline LoRA chaining, and truthful host gating (new functionality/stability)</strong></summary>
 
 - Expanded RookieUI's non-SD preset matrix to the official ComfyUI text-to-image templates currently tracked in `reference/workflow_templates`, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
+- Shipped official non-SD template paths now also support prompt-inline `<lora:model_name:weight>` chaining, preserving any template-owned LoRA first and then appending user inline LoRAs through model-only `Load LoRA` nodes before host submission.
 - Tightened live-host catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
 - Completed restarted-host catalog/execute proof for the current asset-ready official non-SD subset: `Anima`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Z-Image`, and `Z-Image Turbo`.
 
@@ -310,7 +311,7 @@ Current extension seams:
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
-  - [Official Edit Presets and Template-Owned LoRAs](#official-edit-presets-and-template-owned-loras)
+  - [Current Official Edit Preset Coverage and Template-Owned LoRAs](#current-official-edit-preset-coverage-and-template-owned-loras)
   - [Official Non-SD Inline LoRA Support](#official-non-sd-inline-lora-support)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
@@ -434,7 +435,7 @@ If your host or Manager install path does not automatically install custom-node 
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
 - Official `Edit` workflows are now being added through a dedicated image-edit surface rather than the generic `img2img` preset list. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
 
-### Official Edit Presets and Template-Owned LoRAs
+### Current Official Edit Preset Coverage and Template-Owned LoRAs
 
 - RookieUI now ships the first official ComfyUI `imageEdit` preset, `Qwen-Image Edit`, on a dedicated edit-aware image-input path.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The current shipped edit path does not require mask input.
@@ -449,7 +450,15 @@ If your host or Manager install path does not automatically install custom-node 
   - `Qwen-Image Edit`
 - Additional official edit models are planned incrementally, including single-image and multi-reference-image workflows. Multiple-reference edit flows will land on a richer edit-specific payload/runtime path rather than being squeezed into the current single-image `img2img` contract.
 
+---
+
 ### Official Non-SD Inline LoRA Support
+
+<div align="left">
+  <img src="assets/loras.png" width="100%" />
+</div>
+
+<br>
 
 - Shipped official non-SD template workflows now accept prompt-inline LoRA syntax such as `<lora:model_name:1>` on their native template runtime path instead of treating inline LoRAs as Stable Diffusion-only behavior.
 - RookieUI extracts inline LoRA activations from the prompt, creates model-only `Load LoRA` nodes, and chains them immediately after the official `Load Diffusion Model` path before submitting the final ComfyUI workflow JSON to the host.
