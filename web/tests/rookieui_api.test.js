@@ -68,17 +68,39 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f151-20260418");
+    expect(result.data.model_families.contract_version).toBe("f158-20260419");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
+    const fluxEntry = result.data.model_families.entries.find((entry) => entry.id === "flux");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
+    const qwenEditEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit");
+    const qwenEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image");
     expect(chromaEntry.shift_visible).toBe(true);
     expect(chromaEntry.default_shift).toBe(1);
+    expect(chromaEntry.available_surface_flows).toEqual(["txt2img"]);
     expect(ernieEntry.prompt_enhancement_visible).toBe(true);
     expect(ernieEntry.default_prompt_enhancement_enabled).toBe(true);
+    expect(fluxEntry.template_lora_visible).toBe(true);
+    expect(fluxEntry.template_lora_override_allowed).toBe(true);
+    expect(fluxEntry.official_template_lora_label).toBe("Flux_2-Turbo-LoRA_comfyui.safetensors");
     expect(longcatEntry.flux_guidance_visible).toBe(true);
     expect(longcatEntry.default_flux_guidance).toBe(4);
+    expect(qwenEntry.template_lora_visible).toBe(true);
+    expect(qwenEntry.template_lora_override_allowed).toBe(true);
+    expect(qwenEntry.official_template_lora_label).toBe(
+      "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+    );
+    expect(qwenEditEntry.available_surface_flows).toEqual(["edit"]);
+    expect(qwenEditEntry.template_lora_visible).toBe(true);
+    expect(qwenEditEntry.template_lora_override_allowed).toBe(true);
+    expect(qwenEditEntry.official_template_lora_label).toBe(
+      "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+    );
+    expect(result.data.model_families.entries.find((entry) => entry.id === "sd15")?.available_surface_flows).toEqual([
+      "txt2img",
+      "img2img",
+    ]);
     expect(result.data.prompt_semantics.contract_version).toBe("r55-20260411");
     expect(result.data.features.adetailer).toBe(true);
     expect(result.data.adetailer.contract.version).toBe("r74f77-20260414");
@@ -218,6 +240,7 @@ describe("fetchRookieUICapabilities", () => {
       "hidream_i1_full",
       "longcat_image",
       "qwen_image",
+      "qwen_image_edit",
       "z_image",
       "z_image_turbo",
     ]);
@@ -242,12 +265,17 @@ describe("fetchRookieUICapabilities", () => {
       "hidream_i1_full",
       "longcat_image",
       "qwen_image",
+      "qwen_image_edit",
       "z_image",
       "z_image_turbo",
     ]);
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.profile).toBe("flux");
     expect(presets.data.presets.find((preset) => preset.id === "chroma")?.shift).toBe(1);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
+    expect(presets.data.presets.find((preset) => preset.id === "flux")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
     expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);

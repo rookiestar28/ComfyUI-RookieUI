@@ -221,6 +221,25 @@ def _coerce_lora_selector(
     )
 
 
+def _resolve_template_lora_selector(
+    raw_value: str | None,
+    *,
+    profile_id: str,
+    inventory_selectors: list[str] | None,
+    strict_match: bool,
+) -> str:
+    normalized_value = str(raw_value or "").strip()
+    if normalized_value:
+        return resolve_inventory_selector(
+            normalized_value,
+            "template_lora_name",
+            default_value="",
+            inventory_selectors=inventory_selectors,
+            strict_match=strict_match,
+        )
+    return ""
+
+
 def _coerce_lora_strength(value: object, field_name: str) -> float:
     normalized = round(_coerce_float(value, field_name), 2)
     if normalized < _MIN_LORA_STRENGTH or normalized > _MAX_LORA_STRENGTH:
@@ -378,7 +397,12 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     )
     text_encoder_default = resolve_text_encoder_selector_context(profile.id, inventory)
     aux_text_encoder_name = resolve_aux_text_encoder_selector_context(profile.id, inventory)
-    template_lora_name = resolve_template_lora_selector_context(profile.id, inventory)
+    template_lora_name = _resolve_template_lora_selector(
+        request.template_lora_name,
+        profile_id=profile.id,
+        inventory_selectors=inventory.loras,
+        strict_match=inventory_is_host,
+    ) or resolve_template_lora_selector_context(profile.id, inventory)
     text_encoder_name = resolve_inventory_selector(
         raw_text_encoder_selector,
         "text_encoder_name",
@@ -410,6 +434,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
             raise ValueError(
                 f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
+        if profile.id == "flux" and not template_lora_name:
+            raise ValueError("template_lora_name requires the official Flux template LoRA in host inventory.")
         if profile.id == "qwen_image" and not template_lora_name:
             raise ValueError("template_lora_name requires the official Qwen-Image template LoRA in host inventory.")
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))

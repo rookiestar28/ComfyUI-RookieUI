@@ -82,7 +82,19 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   installExplicitFormSubmitShortcuts(form);
 
   const profileLookup = buildProfileLookup(bootstrapState.capabilities);
-  const presetLookup = buildPresetLookup(bootstrapState.presets?.presets ?? []);
+  const rawPresets = bootstrapState.presets?.presets ?? [];
+  const visibleTxt2ImgPresets = rawPresets.filter((preset) => {
+    const profile = profileLookup.get(String(preset?.profile ?? "").trim().toLowerCase()) ?? profileLookup.get(preset?.profile);
+    if (!profile) {
+      return false;
+    }
+    const availableSurfaceFlows = Array.isArray(profile?.available_surface_flows)
+      ? profile.available_surface_flows
+      : [];
+    return availableSurfaceFlows.includes("txt2img");
+  });
+  const effectiveTxt2ImgPresets = visibleTxt2ImgPresets.length > 0 ? visibleTxt2ImgPresets : rawPresets;
+  const presetLookup = buildPresetLookup(rawPresets);
   const profiles = bootstrapState.capabilities.parity?.profiles ?? [];
   const inventory = bootstrapState.models ?? {
     checkpoints: ["__host_default__"],
@@ -133,11 +145,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   const controlnetTypeOrder = Array.isArray(controlnetCatalog.control_type_order)
     ? controlnetCatalog.control_type_order
     : undefined;
-  const presetOptions = (bootstrapState.presets?.presets ?? []).map((preset) => ({
+  const presetOptions = effectiveTxt2ImgPresets.map((preset) => ({
     value: preset.id,
     label: preset.title,
   }));
-  const allPresets = bootstrapState.presets?.presets ?? [];
+  const allPresets = effectiveTxt2ImgPresets;
   const initialPreset = presetOptions[0]?.value ?? "sd15";
   const initialProfile = profiles[0]?.id ?? "sd15";
   const dtypeProfiles = bootstrapState.compatibility?.dtype_profiles ?? [
@@ -193,6 +205,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       dtypeProfiles.map((profile) => ({ value: profile.id, label: profile.title })),
       initialLowBits,
     ),
+    templateLoraName: createInput("text", "rookieui-template-lora-name", ""),
     loraName: createInput("text", "rookieui-lora-name", ""),
     loraStrengthModel: createInput("number", "rookieui-lora-strength-model", "1", {
       step: 0.05,
@@ -312,6 +325,69 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     promptEnhancementField: null,
     promptEnhancementInput: elements.promptEnhancementEnabled,
   };
+  const templateLoraControls = {
+    field: null,
+    statusNode: null,
+    resetButton: null,
+    libraryHeading: null,
+    libraryHost: null,
+  };
+  const setFieldVisibility = (fieldNode, visible) => {
+    if (!fieldNode) {
+      return;
+    }
+    fieldNode.hidden = !visible;
+    fieldNode.querySelectorAll("input, select, textarea, button").forEach((control) => {
+      control.disabled = !visible;
+    });
+  };
+  const resolvePresetTemplateLoraDefault = () =>
+    String(presetLookup.get(elements.preset.value)?.template_lora_name ?? "").trim();
+  const resolveTemplateLoraOfficialLabel = () =>
+    String(profileLookup.get(elements.profileState.value)?.official_template_lora_label ?? "").trim();
+  const syncTemplateLoraControls = () => {
+    const profile = profileLookup.get(String(elements.profileState.value ?? "").trim().toLowerCase()) ?? null;
+    const visible = Boolean(profile?.template_lora_visible);
+    const overrideAllowed = Boolean(profile?.template_lora_override_allowed);
+    const currentValue = String(elements.templateLoraName.value ?? "").trim();
+    const presetDefault = resolvePresetTemplateLoraDefault();
+    const officialLabel = resolveTemplateLoraOfficialLabel();
+    const officialResolved = presetDefault || officialLabel;
+    setFieldVisibility(templateLoraControls.field, visible);
+    if (templateLoraControls.libraryHeading) {
+      templateLoraControls.libraryHeading.hidden = !visible;
+    }
+    if (templateLoraControls.libraryHost) {
+      templateLoraControls.libraryHost.hidden = !visible;
+      templateLoraControls.libraryHost.querySelectorAll("button").forEach((button) => {
+        button.disabled = !visible || !overrideAllowed;
+      });
+    }
+    if (templateLoraControls.statusNode) {
+      templateLoraControls.statusNode.hidden = !visible;
+    }
+    if (templateLoraControls.resetButton) {
+      templateLoraControls.resetButton.hidden = !visible;
+      templateLoraControls.resetButton.disabled = !visible || !overrideAllowed;
+    }
+    elements.templateLoraName.disabled = !visible || !overrideAllowed;
+    if (!visible || !templateLoraControls.statusNode) {
+      return;
+    }
+    if (!currentValue && !officialResolved) {
+      templateLoraControls.statusNode.textContent = "No template-owned LoRA is required for this preset.";
+      return;
+    }
+    if (!officialResolved) {
+      templateLoraControls.statusNode.textContent = `Official template LoRA '${officialLabel || "template-owned LoRA"}' is not available on the current host. Choose an override to continue with a non-official variant.`;
+      return;
+    }
+    if (!currentValue || currentValue === presetDefault) {
+      templateLoraControls.statusNode.textContent = `Official default active: ${officialResolved}`;
+      return;
+    }
+    templateLoraControls.statusNode.textContent = `Custom override active: ${currentValue}. Official default is ${officialResolved}; exact official template parity no longer applies.`;
+  };
 
   const buildXYZBaseRequest = () => ({
     prompt: elements.prompt.value,
@@ -340,6 +416,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     hires_steps: Number(elements.hiresSteps.value),
     hires_denoise: Number(elements.hiresDenoise.value),
     hires_upscale_method: elements.hiresUpscaleMethod.value,
+    template_lora_name: elements.templateLoraName.value,
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
@@ -487,6 +564,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     elements.textEncoder,
   );
   syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+  syncTemplateLoraControls();
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
@@ -497,6 +575,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       elements.textEncoder,
     );
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+    syncTemplateLoraControls();
   });
 
   const subtabHost = document.createElement("div");
@@ -756,8 +835,44 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         const loraGrid = document.createElement("div");
         loraGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         loraSection.appendChild(loraGrid);
+        templateLoraControls.field = createField(loraGrid, "Template LoRA", elements.templateLoraName);
         createField(loraGrid, "Model Strength", elements.loraStrengthModel);
         createField(loraGrid, "CLIP Strength", elements.loraStrengthClip);
+
+        templateLoraControls.statusNode = document.createElement("p");
+        templateLoraControls.statusNode.className = "rookieui-shell__status";
+        templateLoraControls.statusNode.id = "rookieui-txt2img-template-lora-status";
+        loraSection.appendChild(templateLoraControls.statusNode);
+
+        templateLoraControls.resetButton = createActionButton(
+          "rookieui-txt2img-reset-template-lora",
+          "Reset Template LoRA",
+        );
+        templateLoraControls.resetButton.addEventListener("click", () => {
+          elements.templateLoraName.value = resolvePresetTemplateLoraDefault();
+          syncTemplateLoraControls();
+        });
+        loraSection.appendChild(templateLoraControls.resetButton);
+
+        templateLoraControls.libraryHeading = appendTextElement(
+          loraSection,
+          "h5",
+          "rookieui-shell__section-title",
+          "Template LoRA Overrides",
+        );
+        templateLoraControls.libraryHost = document.createElement("div");
+        loraSection.appendChild(templateLoraControls.libraryHost);
+        buildSelectionLibrary(
+          templateLoraControls.libraryHost,
+          "Available Template LoRA Overrides",
+          inventory.loras ?? [],
+          () => elements.templateLoraName.value,
+          (value) => {
+            elements.templateLoraName.value = value;
+            syncTemplateLoraControls();
+          },
+          "rookieui-txt2img-template-lora-item",
+        );
 
         const loraStatus = document.createElement("p");
         loraStatus.className = "rookieui-shell__status";
@@ -782,6 +897,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           "rookieui-txt2img-lora-item",
           loraStatus,
         );
+        elements.templateLoraName.addEventListener("input", syncTemplateLoraControls);
+        elements.templateLoraName.addEventListener("change", syncTemplateLoraControls);
+        syncTemplateLoraControls();
       },
     },
   ]);
@@ -822,6 +940,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       elements.textEncoder,
     );
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+    syncTemplateLoraControls();
   });
 
   formRegistry.txt2img = {
@@ -853,6 +972,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         hires_steps: "hiresSteps",
         hires_denoise: "hiresDenoise",
         hires_upscale_method: "hiresUpscaleMethod",
+        template_lora_name: "templateLoraName",
         lora_name: "loraName",
         lora_strength_model: "loraStrengthModel",
         lora_strength_clip: "loraStrengthClip",
@@ -879,6 +999,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         elements.textEncoder,
       );
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+      syncTemplateLoraControls();
       syncBoundControls(Object.values(elements));
       txt2imgStateLock.capture();
     },

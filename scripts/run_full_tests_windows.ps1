@@ -28,6 +28,38 @@ function Invoke-Checked {
   }
 }
 
+function Test-PortBindable {
+  param([Parameter(Mandatory = $true)][int]$Port)
+  $listener = $null
+  try {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+    $listener.Start()
+    return $true
+  }
+  catch {
+    return $false
+  }
+  finally {
+    if ($listener -ne $null) {
+      try {
+        $listener.Stop()
+      }
+      catch {
+      }
+    }
+  }
+}
+
+function Resolve-E2EPort {
+  param([int[]]$CandidatePorts)
+  foreach ($candidate in $CandidatePorts) {
+    if (Test-PortBindable -Port $candidate) {
+      return $candidate
+    }
+  }
+  throw "[tests] ERROR: could not find a bindable localhost port for Playwright E2E."
+}
+
 function Get-GitDiffSnapshot {
   param([switch]$Cached)
   if ($Cached) {
@@ -114,6 +146,13 @@ if (-not (Test-Path (Join-Path $root "node_modules\@playwright\test\package.json
   Write-Host "[tests] Installing frontend dependencies via npm install ..."
   Invoke-Checked "npm install" { npm install }
 }
+
+$env:ROOKIEUI_E2E_PYTHON = $venvPython
+if (-not $env:ROOKIEUI_E2E_PORT) {
+  $env:ROOKIEUI_E2E_PORT = [string](Resolve-E2EPort -CandidatePorts @(4173, 4300, 4310, 4320, 4500))
+}
+Write-Host "[tests] Playwright harness python: $env:ROOKIEUI_E2E_PYTHON"
+Write-Host "[tests] Playwright harness port: $env:ROOKIEUI_E2E_PORT"
 
 Write-Host "[tests] 1/4 detect-secrets"
 Invoke-Checked "detect-secrets" { & $venvPython -m pre_commit run detect-secrets --all-files }

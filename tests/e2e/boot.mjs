@@ -22,6 +22,11 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     vae_name: "qwen_image_vae.safetensors",
     text_encoder_name: "Automatic",
   },
+  qwen_image_edit: {
+    checkpoint_name: "qwen_image_edit_fp8_e4m3fn.safetensors",
+    vae_name: "qwen_image_vae.safetensors",
+    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+  },
   klein_4b_distilled: {
     checkpoint_name: "flux-2-klein-4b.safetensors",
     vae_name: "flux2-vae.safetensors",
@@ -107,6 +112,16 @@ const E2E_PARITY_PROFILES = E2E_MODEL_FAMILY_ENTRIES.map((entry) => ({
   default_scheduler: entry.default_scheduler,
   default_clip_skip: entry.default_clip_skip,
   supports_clip_skip: entry.supports_clip_skip,
+  text_encoder_visible: entry.text_encoder_visible,
+  shift_visible: entry.shift_visible,
+  default_shift: entry.default_shift,
+  flux_guidance_visible: entry.flux_guidance_visible,
+  default_flux_guidance: entry.default_flux_guidance,
+  prompt_enhancement_visible: entry.prompt_enhancement_visible,
+  default_prompt_enhancement_enabled: entry.default_prompt_enhancement_enabled,
+  edit_megapixels_visible: entry.edit_megapixels_visible,
+  default_edit_megapixels: entry.default_edit_megapixels,
+  available_surface_flows: entry.available_surface_flows,
   notes: [...entry.notes],
 }));
 
@@ -122,9 +137,13 @@ const E2E_PRESETS = E2E_MODEL_FAMILY_ENTRIES.map((entry) => ({
   height: entry.default_height,
   steps: entry.default_steps,
   cfg_scale: entry.default_cfg_scale,
+  shift: entry.default_shift ?? null,
+  flux_guidance: entry.default_flux_guidance ?? null,
+  edit_megapixels: entry.default_edit_megapixels ?? null,
   sampler_name: entry.default_sampler,
   scheduler_name: entry.default_scheduler,
   clip_skip: entry.default_clip_skip,
+  prompt_enhancement_enabled: entry.default_prompt_enhancement_enabled ?? false,
 }));
 
 const E2E_NEWER_FAMILY_PROFILES = DEFAULT_NEWER_FAMILY_PROFILES.map((entry) => ({ ...entry, aliases: [...entry.aliases] }));
@@ -134,6 +153,7 @@ const E2E_PRIMARY_MODEL_CATEGORY_BY_FAMILY = { ...DEFAULT_PRIMARY_MODEL_CATEGORY
 const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux",
   "qwen_image",
+  "qwen_image_edit",
   "klein_4b_distilled",
   "klein_4b",
   "klein_9b_distilled",
@@ -542,7 +562,7 @@ window.fetch = async (url, options = {}) => {
         vae: E2E_VAE_OPTIONS,
         text_encoders: E2E_TEXT_ENCODER_OPTIONS,
         embeddings: ["badhandv4.pt"],
-        loras: ["detail_tweaker.safetensors"],
+        loras: ["detail_tweaker.safetensors", "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
         ultralytics: ["sam2_b.pt"],
         unet: [],
         upscale_models: ["4x-UltraSharp.pth"],
@@ -724,7 +744,7 @@ window.fetch = async (url, options = {}) => {
         profiles: E2E_PARITY_PROFILES,
       },
       model_families: {
-        contract_version: "f151-20260418",
+        contract_version: "f157-20260419",
         entries: E2E_MODEL_FAMILY_ENTRIES.map(
           ({ checkpoint_name: _checkpointName, vae_name: _vaeName, text_encoder_name: _textEncoderName, ...entry }) => entry,
         ),

@@ -21,6 +21,9 @@ if str(_REPO_ROOT) not in sys.path:
 
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
 from rookieui.contracts.family_template_manifest import (
+    build_non_sd_catalog_profile_ids,
+    build_non_sd_edit_megapixels_expectations,
+    build_non_sd_edit_profile_ids,
     build_non_sd_flux_guidance_expectations,
     build_non_sd_prompt_enhancement_expectations,
     build_non_sd_shift_expectations,
@@ -29,6 +32,7 @@ from rookieui.contracts.family_template_manifest import (
     build_text_encoder_sequence_hints_by_profile,
     build_vae_priority_hints_by_profile,
     build_diffusion_model_priority_hints_by_profile,
+    get_family_template_manifest_entry,
 )
 from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
@@ -65,10 +69,13 @@ from tests.prompt_parity_fixtures import (
 )
 
 
-_NON_SD_DIFFUSION_PROFILES = build_non_sd_txt2img_profile_ids()
+_NON_SD_TXT2IMG_PROFILES = build_non_sd_txt2img_profile_ids()
+_NON_SD_EDIT_PROFILES = build_non_sd_edit_profile_ids()
+_NON_SD_CATALOG_PROFILES = build_non_sd_catalog_profile_ids()
 _NON_SD_SHIFT_EXPECTATIONS = build_non_sd_shift_expectations()
 _NON_SD_FLUX_GUIDANCE_EXPECTATIONS = build_non_sd_flux_guidance_expectations()
 _NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS = build_non_sd_prompt_enhancement_expectations()
+_NON_SD_EDIT_MEGAPIXELS_EXPECTATIONS = build_non_sd_edit_megapixels_expectations()
 _NON_SD_CHECKPOINT_PRIORITY_HINTS = build_diffusion_model_priority_hints_by_profile()
 _NON_SD_TEXT_ENCODER_PRIORITY_HINTS = build_text_encoder_priority_hints_by_profile()
 _NON_SD_TEXT_ENCODER_SEQUENCE_HINTS = build_text_encoder_sequence_hints_by_profile()
@@ -283,7 +290,7 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
         return ",".join(_SD_PROMPT_PARITY_PROFILES)
     if validation_mode == "auxiliary-contracts":
         return ""
-    return ",".join(_NON_SD_DIFFUSION_PROFILES)
+    return ",".join(_NON_SD_CATALOG_PROFILES)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -291,7 +298,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Run optional live RookieUI smoke checks against a real ComfyUI host. "
             "This lane validates profile-to-model/text-encoder alignment and can optionally "
-            "submit/poll lightweight txt2img runs for non-SD diffusion profiles while also "
+            "submit/poll lightweight generation runs for non-SD txt2img/edit profiles while also "
             "supporting auxiliary route contract checks."
         )
     )
@@ -3074,14 +3081,36 @@ def _validate_catalog_contract(
 
         lowered_text_encoder = text_encoder_name.lower()
         # CRITICAL: newer-family diffusion presets must keep the host-native text-encoder family aligned; mismatches crash execution.
+        manifest_entry = get_family_template_manifest_entry(profile_id)
+        resolved_template_lora = resolve_template_lora_selector_context(profile_id, inventory_snapshot)
+        expected_template_lora_label = str(getattr(manifest_entry, "official_template_lora_label", "") or "").strip()
+        preset_template_lora_name = str(preset.get("template_lora_name", "")).strip()
+        if getattr(manifest_entry, "template_lora_visible", False):
+            if not resolved_template_lora:
+                errors.append(
+                    f"profile '{profile_id}' host LoRA catalog did not expose the official template-owned LoRA."
+                )
+            if preset_template_lora_name and not _normalize_selector_token(preset_template_lora_name) == _normalize_selector_token(
+                resolved_template_lora
+            ):
+                errors.append(
+                    f"profile '{profile_id}' preset template LoRA '{preset_template_lora_name}' drifted from the current official host default '{resolved_template_lora}'."
+                )
+            if expected_template_lora_label and resolved_template_lora and not _normalize_selector_token(
+                resolved_template_lora
+            ).endswith(_normalize_selector_token(expected_template_lora_label)):
+                errors.append(
+                    f"profile '{profile_id}' resolved template LoRA '{resolved_template_lora}' did not match the official label '{expected_template_lora_label}'."
+                )
         if profile_id == "qwen_image":
             if "qwen" not in lowered_text_encoder:
                 errors.append(
                     f"profile '{profile_id}' expected a Qwen text encoder but got '{text_encoder_name}'."
                 )
-            if not resolve_template_lora_selector_context(profile_id, inventory_snapshot):
+        elif profile_id == "qwen_image_edit":
+            if "qwen" not in lowered_text_encoder:
                 errors.append(
-                    "profile 'qwen_image' host LoRA catalog did not expose the official Qwen-Image template LoRA."
+                    f"profile '{profile_id}' expected a Qwen text encoder but got '{text_encoder_name}'."
                 )
         elif profile_id in {"ernie_image", "ernie_image_turbo"}:
             if "ernie" not in lowered_checkpoint:
@@ -3142,6 +3171,20 @@ def _validate_catalog_contract(
                     f"but got '{actual_enabled}'."
                 )
 
+        expected_edit_megapixels = _NON_SD_EDIT_MEGAPIXELS_EXPECTATIONS.get(profile_id)
+        if expected_edit_megapixels is not None:
+            actual_edit_megapixels = preset.get("edit_megapixels")
+            try:
+                if actual_edit_megapixels is None or float(actual_edit_megapixels) != expected_edit_megapixels:
+                    errors.append(
+                        f"profile '{profile_id}' expected preset edit_megapixels={expected_edit_megapixels} "
+                        f"but got '{actual_edit_megapixels}'."
+                    )
+            except (TypeError, ValueError):
+                errors.append(
+                    f"profile '{profile_id}' expected numeric preset edit_megapixels but got '{actual_edit_megapixels}'."
+                )
+
     return errors, presets_by_id
 
 
@@ -3184,27 +3227,15 @@ def _build_txt2img_payload(
     *,
     models_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    vae_name = str(preset.get("vae_name", "Automatic")).strip() or "Automatic"
-    text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
-    shift = preset.get("shift")
-    flux_guidance = preset.get("flux_guidance")
+    vae_name, text_encoder_name, shift, flux_guidance = _resolve_family_selectors_for_live_payload(
+        profile_id,
+        preset,
+        models_payload=models_payload,
+    )
     prompt_enhancement_enabled = bool(preset.get("prompt_enhancement_enabled", False))
-    if models_payload is not None:
-        inventory = _build_inventory_snapshot_from_models_payload(models_payload)
-        if vae_name == "Automatic":
-            resolved_vae = resolve_vae_selector_context(profile_id, inventory)
-            if resolved_vae:
-                vae_name = resolved_vae
-        if not text_encoder_name or text_encoder_name == "Automatic" or "|" in text_encoder_name:
-            resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, inventory)
-            if resolved_text_encoder and resolved_text_encoder != "Automatic" and "|" not in resolved_text_encoder:
-                text_encoder_name = resolved_text_encoder
-            elif "|" in str(resolved_text_encoder or ""):
-                text_encoder_name = ""
-        if shift in {None, ""}:
-            shift = preset.get("shift")
-        if flux_guidance in {None, ""}:
-            flux_guidance = preset.get("flux_guidance")
+    template_lora_name = str(preset.get("template_lora_name", "")).strip()
+    if models_payload is not None and not template_lora_name:
+        template_lora_name = resolve_template_lora_selector_context(profile_id, _build_inventory_snapshot_from_models_payload(models_payload))
     return {
         "prompt": f"[rookieui live smoke] {profile_id}",
         "negative_prompt": "",
@@ -3221,11 +3252,85 @@ def _build_txt2img_payload(
         "sampler_name": str(preset.get("sampler_name", "euler")).strip() or "euler",
         "scheduler_name": str(preset.get("scheduler_name", "normal")).strip() or "normal",
         "prompt_enhancement_enabled": prompt_enhancement_enabled,
+        "template_lora_name": template_lora_name,
         "batch_count": 1,
         "seed": 1,
         "hires_enabled": False,
         "client_id": client_id,
     }
+
+
+def _build_edit_payload(
+    profile_id: str,
+    preset: dict[str, Any],
+    client_id: str,
+    *,
+    models_payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    vae_name, text_encoder_name, shift, flux_guidance = _resolve_family_selectors_for_live_payload(
+        profile_id,
+        preset,
+        models_payload=models_payload,
+    )
+    edit_megapixels = preset.get("edit_megapixels")
+    if edit_megapixels in {None, ""}:
+        edit_megapixels = _NON_SD_EDIT_MEGAPIXELS_EXPECTATIONS.get(profile_id)
+    template_lora_name = str(preset.get("template_lora_name", "")).strip()
+    if models_payload is not None and not template_lora_name:
+        template_lora_name = resolve_template_lora_selector_context(profile_id, _build_inventory_snapshot_from_models_payload(models_payload))
+    return {
+        "prompt": f"[rookieui live smoke] {profile_id} edit",
+        "negative_prompt": "",
+        "profile": profile_id,
+        "mode": "edit",
+        "image_data": _build_png_data_url(color="midnightblue"),
+        "checkpoint_name": str(preset.get("checkpoint_name", "")).strip(),
+        "vae_name": vae_name,
+        "text_encoder_name": text_encoder_name,
+        "width": int(preset.get("width", 1024)),
+        "height": int(preset.get("height", 1024)),
+        "steps": int(preset.get("steps", 4)),
+        "cfg_scale": float(preset.get("cfg_scale", 1.0)),
+        "shift": None if shift in {None, ""} else float(shift),
+        "flux_guidance": None if flux_guidance in {None, ""} else float(flux_guidance),
+        "edit_megapixels": None if edit_megapixels in {None, ""} else float(edit_megapixels),
+        "template_lora_name": template_lora_name,
+        "sampler_name": str(preset.get("sampler_name", "euler")).strip() or "euler",
+        "scheduler_name": str(preset.get("scheduler_name", "simple")).strip() or "simple",
+        "denoise_strength": 1.0,
+        "batch_size": 1,
+        "seed": 1,
+        "client_id": client_id,
+    }
+
+
+def _resolve_family_selectors_for_live_payload(
+    profile_id: str,
+    preset: dict[str, Any],
+    *,
+    models_payload: dict[str, Any] | None = None,
+) -> tuple[str, str, Any, Any]:
+    vae_name = str(preset.get("vae_name", "Automatic")).strip() or "Automatic"
+    text_encoder_name = str(preset.get("text_encoder_name", "")).strip()
+    shift = preset.get("shift")
+    flux_guidance = preset.get("flux_guidance")
+    if models_payload is not None:
+        inventory = _build_inventory_snapshot_from_models_payload(models_payload)
+        if vae_name == "Automatic":
+            resolved_vae = resolve_vae_selector_context(profile_id, inventory)
+            if resolved_vae:
+                vae_name = resolved_vae
+        if not text_encoder_name or text_encoder_name == "Automatic" or "|" in text_encoder_name:
+            resolved_text_encoder = resolve_text_encoder_selector_context(profile_id, inventory)
+            if resolved_text_encoder and resolved_text_encoder != "Automatic" and "|" not in resolved_text_encoder:
+                text_encoder_name = resolved_text_encoder
+            elif "|" in str(resolved_text_encoder or ""):
+                text_encoder_name = ""
+        if shift in {None, ""}:
+            shift = preset.get("shift")
+        if flux_guidance in {None, ""}:
+            flux_guidance = preset.get("flux_guidance")
+    return vae_name, text_encoder_name, shift, flux_guidance
 
 
 def _build_prompt_parity_request_payload(case: LivePromptParityCase) -> dict[str, Any]:
@@ -3998,16 +4103,27 @@ def _run_execute_smoke(
         if preset is None:
             errors.append(f"profile '{profile_id}' missing preset; execute lane skipped.")
             continue
+        manifest_entry = get_family_template_manifest_entry(profile_id)
         client_id = f"rookieui-live-smoke-{profile_id}"
-        request_payload = _build_txt2img_payload(
-            profile_id,
-            preset,
-            client_id,
-            models_payload=models_payload,
-        )
+        route_path = "/rookieui/generate/txt2img"
+        if manifest_entry.flow_kind == "edit":
+            route_path = "/rookieui/generate/img2img"
+            request_payload = _build_edit_payload(
+                profile_id,
+                preset,
+                client_id,
+                models_payload=models_payload,
+            )
+        else:
+            request_payload = _build_txt2img_payload(
+                profile_id,
+                preset,
+                client_id,
+                models_payload=models_payload,
+            )
         submit_result = _request_json(
             "POST",
-            f"{base_url}/rookieui/generate/txt2img",
+            f"{base_url}{route_path}",
             payload=request_payload,
             timeout_seconds=request_timeout_seconds,
         )

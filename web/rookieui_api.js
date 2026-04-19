@@ -1,6 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
+const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f158-20260419";
 export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
   {
     id: "sd15",
@@ -241,6 +242,7 @@ export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
     notes: [
       "Matches the official Flux.1 Dev FP8 template defaults.",
       "Text Encoder selector stays hidden because the official template owns the dual-encoder bundle.",
+      "Template LoRA stays explicit and defaults to the official turbo LoRA, but may be overridden with truthful drift messaging.",
     ],
   },
   {
@@ -475,6 +477,33 @@ export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
     ],
   },
   {
+    id: "qwen_image_edit",
+    title: "Qwen-Image Edit",
+    translation_base_family: "sdxl",
+    public_base_family: "qwen_image_edit",
+    prompt_encoder: "clip_text_encode_sdxl",
+    default_width: 1328,
+    default_height: 1328,
+    default_steps: 4,
+    default_cfg_scale: 1.0,
+    default_sampler: "euler",
+    default_scheduler: "simple",
+    default_clip_skip: 1,
+    supports_clip_skip: false,
+    primary_model_category: "diffusion_models",
+    text_encoder_visible: false,
+    support_tier: "family-adapted",
+    compatibility_summary:
+      "Official ComfyUI Qwen-Image Edit template preset on the dedicated edit-flow seam.",
+    experimental: true,
+    aliases: ["qwen image edit", "qwen-image edit"],
+    notes: [
+      "Matches the official Qwen-Image Edit template defaults.",
+      "Edit flow requires a source image and does not require a mask.",
+      "The current RookieUI edit surface ships the single-reference official template path only.",
+    ],
+  },
+  {
     id: "z_image",
     title: "Z-Image",
     translation_base_family: "sdxl",
@@ -557,8 +586,29 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
   hidream_i1_dev_fp8: { shift_visible: true, default_shift: 6.0 },
   hidream_i1_fast: { shift_visible: true, default_shift: 3.0 },
   hidream_i1_full: { shift_visible: true, default_shift: 3.0 },
+  flux: {
+    template_lora_visible: true,
+    template_lora_override_allowed: true,
+    official_template_lora_label: "Flux_2-Turbo-LoRA_comfyui.safetensors",
+  },
   longcat_image: { flux_guidance_visible: true, default_flux_guidance: 4.0 },
-  qwen_image: { shift_visible: true, default_shift: 3.0 },
+  qwen_image: {
+    shift_visible: true,
+    default_shift: 3.0,
+    template_lora_visible: true,
+    template_lora_override_allowed: true,
+    official_template_lora_label: "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+  },
+  qwen_image_edit: {
+    shift_visible: true,
+    default_shift: 3.0,
+    edit_megapixels_visible: true,
+    default_edit_megapixels: 1.5,
+    template_lora_visible: true,
+    template_lora_override_allowed: true,
+    official_template_lora_label: "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+    available_surface_flows: ["edit"],
+  },
   z_image: { shift_visible: true, default_shift: 3.0 },
   z_image_turbo: { shift_visible: true, default_shift: 3.0 },
 });
@@ -571,6 +621,12 @@ export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
     default_flux_guidance: null,
     prompt_enhancement_visible: false,
     default_prompt_enhancement_enabled: false,
+    edit_megapixels_visible: false,
+    default_edit_megapixels: null,
+    template_lora_visible: false,
+    template_lora_override_allowed: false,
+    official_template_lora_label: "",
+    available_surface_flows: entry.support_tier === "parity" ? ["txt2img", "img2img"] : ["txt2img"],
     ...entry,
     ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
   })),
@@ -597,6 +653,7 @@ const DEFAULT_PRESETS = Object.freeze(
     checkpoint_name: "__host_default__",
     vae_name: "Automatic",
     text_encoder_name: "Automatic",
+    template_lora_name: "",
     width: entry.default_width,
     height: entry.default_height,
     steps: entry.default_steps,
@@ -607,6 +664,7 @@ const DEFAULT_PRESETS = Object.freeze(
     scheduler_name: entry.default_scheduler,
     clip_skip: entry.default_clip_skip,
     prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
+    edit_megapixels: entry.default_edit_megapixels ?? null,
   })),
 );
 
@@ -670,7 +728,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     },
   },
   model_families: {
-    contract_version: "f151-20260418",
+    contract_version: MODEL_FAMILY_REGISTRY_CONTRACT_VERSION,
     entries: DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES,
   },
   prompt_semantics: {

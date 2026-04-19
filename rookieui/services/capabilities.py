@@ -113,6 +113,20 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "default_prompt_enhancement_enabled": bool(
                     entry.get("default_prompt_enhancement_enabled", False)
                 ),
+                "edit_megapixels_visible": bool(entry.get("edit_megapixels_visible", False)),
+                "default_edit_megapixels": (
+                    float(entry.get("default_edit_megapixels"))
+                    if entry.get("default_edit_megapixels") not in (None, "")
+                    else None
+                ),
+                "template_lora_visible": bool(entry.get("template_lora_visible", False)),
+                "template_lora_override_allowed": bool(entry.get("template_lora_override_allowed", False)),
+                "official_template_lora_label": normalize_metadata_text(
+                    entry.get("official_template_lora_label", "")
+                ),
+                "available_surface_flows": _normalize_metadata_list(
+                    entry.get("available_surface_flows", [])
+                ),
                 "support_tier": normalize_metadata_text(entry.get("support_tier", "")),
                 "compatibility_summary": normalize_metadata_text(entry.get("compatibility_summary", "")),
                 "experimental": bool(entry.get("experimental", False)),

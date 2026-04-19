@@ -298,6 +298,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             diffusion_models=["flux\\flux1-dev.safetensors", "lumina\\lumina2.safetensors"],
             vae=["flux_vae.safetensors"],
             text_encoders=["t5xxl.safetensors"],
+            loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
             controlnet=[],
             default_checkpoint="SDXL\\realvisxl.safetensors",
             default_vae="flux_vae.safetensors",
@@ -340,6 +341,36 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         )
 
         self.assertEqual(normalized.text_encoder_name, "clip_g.safetensors")
+
+    def test_normalize_txt2img_request_accepts_template_lora_override_for_flux(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-dev.safetensors"],
+                vae=["flux_vae.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
+                loras=[
+                    "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
+                    "Flux\\My-Custom-Flux-LoRA.safetensors",
+                ],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="flux_vae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux",
+                    "checkpoint_name": "flux/flux1-dev.safetensors",
+                    "template_lora_name": "Flux/My-Custom-Flux-LoRA.safetensors",
+                }
+            )
+
+        self.assertEqual(normalized.template_lora_name, "Flux\\My-Custom-Flux-LoRA.safetensors")
 
     def test_normalize_txt2img_request_uses_profile_aware_text_encoder_default_for_zit(self) -> None:
         with mock.patch(
@@ -446,7 +477,10 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "t5xxl_fp16.safetensors",
                 "t5xxl_fp8_e4m3fn_scaled.safetensors",
             ],
-            loras=["Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"],
+            loras=[
+                "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
+                "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+            ],
             default_checkpoint="SDXL\\realvisxl.safetensors",
             default_vae="qwen_image_vae.safetensors",
             default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -515,6 +549,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     self.assertEqual(normalized.checkpoint_name, expected_checkpoint)
                     self.assertEqual(normalized.text_encoder_name, expected_text_encoder)
                     self.assertEqual(normalized.vae_name, expected_vae)
+                    if profile_id == "flux":
+                        self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
                     if profile_id in {"ernie_image", "ernie_image_turbo"}:
                         self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
                     if profile_id == "qwen_image":
@@ -522,6 +558,40 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                             normalized.template_lora_name,
                             "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
                         )
+
+    def test_normalize_txt2img_request_accepts_template_lora_override_for_qwen_image(self) -> None:
+        mocked_inventory = mock.Mock(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["qwen\\qwen_image_2512_fp8_e4m3fn.safetensors"],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[
+                "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                "Qwen-image\\My-Custom-Qwen-Image-LoRA.safetensors",
+            ],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            controlnet=[],
+        )
+
+        with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=mocked_inventory):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "matrix smoke",
+                    "profile": "qwen_image",
+                    "checkpoint_name": "qwen/qwen_image_2512_fp8_e4m3fn.safetensors",
+                    "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                    "vae_name": "qwen_image_vae.safetensors",
+                    "template_lora_name": "Qwen-image/My-Custom-Qwen-Image-LoRA.safetensors",
+                }
+            )
+
+        self.assertEqual(
+            normalized.template_lora_name,
+            "Qwen-image\\My-Custom-Qwen-Image-LoRA.safetensors",
+        )
 
     def test_translate_txt2img_request_chains_inline_and_selected_loras(self) -> None:
         normalized = normalize_txt2img_request(
@@ -709,7 +779,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 diffusion_models=["flux\\flux1-dev.safetensors"],
                 vae=["flux_vae.safetensors"],
                 text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors", "flux_text_encoder.safetensors"],
-                loras=[],
+                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="flux_vae.safetensors",
                 default_text_encoder="clip_l.safetensors",
@@ -728,6 +798,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.primary_model_category, "diffusion_models")
         self.assertEqual(request.vae_name, "flux_vae.safetensors")
         self.assertEqual(request.text_encoder_name, "clip_l.safetensors|t5xxl_fp16.safetensors")
+        self.assertEqual(request.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
 
     def test_translate_txt2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
         with mock.patch(
@@ -738,7 +809,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 diffusion_models=["flux\\flux1-dev.safetensors"],
                 vae=["flux_vae.safetensors"],
                 text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
-                loras=[],
+                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="flux_vae.safetensors",
                 default_text_encoder="clip_l.safetensors",
@@ -759,6 +830,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("UNETLoader", class_types)
         self.assertIn("DualCLIPLoader", class_types)
         self.assertIn("VAELoader", class_types)
+        self.assertIn("LoraLoaderModelOnly", class_types)
         self.assertIn("CLIPTextEncode", class_types)
         self.assertIn("ConditioningZeroOut", class_types)
         self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)

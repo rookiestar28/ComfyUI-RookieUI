@@ -206,6 +206,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const diffusionModelOptions = [
     "flux1-dev.safetensors",
     "qwen_image_2512_fp8_e4m3fn.safetensors",
+    "qwen_image_edit_fp8_e4m3fn.safetensors",
     "flux-2-klein-4b.safetensors",
     "flux-2-klein-base-4b.safetensors",
     "flux-2-klein-9b-fp8.safetensors",
@@ -295,7 +296,13 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
 
   await page.locator("#rookieui-txt2img-preview-img2img").click();
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
-  for (const row of clipSkipPresetMatrix) {
+  const img2imgPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(img2imgPresetValues).toEqual(["sd15", "sdxl", "pony", "illustrious", "noob"]);
+  for (const row of clipSkipPresetMatrix.filter((entry) =>
+    ["sd15", "sdxl", "pony", "illustrious", "noob"].includes(entry.id),
+  )) {
     await page.locator("#rookieui-img2img-preset").selectOption(row.id);
     await expect(page.locator("#rookieui-img2img-clip-skip")).toBeEnabled();
     await expect(page.locator("#rookieui-img2img-clip-skip-slider")).toBeEnabled();
@@ -622,11 +629,30 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const img2imgModes = await page.locator("#rookieui-img2img-mode option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
-  expect(img2imgModes).toEqual(["img2img", "sketch", "inpaint", "inpaint_sketch", "inpaint_upload", "batch"]);
-  await page.locator("#rookieui-img2img-mode").selectOption("batch");
+  expect(img2imgModes).toEqual(["img2img", "edit", "sketch", "inpaint", "inpaint_sketch", "inpaint_upload", "batch"]);
+  await page.locator("#rookieui-img2img-generation-mode-batch").click();
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("batch");
   await expect(page.locator("#rookieui-img2img-batch-pane")).toBeVisible();
-  await page.locator("#rookieui-img2img-mode").selectOption("img2img");
-  await page.locator("#rookieui-img2img-mode").selectOption("inpaint");
+  await page.locator("#rookieui-img2img-generation-mode-edit").click();
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("edit");
+  await expect.poll(async () => page.locator("#rookieui-img2img-mask-editor").evaluate((node) => node.hidden)).toBe(true);
+  await expect.poll(async () => page.locator("#rookieui-img2img-mask-dropzone").evaluate((node) => node.hidden)).toBe(true);
+  await expect(page.locator("#rookieui-mask-asset")).toBeDisabled();
+  await expect(page.locator("#rookieui-img2img-mask-file")).toBeDisabled();
+  await expect(page.locator("#rookieui-img2img-mode-note")).toContainText("official edit models do not use mask input");
+  const editPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(editPresetValues).toEqual(["qwen_image_edit"]);
+  await expect(page.locator("#rookieui-img2img-edit-megapixels")).toBeEnabled();
+  await expect(page.locator("#rookieui-img2img-width")).toBeDisabled();
+  await expect(page.locator("#rookieui-denoise-strength")).toBeDisabled();
+  await page.locator("#rookieui-img2img-generation-mode-img2img").click();
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
+  await expect.poll(async () => page.locator("#rookieui-img2img-mask-editor").evaluate((node) => node.hidden)).toBe(false);
+  await expect.poll(async () => page.locator("#rookieui-img2img-mask-dropzone").evaluate((node) => node.hidden)).toBe(false);
+  await page.locator("#rookieui-img2img-generation-mode-inpaint").click();
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("inpaint");
   await page.locator("#rookieui-image-asset").fill("e2e-source-image");
   await page.locator("#rookieui-mask-asset").fill("e2e-mask-image");
   await expect(page.locator("#rookieui-img2img-generation-section #rookieui-img2img-hires-controls")).toHaveCount(1);

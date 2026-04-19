@@ -7,7 +7,9 @@ from rookieui.contracts.generation import (
 )
 from rookieui.services import parity_matrix
 from rookieui.services.workflow_builders.non_sd_templates import (
+    build_non_sd_edit_workflow,
     build_non_sd_txt2img_workflow,
+    is_official_non_sd_edit_profile,
     is_official_non_sd_txt2img_profile,
 )
 from rookieui.services.workflow_builders.sd_family_graphs import (
@@ -46,6 +48,8 @@ def build_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, objec
 
 def build_img2img_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     # IMPORTANT: keep execution_mode as the graph selector; user-facing mode labels (sketch/inpaint_upload/batch) are normalized upstream.
+    if _should_use_official_non_sd_edit_template(request):
+        return build_non_sd_edit_workflow(request)
     if request.base_family == "sd15":
         return _build_sd15_inpaint_graph(request) if request.execution_mode == "inpaint" else _build_sd15_img2img_graph(request)
     if request.base_family == "sdxl":
@@ -89,7 +93,11 @@ def translate_txt2img_request(request: NormalizedTxt2ImgRequest) -> WorkflowTran
 
 
 def translate_img2img_request(request: NormalizedImg2ImgRequest) -> WorkflowTranslationResult:
-    workflow_kind = f"{request.mode}-{request.base_family}"
+    workflow_kind = (
+        f"edit-{request.profile}"
+        if _should_use_official_non_sd_edit_template(request)
+        else f"{request.mode}-{request.base_family}"
+    )
     if request.hires_enabled:
         workflow_kind = f"{workflow_kind}-hires"
     return _build_translation_result(
@@ -98,3 +106,14 @@ def translate_img2img_request(request: NormalizedImg2ImgRequest) -> WorkflowTran
         profile=request.profile,
         workflow=build_img2img_workflow(request),
     )
+
+
+def _should_use_official_non_sd_edit_template(request: NormalizedImg2ImgRequest) -> bool:
+    if request.execution_mode != "edit":
+        return False
+    if request.primary_model_category != "diffusion_models":
+        return False
+    if not is_official_non_sd_edit_profile(request.profile):
+        return False
+    # IMPORTANT: edit templates currently own only the canonical single-image path; keep adjunct seams on the legacy graph until explicit parity exists.
+    return not (request.hires_enabled or bool(request.controlnet_units) or request.adetailer.enabled)

@@ -864,7 +864,7 @@ export function createImg2ImgMaskCanvasEditor({
     const rawMode = String(modeValue ?? "").trim().toLowerCase();
     const executionMode =
       typeof resolveExecutionMode === "function" ? String(resolveExecutionMode(rawMode) ?? rawMode) : rawMode;
-    root.hidden = executionMode === "batch" || rawMode === "batch";
+    root.hidden = executionMode === "batch" || executionMode === "edit" || rawMode === "batch";
   };
 
   const refreshFromInputs = async () => {

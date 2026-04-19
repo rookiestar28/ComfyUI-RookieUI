@@ -4,9 +4,10 @@ from collections.abc import Callable
 
 from rookieui.contracts.family_template_manifest import (
     build_non_sd_runtime_adapter_map,
+    list_non_sd_edit_manifest_entries,
     build_non_sd_txt2img_profile_ids,
 )
-from rookieui.contracts.generation import NormalizedTxt2ImgRequest
+from rookieui.contracts.generation import NormalizedImg2ImgRequest, NormalizedTxt2ImgRequest
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
     _build_clip_loader_node,
@@ -26,13 +27,19 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     "请据此扩写为一段内容丰富、细节充分的视觉描述，以帮助文生图模型生成高质量的图片。仅输出增强后的描述，"
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
+_FLUX_TEMPLATE_LORA_NAME = "Flux_2-Turbo-LoRA_comfyui.safetensors"
 _QWEN_TEMPLATE_LORA_NAME = "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"
 _OFFICIAL_NON_SD_TXT2IMG_PROFILES = frozenset(build_non_sd_txt2img_profile_ids())
+_OFFICIAL_NON_SD_EDIT_PROFILES = frozenset(entry.id for entry in list_non_sd_edit_manifest_entries())
 _NON_SD_RUNTIME_ADAPTER_BY_PROFILE = build_non_sd_runtime_adapter_map()
 
 
 def is_official_non_sd_txt2img_profile(profile_id: str) -> bool:
     return str(profile_id or "").strip().lower() in _OFFICIAL_NON_SD_TXT2IMG_PROFILES
+
+
+def is_official_non_sd_edit_profile(profile_id: str) -> bool:
+    return str(profile_id or "").strip().lower() in _OFFICIAL_NON_SD_EDIT_PROFILES
 
 
 def _append_empty_latent_node(
@@ -385,6 +392,82 @@ def _append_switch_node(
     return node_id
 
 
+def _append_asset_image_loader_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    image_asset: str,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "RookieUILoadAssetImage",
+        "inputs": {
+            "asset": image_asset,
+        },
+    }
+    return node_id
+
+
+def _append_image_scale_to_total_pixels_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    image_id: str | list[object],
+    megapixels: float,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ImageScaleToTotalPixels",
+        "inputs": {
+            "upscale_method": "lanczos",
+            "megapixels": megapixels,
+            "resolution_steps": 1,
+            "image": _to_node_ref(image_id),
+        },
+    }
+    return node_id
+
+
+def _append_vae_encode_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    image_id: str | list[object],
+    vae_source: list[object],
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "VAEEncode",
+        "inputs": {
+            "pixels": _to_node_ref(image_id),
+            "vae": vae_source,
+        },
+    }
+    return node_id
+
+
+def _append_qwen_image_edit_encode_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    prompt_text: str,
+    clip_source: list[object],
+    vae_source: list[object],
+    image_id: str | list[object],
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "TextEncodeQwenImageEdit",
+        "inputs": {
+            "prompt": prompt_text,
+            "clip": clip_source,
+            "vae": vae_source,
+            "image": _to_node_ref(image_id),
+        },
+    }
+    return node_id
+
+
 def _build_single_clip_source(
     workflow: dict[str, object],
     *,
@@ -520,6 +603,12 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         raise ValueError("Flux official template requires two ordered text encoders.")
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_lora_loader_model_only_node(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        lora_name=request.template_lora_name or _FLUX_TEMPLATE_LORA_NAME,
+    )
     clip_source = _build_flux_dual_clip_source(
         workflow,
         allocator=allocator,
@@ -552,7 +641,7 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         latent_id=latent_id,
         request=request,
         denoise=1.0,
-        model_source=[unet_id, 0],
+        model_source=model_source,
     )
     decode_id = allocator.next()
     save_id = allocator.next()
@@ -1098,6 +1187,93 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
 }
 
 
+def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    image_id = _append_asset_image_loader_node(
+        workflow,
+        allocator=allocator,
+        image_asset=request.image_asset,
+    )
+    scaled_image_id = _append_image_scale_to_total_pixels_node(
+        workflow,
+        allocator=allocator,
+        image_id=image_id,
+        megapixels=float(request.edit_megapixels or 1.5),
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="qwen_image",
+    )
+    positive_id = _append_qwen_image_edit_encode_node(
+        workflow,
+        allocator=allocator,
+        prompt_text=request.prompt,
+        clip_source=clip_source,
+        vae_source=[vae_id, 0],
+        image_id=scaled_image_id,
+    )
+    negative_id = _append_qwen_image_edit_encode_node(
+        workflow,
+        allocator=allocator,
+        prompt_text=request.negative_prompt,
+        clip_source=clip_source,
+        vae_source=[vae_id, 0],
+        image_id=scaled_image_id,
+    )
+    latent_id = _append_vae_encode_node(
+        workflow,
+        allocator=allocator,
+        image_id=scaled_image_id,
+        vae_source=[vae_id, 0],
+    )
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_lora_loader_model_only_node(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        lora_name=request.template_lora_name,
+    )
+    model_source = _append_model_sampling_node(
+        workflow,
+        allocator=allocator,
+        class_type="ModelSamplingAuraFlow",
+        model_source=model_source,
+        shift=float(request.shift or 0.0),
+    )
+    model_source = _append_cfg_norm_node(
+        workflow,
+        allocator=allocator,
+        model_source=model_source,
+    )
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow,
+        node_id=sampler_id,
+        positive_id=positive_id,
+        negative_id=negative_id,
+        latent_id=latent_id,
+        request=request,
+        denoise=1.0,
+        model_source=model_source,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
 def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     profile_id = str(request.profile or "").strip().lower()
     adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
@@ -1105,3 +1281,11 @@ def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str
     if builder is None:
         raise ValueError(f"Unsupported official non-SD txt2img profile: {request.profile}")
     return builder(request)
+
+
+def build_non_sd_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_id = str(request.profile or "").strip().lower()
+    adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
+    if adapter_id == "qwen_image_edit":
+        return _build_qwen_image_edit_workflow(request)
+    raise ValueError(f"Unsupported official non-SD edit profile: {request.profile}")

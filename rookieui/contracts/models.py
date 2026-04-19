@@ -175,6 +175,7 @@ class PresetDefinition:
     checkpoint_name: str
     vae_name: str
     text_encoder_name: str
+    template_lora_name: str
     width: int
     height: int
     steps: int
@@ -185,6 +186,7 @@ class PresetDefinition:
     shift: float | None = None
     flux_guidance: float | None = None
     prompt_enhancement_enabled: bool = False
+    edit_megapixels: float | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

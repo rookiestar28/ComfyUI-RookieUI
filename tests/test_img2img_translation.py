@@ -30,6 +30,19 @@ class Img2ImgTranslationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self._asset_path_patcher.stop()
 
+    def _build_qwen_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
     def test_normalize_img2img_request_applies_sd15_defaults(self) -> None:
         request = normalize_img2img_request(
             {
@@ -193,6 +206,81 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.mode, "inpaint_upload")
         self.assertEqual(normalized.execution_mode, "inpaint")
 
+    def test_normalize_img2img_request_rejects_non_sd_profile_not_exposed_for_img2img_surface(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not currently exposed on the img2img surface"):
+            normalize_img2img_request(
+                {
+                    "prompt": "portrait cleanup",
+                    "image_asset": "portrait-input",
+                    "profile": "flux",
+                }
+            )
+
+    def test_normalize_img2img_request_accepts_edit_mode_without_mask(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "edit",
+                }
+            )
+
+        self.assertEqual(normalized.mode, "edit")
+        self.assertEqual(normalized.execution_mode, "edit")
+        self.assertEqual(normalized.mask_asset, "")
+        self.assertEqual(normalized.profile, "qwen_image_edit")
+        self.assertEqual(
+            normalized.template_lora_name,
+            "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        )
+
+    def test_normalize_img2img_request_accepts_template_lora_override_for_qwen_edit(self) -> None:
+        inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[
+                "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                "Qwen-Image\\My-Custom-Qwen-Edit-LoRA.safetensors",
+            ],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "edit",
+                    "template_lora_name": "Qwen-Image/My-Custom-Qwen-Edit-LoRA.safetensors",
+                }
+            )
+
+        self.assertEqual(
+            normalized.template_lora_name,
+            "Qwen-Image\\My-Custom-Qwen-Edit-LoRA.safetensors",
+        )
+
+    def test_normalize_img2img_request_rejects_edit_profile_on_legacy_img2img_surface(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not currently exposed on the img2img surface"):
+            normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "img2img",
+                }
+            )
+
     def test_normalize_img2img_request_exposes_prompt_semantics_and_warning_codes(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -332,46 +420,6 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertFalse(normalized.adetailer.units[0].use_checkpoint)
         self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "Use same checkpoint")
 
-    def test_normalize_img2img_request_accepts_adetailer_diffusion_family_checkpoint_override(self) -> None:
-        fake_inventory = ModelInventorySnapshot(
-            source="host",
-            checkpoints=["SDXL\\realvisxl.safetensors"],
-            diffusion_models=["flux\\flux1-dev.safetensors", "lumina\\lumina2.safetensors"],
-            vae=["flux_vae.safetensors"],
-            text_encoders=["t5xxl.safetensors"],
-            controlnet=[],
-            default_checkpoint="SDXL\\realvisxl.safetensors",
-            default_vae="flux_vae.safetensors",
-            default_text_encoder="t5xxl.safetensors",
-        )
-
-        with (
-            mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=fake_inventory),
-            mock.patch("rookieui.services.adetailer.discover_model_inventory", return_value=fake_inventory),
-        ):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "flux",
-                    "checkpoint_name": "flux\\flux1-dev.safetensors",
-                    "adetailer": {
-                        "enabled": True,
-                        "units": [
-                            {
-                                "enabled": True,
-                                "detector": "face_yolov8n.pt",
-                                "use_checkpoint": True,
-                                "checkpoint_name": "flux\\flux1-dev.safetensors",
-                            }
-                        ],
-                    },
-                }
-            )
-
-        self.assertTrue(normalized.adetailer.units[0].use_checkpoint)
-        self.assertEqual(normalized.adetailer.units[0].checkpoint_name, "flux\\flux1-dev.safetensors")
-
     def test_normalize_img2img_request_uses_batch_image_as_source_fallback(self) -> None:
         with mock.patch(
             "rookieui.services.img2img.store_uploaded_image",
@@ -436,205 +484,6 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(normalized.text_encoder_name, "")
 
-    def test_normalize_img2img_request_keeps_text_encoder_for_qwen_profile(self) -> None:
-        normalized = normalize_img2img_request(
-            {
-                "prompt": "portrait cleanup",
-                "image_asset": "portrait-input",
-                "profile": "qwen_image",
-                "text_encoder_name": "clip_g.safetensors",
-            }
-        )
-
-        self.assertEqual(normalized.text_encoder_name, "clip_g.safetensors")
-
-    def test_normalize_img2img_request_uses_profile_aware_text_encoder_default_for_zit(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["lumina2.safetensors", "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors"],
-                vae=["qwen_image_vae.safetensors", "lumina_vae.safetensors"],
-                text_encoders=["QwenImageTEModel_.safetensors", "LuminaTEModel.safetensors"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="qwen_image_vae.safetensors",
-                default_text_encoder="QwenImageTEModel_.safetensors",
-                controlnet=[],
-            ),
-        ):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "zit",
-                    "checkpoint_name": "ZIT\\zImageTurboNSFW_21BF16AIO.safetensors",
-                    "text_encoder_name": "",
-                    "vae_name": "",
-                }
-            )
-
-        self.assertEqual(normalized.text_encoder_name, "LuminaTEModel.safetensors")
-        self.assertEqual(normalized.vae_name, "lumina_vae.safetensors")
-
-    def test_normalize_img2img_request_uses_profile_aware_text_encoder_default_for_ernie_image(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["ernie\\ernie-image.safetensors"],
-                vae=["flux2-vae.safetensors", "ernie_vae.safetensors"],
-                text_encoders=[
-                    "Ministral3_3B_fp16.safetensors",
-                    "ernie-image-prompt-enhancer.safetensors",
-                    "QwenImageTEModel_.safetensors",
-                ],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="qwen_image_vae.safetensors",
-                default_text_encoder="QwenImageTEModel_.safetensors",
-                controlnet=[],
-            ),
-        ):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "ernie_image",
-                    "checkpoint_name": "ernie/ernie-image.safetensors",
-                    "text_encoder_name": "",
-                    "vae_name": "",
-                }
-            )
-
-        self.assertEqual(normalized.text_encoder_name, "Ministral3_3B_fp16.safetensors")
-        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
-        self.assertEqual(normalized.vae_name, "flux2-vae.safetensors")
-
-    def test_normalize_img2img_request_uses_profile_aware_selectors_for_official_non_sd_templates(
-        self,
-    ) -> None:
-        mocked_inventory = mock.Mock(
-            source="host",
-            checkpoints=["SDXL\\realvisxl.safetensors"],
-            diffusion_models=[
-                "flux\\flux1-dev.safetensors",
-                "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
-                "klein\\flux-2-klein-4b.safetensors",
-                "klein\\flux-2-klein-base-4b.safetensors",
-                "klein\\flux-2-klein-9b-fp8.safetensors",
-                "klein\\flux-2-klein-base-9b-fp8.safetensors",
-                "anima\\anima-preview3-base.safetensors",
-                "chroma\\Chroma1-HD-fp8mixed.safetensors",
-                "ernie\\ernie-image.safetensors",
-                "ernie\\ernie-image-turbo.safetensors",
-                "hidream\\hidream_i1_dev_fp8.safetensors",
-                "hidream\\hidream_i1_fast_fp8.safetensors",
-                "hidream\\hidream_i1_full_fp8.safetensors",
-                "longcat\\longcat_image_bf16.safetensors",
-                "zimage\\z_image_bf16.safetensors",
-                "zimage\\z_image_turbo_bf16.safetensors",
-            ],
-            vae=[
-                "qwen_image_vae.safetensors",
-                "ae.safetensors",
-                "flux2-vae.safetensors",
-                "full_encoder_small_decoder.safetensors",
-            ],
-            text_encoders=[
-                "clip_l.safetensors",
-                "clip_l_hidream.safetensors",
-                "clip_g_hidream.safetensors",
-                "ernie-image-prompt-enhancer.safetensors",
-                "llama_3.1_8b_instruct_fp8_scaled.safetensors",
-                "ministral-3-3b.safetensors",
-                "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-                "qwen_3_06b_base.safetensors",
-                "qwen_3_4b.safetensors",
-                "qwen_3_8b_fp8mixed.safetensors",
-                "t5xxl_fp16.safetensors",
-                "t5xxl_fp8_e4m3fn_scaled.safetensors",
-            ],
-            loras=["Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"],
-            default_checkpoint="SDXL\\realvisxl.safetensors",
-            default_vae="qwen_image_vae.safetensors",
-            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
-            controlnet=[],
-        )
-        expectations = {
-            "flux": ("flux\\flux1-dev.safetensors", "clip_l.safetensors|t5xxl_fp16.safetensors", "ae.safetensors"),
-            "qwen_image": (
-                "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
-                "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-                "qwen_image_vae.safetensors",
-            ),
-            "klein_4b_distilled": ("klein\\flux-2-klein-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
-            "klein_4b": ("klein\\flux-2-klein-base-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
-            "klein_9b_distilled": (
-                "klein\\flux-2-klein-9b-fp8.safetensors",
-                "qwen_3_8b_fp8mixed.safetensors",
-                "full_encoder_small_decoder.safetensors",
-            ),
-            "klein_9b": (
-                "klein\\flux-2-klein-base-9b-fp8.safetensors",
-                "qwen_3_8b_fp8mixed.safetensors",
-                "full_encoder_small_decoder.safetensors",
-            ),
-            "anima": ("anima\\anima-preview3-base.safetensors", "qwen_3_06b_base.safetensors", "qwen_image_vae.safetensors"),
-            "chroma": ("chroma\\Chroma1-HD-fp8mixed.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors", "ae.safetensors"),
-            "ernie_image": ("ernie\\ernie-image.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
-            "ernie_image_turbo": ("ernie\\ernie-image-turbo.safetensors", "ministral-3-3b.safetensors", "flux2-vae.safetensors"),
-            "hidream_i1_dev_fp8": (
-                "hidream\\hidream_i1_dev_fp8.safetensors",
-                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
-                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
-                "ae.safetensors",
-            ),
-            "hidream_i1_fast": (
-                "hidream\\hidream_i1_fast_fp8.safetensors",
-                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
-                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
-                "ae.safetensors",
-            ),
-            "hidream_i1_full": (
-                "hidream\\hidream_i1_full_fp8.safetensors",
-                "clip_l_hidream.safetensors|clip_g_hidream.safetensors|"
-                "t5xxl_fp8_e4m3fn_scaled.safetensors|llama_3.1_8b_instruct_fp8_scaled.safetensors",
-                "ae.safetensors",
-            ),
-            "longcat_image": ("longcat\\longcat_image_bf16.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "ae.safetensors"),
-            "z_image": ("zimage\\z_image_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
-            "z_image_turbo": ("zimage\\z_image_turbo_bf16.safetensors", "qwen_3_4b.safetensors", "ae.safetensors"),
-        }
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mocked_inventory,
-        ):
-            for profile_id, (expected_checkpoint, expected_text_encoder, expected_vae) in expectations.items():
-                with self.subTest(profile_id=profile_id):
-                    normalized = normalize_img2img_request(
-                        {
-                            "prompt": "matrix smoke",
-                            "image_asset": "portrait-input",
-                            "profile": profile_id,
-                            "checkpoint_name": expected_checkpoint,
-                            "text_encoder_name": "",
-                            "vae_name": "",
-                        }
-                    )
-                    self.assertEqual(normalized.checkpoint_name, expected_checkpoint)
-                    self.assertEqual(normalized.text_encoder_name, expected_text_encoder)
-                    self.assertEqual(normalized.vae_name, expected_vae)
-                    if profile_id in {"ernie_image", "ernie_image_turbo"}:
-                        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
-                    if profile_id == "qwen_image":
-                        self.assertEqual(
-                            normalized.template_lora_name,
-                            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
-                        )
-
     def test_normalize_img2img_request_resolves_host_checkpoint_selector(self) -> None:
         with mock.patch(
             "rookieui.services.img2img.discover_model_inventory",
@@ -658,169 +507,6 @@ class Img2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(request.checkpoint_name, "SD15\\beautifulRealistic_v40.safetensors")
-
-    def test_normalize_img2img_request_resolves_profile_mapped_diffusion_model_selector(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["flux\\flux1-dev.safetensors"],
-                vae=["flux_vae.safetensors"],
-                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors", "flux_text_encoder.safetensors"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="flux_vae.safetensors",
-                default_text_encoder="clip_l.safetensors",
-                controlnet=[],
-            ),
-        ):
-            request = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "flux",
-                    "checkpoint_name": "flux/flux1-dev.safetensors",
-                }
-            )
-
-        self.assertEqual(request.checkpoint_name, "flux\\flux1-dev.safetensors")
-        self.assertEqual(request.primary_model_category, "diffusion_models")
-        self.assertEqual(request.vae_name, "flux_vae.safetensors")
-        self.assertEqual(request.text_encoder_name, "clip_l.safetensors|t5xxl_fp16.safetensors")
-
-    def test_normalize_img2img_request_requires_family_specific_text_encoder_for_diffusion_model_category(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["flux\\flux1-dev.safetensors"],
-                vae=["flux_vae.safetensors"],
-                text_encoders=["Automatic"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="flux_vae.safetensors",
-                default_text_encoder="Automatic",
-                controlnet=[],
-            ),
-        ):
-            with self.assertRaisesRegex(
-                ValueError,
-                "text_encoder_name requires a family-specific host selector",
-            ):
-                normalize_img2img_request(
-                    {
-                        "prompt": "portrait cleanup",
-                        "image_asset": "portrait-input",
-                        "profile": "flux",
-                        "checkpoint_name": "flux/flux1-dev.safetensors",
-                        "text_encoder_name": "Automatic",
-                        "vae_name": "flux_vae.safetensors",
-                    }
-                )
-
-    def test_normalize_img2img_request_requires_family_specific_vae_for_diffusion_model_category(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["flux\\flux1-dev.safetensors"],
-                vae=["Automatic"],
-                text_encoders=["clip_l.safetensors"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="Automatic",
-                default_text_encoder="clip_l.safetensors",
-                controlnet=[],
-            ),
-        ):
-            with self.assertRaisesRegex(
-                ValueError,
-                "vae_name requires a family-specific host selector",
-            ):
-                normalize_img2img_request(
-                    {
-                        "prompt": "portrait cleanup",
-                        "image_asset": "portrait-input",
-                        "profile": "flux",
-                        "checkpoint_name": "flux/flux1-dev.safetensors",
-                        "text_encoder_name": "clip_l.safetensors",
-                        "vae_name": "Automatic",
-                    }
-                )
-
-    def test_translate_img2img_request_uses_unet_loader_for_diffusion_model_category(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["flux\\flux1-dev.safetensors"],
-                vae=["flux_vae.safetensors"],
-                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="flux_vae.safetensors",
-                default_text_encoder="clip_l.safetensors",
-                controlnet=[],
-            ),
-        ):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "flux",
-                    "checkpoint_name": "flux/flux1-dev.safetensors",
-                    "vae_name": "flux_vae.safetensors",
-                }
-            )
-
-        result = translate_img2img_request(normalized).to_payload()
-        class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("UNETLoader", class_types)
-        self.assertIn("DualCLIPLoader", class_types)
-        self.assertIn("VAELoader", class_types)
-        self.assertIn("CLIPTextEncodeSDXL", class_types)
-        self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)
-        self.assertNotIn("CheckpointLoaderSimple", class_types)
-
-    def test_translate_img2img_request_uses_single_clip_loader_for_ernie_image(self) -> None:
-        with mock.patch(
-            "rookieui.services.img2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["ernie\\ernie-image.safetensors"],
-                vae=["flux2-vae.safetensors"],
-                text_encoders=["Ministral3_3B_fp16.safetensors", "ernie-image-prompt-enhancer.safetensors"],
-                loras=[],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="flux2-vae.safetensors",
-                default_text_encoder="Ministral3_3B_fp16.safetensors",
-                controlnet=[],
-            ),
-        ):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "portrait cleanup",
-                    "image_asset": "portrait-input",
-                    "profile": "ernie_image",
-                    "checkpoint_name": "ernie/ernie-image.safetensors",
-                    "text_encoder_name": "Ministral3_3B_fp16.safetensors",
-                    "vae_name": "flux2-vae.safetensors",
-                }
-            )
-
-        result = translate_img2img_request(normalized).to_payload()
-        class_types = {node["class_type"] for node in result["workflow"].values()}
-        self.assertIn("UNETLoader", class_types)
-        self.assertIn("CLIPLoader", class_types)
-        self.assertIn("VAELoader", class_types)
-        self.assertIn("CLIPTextEncode", class_types)
-        self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
-        self.assertNotIn("CLIPTextEncodeSDXL", class_types)
 
     def test_translate_img2img_request_builds_sd15_inpaint_workflow(self) -> None:
         normalized = normalize_img2img_request(
@@ -917,6 +603,32 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(len(sampler_nodes), 1)
         self.assertEqual(sampler_nodes[0]["inputs"]["denoise"], 0.75)
         self.assertEqual(sampler_nodes[0]["inputs"]["seed"], result["normalized_request"]["execution_seed"])
+
+    def test_translate_img2img_request_builds_qwen_image_edit_workflow(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "edit",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+
+        self.assertEqual(result["workflow_kind"], "edit-qwen_image_edit")
+        self.assertIn("ImageScaleToTotalPixels", class_types)
+        self.assertIn("TextEncodeQwenImageEdit", class_types)
+        self.assertIn("LoraLoaderModelOnly", class_types)
+        self.assertIn("ModelSamplingAuraFlow", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertEqual(
+            len([node for node in result["workflow"].values() if node["class_type"] == "TextEncodeQwenImageEdit"]),
+            2,
+        )
 
     def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
         normalized = normalize_img2img_request(
@@ -1163,6 +875,42 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(response["status"], 400)
         self.assertEqual(response["payload"]["status"], "invalid-request")
+
+    def test_img2img_route_rejects_non_sd_profile_hidden_from_img2img_surface(self) -> None:
+        response = asyncio.run(
+            routes.img2img(
+                _FakeJsonRequest(
+                    {
+                        "prompt": "forest shrine variation",
+                        "image_asset": "img-source",
+                        "profile": "flux",
+                    }
+                )
+            )
+        )
+
+        self.assertEqual(response["status"], 400)
+        self.assertEqual(response["payload"]["status"], "invalid-request")
+        self.assertIn("not currently exposed on the img2img surface", response["payload"]["detail"])
+
+    def test_img2img_route_accepts_edit_mode_without_mask(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            response = asyncio.run(
+                routes.img2img(
+                    _FakeJsonRequest(
+                        {
+                            "prompt": "refresh the storefront signage",
+                            "image_asset": "img-source",
+                            "profile": "qwen_image_edit",
+                            "mode": "edit",
+                            "dry_run": True,
+                        }
+                    )
+                )
+            )
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["workflow_kind"], "edit-qwen_image_edit")
 
     def test_img2img_route_rejects_unknown_asset_handle(self) -> None:
         with mock.patch(

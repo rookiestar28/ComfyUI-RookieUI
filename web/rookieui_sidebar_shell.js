@@ -345,11 +345,19 @@ function buildProfileLookup(capabilities) {
       default_flux_guidance: entry.default_flux_guidance ?? null,
       prompt_enhancement_visible: Boolean(entry.prompt_enhancement_visible),
       default_prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
+      edit_megapixels_visible: Boolean(entry.edit_megapixels_visible),
+      default_edit_megapixels: entry.default_edit_megapixels ?? null,
+      template_lora_visible: Boolean(entry.template_lora_visible),
+      template_lora_override_allowed: Boolean(entry.template_lora_override_allowed),
+      official_template_lora_label: entry.official_template_lora_label || "",
       primary_model_category: entry.primary_model_category || "",
       support_tier: entry.support_tier || "",
       experimental: Boolean(entry.experimental),
       compatibility_summary: entry.compatibility_summary || "",
       aliases: Array.isArray(entry.aliases) ? entry.aliases : [],
+      available_surface_flows: Array.isArray(entry.available_surface_flows)
+        ? entry.available_surface_flows.map((flow) => String(flow ?? "").trim().toLowerCase()).filter(Boolean)
+        : ["txt2img", "img2img"],
     };
     lookup.set(entry.id, merged);
     const aliases = Array.isArray(entry.aliases) ? entry.aliases : [];
@@ -541,12 +549,14 @@ function updateFormFromPreset(presetLookup, presetId, elements, profileLookup, m
   }
   setElementValue(elements.vae, preset.vae_name);
   setElementValue(elements.textEncoder, preset.text_encoder_name);
+  setElementValue(elements.templateLoraName, preset.template_lora_name ?? "");
   setElementValue(elements.width, preset.width);
   setElementValue(elements.height, preset.height);
   setElementValue(elements.steps, preset.steps);
   setElementValue(elements.cfgScale, preset.cfg_scale);
   setElementValue(elements.shift, preset.shift ?? "");
   setElementValue(elements.fluxGuidance, preset.flux_guidance ?? "");
+  setElementValue(elements.editMegapixels, preset.edit_megapixels ?? "");
   setElementValue(elements.sampler, preset.sampler_name);
   setElementValue(elements.scheduler, preset.scheduler_name);
   setElementValue(elements.clipSkip, preset.clip_skip);
@@ -569,6 +579,7 @@ function updateFormFromProfile(profileLookup, profileId, elements) {
   setElementValue(elements.cfgScale, profile.default_cfg_scale);
   setElementValue(elements.shift, profile.default_shift ?? "");
   setElementValue(elements.fluxGuidance, profile.default_flux_guidance ?? "");
+  setElementValue(elements.editMegapixels, profile.default_edit_megapixels ?? "");
   setElementValue(elements.sampler, profile.default_sampler);
   setElementValue(elements.scheduler, profile.default_scheduler);
   setElementValue(elements.clipSkip, profile.default_clip_skip);
@@ -650,6 +661,11 @@ function syncFamilyAwareAdvancedParameterFields(profileLookup, profileId, contro
     controls.promptEnhancementInput,
     Boolean(profile?.prompt_enhancement_visible),
   );
+  setVisibility(
+    controls.editMegapixelsField,
+    controls.editMegapixelsInput,
+    Boolean(profile?.edit_megapixels_visible),
+  );
 }
 
 function readOptionalNumericControl(input) {
@@ -666,12 +682,14 @@ function readTxt2ImgPayload(elements) {
     checkpoint_name: elements.checkpoint.value,
     vae_name: elements.vae.value,
     text_encoder_name: elements.textEncoder.value,
+    template_lora_name: elements.templateLoraName?.value ?? "",
     width: Number(elements.width.value),
     height: Number(elements.height.value),
     steps: Number(elements.steps.value),
     cfg_scale: Number(elements.cfgScale.value),
     shift: elements.shift ? readOptionalNumericControl(elements.shift) : null,
     flux_guidance: elements.fluxGuidance ? readOptionalNumericControl(elements.fluxGuidance) : null,
+    edit_megapixels: elements.editMegapixels ? readOptionalNumericControl(elements.editMegapixels) : null,
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
     prompt_enhancement_enabled: elements.promptEnhancementEnabled?.checked ?? false,
@@ -736,6 +754,7 @@ function readImg2ImgPayload(elements) {
     checkpoint_name: elements.checkpoint.value,
     vae_name: elements.vae.value,
     text_encoder_name: elements.textEncoder.value,
+    template_lora_name: elements.templateLoraName?.value ?? "",
     image_asset: elements.imageAsset.value,
     image_data: elements.imageData.value,
     mask_asset: elements.maskAsset.value,
@@ -786,6 +805,7 @@ function readImg2ImgPayload(elements) {
 // IMPORTANT: keep A1111-facing mode labels separate from execution mode; sketch/inpaint-upload/batch still route through normalized backend graph lanes.
 const IMG2IMG_EXECUTION_MODE_MAP = Object.freeze({
   img2img: "img2img",
+  edit: "edit",
   sketch: "img2img",
   inpaint: "inpaint",
   inpaint_sketch: "inpaint",
@@ -816,11 +836,13 @@ function isImg2ImgBatchMode(modeValue) {
 }
 
 function syncMaskField(modeInput, maskField, inpaintControls = [], options = {}) {
-  const inpaintEnabled = resolveImg2ImgExecutionMode(modeInput.value) === "inpaint";
+  const executionMode = resolveImg2ImgExecutionMode(modeInput.value);
+  const inpaintEnabled = executionMode === "inpaint";
+  const editEnabled = executionMode === "edit";
   const batchMode = isImg2ImgBatchMode(modeInput.value);
   // IMPORTANT: keep mask asset input/upload interactive in every Img2Img mode; users often preload masks before switching to an inpaint execution mode.
-  maskField.disabled = false;
-  maskField.placeholder = inpaintEnabled ? "required for inpaint" : "optional";
+  maskField.disabled = editEnabled;
+  maskField.placeholder = inpaintEnabled ? "required for inpaint" : editEnabled ? "not used by edit models" : "optional";
   inpaintControls.forEach((control) => {
     if (!control) {
       return;
@@ -828,10 +850,10 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
     control.disabled = !inpaintEnabled;
   });
   if (options.maskDropzone) {
-    options.maskDropzone.hidden = false;
+    options.maskDropzone.hidden = editEnabled;
   }
   if (options.maskFileInput) {
-    options.maskFileInput.disabled = false;
+    options.maskFileInput.disabled = editEnabled;
   }
   if (options.batchPane) {
     options.batchPane.hidden = !batchMode;
@@ -845,6 +867,10 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
   if (options.modeHintNode) {
     if (batchMode) {
       options.modeHintNode.textContent = "Batch mode: upload multiple source files below (first file drives current workflow preview).";
+      return;
+    }
+    if (editEnabled) {
+      options.modeHintNode.textContent = "Edit mode: source image required; official edit models do not use mask input.";
       return;
     }
     if (inpaintEnabled) {

@@ -1,5 +1,6 @@
 export const IMG2IMG_GENERATION_MODE_DEFINITIONS = Object.freeze([
   Object.freeze({ id: "img2img", label: "img2img" }),
+  Object.freeze({ id: "edit", label: "Edit" }),
   Object.freeze({ id: "sketch", label: "Sketch" }),
   Object.freeze({ id: "inpaint", label: "Inpaint" }),
   Object.freeze({ id: "inpaint_sketch", label: "Inpaint sketch" }),

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
-from rookieui.contracts.model_family_registry import get_model_family_registry_entry
+from rookieui.contracts.model_family_registry import (
+    get_model_family_registry_entry,
+    model_family_supports_surface_flow,
+)
 from rookieui.contracts.aliases import (
     DEFAULT_INPAINT_AREA as _DEFAULT_INPAINT_AREA,
     DEFAULT_MASKED_CONTENT as _DEFAULT_INPAINT_CONTENT,
@@ -55,6 +58,7 @@ from rookieui.services.txt2img import (
     _coerce_prompt_enhancement_enabled,
     _coerce_steps,
     _resolve_diffusion_text_encoder_selector,
+    _resolve_template_lora_selector,
 )
 
 _MIN_DENOISE = 0.0
@@ -73,9 +77,12 @@ _MIN_SHIFT = 0.0
 _MAX_SHIFT = 20.0
 _MIN_FLUX_GUIDANCE = 0.0
 _MAX_FLUX_GUIDANCE = 20.0
+_MIN_EDIT_MEGAPIXELS = 0.25
+_MAX_EDIT_MEGAPIXELS = 8.0
 
 _IMG2IMG_MODE_ALIASES = {
     "img2img": "img2img",
+    "edit": "edit",
     "sketch": "img2img",
     "inpaint": "inpaint",
     "inpaint_sketch": "inpaint",
@@ -192,6 +199,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     execution_mode = _IMG2IMG_MODE_ALIASES.get(mode)
     if execution_mode is None:
         raise ValueError("mode is unsupported.")
+    requested_surface_flow = "edit" if execution_mode == "edit" else "img2img"
+    if not model_family_supports_surface_flow(profile.id, requested_surface_flow):
+        raise ValueError(f"profile '{profile.id}' is not currently exposed on the {requested_surface_flow} surface.")
     batch_images = _coerce_batch_images(request.batch_images)
     batch_image_seed = batch_images[0] if mode == "batch" and batch_images else ""
 
@@ -265,6 +275,14 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         field_name="flux_guidance",
         minimum=_MIN_FLUX_GUIDANCE,
         maximum=_MAX_FLUX_GUIDANCE,
+    )
+    edit_megapixels = _coerce_optional_profile_float(
+        request.edit_megapixels,
+        profile_entry.default_edit_megapixels,
+        applied_defaults,
+        field_name="edit_megapixels",
+        minimum=_MIN_EDIT_MEGAPIXELS,
+        maximum=_MAX_EDIT_MEGAPIXELS,
     )
 
     sampler_input = normalize_option_label(request.sampler_name, "sampler_name")
@@ -422,7 +440,12 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     )
     text_encoder_default = resolve_text_encoder_selector_context(profile.id, inventory)
     aux_text_encoder_name = resolve_aux_text_encoder_selector_context(profile.id, inventory)
-    template_lora_name = resolve_template_lora_selector_context(profile.id, inventory)
+    template_lora_name = _resolve_template_lora_selector(
+        request.template_lora_name,
+        profile_id=profile.id,
+        inventory_selectors=inventory.loras,
+        strict_match=inventory_is_host,
+    ) or resolve_template_lora_selector_context(profile.id, inventory)
     text_encoder_name = resolve_inventory_selector(
         raw_text_encoder_selector,
         "text_encoder_name",
@@ -456,6 +479,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
             )
         if profile.id == "qwen_image" and not template_lora_name:
             raise ValueError("template_lora_name requires the official Qwen-Image template LoRA in host inventory.")
+        if profile.id == "qwen_image_edit" and not template_lora_name:
+            raise ValueError("template_lora_name requires the official Qwen-Image Edit template LoRA in host inventory.")
 
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)
@@ -494,6 +519,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         cfg_scale=cfg_scale,
         shift=shift,
         flux_guidance=flux_guidance,
+        edit_megapixels=edit_megapixels,
         sampler_name=sampler_name,
         scheduler_name=scheduler_name,
         prompt_enhancement_enabled=prompt_enhancement_enabled,

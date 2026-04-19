@@ -133,7 +133,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             (
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,klein_4b_distilled,klein_4b,"
                 "klein_9b_distilled,klein_9b,hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
-                "longcat_image,qwen_image,z_image,z_image_turbo"
+                "longcat_image,qwen_image,z_image,z_image_turbo,qwen_image_edit"
             ),
         )
 
@@ -446,6 +446,62 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         self.assertEqual(payload["vae_name"], "flux2-vae.safetensors")
         self.assertTrue(payload["prompt_enhancement_enabled"])
 
+    def test_build_edit_payload_resolves_profile_aware_qwen_edit_selectors_from_models_payload(self) -> None:
+        payload = live_smoke._build_edit_payload(
+            "qwen_image_edit",
+            {
+                "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                "vae_name": "Automatic",
+                "text_encoder_name": "",
+                "edit_megapixels": 1.5,
+            },
+            "client-edit",
+            models_payload={
+                "source": "host",
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+                "vae": ["qwen_image_vae.safetensors"],
+                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+                "default_checkpoint": "realvisxl.safetensors",
+                "default_vae": "qwen_image_vae.safetensors",
+                "default_text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            },
+        )
+
+        self.assertEqual(payload["mode"], "edit")
+        self.assertEqual(payload["text_encoder_name"], "qwen_2.5_vl_7b_fp8_scaled.safetensors")
+        self.assertEqual(payload["vae_name"], "qwen_image_vae.safetensors")
+        self.assertEqual(payload["edit_megapixels"], 1.5)
+        self.assertTrue(str(payload["image_data"]).startswith("data:image/png;base64,"))
+
+    def test_build_txt2img_payload_resolves_profile_aware_flux_template_lora(self) -> None:
+        payload = live_smoke._build_txt2img_payload(
+            "flux",
+            {
+                "checkpoint_name": "Flux\\flux1-dev.safetensors",
+                "vae_name": "Automatic",
+                "text_encoder_name": "",
+                "template_lora_name": "",
+            },
+            "client-flux",
+            models_payload={
+                "source": "host",
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["Flux\\flux1-dev.safetensors"],
+                "vae": ["ae.safetensors"],
+                "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors"],
+                "loras": ["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
+                "default_checkpoint": "realvisxl.safetensors",
+                "default_vae": "ae.safetensors",
+                "default_text_encoder": "clip_l.safetensors",
+            },
+        )
+
+        self.assertEqual(payload["text_encoder_name"], "")
+        self.assertEqual(payload["vae_name"], "ae.safetensors")
+        self.assertEqual(payload["template_lora_name"], "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+
     def test_validate_catalog_contract_accepts_ernie_image_with_blank_text_encoder_selector(self) -> None:
         errors, presets_by_id = live_smoke._validate_catalog_contract(
             {
@@ -561,6 +617,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                 "diffusion_models": ["Flux\\flux1-dev.safetensors"],
                 "vae": ["ae.safetensors"],
                 "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors"],
+                "loras": ["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
                 "catalog": {"primary_model_category_by_family": {"flux": "diffusion_models"}},
             },
             {
@@ -570,6 +627,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
                         "checkpoint_name": "Flux\\flux1-dev.safetensors",
                         "vae_name": "ae.safetensors",
                         "text_encoder_name": "clip_l.safetensors|t5xxl_fp8_e4m3fn.safetensors",
+                        "template_lora_name": "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
                         "prompt_enhancement_enabled": False,
                     }
                 ]
@@ -578,6 +636,115 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         )
 
         self.assertEqual(errors, [])
+
+    def test_validate_catalog_contract_requires_official_flux_template_lora(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Flux\\flux1-dev.safetensors"],
+                "vae": ["ae.safetensors"],
+                "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn.safetensors"],
+                "loras": ["Flux\\Flux_2-Lightning-4steps.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"flux": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "flux",
+                        "checkpoint_name": "Flux\\flux1-dev.safetensors",
+                        "vae_name": "ae.safetensors",
+                        "text_encoder_name": "clip_l.safetensors|t5xxl_fp8_e4m3fn.safetensors",
+                    }
+                ]
+            },
+            ["flux"],
+        )
+
+        self.assertIn("profile 'flux' host LoRA catalog did not expose the official template-owned LoRA.", errors)
+
+    def test_validate_catalog_contract_accepts_qwen_image_edit_with_official_lora(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+                "vae": ["qwen_image_vae.safetensors"],
+                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"qwen_image_edit": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "qwen_image_edit",
+                        "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                        "vae_name": "qwen_image_vae.safetensors",
+                        "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                        "shift": 3.0,
+                        "edit_megapixels": 1.5,
+                    }
+                ]
+            },
+            ["qwen_image_edit"],
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_run_execute_smoke_routes_qwen_image_edit_through_img2img_without_mask(self) -> None:
+        submit_calls: list[tuple[str, dict[str, object]]] = []
+
+        def _fake_request_json(
+            method: str,
+            url: str,
+            *,
+            payload: dict[str, object] | None = None,
+            timeout_seconds: float,
+        ) -> dict[str, object]:
+            self.assertEqual(method, "POST")
+            assert payload is not None
+            submit_calls.append((url, payload))
+            return {"submission": {"accepted": True, "prompt_id": "prompt-1"}}
+
+        with (
+            mock.patch.object(live_smoke, "_request_json", side_effect=_fake_request_json),
+            mock.patch.object(
+                live_smoke,
+                "_poll_queue_job_until_terminal",
+                return_value={"status": "completed"},
+            ),
+        ):
+            errors = live_smoke._run_execute_smoke(
+                "http://127.0.0.1:8188",
+                ["qwen_image_edit"],
+                {
+                    "source": "host",
+                    "checkpoints": ["realvisxl.safetensors"],
+                    "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+                    "vae": ["qwen_image_vae.safetensors"],
+                    "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+                    "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+                    "default_checkpoint": "realvisxl.safetensors",
+                    "default_vae": "qwen_image_vae.safetensors",
+                    "default_text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                },
+                {
+                    "qwen_image_edit": {
+                        "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                        "vae_name": "Automatic",
+                        "text_encoder_name": "",
+                        "shift": 3.0,
+                        "edit_megapixels": 1.5,
+                    }
+                },
+                request_timeout_seconds=5.0,
+                poll_timeout_seconds=5.0,
+                poll_interval_seconds=0.1,
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(submit_calls), 1)
+        submit_url, submit_payload = submit_calls[0]
+        self.assertEqual(submit_url, "http://127.0.0.1:8188/rookieui/generate/img2img")
+        self.assertEqual(submit_payload["mode"], "edit")
+        self.assertNotIn("mask_asset", submit_payload)
+        self.assertTrue(str(submit_payload["image_data"]).startswith("data:image/png;base64,"))
 
     def test_validate_catalog_contract_reports_wrong_chroma_family_fallback(self) -> None:
         errors, _ = live_smoke._validate_catalog_contract(

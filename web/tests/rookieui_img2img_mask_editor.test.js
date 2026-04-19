@@ -140,6 +140,29 @@ describe("createImg2ImgMaskCanvasEditor", () => {
     expect(document.getElementById("mask-editor-batch").hidden).toBe(true);
   });
 
+  test("hides editor in edit execution mode", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const editor = createImg2ImgMaskCanvasEditor({
+      idPrefix: "mask-editor-edit",
+      parent,
+      modeInput: createInput("img2img"),
+      imageDataInput: createInput("data:image/png;base64,source"),
+      imageAssetInput: createInput(""),
+      maskDataInput: createInput(""),
+      maskAssetInput: createInput(""),
+      resolveExecutionMode: (mode) => mode,
+      maskCanvasContract: {
+        stageMaskData: vi.fn(() => true),
+        applyStagedMask: vi.fn(() => ({ ok: true })),
+      },
+      allowJsdomCanvas: true,
+    });
+
+    editor.setMode("edit");
+    expect(document.getElementById("mask-editor-edit").hidden).toBe(true);
+  });
+
   test("toggles source placeholder visibility with source binding state", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);

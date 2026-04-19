@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f151-20260418"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f158-20260419"
 
 
 @dataclass(frozen=True)
@@ -29,12 +29,18 @@ class FamilyTemplateManifestEntry:
     default_flux_guidance: float | None
     prompt_enhancement_visible: bool
     default_prompt_enhancement_enabled: bool
+    edit_megapixels_visible: bool
+    default_edit_megapixels: float | None
+    template_lora_visible: bool
+    template_lora_override_allowed: bool
+    official_template_lora_label: str
     support_tier: str
     compatibility_summary: str
     experimental: bool = False
     aliases: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
     flow_kind: str = "txt2img"
+    available_surface_flows: tuple[str, ...] = ("txt2img", "img2img")
     runtime_adapter_id: str = ""
     official_template_path: str = ""
     diffusion_model_hints: tuple[str, ...] = ()
@@ -72,14 +78,27 @@ class FamilyTemplateManifestEntry:
             "default_flux_guidance": self.default_flux_guidance,
             "prompt_enhancement_visible": self.prompt_enhancement_visible,
             "default_prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
+            "edit_megapixels_visible": self.edit_megapixels_visible,
+            "default_edit_megapixels": self.default_edit_megapixels,
+            "template_lora_visible": self.template_lora_visible,
+            "template_lora_override_allowed": self.template_lora_override_allowed,
+            "official_template_lora_label": self.official_template_lora_label,
             "support_tier": self.support_tier,
             "compatibility_summary": self.compatibility_summary,
             "experimental": self.experimental,
             "aliases": list(self.aliases),
             "notes": list(self.notes),
+            "available_surface_flows": list(self.available_surface_flows),
         }
 
-    def to_preset_payload(self, *, checkpoint_name: str, vae_name: str, text_encoder_name: str) -> dict[str, Any]:
+    def to_preset_payload(
+        self,
+        *,
+        checkpoint_name: str,
+        vae_name: str,
+        text_encoder_name: str,
+        template_lora_name: str,
+    ) -> dict[str, Any]:
         return {
             "id": self.id,
             "title": "SD1.5" if self.id == "sd15" else ("SDXL" if self.id == "sdxl" else self.title),
@@ -88,6 +107,7 @@ class FamilyTemplateManifestEntry:
             "checkpoint_name": checkpoint_name,
             "vae_name": vae_name,
             "text_encoder_name": text_encoder_name,
+            "template_lora_name": template_lora_name,
             "width": self.default_width,
             "height": self.default_height,
             "steps": self.default_steps,
@@ -98,6 +118,7 @@ class FamilyTemplateManifestEntry:
             "scheduler_name": self.default_scheduler,
             "clip_skip": self.default_clip_skip,
             "prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
+            "edit_megapixels": self.default_edit_megapixels,
         }
 
 
@@ -140,6 +161,11 @@ def _parity_entry(
         default_flux_guidance=None,
         prompt_enhancement_visible=False,
         default_prompt_enhancement_enabled=False,
+        edit_megapixels_visible=False,
+        default_edit_megapixels=None,
+        template_lora_visible=False,
+        template_lora_override_allowed=False,
+        official_template_lora_label="",
         support_tier="parity",
         compatibility_summary=compatibility_summary,
         notes=notes,
@@ -166,6 +192,13 @@ def _template_entry(
     default_flux_guidance: float | None = None,
     prompt_enhancement_visible: bool = False,
     default_prompt_enhancement_enabled: bool = False,
+    edit_megapixels_visible: bool = False,
+    default_edit_megapixels: float | None = None,
+    template_lora_visible: bool = False,
+    template_lora_override_allowed: bool = False,
+    official_template_lora_label: str = "",
+    flow_kind: str = "txt2img",
+    available_surface_flows: tuple[str, ...] = ("txt2img",),
     runtime_adapter_id: str = "",
     official_template_path: str = "",
     diffusion_model_hints: tuple[str, ...] = (),
@@ -202,11 +235,18 @@ def _template_entry(
         default_flux_guidance=default_flux_guidance,
         prompt_enhancement_visible=prompt_enhancement_visible,
         default_prompt_enhancement_enabled=default_prompt_enhancement_enabled,
+        edit_megapixels_visible=edit_megapixels_visible,
+        default_edit_megapixels=default_edit_megapixels,
+        template_lora_visible=template_lora_visible,
+        template_lora_override_allowed=template_lora_override_allowed,
+        official_template_lora_label=official_template_lora_label,
         support_tier="family-adapted",
         compatibility_summary=compatibility_summary,
         experimental=True,
         aliases=aliases,
         notes=notes,
+        flow_kind=flow_kind,
+        available_surface_flows=available_surface_flows,
         runtime_adapter_id=runtime_adapter_id,
         official_template_path=official_template_path,
         diffusion_model_hints=diffusion_model_hints,
@@ -431,7 +471,11 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         notes=(
             "Matches the official Flux.1 Dev FP8 template defaults.",
             "Text Encoder selector stays hidden because the official template owns the dual-encoder bundle.",
+            "Template LoRA stays explicit and defaults to the official turbo LoRA, but may be overridden with truthful drift messaging.",
         ),
+        template_lora_visible=True,
+        template_lora_override_allowed=True,
+        official_template_lora_label="Flux_2-Turbo-LoRA_comfyui.safetensors",
         runtime_adapter_id="flux",
         official_template_path="reference/workflow_templates/Flux.1 Dev FP8.json",
         diffusion_model_hints=("flux",),
@@ -439,6 +483,11 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         text_encoder_hints=("clip_l", "t5"),
         text_encoder_priority_hints=(("clip_l",), ("clip", "l"), ("t5xxl",), ("flux",), ("t5",)),
         text_encoder_sequence_priority_hints=((("clip_l",), ("t5xxl", "fp16")), (("clip_l",), ("t5xxl",))),
+        template_lora_priority_hints=(
+            ("flux", "2", "turbo", "lora", "comfyui"),
+            ("flux_2", "turbo", "lora", "comfyui"),
+            ("flux", "turbo", "lora"),
+        ),
         vae_hints=("flux", "ae"),
         vae_priority_hints=(("ae",), ("flux", "vae"), ("flux",)),
         vae_deny_hints=("qwen",),
@@ -682,21 +731,77 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         aliases=("qwen image", "qwen-image 2512", "qwen image 2512"),
         notes=(
             "Matches the official Qwen-Image 2512 template defaults.",
-            "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing and template-baked LoRA.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing.",
+            "Template LoRA stays explicit and defaults to the official 2-step turbo LoRA, but may be overridden with truthful drift messaging.",
         ),
         shift_visible=True,
         default_shift=3.0,
+        template_lora_visible=True,
+        template_lora_override_allowed=True,
+        official_template_lora_label="Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
         runtime_adapter_id="qwen_image",
         official_template_path="reference/workflow_templates/Qwen-Image 2512.json",
         diffusion_model_hints=("qwen", "2512"),
-        diffusion_model_priority_hints=(("qwen", "image", "2512"), ("qwen", "2512", "fp8"), ("qwen", "2512"), ("qwen", "image")),
+        diffusion_model_priority_hints=(
+            ("qwen", "image", "2512", "fp8", "e4m3fn"),
+            ("qwen_image_2512", "fp8", "e4m3fn"),
+            ("qwen", "image", "2512", "fp8"),
+            ("qwen", "image", "2512"),
+        ),
         diffusion_model_deny_hints=("lightning", "lora", "2step", "4step", "8step", "distill", "distilled"),
         text_encoder_hints=("qwen", "2.5", "vl"),
         text_encoder_priority_hints=(("qwen_2.5_vl_7b",), ("qwen_2.5_vl",), ("qwen", "image"), ("qwen",)),
         template_lora_priority_hints=(
-            ("wuli", "qwen", "image", "2512", "turbo", "lora"),
-            ("qwen", "image", "2512", "turbo", "lora"),
-            ("qwen", "image", "2512", "lora"),
+            ("wuli", "qwen", "image", "2512", "turbo", "lora", "2steps"),
+            ("qwen", "image", "2512", "turbo", "lora", "2steps"),
+            ("qwen", "image", "2512", "lora", "2steps"),
+        ),
+        vae_hints=("qwen", "qwen-image", "qwen_image"),
+        vae_priority_hints=(("qwen", "vae"), ("qwen", "image"), ("qwen",)),
+    ),
+    _template_entry(
+        id="qwen_image_edit",
+        title="Qwen-Image Edit",
+        public_base_family="qwen_image_edit",
+        default_width=1328,
+        default_height=1328,
+        default_steps=4,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Qwen-Image Edit template preset on the dedicated edit-flow seam.",
+        aliases=("qwen image edit", "qwen-image edit"),
+        notes=(
+            "Matches the official Qwen-Image Edit template defaults.",
+            "Edit flow requires a source image but does not require a mask.",
+            "The current RookieUI edit surface ships the single-reference official template path only.",
+            "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        edit_megapixels_visible=True,
+        default_edit_megapixels=1.5,
+        template_lora_visible=True,
+        template_lora_override_allowed=True,
+        official_template_lora_label="Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        flow_kind="edit",
+        available_surface_flows=("edit",),
+        runtime_adapter_id="qwen_image_edit",
+        official_template_path="reference/workflow_templates/imageEdit/Qwen-image edit.json",
+        diffusion_model_hints=("qwen", "image", "edit"),
+        diffusion_model_priority_hints=(
+            ("qwen", "image", "edit", "fp8", "e4m3fn"),
+            ("qwen_image_edit", "fp8", "e4m3fn"),
+            ("qwen", "image", "edit", "fp8"),
+            ("qwen", "image", "edit"),
+        ),
+        diffusion_model_deny_hints=("lightning", "lora", "turbo", "2512", "firered", "fire-red", "2509", "transformer"),
+        text_encoder_hints=("qwen", "2.5", "vl"),
+        text_encoder_priority_hints=(("qwen_2.5_vl_7b",), ("qwen_2.5_vl",), ("qwen", "image"), ("qwen",)),
+        template_lora_priority_hints=(
+            ("qwen", "image", "edit", "lightning", "4steps"),
+            ("qwen", "image", "edit", "lora", "4steps"),
+            ("qwen", "edit", "lightning", "4steps"),
         ),
         vae_hints=("qwen", "qwen-image", "qwen_image"),
         vae_priority_hints=(("qwen", "vae"), ("qwen", "image"), ("qwen",)),
@@ -787,6 +892,29 @@ def build_model_family_registry_payload() -> dict[str, object]:
     }
 
 
+def _normalized_surface_flow(surface_flow: str) -> str:
+    return str(surface_flow or "").strip().lower()
+
+
+def list_manifest_entries_for_surface_flow(surface_flow: str) -> list[FamilyTemplateManifestEntry]:
+    normalized_surface_flow = _normalized_surface_flow(surface_flow)
+    if not normalized_surface_flow:
+        return list(_MANIFEST_ENTRIES)
+    return [
+        entry
+        for entry in _MANIFEST_ENTRIES
+        if normalized_surface_flow in {flow.strip().lower() for flow in entry.available_surface_flows}
+    ]
+
+
+def supports_surface_flow(family_id: str, surface_flow: str) -> bool:
+    entry = get_family_template_manifest_entry(family_id)
+    normalized_surface_flow = _normalized_surface_flow(surface_flow)
+    if not normalized_surface_flow:
+        return True
+    return normalized_surface_flow in {flow.strip().lower() for flow in entry.available_surface_flows}
+
+
 def build_primary_model_category_by_family() -> dict[str, str]:
     category_map: dict[str, str] = {}
     for entry in _MANIFEST_ENTRIES:
@@ -799,11 +927,23 @@ def build_primary_model_category_by_family() -> dict[str, str]:
     return category_map
 
 
+def list_non_sd_manifest_entries() -> list[FamilyTemplateManifestEntry]:
+    return [entry for entry in _MANIFEST_ENTRIES if entry.support_tier != "parity"]
+
+
 def list_non_sd_txt2img_manifest_entries() -> list[FamilyTemplateManifestEntry]:
     return [
         entry
-        for entry in _MANIFEST_ENTRIES
-        if entry.support_tier != "parity" and entry.flow_kind == "txt2img"
+        for entry in list_non_sd_manifest_entries()
+        if entry.flow_kind == "txt2img"
+    ]
+
+
+def list_non_sd_edit_manifest_entries() -> list[FamilyTemplateManifestEntry]:
+    return [
+        entry
+        for entry in list_non_sd_manifest_entries()
+        if entry.flow_kind == "edit"
     ]
 
 
@@ -811,10 +951,18 @@ def build_non_sd_txt2img_profile_ids() -> tuple[str, ...]:
     return tuple(entry.id for entry in list_non_sd_txt2img_manifest_entries())
 
 
+def build_non_sd_edit_profile_ids() -> tuple[str, ...]:
+    return tuple(entry.id for entry in list_non_sd_edit_manifest_entries())
+
+
+def build_non_sd_catalog_profile_ids() -> tuple[str, ...]:
+    return build_non_sd_txt2img_profile_ids() + build_non_sd_edit_profile_ids()
+
+
 def build_non_sd_runtime_adapter_map() -> dict[str, str]:
     return {
         entry.id: entry.runtime_adapter_id
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.runtime_adapter_id
     }
 
@@ -843,10 +991,18 @@ def build_non_sd_prompt_enhancement_expectations() -> dict[str, bool]:
     }
 
 
+def build_non_sd_edit_megapixels_expectations() -> dict[str, float]:
+    return {
+        entry.id: float(entry.default_edit_megapixels)
+        for entry in list_non_sd_edit_manifest_entries()
+        if entry.edit_megapixels_visible and entry.default_edit_megapixels is not None
+    }
+
+
 def build_diffusion_model_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
     return {
         entry.id: entry.diffusion_model_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.diffusion_model_priority_hints
     }
 
@@ -854,7 +1010,7 @@ def build_diffusion_model_priority_hints_by_profile() -> dict[str, tuple[tuple[s
 def build_diffusion_model_hints_by_profile() -> dict[str, tuple[str, ...]]:
     return {
         entry.id: entry.diffusion_model_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.diffusion_model_hints
     }
 
@@ -862,7 +1018,7 @@ def build_diffusion_model_hints_by_profile() -> dict[str, tuple[str, ...]]:
 def build_diffusion_model_deny_hints_by_profile() -> dict[str, tuple[str, ...]]:
     return {
         entry.id: entry.diffusion_model_deny_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.diffusion_model_deny_hints
     }
 
@@ -870,7 +1026,7 @@ def build_diffusion_model_deny_hints_by_profile() -> dict[str, tuple[str, ...]]:
 def build_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
     return {
         entry.id: entry.text_encoder_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.text_encoder_priority_hints
     }
 
@@ -878,7 +1034,7 @@ def build_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[str,
 def build_text_encoder_hints_by_profile() -> dict[str, tuple[str, ...]]:
     return {
         entry.id: entry.text_encoder_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.text_encoder_hints
     }
 
@@ -886,7 +1042,7 @@ def build_text_encoder_hints_by_profile() -> dict[str, tuple[str, ...]]:
 def build_text_encoder_sequence_hints_by_profile() -> dict[str, tuple[tuple[tuple[str, ...], ...], ...]]:
     return {
         entry.id: entry.text_encoder_sequence_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.text_encoder_sequence_priority_hints
     }
 
@@ -894,7 +1050,7 @@ def build_text_encoder_sequence_hints_by_profile() -> dict[str, tuple[tuple[tupl
 def build_aux_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
     return {
         entry.id: entry.aux_text_encoder_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.aux_text_encoder_priority_hints
     }
 
@@ -902,7 +1058,7 @@ def build_aux_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[
 def build_template_lora_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
     return {
         entry.id: entry.template_lora_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.template_lora_priority_hints
     }
 
@@ -910,7 +1066,7 @@ def build_template_lora_priority_hints_by_profile() -> dict[str, tuple[tuple[str
 def build_vae_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
     return {
         entry.id: entry.vae_priority_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.vae_priority_hints
     }
 
@@ -918,7 +1074,7 @@ def build_vae_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ..
 def build_vae_hints_by_profile() -> dict[str, tuple[str, ...]]:
     return {
         entry.id: entry.vae_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.vae_hints
     }
 
@@ -926,6 +1082,6 @@ def build_vae_hints_by_profile() -> dict[str, tuple[str, ...]]:
 def build_vae_deny_hints_by_profile() -> dict[str, tuple[str, ...]]:
     return {
         entry.id: entry.vae_deny_hints
-        for entry in list_non_sd_txt2img_manifest_entries()
+        for entry in list_non_sd_manifest_entries()
         if entry.vae_deny_hints
     }

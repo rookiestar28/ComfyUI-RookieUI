@@ -35,6 +35,11 @@ $env:ROOKIEUI_E2E_PORT = "4300"
 npm test
 ```
 
+For the repo-standard Windows full gate, `scripts/run_full_tests_windows.ps1` now:
+
+- pins Playwright's harness server to the project-local `.venv` Python via `ROOKIEUI_E2E_PYTHON`
+- auto-selects a bindable localhost port if `4173` is unavailable
+
 ## WSL2 (bash)
 
 ```bash
@@ -74,6 +79,9 @@ ROOKIEUI_E2E_PORT=4300 npm test
   - create local shim (`.tmp/bin/python`) as above
 - Port bind failure:
   - set `ROOKIEUI_E2E_PORT` to an unused port
+- Windows full-gate drift (`npm test` starts harness with the wrong Python):
+  - prefer `powershell -File scripts/run_full_tests_windows.ps1`
+  - or set `ROOKIEUI_E2E_PYTHON=.venv\Scripts\python.exe` before `npm test`
 - Browser missing:
   - run `npx playwright install chromium`
 - Dependency drift:

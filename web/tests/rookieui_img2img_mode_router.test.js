@@ -46,4 +46,12 @@ describe("createImg2ImgModeRouter", () => {
       IMG2IMG_GENERATION_MODE_DEFINITIONS.map((entry) => entry.id),
     );
   });
+
+  test("includes edit as a first-class mode", () => {
+    const modeInput = createModeInput("edit");
+    const router = createImg2ImgModeRouter({ modeInput });
+
+    expect(router.getActiveTabId()).toBe("edit");
+    expect(router.definitions.map((entry) => entry.id)).toContain("edit");
+  });
 });

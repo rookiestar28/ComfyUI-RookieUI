@@ -11,7 +11,7 @@ from rookieui.services.parity_matrix import (
 
 
 class ParityMatrixTests(unittest.TestCase):
-    def test_build_parity_payload_lists_sd_family_profiles(self) -> None:
+    def test_build_parity_payload_lists_current_model_family_profiles(self) -> None:
         payload = build_parity_payload()
         profile_ids = [profile["id"] for profile in payload["profiles"]]
 
@@ -37,6 +37,7 @@ class ParityMatrixTests(unittest.TestCase):
                 "hidream_i1_full",
                 "longcat_image",
                 "qwen_image",
+                "qwen_image_edit",
                 "z_image",
                 "z_image_turbo",
             ],

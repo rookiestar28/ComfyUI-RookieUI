@@ -44,12 +44,13 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f151-20260418")
+        self.assertEqual(payload["model_families"]["contract_version"], "f158-20260419")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("chroma", family_ids)
         self.assertIn("flux", family_ids)
         self.assertIn("ernie_image", family_ids)
+        self.assertIn("qwen_image_edit", family_ids)
         self.assertIn("z_image_turbo", family_ids)
         flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
         ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
@@ -57,15 +58,31 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(flux_entry["translation_base_family"], "sdxl")
         self.assertEqual(flux_entry["public_base_family"], "flux")
         self.assertFalse(flux_entry["text_encoder_visible"])
+        self.assertTrue(flux_entry["template_lora_visible"])
+        self.assertTrue(flux_entry["template_lora_override_allowed"])
+        self.assertEqual(flux_entry["official_template_lora_label"], "Flux_2-Turbo-LoRA_comfyui.safetensors")
         self.assertFalse(flux_entry["shift_visible"])
+        self.assertEqual(flux_entry["available_surface_flows"], ["txt2img"])
         self.assertEqual(ernie_entry["translation_base_family"], "sdxl")
         self.assertEqual(ernie_entry["public_base_family"], "ernie_image")
         self.assertFalse(ernie_entry["text_encoder_visible"])
         self.assertTrue(ernie_entry["prompt_enhancement_visible"])
         chroma_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "chroma")
+        qwen_edit_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit")
         self.assertTrue(chroma_entry["shift_visible"])
         self.assertEqual(chroma_entry["default_shift"], 1.0)
+        self.assertTrue(qwen_edit_entry["edit_megapixels_visible"])
+        self.assertEqual(qwen_edit_entry["default_edit_megapixels"], 1.5)
+        self.assertTrue(qwen_edit_entry["template_lora_visible"])
+        self.assertTrue(qwen_edit_entry["template_lora_override_allowed"])
+        self.assertEqual(
+            qwen_edit_entry["official_template_lora_label"],
+            "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        )
+        self.assertEqual(qwen_edit_entry["available_surface_flows"], ["edit"])
         self.assertEqual(z_turbo_entry["public_base_family"], "z_image")
+        sd15_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "sd15")
+        self.assertEqual(sd15_entry["available_surface_flows"], ["txt2img", "img2img"])
 
     def test_build_capabilities_payload_normalizes_host_surfaces(self) -> None:
         payload = build_capabilities_payload(

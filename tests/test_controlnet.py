@@ -549,7 +549,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
                 diffusion_models=["flux\\flux1-dev.safetensors"],
                 vae=["flux_vae.safetensors"],
                 text_encoders=["clip_l.safetensors"],
-                loras=[],
+                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
                 default_checkpoint="SDXL\\realvisxl.safetensors",
                 default_vae="flux_vae.safetensors",
                 default_text_encoder="clip_l.safetensors",

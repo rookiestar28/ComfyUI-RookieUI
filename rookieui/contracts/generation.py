@@ -20,6 +20,7 @@ class Txt2ImgRequest:
     checkpoint_name: str = "__host_default__"
     vae_name: str = "Automatic"
     text_encoder_name: str = "Automatic"
+    template_lora_name: str | None = None
     width: int | None = None
     height: int | None = None
     steps: int | None = None
@@ -59,6 +60,7 @@ class Img2ImgRequest:
     checkpoint_name: str = "__host_default__"
     vae_name: str = "Automatic"
     text_encoder_name: str = "Automatic"
+    template_lora_name: str | None = None
     image_asset: str = ""
     image_data: str = ""
     mask_asset: str = ""
@@ -72,6 +74,7 @@ class Img2ImgRequest:
     cfg_scale: float | None = None
     shift: float | None = None
     flux_guidance: float | None = None
+    edit_megapixels: float | None = None
     sampler_name: str | None = None
     scheduler_name: str | None = None
     prompt_enhancement_enabled: bool | None = None
@@ -187,6 +190,7 @@ class NormalizedImg2ImgRequest:
     cfg_scale: float
     shift: float | None
     flux_guidance: float | None
+    edit_megapixels: float | None
     sampler_name: str
     scheduler_name: str
     prompt_enhancement_enabled: bool
