@@ -262,13 +262,6 @@ export function createXYZPlotShell({
   body.className = "rookieui-shell__xyz-plot-body";
   shell.appendChild(body);
 
-  appendTextElement(
-    body,
-    "p",
-    "rookieui-shell__status rookieui-shell__xyz-plot-note",
-    `Bottom-mounted sweep surface for ${mode}. It stays below ControlNet / ADetailer blocks by design.`,
-  );
-
   const leftColumn = document.createElement("div");
   leftColumn.className = "rookieui-shell__xyz-plot-column";
   body.appendChild(leftColumn);
@@ -450,12 +443,12 @@ export function createXYZPlotShell({
     button.classList.remove("rookieui-shell__button--secondary");
     button.classList.add("rookieui-shell__xyz-plot-action");
   });
-  [estimateButton, runButton, refreshButton].forEach((button) => {
-    button.classList.add("rookieui-shell__button--accent");
-  });
+  estimateButton.classList.add("rookieui-shell__xyz-plot-action--estimate");
+  runButton.classList.add("rookieui-shell__button--accent");
+  refreshButton.classList.add("rookieui-shell__xyz-plot-action--refresh");
   // IMPORTANT: keep the XYZ cancel action on its own Ferrari-red lane; the shared danger token is intentionally softer elsewhere.
   cancelButton.classList.add("rookieui-shell__button--danger", "rookieui-shell__xyz-plot-action--danger");
-  [estimateButton, runButton, refreshButton, cancelButton].forEach((button) => actionRow.appendChild(button));
+  [estimateButton, refreshButton, runButton, cancelButton].forEach((button) => actionRow.appendChild(button));
 
   const estimateSection = document.createElement("section");
   estimateSection.className = "rookieui-shell__xyz-plot-card";

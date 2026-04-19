@@ -260,7 +260,7 @@
 
 .rookieui-shell__xyz-plot {
   margin-top: 14px;
-  border-style: dashed;
+  border-style: solid;
 }
 
 .rookieui-shell__xyz-plot-summary-bar .rookieui-shell__hires-header {
@@ -499,6 +499,18 @@
   border-radius: 8px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.rookieui-shell__xyz-plot-action--estimate {
+  border-color: color-mix(in srgb, #198754 88%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, #34b36a 90%, white 10%), #198754);
+  color: var(--rookieui-text-inverse);
+}
+
+.rookieui-shell__xyz-plot-action--refresh {
+  border-color: color-mix(in srgb, #2b7cdc 88%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, #5a9ff0 88%, white 12%), #2b7cdc);
+  color: var(--rookieui-text-inverse);
 }
 
 .rookieui-shell__xyz-plot-action--danger {

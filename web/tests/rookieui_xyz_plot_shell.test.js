@@ -247,10 +247,15 @@ describe("xyz plot shell", () => {
     const section = document.getElementById("txt2img-xyz-section");
     expect(section?.open).toBe(false);
     expect(section?.querySelector("summary")?.className).toContain("rookieui-shell__hires-summary");
+    expect(section?.textContent).not.toContain("Bottom-mounted sweep surface");
     expect(document.querySelector("#txt2img-xyz-draw-legend + span")?.className).toContain("rookieui-shell__field-label");
-    expect(document.getElementById("txt2img-xyz-estimate")?.className).toContain("rookieui-shell__button--accent");
+    const actionOrder = Array.from(
+      section?.querySelectorAll(".rookieui-shell__xyz-plot-actions > button") ?? [],
+    ).map((node) => node.textContent?.trim());
+    expect(actionOrder).toEqual(["Estimate", "Refresh", "Run XYZ Plot", "Cancel Session"]);
+    expect(document.getElementById("txt2img-xyz-estimate")?.className).toContain("rookieui-shell__xyz-plot-action--estimate");
     expect(document.getElementById("txt2img-xyz-run")?.className).toContain("rookieui-shell__button--accent");
-    expect(document.getElementById("txt2img-xyz-refresh")?.className).toContain("rookieui-shell__button--accent");
+    expect(document.getElementById("txt2img-xyz-refresh")?.className).toContain("rookieui-shell__xyz-plot-action--refresh");
     expect(document.getElementById("txt2img-xyz-cancel")?.className).toContain("rookieui-shell__button--danger");
     expect(document.getElementById("txt2img-xyz-cancel")?.className).toContain("rookieui-shell__xyz-plot-action--danger");
     expect(document.getElementById("txt2img-xyz-cancel")?.className).not.toContain("rookieui-shell__button--secondary");

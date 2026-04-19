@@ -42,32 +42,47 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
     const optionLabel = document.querySelector("#rookieui-txt2img-xyz-plot-draw-legend + span");
     const marginLabel = document.querySelector("#rookieui-txt2img-xyz-plot-margin-size")?.closest("label")?.querySelector(".rookieui-shell__field-label");
     const actionRow = document.querySelector("#rookieui-txt2img-xyz-plot-section .rookieui-shell__xyz-plot-actions");
+    const xyzSection = document.getElementById("rookieui-txt2img-xyz-plot-section");
     const estimateButton = document.getElementById("rookieui-txt2img-xyz-plot-estimate");
     const runButton = document.getElementById("rookieui-txt2img-xyz-plot-run");
     const refreshButton = document.getElementById("rookieui-txt2img-xyz-plot-refresh");
     const cancelButton = document.getElementById("rookieui-txt2img-xyz-plot-cancel");
     const generateButton = document.getElementById("rookieui-txt2img-submit");
-    const actionButtons = [estimateButton, runButton, refreshButton, cancelButton];
+    const actionButtons = [estimateButton, refreshButton, runButton, cancelButton];
     const actionRects = actionButtons.map((button) => button?.getBoundingClientRect() ?? null);
     const rowRect = actionRow?.getBoundingClientRect() ?? null;
     return {
       optionFont: optionLabel ? getComputedStyle(optionLabel).fontSize : "",
       marginFont: marginLabel ? getComputedStyle(marginLabel).fontSize : "",
+      notePresent: Boolean(
+        Array.from(xyzSection?.querySelectorAll(".rookieui-shell__xyz-plot-note") ?? []).some(
+          (node) => node.textContent?.includes("Bottom-mounted sweep surface"),
+        ),
+      ),
+      borderStyle: xyzSection ? getComputedStyle(xyzSection).borderStyle : "",
       generateBackgroundImage: generateButton ? getComputedStyle(generateButton).backgroundImage : "",
       generateColor: generateButton ? getComputedStyle(generateButton).color : "",
       estimateBackgroundImage: estimateButton ? getComputedStyle(estimateButton).backgroundImage : "",
+      estimateClassName: estimateButton?.className ?? "",
       refreshBackgroundImage: refreshButton ? getComputedStyle(refreshButton).backgroundImage : "",
+      refreshClassName: refreshButton?.className ?? "",
       cancelBackgroundImage: cancelButton ? getComputedStyle(cancelButton).backgroundImage : "",
       cancelBorderColor: cancelButton ? getComputedStyle(cancelButton).borderColor : "",
       cancelColor: cancelButton ? getComputedStyle(cancelButton).color : "",
+      actionLabels: Array.from(actionRow?.querySelectorAll("button") ?? []).map((button) => button.textContent?.trim() ?? ""),
       actionWidths: actionRects.map((rect) => rect?.width ?? 0),
       rowLeftDelta: rowRect && actionRects[0] ? Math.abs(actionRects[0].left - rowRect.left) : 999,
       rowRightDelta: rowRect && actionRects[3] ? Math.abs(rowRect.right - actionRects[3].right) : 999,
     };
   });
   expect(controlSurfaceMetrics.optionFont).toBe(controlSurfaceMetrics.marginFont);
-  expect(controlSurfaceMetrics.estimateBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
-  expect(controlSurfaceMetrics.refreshBackgroundImage).toBe(controlSurfaceMetrics.generateBackgroundImage);
+  expect(controlSurfaceMetrics.notePresent).toBe(false);
+  expect(controlSurfaceMetrics.borderStyle).toBe("solid");
+  expect(controlSurfaceMetrics.actionLabels).toEqual(["Estimate", "Refresh", "Run XYZ Plot", "Cancel Session"]);
+  expect(controlSurfaceMetrics.estimateClassName).toContain("rookieui-shell__xyz-plot-action--estimate");
+  expect(controlSurfaceMetrics.refreshClassName).toContain("rookieui-shell__xyz-plot-action--refresh");
+  expect(controlSurfaceMetrics.estimateBackgroundImage).toContain("25, 135, 84");
+  expect(controlSurfaceMetrics.refreshBackgroundImage).toContain("43, 124, 220");
   expect(controlSurfaceMetrics.cancelBackgroundImage).not.toBe(controlSurfaceMetrics.generateBackgroundImage);
   expect(controlSurfaceMetrics.cancelBackgroundImage).toContain("219, 0, 0");
   expect(controlSurfaceMetrics.cancelBorderColor).toBe("rgb(255, 18, 0)");
