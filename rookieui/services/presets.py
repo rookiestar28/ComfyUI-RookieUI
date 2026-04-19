@@ -17,25 +17,15 @@ def build_preset_payload() -> dict[str, object]:
         _, primary_models, primary_default = resolve_primary_model_selector_context(profile_id, inventory)
         text_encoder_default = resolve_text_encoder_selector_context(profile_id, inventory)
         vae_default = resolve_vae_selector_context(profile_id, inventory)
+        # IMPORTANT: presets must stay manifest-derived so new family/template intake does not fork
+        # registry truth from the bootstrap/default-preset surface.
         presets.append(
             PresetDefinition(
-                id=entry.id,
-                title="SD1.5" if entry.id == "sd15" else ("SDXL" if entry.id == "sdxl" else entry.title),
-                profile=profile_id,
-                base_family=entry.public_base_family,
-                checkpoint_name=primary_default if primary_models else inventory.default_checkpoint,
-                vae_name=vae_default,
-                text_encoder_name=text_encoder_default,
-                width=entry.default_width,
-                height=entry.default_height,
-                steps=entry.default_steps,
-                cfg_scale=entry.default_cfg_scale,
-                shift=entry.default_shift,
-                flux_guidance=entry.default_flux_guidance,
-                sampler_name=entry.default_sampler,
-                scheduler_name=entry.default_scheduler,
-                clip_skip=entry.default_clip_skip,
-                prompt_enhancement_enabled=entry.default_prompt_enhancement_enabled,
+                **entry.to_preset_payload(
+                    checkpoint_name=primary_default if primary_models else inventory.default_checkpoint,
+                    vae_name=vae_default,
+                    text_encoder_name=text_encoder_default,
+                )
             ).to_payload()
         )
     return {

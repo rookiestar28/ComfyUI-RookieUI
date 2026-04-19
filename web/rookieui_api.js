@@ -1,7 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
-const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
+export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
   {
     id: "sd15",
     title: "Stable Diffusion 1.5",
@@ -563,7 +563,20 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
   z_image_turbo: { shift_visible: true, default_shift: 3.0 },
 });
 
-const DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY = Object.freeze(
+export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
+  DEFAULT_MODEL_FAMILY_ENTRIES.map((entry) => ({
+    shift_visible: false,
+    default_shift: null,
+    flux_guidance_visible: false,
+    default_flux_guidance: null,
+    prompt_enhancement_visible: false,
+    default_prompt_enhancement_enabled: false,
+    ...entry,
+    ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
+  })),
+);
+
+export const DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY = Object.freeze(
   DEFAULT_MODEL_FAMILY_ENTRIES.reduce((categoryMap, entry) => {
     const keys = new Set([entry.id, entry.public_base_family, ...entry.aliases]);
     keys.forEach((key) => {
@@ -576,7 +589,7 @@ const DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY = Object.freeze(
 );
 
 const DEFAULT_PRESETS = Object.freeze(
-  DEFAULT_MODEL_FAMILY_ENTRIES.map((entry) => ({
+  DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES.map((entry) => ({
     id: entry.id,
     title: entry.id === "sd15" ? "SD1.5" : entry.id === "sdxl" ? "SDXL" : entry.title,
     profile: entry.id,
@@ -588,17 +601,16 @@ const DEFAULT_PRESETS = Object.freeze(
     height: entry.default_height,
     steps: entry.default_steps,
     cfg_scale: entry.default_cfg_scale,
-    shift: DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_shift ?? null,
-    flux_guidance: DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_flux_guidance ?? null,
+    shift: entry.default_shift ?? null,
+    flux_guidance: entry.default_flux_guidance ?? null,
     sampler_name: entry.default_sampler,
     scheduler_name: entry.default_scheduler,
     clip_skip: entry.default_clip_skip,
-    prompt_enhancement_enabled:
-      DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id]?.default_prompt_enhancement_enabled ?? false,
+    prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
   })),
 );
 
-const DEFAULT_NEWER_FAMILY_PROFILES = Object.freeze(
+export const DEFAULT_NEWER_FAMILY_PROFILES = Object.freeze(
   DEFAULT_MODEL_FAMILY_ENTRIES.filter((entry) => entry.support_tier !== "parity").map((entry) => ({
     id: entry.id,
     title: entry.title,
@@ -659,16 +671,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
   },
   model_families: {
     contract_version: "f151-20260418",
-    entries: DEFAULT_MODEL_FAMILY_ENTRIES.map((entry) => ({
-      shift_visible: false,
-      default_shift: null,
-      flux_guidance_visible: false,
-      default_flux_guidance: null,
-      prompt_enhancement_visible: false,
-      default_prompt_enhancement_enabled: false,
-      ...entry,
-      ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
-    })),
+    entries: DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES,
   },
   prompt_semantics: {
     contract_version: "r55-20260411",

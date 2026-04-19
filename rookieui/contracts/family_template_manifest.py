@@ -1,0 +1,931 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f151-20260418"
+
+
+@dataclass(frozen=True)
+class FamilyTemplateManifestEntry:
+    id: str
+    title: str
+    translation_base_family: str
+    public_base_family: str
+    prompt_encoder: str
+    default_width: int
+    default_height: int
+    default_steps: int
+    default_cfg_scale: float
+    default_sampler: str
+    default_scheduler: str
+    default_clip_skip: int
+    supports_clip_skip: bool
+    primary_model_category: str
+    text_encoder_visible: bool
+    shift_visible: bool
+    default_shift: float | None
+    flux_guidance_visible: bool
+    default_flux_guidance: float | None
+    prompt_enhancement_visible: bool
+    default_prompt_enhancement_enabled: bool
+    support_tier: str
+    compatibility_summary: str
+    experimental: bool = False
+    aliases: tuple[str, ...] = ()
+    notes: tuple[str, ...] = field(default_factory=tuple)
+    flow_kind: str = "txt2img"
+    runtime_adapter_id: str = ""
+    official_template_path: str = ""
+    diffusion_model_hints: tuple[str, ...] = ()
+    diffusion_model_priority_hints: tuple[tuple[str, ...], ...] = ()
+    diffusion_model_deny_hints: tuple[str, ...] = ()
+    text_encoder_hints: tuple[str, ...] = ()
+    text_encoder_priority_hints: tuple[tuple[str, ...], ...] = ()
+    text_encoder_sequence_priority_hints: tuple[tuple[tuple[str, ...], ...], ...] = ()
+    aux_text_encoder_priority_hints: tuple[tuple[str, ...], ...] = ()
+    template_lora_priority_hints: tuple[tuple[str, ...], ...] = ()
+    vae_hints: tuple[str, ...] = ()
+    vae_priority_hints: tuple[tuple[str, ...], ...] = ()
+    vae_deny_hints: tuple[str, ...] = ()
+
+    def to_registry_payload(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "translation_base_family": self.translation_base_family,
+            "public_base_family": self.public_base_family,
+            "prompt_encoder": self.prompt_encoder,
+            "default_width": self.default_width,
+            "default_height": self.default_height,
+            "default_steps": self.default_steps,
+            "default_cfg_scale": self.default_cfg_scale,
+            "default_sampler": self.default_sampler,
+            "default_scheduler": self.default_scheduler,
+            "default_clip_skip": self.default_clip_skip,
+            "supports_clip_skip": self.supports_clip_skip,
+            "primary_model_category": self.primary_model_category,
+            "text_encoder_visible": self.text_encoder_visible,
+            "shift_visible": self.shift_visible,
+            "default_shift": self.default_shift,
+            "flux_guidance_visible": self.flux_guidance_visible,
+            "default_flux_guidance": self.default_flux_guidance,
+            "prompt_enhancement_visible": self.prompt_enhancement_visible,
+            "default_prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
+            "support_tier": self.support_tier,
+            "compatibility_summary": self.compatibility_summary,
+            "experimental": self.experimental,
+            "aliases": list(self.aliases),
+            "notes": list(self.notes),
+        }
+
+    def to_preset_payload(self, *, checkpoint_name: str, vae_name: str, text_encoder_name: str) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "title": "SD1.5" if self.id == "sd15" else ("SDXL" if self.id == "sdxl" else self.title),
+            "profile": self.id,
+            "base_family": self.public_base_family,
+            "checkpoint_name": checkpoint_name,
+            "vae_name": vae_name,
+            "text_encoder_name": text_encoder_name,
+            "width": self.default_width,
+            "height": self.default_height,
+            "steps": self.default_steps,
+            "cfg_scale": self.default_cfg_scale,
+            "shift": self.default_shift,
+            "flux_guidance": self.default_flux_guidance,
+            "sampler_name": self.default_sampler,
+            "scheduler_name": self.default_scheduler,
+            "clip_skip": self.default_clip_skip,
+            "prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
+        }
+
+
+def _parity_entry(
+    *,
+    id: str,
+    title: str,
+    translation_base_family: str,
+    default_width: int,
+    default_height: int,
+    default_steps: int,
+    default_cfg_scale: float,
+    default_sampler: str,
+    default_scheduler: str,
+    default_clip_skip: int,
+    supports_clip_skip: bool,
+    compatibility_summary: str,
+    notes: tuple[str, ...],
+) -> FamilyTemplateManifestEntry:
+    prompt_encoder = "clip_text_encode" if translation_base_family == "sd15" else "clip_text_encode_sdxl"
+    return FamilyTemplateManifestEntry(
+        id=id,
+        title=title,
+        translation_base_family=translation_base_family,
+        public_base_family=translation_base_family,
+        prompt_encoder=prompt_encoder,
+        default_width=default_width,
+        default_height=default_height,
+        default_steps=default_steps,
+        default_cfg_scale=default_cfg_scale,
+        default_sampler=default_sampler,
+        default_scheduler=default_scheduler,
+        default_clip_skip=default_clip_skip,
+        supports_clip_skip=supports_clip_skip,
+        primary_model_category="checkpoints",
+        text_encoder_visible=False,
+        shift_visible=False,
+        default_shift=None,
+        flux_guidance_visible=False,
+        default_flux_guidance=None,
+        prompt_enhancement_visible=False,
+        default_prompt_enhancement_enabled=False,
+        support_tier="parity",
+        compatibility_summary=compatibility_summary,
+        notes=notes,
+    )
+
+
+def _template_entry(
+    *,
+    id: str,
+    title: str,
+    public_base_family: str,
+    default_width: int,
+    default_height: int,
+    default_steps: int,
+    default_cfg_scale: float,
+    default_sampler: str,
+    default_scheduler: str,
+    compatibility_summary: str,
+    aliases: tuple[str, ...] = (),
+    notes: tuple[str, ...] = (),
+    shift_visible: bool = False,
+    default_shift: float | None = None,
+    flux_guidance_visible: bool = False,
+    default_flux_guidance: float | None = None,
+    prompt_enhancement_visible: bool = False,
+    default_prompt_enhancement_enabled: bool = False,
+    runtime_adapter_id: str = "",
+    official_template_path: str = "",
+    diffusion_model_hints: tuple[str, ...] = (),
+    diffusion_model_priority_hints: tuple[tuple[str, ...], ...] = (),
+    diffusion_model_deny_hints: tuple[str, ...] = (),
+    text_encoder_hints: tuple[str, ...] = (),
+    text_encoder_priority_hints: tuple[tuple[str, ...], ...] = (),
+    text_encoder_sequence_priority_hints: tuple[tuple[tuple[str, ...], ...], ...] = (),
+    aux_text_encoder_priority_hints: tuple[tuple[str, ...], ...] = (),
+    template_lora_priority_hints: tuple[tuple[str, ...], ...] = (),
+    vae_hints: tuple[str, ...] = (),
+    vae_priority_hints: tuple[tuple[str, ...], ...] = (),
+    vae_deny_hints: tuple[str, ...] = (),
+) -> FamilyTemplateManifestEntry:
+    return FamilyTemplateManifestEntry(
+        id=id,
+        title=title,
+        translation_base_family="sdxl",
+        public_base_family=public_base_family,
+        prompt_encoder="clip_text_encode_sdxl",
+        default_width=default_width,
+        default_height=default_height,
+        default_steps=default_steps,
+        default_cfg_scale=default_cfg_scale,
+        default_sampler=default_sampler,
+        default_scheduler=default_scheduler,
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        primary_model_category="diffusion_models",
+        text_encoder_visible=False,
+        shift_visible=shift_visible,
+        default_shift=default_shift,
+        flux_guidance_visible=flux_guidance_visible,
+        default_flux_guidance=default_flux_guidance,
+        prompt_enhancement_visible=prompt_enhancement_visible,
+        default_prompt_enhancement_enabled=default_prompt_enhancement_enabled,
+        support_tier="family-adapted",
+        compatibility_summary=compatibility_summary,
+        experimental=True,
+        aliases=aliases,
+        notes=notes,
+        runtime_adapter_id=runtime_adapter_id,
+        official_template_path=official_template_path,
+        diffusion_model_hints=diffusion_model_hints,
+        diffusion_model_priority_hints=diffusion_model_priority_hints,
+        diffusion_model_deny_hints=diffusion_model_deny_hints,
+        text_encoder_hints=text_encoder_hints,
+        text_encoder_priority_hints=text_encoder_priority_hints,
+        text_encoder_sequence_priority_hints=text_encoder_sequence_priority_hints,
+        aux_text_encoder_priority_hints=aux_text_encoder_priority_hints,
+        template_lora_priority_hints=template_lora_priority_hints,
+        vae_hints=vae_hints,
+        vae_priority_hints=vae_priority_hints,
+        vae_deny_hints=vae_deny_hints,
+    )
+
+
+_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
+    _parity_entry(
+        id="sd15",
+        title="Stable Diffusion 1.5",
+        translation_base_family="sd15",
+        default_width=512,
+        default_height=512,
+        default_steps=28,
+        default_cfg_scale=7.0,
+        default_sampler="euler_ancestral",
+        default_scheduler="normal",
+        default_clip_skip=1,
+        supports_clip_skip=True,
+        compatibility_summary="Primary A1111 parity baseline for classic Stable Diffusion checkpoints.",
+        notes=(
+            "Primary A1111 baseline for classic Stable Diffusion checkpoints.",
+            "Uses standard CLIP text encoding and optional clip-skip projection.",
+        ),
+    ),
+    _parity_entry(
+        id="sdxl",
+        title="Stable Diffusion XL",
+        translation_base_family="sdxl",
+        default_width=1024,
+        default_height=1024,
+        default_steps=28,
+        default_cfg_scale=7.0,
+        default_sampler="dpmpp_2m",
+        default_scheduler="karras",
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        compatibility_summary="Primary SDXL parity baseline with dual-text-encoder semantics.",
+        notes=(
+            "Uses SDXL dual-text-encoder semantics through CLIPTextEncodeSDXL.",
+            "Acts as the baseline for SDXL-derived families in RookieUI parity lanes.",
+        ),
+    ),
+    _parity_entry(
+        id="pony",
+        title="Pony",
+        translation_base_family="sdxl",
+        default_width=1024,
+        default_height=1024,
+        default_steps=28,
+        default_cfg_scale=7.0,
+        default_sampler="dpmpp_2m",
+        default_scheduler="karras",
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        compatibility_summary="SDXL-derived parity lane with preserved Pony-facing defaults.",
+        notes=("SDXL-derived parity lane with community-oriented defaults preserved as SDXL translation.",),
+    ),
+    _parity_entry(
+        id="illustrious",
+        title="Illustrious",
+        translation_base_family="sdxl",
+        default_width=1024,
+        default_height=1024,
+        default_steps=28,
+        default_cfg_scale=7.0,
+        default_sampler="dpmpp_2m",
+        default_scheduler="karras",
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        compatibility_summary="SDXL-derived parity lane retained as an explicit profile.",
+        notes=("SDXL-derived parity lane retained as an explicit profile for A1111-style UX.",),
+    ),
+    _parity_entry(
+        id="noob",
+        title="Noob",
+        translation_base_family="sdxl",
+        default_width=1024,
+        default_height=1024,
+        default_steps=28,
+        default_cfg_scale=7.0,
+        default_sampler="dpmpp_2m",
+        default_scheduler="karras",
+        default_clip_skip=1,
+        supports_clip_skip=False,
+        compatibility_summary="SDXL-derived parity lane retained for rookie-safe defaults.",
+        notes=("SDXL-derived parity lane retained as an explicit profile for rookie-safe defaults.",),
+    ),
+    _template_entry(
+        id="anima",
+        title="Anima",
+        public_base_family="anima",
+        default_width=1024,
+        default_height=1024,
+        default_steps=30,
+        default_cfg_scale=4.0,
+        default_sampler="er_sde",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Anima template preset routed through the non-SD template seam.",
+        aliases=("anima preview3",),
+        notes=(
+            "Matches the official Anima text-to-image template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_06b pairing.",
+        ),
+        runtime_adapter_id="anima",
+        official_template_path="reference/workflow_templates/Anima.json",
+        diffusion_model_hints=("anima",),
+        diffusion_model_priority_hints=(("anima",),),
+        text_encoder_hints=("anima",),
+        text_encoder_priority_hints=(("qwen_3_06b",), ("anima",), ("qwen",)),
+        vae_hints=("anima",),
+        vae_priority_hints=(("qwen_image", "vae"), ("qwen", "image", "vae"), ("anima", "vae"), ("anima",)),
+    ),
+    _template_entry(
+        id="chroma",
+        title="Chroma",
+        public_base_family="chroma",
+        default_width=1024,
+        default_height=1024,
+        default_steps=26,
+        default_cfg_scale=3.5,
+        default_sampler="euler",
+        default_scheduler="beta",
+        compatibility_summary="Official ComfyUI Chroma template preset routed through the non-SD template seam.",
+        aliases=("chroma1",),
+        notes=(
+            "Matches the official Chroma text-to-image template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed T5 encoder pairing.",
+        ),
+        shift_visible=True,
+        default_shift=1.0,
+        runtime_adapter_id="chroma",
+        official_template_path="reference/workflow_templates/Chroma.json",
+        diffusion_model_hints=("chroma",),
+        diffusion_model_priority_hints=(("chroma1",), ("chroma",)),
+        text_encoder_hints=("t5", "chroma"),
+        text_encoder_priority_hints=(("t5xxl", "fp8"), ("t5xxl",), ("chroma",), ("t5",)),
+        vae_hints=("ae", "chroma"),
+        vae_priority_hints=(("ae",), ("chroma",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="ernie_image",
+        title="ERNIE-Image",
+        public_base_family="ernie_image",
+        default_width=1024,
+        default_height=1024,
+        default_steps=40,
+        default_cfg_scale=4.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI ERNIE-Image template preset on the current non-SD translation seam.",
+        aliases=("ernie-image", "ernie image"),
+        notes=(
+            "Matches the official ERNIE-Image template defaults.",
+            "Text Encoder selector stays hidden because the official template owns both the Ministral and prompt-enhancer pairing.",
+        ),
+        prompt_enhancement_visible=True,
+        default_prompt_enhancement_enabled=True,
+        runtime_adapter_id="ernie",
+        official_template_path="reference/workflow_templates/Ernie Image.json",
+        diffusion_model_hints=("ernie", "image"),
+        diffusion_model_priority_hints=(("ernie", "image"), ("ernie",)),
+        text_encoder_hints=("ernie", "ministral", "3_3b", "ministral3"),
+        text_encoder_priority_hints=(("ministral3_3b",), ("ministral_3_3b",), ("ministral", "3", "3b"), ("ernie",)),
+        aux_text_encoder_priority_hints=(("ernie", "prompt", "enhancer"), ("prompt", "enhancer")),
+        vae_hints=("ernie", "flux2"),
+        vae_priority_hints=(("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="ernie_image_turbo",
+        title="ERNIE-Image Turbo",
+        public_base_family="ernie_image",
+        default_width=1024,
+        default_height=1024,
+        default_steps=8,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI ERNIE-Image Turbo template preset on the current non-SD translation seam.",
+        aliases=("ernie-image-turbo", "ernie image turbo"),
+        notes=(
+            "Matches the official ERNIE-Image Turbo template defaults.",
+            "Text Encoder selector stays hidden because the official template owns both the Ministral and prompt-enhancer pairing.",
+        ),
+        prompt_enhancement_visible=True,
+        default_prompt_enhancement_enabled=True,
+        runtime_adapter_id="ernie",
+        official_template_path="reference/workflow_templates/Ernie Image Turbo.json",
+        diffusion_model_hints=("ernie", "turbo"),
+        diffusion_model_priority_hints=(("ernie", "image", "turbo"), ("ernie", "turbo"), ("ernie",)),
+        text_encoder_hints=("ernie", "ministral", "3_3b", "ministral3"),
+        text_encoder_priority_hints=(("ministral3_3b",), ("ministral_3_3b",), ("ministral", "3", "3b"), ("ernie",)),
+        aux_text_encoder_priority_hints=(("ernie", "prompt", "enhancer"), ("prompt", "enhancer")),
+        vae_hints=("ernie", "flux2"),
+        vae_priority_hints=(("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="flux",
+        title="Flux.1 Dev FP8",
+        public_base_family="flux",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Flux.1 Dev FP8 template preset on the current non-SD translation seam.",
+        aliases=("flux.1 dev fp8", "flux-1 dev fp8", "flux1 dev fp8"),
+        notes=(
+            "Matches the official Flux.1 Dev FP8 template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the dual-encoder bundle.",
+        ),
+        runtime_adapter_id="flux",
+        official_template_path="reference/workflow_templates/Flux.1 Dev FP8.json",
+        diffusion_model_hints=("flux",),
+        diffusion_model_priority_hints=(("flux1", "dev"), ("flux1",), ("flux", "dev"), ("flux",)),
+        text_encoder_hints=("clip_l", "t5"),
+        text_encoder_priority_hints=(("clip_l",), ("clip", "l"), ("t5xxl",), ("flux",), ("t5",)),
+        text_encoder_sequence_priority_hints=((("clip_l",), ("t5xxl", "fp16")), (("clip_l",), ("t5xxl",))),
+        vae_hints=("flux", "ae"),
+        vae_priority_hints=(("ae",), ("flux", "vae"), ("flux",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="klein_4b_distilled",
+        title="Flux.2 4B Distilled Klein",
+        public_base_family="klein",
+        default_width=1024,
+        default_height=1024,
+        default_steps=4,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="beta",
+        compatibility_summary="Official ComfyUI Flux.2 4B Distilled Klein template preset on the current non-SD translation seam.",
+        aliases=("flux.2 4b distilled klein", "klein 4b distilled"),
+        notes=(
+            "Matches the official Flux.2 4B Distilled Klein template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
+        ),
+        runtime_adapter_id="klein_distilled",
+        official_template_path="reference/workflow_templates/Flux.2 4B Distilled Klein.json",
+        diffusion_model_hints=("klein", "4b"),
+        diffusion_model_priority_hints=(("flux", "2", "klein", "4b"), ("klein", "4b")),
+        diffusion_model_deny_hints=("base", "9b"),
+        text_encoder_hints=("qwen", "4b", "klein"),
+        text_encoder_priority_hints=(("qwen_3_4b",), ("klein", "4b"), ("klein",), ("qwen",)),
+        vae_hints=("flux2", "vae", "klein", "4b"),
+        vae_priority_hints=(("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    ),
+    _template_entry(
+        id="klein_4b",
+        title="Flux.2 4B Klein",
+        public_base_family="klein",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=5.0,
+        default_sampler="euler",
+        default_scheduler="beta",
+        compatibility_summary="Official ComfyUI Flux.2 4B Klein template preset on the current non-SD translation seam.",
+        aliases=("klein", "flux.2", "flux2", "flux.2 4b klein", "klein 4b"),
+        notes=(
+            "Matches the official Flux.2 4B Klein template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
+        ),
+        runtime_adapter_id="klein",
+        official_template_path="reference/workflow_templates/Flux.2 4B Klein.json",
+        diffusion_model_hints=("klein", "4b"),
+        diffusion_model_priority_hints=(("klein", "base", "4b"), ("flux", "2", "klein", "base", "4b"), ("klein", "4b")),
+        diffusion_model_deny_hints=("distill", "distilled", "9b"),
+        text_encoder_hints=("qwen", "4b", "klein"),
+        text_encoder_priority_hints=(("qwen_3_4b",), ("klein", "4b"), ("klein",), ("qwen",)),
+        vae_hints=("flux2", "vae", "klein", "4b"),
+        vae_priority_hints=(("flux2", "vae"), ("klein", "4b"), ("flux2",)),
+    ),
+    _template_entry(
+        id="klein_9b_distilled",
+        title="Flux.2 9B Distilled Klein",
+        public_base_family="klein",
+        default_width=1024,
+        default_height=1024,
+        default_steps=4,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="beta",
+        compatibility_summary="Official ComfyUI Flux.2 9B Distilled Klein template preset on the current non-SD translation seam.",
+        aliases=("flux.2 9b distilled klein", "klein 9b distilled"),
+        notes=(
+            "Matches the official Flux.2 9B Distilled Klein template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_8b pairing.",
+        ),
+        runtime_adapter_id="klein_distilled",
+        official_template_path="reference/workflow_templates/Flux.2 9B Distilled Klein.json",
+        diffusion_model_hints=("klein", "9b"),
+        diffusion_model_priority_hints=(("flux", "2", "klein", "9b"), ("klein", "9b")),
+        diffusion_model_deny_hints=("base", "4b"),
+        text_encoder_hints=("qwen", "8b", "klein"),
+        text_encoder_priority_hints=(("qwen_3_8b",), ("klein", "9b"), ("klein",), ("qwen",)),
+        vae_hints=("encoder", "decoder", "9b", "klein"),
+        vae_priority_hints=(("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    ),
+    _template_entry(
+        id="klein_9b",
+        title="Flux.2 9B Klein",
+        public_base_family="klein",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=5.0,
+        default_sampler="euler",
+        default_scheduler="beta",
+        compatibility_summary="Official ComfyUI Flux.2 9B Klein template preset on the current non-SD translation seam.",
+        aliases=("flux.2 9b klein", "klein 9b"),
+        notes=(
+            "Matches the official Flux.2 9B Klein template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_8b pairing.",
+        ),
+        runtime_adapter_id="klein",
+        official_template_path="reference/workflow_templates/Flux.2 9B Klein.json",
+        diffusion_model_hints=("klein", "9b"),
+        diffusion_model_priority_hints=(("klein", "base", "9b"), ("flux", "2", "klein", "base", "9b"), ("klein", "9b")),
+        diffusion_model_deny_hints=("distill", "distilled", "4b"),
+        text_encoder_hints=("qwen", "8b", "klein"),
+        text_encoder_priority_hints=(("qwen_3_8b",), ("klein", "9b"), ("klein",), ("qwen",)),
+        vae_hints=("encoder", "decoder", "9b", "klein"),
+        vae_priority_hints=(("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
+    ),
+    _template_entry(
+        id="hidream_i1_dev_fp8",
+        title="HiDream i1 Dev FP8",
+        public_base_family="hidream",
+        default_width=1024,
+        default_height=1024,
+        default_steps=28,
+        default_cfg_scale=1.0,
+        default_sampler="lcm",
+        default_scheduler="normal",
+        compatibility_summary="Official ComfyUI HiDream i1 Dev FP8 template preset on the current non-SD translation seam.",
+        aliases=("hidream i1 dev fp8",),
+        notes=(
+            "Matches the official HiDream i1 Dev FP8 template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
+        ),
+        shift_visible=True,
+        default_shift=6.0,
+        runtime_adapter_id="hidream",
+        official_template_path="reference/workflow_templates/Hidream i1 Dev FP8.json",
+        diffusion_model_hints=("hidream", "dev"),
+        diffusion_model_priority_hints=(("hidream", "dev", "fp8"), ("hidream", "i1", "dev"), ("hidream", "dev")),
+        text_encoder_hints=("hidream", "clip"),
+        text_encoder_priority_hints=(("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+        text_encoder_sequence_priority_hints=(
+            (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+        ),
+        vae_hints=("ae", "hidream"),
+        vae_priority_hints=(("ae",), ("hidream",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="hidream_i1_fast",
+        title="HiDream i1 fast",
+        public_base_family="hidream",
+        default_width=1024,
+        default_height=1024,
+        default_steps=16,
+        default_cfg_scale=1.0,
+        default_sampler="lcm",
+        default_scheduler="normal",
+        compatibility_summary="Official ComfyUI HiDream i1 fast template preset on the current non-SD translation seam.",
+        aliases=("hidream i1 fast",),
+        notes=(
+            "Matches the official HiDream i1 fast template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        runtime_adapter_id="hidream",
+        official_template_path="reference/workflow_templates/Hidream i1 fast.json",
+        diffusion_model_hints=("hidream", "fast"),
+        diffusion_model_priority_hints=(("hidream", "fast"), ("hidream", "i1", "fast")),
+        text_encoder_hints=("hidream", "clip"),
+        text_encoder_priority_hints=(("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+        text_encoder_sequence_priority_hints=(
+            (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+        ),
+        vae_hints=("ae", "hidream"),
+        vae_priority_hints=(("ae",), ("hidream",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="hidream_i1_full",
+        title="HiDream i1 full",
+        public_base_family="hidream",
+        default_width=1024,
+        default_height=1024,
+        default_steps=50,
+        default_cfg_scale=5.0,
+        default_sampler="uni_pc",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI HiDream i1 full template preset on the current non-SD translation seam.",
+        aliases=("hidream", "hidream i1", "hidream i1 full"),
+        notes=(
+            "Matches the official HiDream i1 full template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the four-encoder bundle.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        runtime_adapter_id="hidream",
+        official_template_path="reference/workflow_templates/Hidream i1 full.json",
+        diffusion_model_hints=("hidream", "full"),
+        diffusion_model_priority_hints=(("hidream", "full"), ("hidream", "i1", "full"), ("hidream", "i1")),
+        text_encoder_hints=("hidream", "clip"),
+        text_encoder_priority_hints=(("clip_l_hidream",), ("hidream", "clip"), ("hidream",), ("llama",), ("t5xxl",)),
+        text_encoder_sequence_priority_hints=(
+            (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
+        ),
+        vae_hints=("ae", "hidream"),
+        vae_priority_hints=(("ae",), ("hidream",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="longcat_image",
+        title="Longcat BF16",
+        public_base_family="longcat_image",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=4.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Longcat BF16 template preset on the current non-SD translation seam.",
+        aliases=("longcat", "longcat image"),
+        notes=(
+            "Matches the official Longcat BF16 template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing.",
+        ),
+        flux_guidance_visible=True,
+        default_flux_guidance=4.0,
+        runtime_adapter_id="longcat",
+        official_template_path="reference/workflow_templates/Longcat BF16.json",
+        diffusion_model_hints=("longcat",),
+        diffusion_model_priority_hints=(("longcat",),),
+        text_encoder_hints=("longcat", "qwen", "2.5", "vl"),
+        text_encoder_priority_hints=(("qwen_2.5_vl_7b",), ("longcat",), ("qwen", "vl"), ("qwen",)),
+        vae_hints=("ae", "longcat"),
+        vae_priority_hints=(("ae",), ("longcat",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="qwen_image",
+        title="Qwen-Image 2512",
+        public_base_family="qwen_image",
+        default_width=1328,
+        default_height=1328,
+        default_steps=2,
+        default_cfg_scale=1.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Qwen-Image 2512 template preset on the current non-SD translation seam.",
+        aliases=("qwen image", "qwen-image 2512", "qwen image 2512"),
+        notes=(
+            "Matches the official Qwen-Image 2512 template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing and template-baked LoRA.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        runtime_adapter_id="qwen_image",
+        official_template_path="reference/workflow_templates/Qwen-Image 2512.json",
+        diffusion_model_hints=("qwen", "2512"),
+        diffusion_model_priority_hints=(("qwen", "image", "2512"), ("qwen", "2512", "fp8"), ("qwen", "2512"), ("qwen", "image")),
+        diffusion_model_deny_hints=("lightning", "lora", "2step", "4step", "8step", "distill", "distilled"),
+        text_encoder_hints=("qwen", "2.5", "vl"),
+        text_encoder_priority_hints=(("qwen_2.5_vl_7b",), ("qwen_2.5_vl",), ("qwen", "image"), ("qwen",)),
+        template_lora_priority_hints=(
+            ("wuli", "qwen", "image", "2512", "turbo", "lora"),
+            ("qwen", "image", "2512", "turbo", "lora"),
+            ("qwen", "image", "2512", "lora"),
+        ),
+        vae_hints=("qwen", "qwen-image", "qwen_image"),
+        vae_priority_hints=(("qwen", "vae"), ("qwen", "image"), ("qwen",)),
+    ),
+    _template_entry(
+        id="z_image",
+        title="Z-Image",
+        public_base_family="z_image",
+        default_width=1024,
+        default_height=1024,
+        default_steps=25,
+        default_cfg_scale=4.0,
+        default_sampler="res_multistep",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Z-Image template preset on the current non-SD translation seam.",
+        aliases=("lumina", "z-image", "z image", "lumina2"),
+        notes=(
+            "Matches the official Z-Image template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        runtime_adapter_id="z_image",
+        official_template_path="reference/workflow_templates/Z-Image.json",
+        diffusion_model_hints=("z-image", "z_image", "zimage"),
+        diffusion_model_priority_hints=(("z_image",), ("z-image",), ("z", "image")),
+        text_encoder_hints=("qwen", "3", "4b", "z"),
+        text_encoder_priority_hints=(("qwen_3_4b",), ("z_image",), ("z-image",), ("lumina",), ("qwen",)),
+        vae_hints=("ae", "z-image", "z_image"),
+        vae_priority_hints=(("ae",), ("z-image",), ("z_image",)),
+        vae_deny_hints=("qwen",),
+    ),
+    _template_entry(
+        id="z_image_turbo",
+        title="Z-Image Turbo",
+        public_base_family="z_image",
+        default_width=1024,
+        default_height=1024,
+        default_steps=8,
+        default_cfg_scale=1.0,
+        default_sampler="res_multistep",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Z-Image Turbo template preset on the current non-SD translation seam.",
+        aliases=("zit", "z-image-turbo", "z image turbo"),
+        notes=(
+            "Matches the official Z-Image Turbo template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
+        ),
+        shift_visible=True,
+        default_shift=3.0,
+        runtime_adapter_id="z_image",
+        official_template_path="reference/workflow_templates/Z-Image Turbo.json",
+        diffusion_model_hints=("z-image", "z_image", "zimage", "turbo"),
+        diffusion_model_priority_hints=(("z_image", "turbo"), ("z-image", "turbo"), ("z", "image", "turbo")),
+        text_encoder_hints=("qwen", "3", "4b", "z"),
+        text_encoder_priority_hints=(("qwen_3_4b",), ("z_image", "turbo"), ("z-image", "turbo"), ("lumina",), ("qwen",)),
+        vae_hints=("ae", "z-image", "z_image", "turbo"),
+        vae_priority_hints=(("ae",), ("z-image", "turbo"), ("z_image", "turbo"), ("z-image",), ("z_image",)),
+        vae_deny_hints=("qwen",),
+    ),
+)
+
+
+def list_family_template_manifest_entries() -> list[FamilyTemplateManifestEntry]:
+    return list(_MANIFEST_ENTRIES)
+
+
+def _normalized_aliases(entry: FamilyTemplateManifestEntry) -> tuple[str, ...]:
+    return tuple(str(alias or "").strip().lower() for alias in entry.aliases if str(alias or "").strip())
+
+
+def get_family_template_manifest_entry(family_id: str) -> FamilyTemplateManifestEntry:
+    normalized = (family_id or "").strip().lower()
+    if not normalized:
+        normalized = "sd15"
+    for entry in _MANIFEST_ENTRIES:
+        if entry.id == normalized:
+            return entry
+        if normalized in _normalized_aliases(entry):
+            return entry
+    raise ValueError(f"Unsupported RookieUI model family: {family_id}")
+
+
+def build_model_family_registry_payload() -> dict[str, object]:
+    return {
+        "contract_version": MODEL_FAMILY_REGISTRY_CONTRACT_VERSION,
+        "entries": [entry.to_registry_payload() for entry in _MANIFEST_ENTRIES],
+    }
+
+
+def build_primary_model_category_by_family() -> dict[str, str]:
+    category_map: dict[str, str] = {}
+    for entry in _MANIFEST_ENTRIES:
+        category_map[entry.id] = entry.primary_model_category
+        public_base_family = str(entry.public_base_family or "").strip().lower()
+        if public_base_family and public_base_family not in category_map:
+            category_map[public_base_family] = entry.primary_model_category
+        for alias in _normalized_aliases(entry):
+            category_map[alias] = entry.primary_model_category
+    return category_map
+
+
+def list_non_sd_txt2img_manifest_entries() -> list[FamilyTemplateManifestEntry]:
+    return [
+        entry
+        for entry in _MANIFEST_ENTRIES
+        if entry.support_tier != "parity" and entry.flow_kind == "txt2img"
+    ]
+
+
+def build_non_sd_txt2img_profile_ids() -> tuple[str, ...]:
+    return tuple(entry.id for entry in list_non_sd_txt2img_manifest_entries())
+
+
+def build_non_sd_runtime_adapter_map() -> dict[str, str]:
+    return {
+        entry.id: entry.runtime_adapter_id
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.runtime_adapter_id
+    }
+
+
+def build_non_sd_shift_expectations() -> dict[str, float]:
+    return {
+        entry.id: float(entry.default_shift)
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.shift_visible and entry.default_shift is not None
+    }
+
+
+def build_non_sd_flux_guidance_expectations() -> dict[str, float]:
+    return {
+        entry.id: float(entry.default_flux_guidance)
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.flux_guidance_visible and entry.default_flux_guidance is not None
+    }
+
+
+def build_non_sd_prompt_enhancement_expectations() -> dict[str, bool]:
+    return {
+        entry.id: bool(entry.default_prompt_enhancement_enabled)
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.prompt_enhancement_visible
+    }
+
+
+def build_diffusion_model_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
+    return {
+        entry.id: entry.diffusion_model_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.diffusion_model_priority_hints
+    }
+
+
+def build_diffusion_model_hints_by_profile() -> dict[str, tuple[str, ...]]:
+    return {
+        entry.id: entry.diffusion_model_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.diffusion_model_hints
+    }
+
+
+def build_diffusion_model_deny_hints_by_profile() -> dict[str, tuple[str, ...]]:
+    return {
+        entry.id: entry.diffusion_model_deny_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.diffusion_model_deny_hints
+    }
+
+
+def build_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
+    return {
+        entry.id: entry.text_encoder_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.text_encoder_priority_hints
+    }
+
+
+def build_text_encoder_hints_by_profile() -> dict[str, tuple[str, ...]]:
+    return {
+        entry.id: entry.text_encoder_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.text_encoder_hints
+    }
+
+
+def build_text_encoder_sequence_hints_by_profile() -> dict[str, tuple[tuple[tuple[str, ...], ...], ...]]:
+    return {
+        entry.id: entry.text_encoder_sequence_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.text_encoder_sequence_priority_hints
+    }
+
+
+def build_aux_text_encoder_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
+    return {
+        entry.id: entry.aux_text_encoder_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.aux_text_encoder_priority_hints
+    }
+
+
+def build_template_lora_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
+    return {
+        entry.id: entry.template_lora_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.template_lora_priority_hints
+    }
+
+
+def build_vae_priority_hints_by_profile() -> dict[str, tuple[tuple[str, ...], ...]]:
+    return {
+        entry.id: entry.vae_priority_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.vae_priority_hints
+    }
+
+
+def build_vae_hints_by_profile() -> dict[str, tuple[str, ...]]:
+    return {
+        entry.id: entry.vae_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.vae_hints
+    }
+
+
+def build_vae_deny_hints_by_profile() -> dict[str, tuple[str, ...]]:
+    return {
+        entry.id: entry.vae_deny_hints
+        for entry in list_non_sd_txt2img_manifest_entries()
+        if entry.vae_deny_hints
+    }
