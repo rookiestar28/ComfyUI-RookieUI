@@ -20,6 +20,16 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from rookieui.contracts.extras import EXTRAS_CONTRACT_VERSION
+from rookieui.contracts.family_template_manifest import (
+    build_non_sd_flux_guidance_expectations,
+    build_non_sd_prompt_enhancement_expectations,
+    build_non_sd_shift_expectations,
+    build_non_sd_txt2img_profile_ids,
+    build_text_encoder_priority_hints_by_profile,
+    build_text_encoder_sequence_hints_by_profile,
+    build_vae_priority_hints_by_profile,
+    build_diffusion_model_priority_hints_by_profile,
+)
 from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
@@ -55,104 +65,14 @@ from tests.prompt_parity_fixtures import (
 )
 
 
-_NON_SD_DIFFUSION_PROFILES: tuple[str, ...] = (
-    "anima",
-    "chroma",
-    "ernie_image",
-    "ernie_image_turbo",
-    "flux",
-    "klein_4b_distilled",
-    "klein_4b",
-    "klein_9b_distilled",
-    "klein_9b",
-    "hidream_i1_dev_fp8",
-    "hidream_i1_fast",
-    "hidream_i1_full",
-    "longcat_image",
-    "qwen_image",
-    "z_image",
-    "z_image_turbo",
-)
-_NON_SD_SHIFT_EXPECTATIONS: dict[str, float] = {
-    "chroma": 1.0,
-    "hidream_i1_dev_fp8": 6.0,
-    "hidream_i1_fast": 3.0,
-    "hidream_i1_full": 3.0,
-    "qwen_image": 3.0,
-    "z_image": 3.0,
-    "z_image_turbo": 3.0,
-}
-_NON_SD_FLUX_GUIDANCE_EXPECTATIONS: dict[str, float] = {
-    "longcat_image": 4.0,
-}
-_NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS: dict[str, bool] = {
-    "ernie_image": True,
-    "ernie_image_turbo": True,
-}
-_NON_SD_CHECKPOINT_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "anima": (("anima",),),
-    "chroma": (("chroma",),),
-    "ernie_image": (("ernie", "image"), ("ernie",)),
-    "ernie_image_turbo": (("ernie", "image", "turbo"), ("ernie", "turbo"), ("ernie",)),
-    "flux": (("flux",),),
-    "klein_4b_distilled": (("klein", "4b", "distill"), ("klein", "4b")),
-    "klein_4b": (("klein", "4b"),),
-    "klein_9b_distilled": (("klein", "9b", "distill"), ("klein", "9b")),
-    "klein_9b": (("klein", "9b"),),
-    "hidream_i1_dev_fp8": (("hidream", "dev"),),
-    "hidream_i1_fast": (("hidream", "fast"),),
-    "hidream_i1_full": (("hidream", "full"), ("hidream", "i1")),
-    "longcat_image": (("longcat",),),
-    "qwen_image": (("qwen", "image", "2512"), ("qwen", "2512")),
-    "z_image": (("z_image",), ("z-image",), ("z", "image")),
-    "z_image_turbo": (("z_image", "turbo"), ("z-image", "turbo"), ("zit", "turbo")),
-}
-_NON_SD_TEXT_ENCODER_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "anima": (("qwen_3_06b",), ("qwen", "3", "06b")),
-    "chroma": (("t5xxl",), ("chroma",)),
-    "ernie_image": (("ministral", "3", "3b"), ("ministral3_3b",), ("ernie",)),
-    "ernie_image_turbo": (("ministral", "3", "3b"), ("ministral3_3b",), ("ernie",)),
-    "klein_4b_distilled": (("qwen_3_4b",), ("qwen", "3", "4b")),
-    "klein_4b": (("qwen_3_4b",), ("qwen", "3", "4b")),
-    "klein_9b_distilled": (("qwen_3_8b",), ("qwen", "3", "8b")),
-    "klein_9b": (("qwen_3_8b",), ("qwen", "3", "8b")),
-    "longcat_image": (("qwen_2.5_vl_7b",), ("qwen", "2.5", "vl"), ("longcat",)),
-    "qwen_image": (("qwen_2.5_vl_7b",), ("qwen", "2.5", "vl"), ("qwen", "image")),
-    "z_image": (("qwen_3_4b",), ("qwen", "3", "4b")),
-    "z_image_turbo": (("qwen_3_4b",), ("qwen", "3", "4b")),
-}
-_NON_SD_TEXT_ENCODER_SEQUENCE_HINTS: dict[str, tuple[tuple[tuple[str, ...], ...], ...]] = {
-    "flux": (
-        (("clip_l",), ("t5xxl",)),
-    ),
-    "hidream_i1_dev_fp8": (
-        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
-    ),
-    "hidream_i1_fast": (
-        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
-    ),
-    "hidream_i1_full": (
-        (("clip_l_hidream",), ("clip_g_hidream",), ("t5xxl", "fp8"), ("llama", "8b", "instruct")),
-    ),
-}
-_NON_SD_VAE_PRIORITY_HINTS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "anima": (("qwen_image", "vae"), ("qwen", "image", "vae"), ("anima",)),
-    "chroma": (("ae",), ("chroma",)),
-    "ernie_image": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
-    "ernie_image_turbo": (("flux2", "vae"), ("ernie", "vae"), ("ernie",)),
-    "flux": (("ae",), ("flux", "vae"), ("flux",)),
-    "hidream_i1_dev_fp8": (("ae",), ("hidream",)),
-    "hidream_i1_fast": (("ae",), ("hidream",)),
-    "hidream_i1_full": (("ae",), ("hidream",)),
-    "klein_4b_distilled": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
-    "klein_4b": (("flux2", "vae"), ("klein", "4b"), ("flux2",)),
-    "klein_9b_distilled": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
-    "klein_9b": (("full", "encoder", "small", "decoder"), ("klein", "9b"), ("encoder", "decoder")),
-    "longcat_image": (("ae",), ("longcat",)),
-    "qwen_image": (("qwen", "vae"), ("qwen", "image"), ("qwen",)),
-    "z_image": (("ae",), ("z_image",), ("z-image",)),
-    "z_image_turbo": (("ae",), ("z_image", "turbo"), ("z-image", "turbo"), ("z_image",), ("z-image",)),
-}
+_NON_SD_DIFFUSION_PROFILES = build_non_sd_txt2img_profile_ids()
+_NON_SD_SHIFT_EXPECTATIONS = build_non_sd_shift_expectations()
+_NON_SD_FLUX_GUIDANCE_EXPECTATIONS = build_non_sd_flux_guidance_expectations()
+_NON_SD_PROMPT_ENHANCEMENT_EXPECTATIONS = build_non_sd_prompt_enhancement_expectations()
+_NON_SD_CHECKPOINT_PRIORITY_HINTS = build_diffusion_model_priority_hints_by_profile()
+_NON_SD_TEXT_ENCODER_PRIORITY_HINTS = build_text_encoder_priority_hints_by_profile()
+_NON_SD_TEXT_ENCODER_SEQUENCE_HINTS = build_text_encoder_sequence_hints_by_profile()
+_NON_SD_VAE_PRIORITY_HINTS = build_vae_priority_hints_by_profile()
 _CONTROLNET_VALIDATION_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
 _ADETAILER_VALIDATION_PROFILES: tuple[str, ...] = _CONTROLNET_VALIDATION_PROFILES
 _SD_PROMPT_PARITY_PROFILES: tuple[str, ...] = ("sd15", "pony", "illustrious", "noob", "sdxl")
