@@ -677,6 +677,41 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-2").evaluate((node) => node.hidden)).toBe(false);
   await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-3").evaluate((node) => node.hidden)).toBe(false);
   await expect(page.locator("#rookieui-img2img-reference-note")).toContainText("Add up to 2 more");
+  await page.evaluate(() => {
+    const assignInputValue = (id, value) => {
+      const input = document.getElementById(id);
+      input.value = value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    assignInputValue("rookieui-image-asset", "e2e-edit-reference-1");
+    assignInputValue("rookieui-img2img-reference-asset-2", "e2e-edit-reference-2");
+    assignInputValue("rookieui-img2img-reference-asset-3", "e2e-edit-reference-3");
+    const mainReferenceRadio = document.getElementById("rookieui-img2img-reference-main-2");
+    mainReferenceRadio.checked = true;
+    mainReferenceRadio.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-img2img-form").dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+  });
+  await expect.poll(async () => page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.img2img.length)).toBe(1);
+  const imageEditRequests = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.img2img);
+  expect(imageEditRequests[0]).toMatchObject({
+    mode: "img2img",
+    profile: "flux_kontext_dev_edit",
+    image_asset: "e2e-edit-reference-1",
+    reference_images: [
+      { image_asset: "e2e-edit-reference-1" },
+      { image_asset: "e2e-edit-reference-2" },
+      { image_asset: "e2e-edit-reference-3" },
+    ],
+    main_reference_index: 2,
+  });
+  expect("mask_asset" in imageEditRequests[0]).toBe(false);
+  expect("mask_data" in imageEditRequests[0]).toBe(false);
+  await page.evaluate(() => {
+    window.__ROOKIEUI_E2E_REQUESTS__.img2img.length = 0;
+  });
   await page.locator("#rookieui-img2img-generation-mode-img2img").click();
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");

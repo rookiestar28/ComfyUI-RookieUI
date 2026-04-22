@@ -112,6 +112,16 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             "sd15,pony,illustrious,noob,sdxl",
         )
 
+    def test_default_profiles_for_image_edit_use_first_wave_order(self) -> None:
+        self.assertEqual(
+            live_smoke._default_profiles_for_mode("image-edit"),
+            (
+                "qwen_image_edit,qwen_image_edit_multi_lora,firered_image_edit,"
+                "firered_image_edit_lightning,flux_kontext_dev_edit,flux2_image_edit,"
+                "klein_9b_kv_image_edit,longcat_image_edit"
+            ),
+        )
+
     def test_default_profiles_for_auxiliary_contracts_is_empty(self) -> None:
         self.assertEqual(live_smoke._default_profiles_for_mode("auxiliary-contracts"), "")
 
@@ -475,7 +485,39 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         self.assertEqual(payload["text_encoder_name"], "qwen_2.5_vl_7b_fp8_scaled.safetensors")
         self.assertEqual(payload["vae_name"], "qwen_image_vae.safetensors")
         self.assertEqual(payload["edit_megapixels"], 1.5)
-        self.assertTrue(str(payload["image_data"]).startswith("data:image/png;base64,"))
+        self.assertEqual(payload["main_reference_index"], 0)
+        self.assertEqual(len(payload["reference_images"]), 1)
+        self.assertTrue(str(payload["reference_images"][0]["image_data"]).startswith("data:image/png;base64,"))
+        self.assertNotIn("image_data", payload)
+
+    def test_build_edit_payload_uses_ordered_multi_reference_contract_for_flux_kontext(self) -> None:
+        payload = live_smoke._build_edit_payload(
+            "flux_kontext_dev_edit",
+            {
+                "checkpoint_name": "Flux\\flux1-dev-kontext_fp8_scaled.safetensors",
+                "vae_name": "Automatic",
+                "text_encoder_name": "",
+            },
+            "client-ktext",
+            models_payload={
+                "source": "host",
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["Flux\\flux1-dev-kontext_fp8_scaled.safetensors"],
+                "vae": ["ae.safetensors"],
+                "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors"],
+                "loras": [],
+                "default_checkpoint": "realvisxl.safetensors",
+                "default_vae": "ae.safetensors",
+                "default_text_encoder": "clip_l.safetensors",
+            },
+        )
+
+        self.assertEqual(payload["mode"], "img2img")
+        self.assertEqual(payload["main_reference_index"], 2)
+        self.assertEqual(len(payload["reference_images"]), 3)
+        self.assertEqual(payload["text_encoder_name"], "")
+        self.assertTrue(all(str(entry["image_data"]).startswith("data:image/png;base64,") for entry in payload["reference_images"]))
+        self.assertNotIn("image_data", payload)
 
     def test_build_txt2img_payload_resolves_profile_aware_flux_template_lora(self) -> None:
         payload = live_smoke._build_txt2img_payload(
@@ -689,6 +731,76 @@ class LiveSmokeCatalogTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_validate_catalog_contract_accepts_qwen_image_edit_multi_lora_with_official_lora(self) -> None:
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+                "vae": ["qwen_image_vae.safetensors"],
+                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+                "catalog": {"primary_model_category_by_family": {"qwen_image_edit_multi_lora": "diffusion_models"}},
+            },
+            {
+                "presets": [
+                    {
+                        "id": "qwen_image_edit_multi_lora",
+                        "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                        "vae_name": "qwen_image_vae.safetensors",
+                        "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                        "shift": 3.0,
+                        "edit_megapixels": 1.5,
+                    }
+                ]
+            },
+            ["qwen_image_edit_multi_lora"],
+        )
+
+        self.assertEqual(errors, [])
+
+    def test_validate_image_edit_dry_run_response_pins_triple_template_lora_depth(self) -> None:
+        case = live_smoke._build_image_edit_dry_run_case(
+            "qwen_image_edit_multi_lora",
+            {
+                "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                "vae_name": "qwen_image_vae.safetensors",
+                "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "edit_megapixels": 1.5,
+            },
+            models_payload={
+                "source": "host",
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+                "vae": ["qwen_image_vae.safetensors"],
+                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+                "default_checkpoint": "realvisxl.safetensors",
+                "default_vae": "qwen_image_vae.safetensors",
+                "default_text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+            },
+        )
+
+        errors = live_smoke._validate_image_edit_dry_run_response(
+            case,
+            {
+                "workflow_kind": "img2img-qwen_image_edit_multi_lora",
+                "normalized_request": {
+                    "mode": "img2img",
+                    "execution_mode": "edit",
+                    "reference_image_assets": ["uploaded-reference"],
+                    "main_reference_index": 0,
+                    "mask_asset": "",
+                },
+                "workflow": {
+                    "1": {"class_type": "RookieUILoadAssetImage"},
+                    "2": {"class_type": "LoraLoaderModelOnly"},
+                    "3": {"class_type": "LoraLoaderModelOnly"},
+                    "4": {"class_type": "LoraLoaderModelOnly"},
+                },
+            },
+        )
+
+        self.assertEqual(errors, [])
+
     def test_run_execute_smoke_routes_qwen_image_edit_through_img2img_without_mask(self) -> None:
         submit_calls: list[tuple[str, dict[str, object]]] = []
 
@@ -746,7 +858,71 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         self.assertEqual(submit_url, "http://127.0.0.1:8188/rookieui/generate/img2img")
         self.assertEqual(submit_payload["mode"], "img2img")
         self.assertNotIn("mask_asset", submit_payload)
-        self.assertTrue(str(submit_payload["image_data"]).startswith("data:image/png;base64,"))
+        self.assertEqual(submit_payload["main_reference_index"], 0)
+        self.assertEqual(len(submit_payload["reference_images"]), 1)
+        self.assertTrue(str(submit_payload["reference_images"][0]["image_data"]).startswith("data:image/png;base64,"))
+        self.assertNotIn("image_data", submit_payload)
+
+    def test_run_execute_smoke_routes_flux_kontext_image_edit_with_ordered_references(self) -> None:
+        submit_calls: list[tuple[str, dict[str, object]]] = []
+
+        def _fake_request_json(
+            method: str,
+            url: str,
+            *,
+            payload: dict[str, object] | None = None,
+            timeout_seconds: float,
+        ) -> dict[str, object]:
+            self.assertEqual(method, "POST")
+            assert payload is not None
+            submit_calls.append((url, payload))
+            return {"submission": {"accepted": True, "prompt_id": "prompt-2"}}
+
+        with (
+            mock.patch.object(live_smoke, "_request_json", side_effect=_fake_request_json),
+            mock.patch.object(
+                live_smoke,
+                "_poll_queue_job_until_terminal",
+                return_value={"status": "completed"},
+            ),
+        ):
+            errors = live_smoke._run_execute_smoke(
+                "http://127.0.0.1:8188",
+                ["flux_kontext_dev_edit"],
+                {
+                    "source": "host",
+                    "checkpoints": ["realvisxl.safetensors"],
+                    "diffusion_models": ["Flux\\flux1-dev-kontext_fp8_scaled.safetensors"],
+                    "vae": ["ae.safetensors"],
+                    "text_encoders": ["clip_l.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors"],
+                    "loras": [],
+                    "default_checkpoint": "realvisxl.safetensors",
+                    "default_vae": "ae.safetensors",
+                    "default_text_encoder": "clip_l.safetensors",
+                },
+                {
+                    "flux_kontext_dev_edit": {
+                        "checkpoint_name": "Flux\\flux1-dev-kontext_fp8_scaled.safetensors",
+                        "vae_name": "Automatic",
+                        "text_encoder_name": "",
+                    }
+                },
+                request_timeout_seconds=5.0,
+                poll_timeout_seconds=5.0,
+                poll_interval_seconds=0.1,
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(submit_calls), 1)
+        submit_url, submit_payload = submit_calls[0]
+        self.assertEqual(submit_url, "http://127.0.0.1:8188/rookieui/generate/img2img")
+        self.assertEqual(submit_payload["mode"], "img2img")
+        self.assertEqual(submit_payload["main_reference_index"], 2)
+        self.assertEqual(len(submit_payload["reference_images"]), 3)
+        self.assertTrue(all(str(entry["image_data"]).startswith("data:image/png;base64,") for entry in submit_payload["reference_images"]))
+        self.assertNotIn("mask_asset", submit_payload)
+        self.assertNotIn("image_data", submit_payload)
+
 
     def test_validate_catalog_contract_reports_wrong_chroma_family_fallback(self) -> None:
         errors, _ = live_smoke._validate_catalog_contract(

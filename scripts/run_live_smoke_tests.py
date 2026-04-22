@@ -216,6 +216,17 @@ class LiveADetailerDryRunCase:
 
 
 @dataclass(frozen=True)
+class LiveImageEditDryRunCase:
+    case_id: str
+    profile_id: str
+    request_payload: dict[str, Any]
+    expected_workflow_kind: str
+    expected_reference_count: int
+    expected_main_reference_index: int
+    expected_template_lora_nodes: int
+
+
+@dataclass(frozen=True)
 class AuxiliaryPipelineContext:
     checkpoint_name: str
     workflow_family: str
@@ -278,6 +289,8 @@ def _default_profiles_for_mode(validation_mode: str) -> str:
         return ",".join(_CONTROLNET_VALIDATION_PROFILES)
     if validation_mode == "adetailer":
         return ",".join(_ADETAILER_VALIDATION_PROFILES)
+    if validation_mode == "image-edit":
+        return ",".join(_NON_SD_EDIT_PROFILES)
     if validation_mode == "prompt-workbench":
         return ""
     if validation_mode == "xyz-plot":
@@ -306,6 +319,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--validation-mode",
         choices=(
             "catalog",
+            "image-edit",
             "prompt-parity",
             "prompt-workbench",
             "xyz-plot",
@@ -3272,6 +3286,7 @@ def _build_edit_payload(
         preset,
         models_payload=models_payload,
     )
+    reference_images, main_reference_index = _build_image_edit_reference_payload(profile_id)
     edit_megapixels = preset.get("edit_megapixels")
     if edit_megapixels in {None, ""}:
         edit_megapixels = _NON_SD_EDIT_MEGAPIXELS_EXPECTATIONS.get(profile_id)
@@ -3283,7 +3298,8 @@ def _build_edit_payload(
         "negative_prompt": "",
         "profile": profile_id,
         "mode": "img2img",
-        "image_data": _build_png_data_url(color="midnightblue"),
+        "reference_images": reference_images,
+        "main_reference_index": main_reference_index,
         "checkpoint_name": str(preset.get("checkpoint_name", "")).strip(),
         "vae_name": vae_name,
         "text_encoder_name": text_encoder_name,
@@ -3302,6 +3318,184 @@ def _build_edit_payload(
         "seed": 1,
         "client_id": client_id,
     }
+
+
+def _build_image_edit_reference_payload(profile_id: str) -> tuple[list[dict[str, str]], int]:
+    manifest_entry = get_family_template_manifest_entry(profile_id)
+    max_direct_references = int(getattr(manifest_entry, "max_direct_references", 0) or 0)
+    reference_count = 1 if max_direct_references <= 1 else min(max_direct_references, 3)
+    colors = ("midnightblue", "seagreen", "goldenrod")
+    reference_images = [
+        {"image_data": _build_png_data_url(color=colors[index])}
+        for index in range(reference_count)
+    ]
+    main_reference_index = 0 if reference_count == 1 else min(reference_count - 1, 2)
+    return reference_images, main_reference_index
+
+
+def _expected_template_lora_nodes_for_image_edit(profile_id: str) -> int:
+    manifest_entry = get_family_template_manifest_entry(profile_id)
+    chain_mode = str(getattr(manifest_entry, "template_lora_chain_mode", "") or "").strip().lower()
+    if chain_mode == "single":
+        return 1
+    if chain_mode == "triple":
+        return 3
+    return 0
+
+
+def _build_image_edit_dry_run_case(
+    profile_id: str,
+    preset: dict[str, Any],
+    *,
+    models_payload: dict[str, Any] | None = None,
+) -> LiveImageEditDryRunCase:
+    request_payload = _build_edit_payload(
+        profile_id,
+        preset,
+        f"rookieui-live-smoke-{profile_id}-dry-run",
+        models_payload=models_payload,
+    )
+    request_payload["dry_run"] = True
+    reference_images = request_payload.get("reference_images")
+    expected_reference_count = len(reference_images) if isinstance(reference_images, list) else 0
+    expected_main_reference_index = int(request_payload.get("main_reference_index", 0) or 0)
+    return LiveImageEditDryRunCase(
+        case_id=f"image-edit-{profile_id}",
+        profile_id=profile_id,
+        request_payload=request_payload,
+        expected_workflow_kind=f"img2img-{profile_id}",
+        expected_reference_count=expected_reference_count,
+        expected_main_reference_index=expected_main_reference_index,
+        expected_template_lora_nodes=_expected_template_lora_nodes_for_image_edit(profile_id),
+    )
+
+
+def _validate_image_edit_dry_run_response(
+    case: LiveImageEditDryRunCase,
+    response_payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    workflow_kind = str(response_payload.get("workflow_kind", "")).strip()
+    if workflow_kind != case.expected_workflow_kind:
+        errors.append(
+            f"{case.case_id}: expected workflow_kind '{case.expected_workflow_kind}' but got '{workflow_kind}'."
+        )
+
+    normalized_request = response_payload.get("normalized_request")
+    if not isinstance(normalized_request, dict):
+        return errors + [f"{case.case_id}: img2img dry-run payload missing normalized_request."]
+
+    if str(normalized_request.get("mode", "")).strip() != "img2img":
+        errors.append(f"{case.case_id}: normalized_request.mode drifted from canonical 'img2img'.")
+    if str(normalized_request.get("execution_mode", "")).strip() != "edit":
+        errors.append(f"{case.case_id}: normalized_request.execution_mode should remain 'edit'.")
+
+    reference_image_assets = normalized_request.get("reference_image_assets")
+    if not isinstance(reference_image_assets, list) or len(reference_image_assets) != case.expected_reference_count:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_reference_count} normalized reference image asset(s) "
+            f"but got '{reference_image_assets}'."
+        )
+    if int(normalized_request.get("main_reference_index", -1)) != case.expected_main_reference_index:
+        errors.append(
+            f"{case.case_id}: expected main_reference_index={case.expected_main_reference_index} but got "
+            f"'{normalized_request.get('main_reference_index')}'."
+        )
+    if str(normalized_request.get("mask_asset", "")).strip():
+        errors.append(f"{case.case_id}: image-edit dry-run should not retain a mask asset.")
+
+    workflow = response_payload.get("workflow")
+    if not isinstance(workflow, dict):
+        return errors + [f"{case.case_id}: img2img dry-run payload missing workflow."]
+
+    class_types = [
+        node.get("class_type")
+        for node in workflow.values()
+        if isinstance(node, dict) and isinstance(node.get("class_type"), str)
+    ]
+    if "RookieUILoadAssetMask" in class_types:
+        errors.append(f"{case.case_id}: workflow unexpectedly included RookieUILoadAssetMask.")
+    if class_types.count("RookieUILoadAssetImage") != case.expected_reference_count:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_reference_count} RookieUILoadAssetImage node(s) "
+            f"but got {class_types.count('RookieUILoadAssetImage')}."
+        )
+    if class_types.count("LoraLoaderModelOnly") != case.expected_template_lora_nodes:
+        errors.append(
+            f"{case.case_id}: expected {case.expected_template_lora_nodes} template-owned LoraLoaderModelOnly node(s) "
+            f"but got {class_types.count('LoraLoaderModelOnly')}."
+        )
+    return errors
+
+
+def _run_image_edit_dry_run_smoke(
+    base_url: str,
+    cases: list[LiveImageEditDryRunCase],
+    *,
+    request_timeout_seconds: float,
+) -> list[str]:
+    errors: list[str] = []
+    for case in cases:
+        try:
+            response_payload = _request_json(
+                "POST",
+                f"{base_url}/rookieui/generate/img2img",
+                payload=case.request_payload,
+                timeout_seconds=request_timeout_seconds,
+            )
+        except Exception as exc:
+            errors.append(f"{case.case_id}: dry-run request failed: {exc}")
+            continue
+        if not isinstance(response_payload, dict):
+            errors.append(f"{case.case_id}: dry-run response was not an object.")
+            continue
+        errors.extend(_validate_image_edit_dry_run_response(case, response_payload))
+    return errors
+
+
+def _run_image_edit_validation_lane(
+    base_url: str,
+    models_payload: dict[str, Any],
+    presets_payload: dict[str, Any],
+    profiles: list[str],
+    *,
+    execute: bool,
+    request_timeout_seconds: float,
+    poll_timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> tuple[list[str], list[str]]:
+    selection_errors = [
+        f"profile '{profile_id}' is not an official image-edit validation profile."
+        for profile_id in profiles
+        if profile_id not in _NON_SD_EDIT_PROFILES
+    ]
+    if selection_errors:
+        return selection_errors, []
+
+    contract_errors, presets_by_id = _validate_catalog_contract(models_payload, presets_payload, profiles)
+    dry_run_cases = [
+        _build_image_edit_dry_run_case(profile_id, presets_by_id[profile_id], models_payload=models_payload)
+        for profile_id in profiles
+        if profile_id in presets_by_id
+    ]
+    dry_run_errors = _run_image_edit_dry_run_smoke(
+        base_url,
+        dry_run_cases,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    combined_errors = contract_errors + dry_run_errors
+    execution_errors: list[str] = []
+    if execute and not combined_errors:
+        execution_errors = _run_execute_smoke(
+            base_url,
+            profiles,
+            models_payload,
+            presets_by_id,
+            request_timeout_seconds=request_timeout_seconds,
+            poll_timeout_seconds=poll_timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
+    return combined_errors, execution_errors
 
 
 def _resolve_family_selectors_for_live_payload(
@@ -4484,6 +4678,48 @@ def main() -> int:
                 return 0 if args.report_only else 1
             else:
                 print("[live-smoke] xyz-plot execute checks passed.")
+
+        if combined_errors:
+            print("[live-smoke] REPORT-ONLY COMPLETE")
+        else:
+            print("[live-smoke] PASS")
+        return 0
+
+    if args.validation_mode == "image-edit":
+        try:
+            combined_errors, execution_errors = _run_image_edit_validation_lane(
+                base_url,
+                models_payload,
+                presets_payload,
+                profiles,
+                execute=args.execute,
+                request_timeout_seconds=args.request_timeout_seconds,
+                poll_timeout_seconds=args.poll_timeout_seconds,
+                poll_interval_seconds=args.poll_interval_seconds,
+            )
+        except Exception as exc:
+            print(f"[live-smoke] ERROR: image-edit validation failed unexpectedly: {exc}", file=sys.stderr)
+            return 0 if args.report_only else 1
+
+        if combined_errors:
+            print("[live-smoke] WARNING: image-edit validation reported issues:", file=sys.stderr)
+            for error in combined_errors:
+                print(f"  - {error}", file=sys.stderr)
+            if not args.report_only:
+                return 1
+        else:
+            print("[live-smoke] image-edit catalog + dry-run checks passed.")
+
+        if args.execute:
+            if combined_errors:
+                print("[live-smoke] execute lane skipped because image-edit dry-run checks were not green.")
+            elif execution_errors:
+                print("[live-smoke] ERROR: image-edit execute lane failed:", file=sys.stderr)
+                for error in execution_errors:
+                    print(f"  - {error}", file=sys.stderr)
+                return 0 if args.report_only else 1
+            else:
+                print("[live-smoke] image-edit execute checks passed.")
 
         if combined_errors:
             print("[live-smoke] REPORT-ONLY COMPLETE")

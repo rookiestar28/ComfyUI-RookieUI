@@ -222,6 +222,7 @@ describe("registerRookieUIBootstrapExtension", () => {
               controlnet: ["control_v11p_sd15_canny.safetensors"],
               diffusion_models: [
                 "flux1-dev.safetensors",
+                "flux1-dev-kontext_fp8_scaled.safetensors",
                 "qwen-image.safetensors",
                 "qwen_image_edit_fp8_e4m3fn.safetensors",
                 "klein-flux2.safetensors",
@@ -230,11 +231,13 @@ describe("registerRookieUIBootstrapExtension", () => {
                 "wan2_2b.safetensors",
                 "animaPencilXL_v500.safetensors",
               ],
-              vae: ["Automatic", "qwen_image_vae.safetensors"],
+              vae: ["Automatic", "ae.safetensors", "qwen_image_vae.safetensors"],
               text_encoders: [
+                "clip_l.safetensors",
                 "QwenImageTEModel_.safetensors",
                 "qwen_2.5_vl_7b_fp8_scaled.safetensors",
                 "FluxT5XXL.safetensors",
+                "t5xxl_fp8_e4m3fn_scaled.safetensors",
                 "KleinT5XXL.safetensors",
                 "LuminaTEModel.safetensors",
                 "WanTextEncoder.safetensors",
@@ -265,6 +268,7 @@ describe("registerRookieUIBootstrapExtension", () => {
                   sd15: "checkpoints",
                   sdxl: "checkpoints",
                   flux: "diffusion_models",
+                  flux_kontext_dev_edit: "diffusion_models",
                   qwen_image: "diffusion_models",
                   qwen_image_edit: "diffusion_models",
                   klein: "diffusion_models",
@@ -284,6 +288,7 @@ describe("registerRookieUIBootstrapExtension", () => {
                     title: "Diffusion Models",
                     items: [
                       "flux1-dev.safetensors",
+                      "flux1-dev-kontext_fp8_scaled.safetensors",
                       "qwen-image.safetensors",
                       "qwen_image_edit_fp8_e4m3fn.safetensors",
                       "klein-flux2.safetensors",
@@ -742,6 +747,23 @@ describe("registerRookieUIBootstrapExtension", () => {
                   clip_skip: 1,
                 },
                 {
+                  id: "flux_kontext_dev_edit",
+                  title: "Flux.1 Kontext Dev Edit",
+                  profile: "flux_kontext_dev_edit",
+                  base_family: "flux_kontext_dev_edit",
+                  checkpoint_name: "flux1-dev-kontext_fp8_scaled.safetensors",
+                  vae_name: "ae.safetensors",
+                  text_encoder_name: "clip_l.safetensors|t5xxl_fp8_e4m3fn_scaled.safetensors",
+                  width: 1024,
+                  height: 1024,
+                  steps: 20,
+                  cfg_scale: 1,
+                  flux_guidance: 2.5,
+                  sampler_name: "euler",
+                  scheduler_name: "simple",
+                  clip_skip: 1,
+                },
+                {
                   id: "klein",
                   title: "Klein",
                   profile: "klein",
@@ -915,6 +937,61 @@ describe("registerRookieUIBootstrapExtension", () => {
                   default_scheduler: "simple",
                   default_clip_skip: 1,
                   supports_clip_skip: false,
+                  notes: [],
+                },
+                {
+                  id: "qwen_image_edit",
+                  title: "Qwen-Image Edit",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 1328,
+                  default_height: 1328,
+                  default_steps: 4,
+                  default_cfg_scale: 1,
+                  default_sampler: "euler",
+                  default_scheduler: "simple",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  text_encoder_visible: false,
+                  shift_visible: true,
+                  default_shift: 3.0,
+                  edit_megapixels_visible: true,
+                  default_edit_megapixels: 1.5,
+                  template_lora_visible: true,
+                  template_lora_override_allowed: true,
+                  official_template_lora_label: "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                  image_edit_profile: true,
+                  request_contract_surface: "img2img",
+                  reference_input_mode: "single",
+                  max_direct_references: 1,
+                  encoder_family: "qwen_image_edit",
+                  template_lora_chain_mode: "single",
+                  available_surface_flows: ["img2img"],
+                  notes: [],
+                },
+                {
+                  id: "flux_kontext_dev_edit",
+                  title: "Flux.1 Kontext Dev Edit",
+                  base_family: "sdxl",
+                  prompt_encoder: "clip_text_encode_sdxl",
+                  default_width: 1024,
+                  default_height: 1024,
+                  default_steps: 20,
+                  default_cfg_scale: 1,
+                  default_sampler: "euler",
+                  default_scheduler: "simple",
+                  default_clip_skip: 1,
+                  supports_clip_skip: false,
+                  text_encoder_visible: false,
+                  flux_guidance_visible: true,
+                  default_flux_guidance: 2.5,
+                  image_edit_profile: true,
+                  request_contract_surface: "img2img",
+                  reference_input_mode: "multi",
+                  max_direct_references: 3,
+                  encoder_family: "flux_clip_text",
+                  template_lora_chain_mode: "none",
+                  available_surface_flows: ["img2img"],
                   notes: [],
                 },
                 {
@@ -1288,6 +1365,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     // CRITICAL: regression matrix must keep Clip Skip editable across all preset profiles.
     const diffusionModelOptions = [
       "flux1-dev.safetensors",
+      "flux1-dev-kontext_fp8_scaled.safetensors",
       "qwen-image.safetensors",
       "qwen_image_edit_fp8_e4m3fn.safetensors",
       "klein-flux2.safetensors",
@@ -1608,6 +1686,52 @@ describe("registerRookieUIBootstrapExtension", () => {
       "Image-edit profiles require a source image in Reference 1.",
     );
     expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/img2img")).toHaveLength(0);
+    document.getElementById("rookieui-img2img-preset").value = "flux_kontext_dev_edit";
+    document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (
+        document.getElementById("rookieui-img2img-reference-card-2")?.hidden === false &&
+        document.getElementById("rookieui-img2img-reference-card-3")?.hidden === false
+      ) {
+        break;
+      }
+    }
+    expect(document.getElementById("rookieui-img2img-reference-card-2").hidden).toBe(false);
+    expect(document.getElementById("rookieui-img2img-reference-card-3").hidden).toBe(false);
+    document.getElementById("rookieui-image-asset").value = "edit-reference-1";
+    document.getElementById("rookieui-image-asset").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-img2img-reference-asset-2").value = "edit-reference-2";
+    document.getElementById("rookieui-img2img-reference-asset-2").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-img2img-reference-asset-3").value = "edit-reference-3";
+    document.getElementById("rookieui-img2img-reference-asset-3").dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("rookieui-img2img-reference-main-2").checked = true;
+    document.getElementById("rookieui-img2img-reference-main-2").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-img2img-form").dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (fetchCalls.some(([url]) => url === "/rookieui/generate/img2img")) {
+        break;
+      }
+    }
+    const imageEditCall = fetchCalls.find(([url]) => url === "/rookieui/generate/img2img");
+    expect(imageEditCall).toBeDefined();
+    const imageEditPayload = JSON.parse(imageEditCall[1].body);
+    expect(imageEditPayload.mode).toBe("img2img");
+    expect(imageEditPayload.profile).toBe("flux_kontext_dev_edit");
+    expect(imageEditPayload.image_asset).toBe("edit-reference-1");
+    expect(imageEditPayload.reference_images).toEqual([
+      { image_asset: "edit-reference-1", image_data: "" },
+      { image_asset: "edit-reference-2", image_data: "" },
+      { image_asset: "edit-reference-3", image_data: "" },
+    ]);
+    expect(imageEditPayload.main_reference_index).toBe(2);
+    expect(imageEditPayload).not.toHaveProperty("mask_asset");
+    expect(imageEditPayload).not.toHaveProperty("mask_data");
+    const preservedFetchCalls = fetchCalls.filter(([url]) => url !== "/rookieui/generate/img2img");
+    fetchCalls.splice(0, fetchCalls.length, ...preservedFetchCalls);
     document.getElementById("rookieui-img2img-preset").value = "sd15";
     document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("rookieui-img2img-generation-mode-inpaint").click();

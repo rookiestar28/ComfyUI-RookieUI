@@ -893,6 +893,9 @@ async function submitImg2Img(
       statusNode.textContent = "Selected main reference slot does not contain an image.";
       return;
     }
+    // IMPORTANT: image-edit requests must not leak stale mask handles from earlier inpaint sessions.
+    delete payload.mask_asset;
+    delete payload.mask_data;
   } else {
     delete payload.reference_images;
     delete payload.main_reference_index;
