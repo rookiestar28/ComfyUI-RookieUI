@@ -1,7 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
-const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f167-20260423";
+const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423";
 export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
   {
     id: "sd15",
@@ -807,7 +807,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 1,
     encoder_family: "qwen_image_edit",
     template_lora_chain_mode: "single",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   qwen_image_edit_multi_lora: {
     shift_visible: true,
@@ -823,7 +823,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 1,
     encoder_family: "qwen_image_edit",
     template_lora_chain_mode: "triple",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   firered_image_edit: {
     shift_visible: true,
@@ -836,7 +836,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 3,
     encoder_family: "qwen_image_edit_plus",
     template_lora_chain_mode: "none",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   firered_image_edit_lightning: {
     shift_visible: true,
@@ -852,7 +852,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 3,
     encoder_family: "qwen_image_edit_plus",
     template_lora_chain_mode: "single",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   flux_kontext_dev_edit: {
     flux_guidance_visible: true,
@@ -863,7 +863,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 3,
     encoder_family: "flux_clip_text",
     template_lora_chain_mode: "none",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   flux2_image_edit: {
     flux_guidance_visible: true,
@@ -876,7 +876,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 1,
     encoder_family: "flux_clip_text",
     template_lora_chain_mode: "none",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   klein_9b_kv_image_edit: {
     edit_megapixels_visible: true,
@@ -887,7 +887,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 3,
     encoder_family: "flux_clip_text",
     template_lora_chain_mode: "none",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   longcat_image_edit: {
     flux_guidance_visible: true,
@@ -900,7 +900,7 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 1,
     encoder_family: "qwen_image_edit",
     template_lora_chain_mode: "none",
-    available_surface_flows: ["edit"],
+    available_surface_flows: ["img2img"],
   },
   z_image: { shift_visible: true, default_shift: 3.0 },
   z_image_turbo: { shift_visible: true, default_shift: 3.0 },

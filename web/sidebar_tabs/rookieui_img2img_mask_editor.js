@@ -68,6 +68,7 @@ export function createImg2ImgMaskCanvasEditor({
   idPrefix = "rookieui-img2img-mask-editor",
   parent,
   modeInput,
+  imageEditProfileInput,
   imageDataInput,
   imageAssetInput,
   maskDataInput,
@@ -864,7 +865,9 @@ export function createImg2ImgMaskCanvasEditor({
     const rawMode = String(modeValue ?? "").trim().toLowerCase();
     const executionMode =
       typeof resolveExecutionMode === "function" ? String(resolveExecutionMode(rawMode) ?? rawMode) : rawMode;
-    root.hidden = executionMode === "batch" || executionMode === "edit" || rawMode === "batch";
+    const imageEditProfile = String(imageEditProfileInput?.value ?? "").trim().toLowerCase() === "true";
+    // CRITICAL: image-edit profiles now ride the canonical img2img mode, so mode-only visibility would incorrectly re-expose the mask editor.
+    root.hidden = executionMode === "batch" || executionMode === "edit" || rawMode === "batch" || imageEditProfile;
   };
 
   const refreshFromInputs = async () => {

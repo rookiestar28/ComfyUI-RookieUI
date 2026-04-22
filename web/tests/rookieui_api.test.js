@@ -68,7 +68,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f167-20260423");
+    expect(result.data.model_families.contract_version).toBe("f168-20260423");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
@@ -100,7 +100,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(qwenEntry.official_template_lora_label).toBe(
       "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
     );
-    expect(qwenEditEntry.available_surface_flows).toEqual(["edit"]);
+    expect(qwenEditEntry.available_surface_flows).toEqual(["img2img"]);
     expect(qwenEditEntry.template_lora_visible).toBe(true);
     expect(qwenEditEntry.template_lora_override_allowed).toBe(true);
     expect(qwenEditEntry.official_template_lora_label).toBe(
@@ -129,7 +129,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(kontextEditEntry.max_direct_references).toBe(3);
     expect(kontextEditEntry.encoder_family).toBe("flux_clip_text");
     expect(kontextEditEntry.flux_guidance_visible).toBe(true);
-    expect(kontextEditEntry.available_surface_flows).toEqual(["edit"]);
+    expect(kontextEditEntry.available_surface_flows).toEqual(["img2img"]);
     expect(flux2EditEntry.image_edit_profile).toBe(true);
     expect(flux2EditEntry.reference_input_mode).toBe("single");
     expect(flux2EditEntry.edit_megapixels_visible).toBe(true);

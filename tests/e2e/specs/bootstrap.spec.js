@@ -304,7 +304,21 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const img2imgPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
-  expect(img2imgPresetValues).toEqual(["sd15", "sdxl", "pony", "illustrious", "noob"]);
+  expect(img2imgPresetValues).toEqual([
+    "sd15",
+    "sdxl",
+    "pony",
+    "illustrious",
+    "noob",
+    "qwen_image_edit",
+    "qwen_image_edit_multi_lora",
+    "firered_image_edit",
+    "firered_image_edit_lightning",
+    "flux_kontext_dev_edit",
+    "flux2_image_edit",
+    "klein_9b_kv_image_edit",
+    "longcat_image_edit",
+  ]);
   for (const row of clipSkipPresetMatrix.filter((entry) =>
     ["sd15", "sdxl", "pony", "illustrious", "noob"].includes(entry.id),
   )) {
@@ -634,35 +648,38 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const img2imgModes = await page.locator("#rookieui-img2img-mode option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
-  expect(img2imgModes).toEqual(["img2img", "edit", "sketch", "inpaint", "inpaint_sketch", "inpaint_upload", "batch"]);
+  expect(img2imgModes).toEqual(["img2img", "sketch", "inpaint", "inpaint_sketch", "inpaint_upload", "batch"]);
   await page.locator("#rookieui-img2img-generation-mode-batch").click();
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("batch");
   await expect(page.locator("#rookieui-img2img-batch-pane")).toBeVisible();
-  await page.locator("#rookieui-img2img-generation-mode-edit").click();
-  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("edit");
+  await expect(page.locator("#rookieui-img2img-generation-mode-edit")).toHaveCount(0);
+  await page.locator("#rookieui-img2img-preset").selectOption("qwen_image_edit");
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
   await expect.poll(async () => page.locator("#rookieui-img2img-mask-editor").evaluate((node) => node.hidden)).toBe(true);
   await expect.poll(async () => page.locator("#rookieui-img2img-mask-dropzone").evaluate((node) => node.hidden)).toBe(true);
   await expect(page.locator("#rookieui-mask-asset")).toBeDisabled();
   await expect(page.locator("#rookieui-img2img-mask-file")).toBeDisabled();
-  await expect(page.locator("#rookieui-img2img-mode-note")).toContainText("official edit models do not use mask input");
-  const editPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
+  await expect(page.locator("#rookieui-img2img-mode-note")).toContainText("Image-edit profile: source image required");
+  const integratedPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
-  expect(editPresetValues).toEqual([
-    "qwen_image_edit",
-    "qwen_image_edit_multi_lora",
-    "firered_image_edit",
-    "firered_image_edit_lightning",
-    "flux_kontext_dev_edit",
-    "flux2_image_edit",
-    "klein_9b_kv_image_edit",
-    "longcat_image_edit",
-  ]);
+  expect(integratedPresetValues).toContain("qwen_image_edit");
+  expect(integratedPresetValues).toContain("flux_kontext_dev_edit");
   await expect(page.locator("#rookieui-img2img-edit-megapixels")).toBeEnabled();
   await expect(page.locator("#rookieui-img2img-width")).toBeDisabled();
   await expect(page.locator("#rookieui-denoise-strength")).toBeDisabled();
+  await expect(page.locator("#rookieui-img2img-reference-section")).toBeVisible();
+  await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-2").evaluate((node) => node.hidden)).toBe(true);
+  await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-3").evaluate((node) => node.hidden)).toBe(true);
+  await expect(page.locator("#rookieui-img2img-generation-mode-inpaint")).toBeDisabled();
+  await expect(page.locator("#rookieui-img2img-generation-mode-batch")).toBeDisabled();
+  await page.locator("#rookieui-img2img-preset").selectOption("flux_kontext_dev_edit");
+  await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-2").evaluate((node) => node.hidden)).toBe(false);
+  await expect.poll(async () => page.locator("#rookieui-img2img-reference-card-3").evaluate((node) => node.hidden)).toBe(false);
+  await expect(page.locator("#rookieui-img2img-reference-note")).toContainText("Add up to 2 more");
   await page.locator("#rookieui-img2img-generation-mode-img2img").click();
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
+  await page.locator("#rookieui-img2img-preset").selectOption("sd15");
   await expect.poll(async () => page.locator("#rookieui-img2img-mask-editor").evaluate((node) => node.hidden)).toBe(false);
   await expect.poll(async () => page.locator("#rookieui-img2img-mask-dropzone").evaluate((node) => node.hidden)).toBe(false);
   await page.locator("#rookieui-img2img-generation-mode-inpaint").click();

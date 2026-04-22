@@ -44,7 +44,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f167-20260423")
+        self.assertEqual(payload["model_families"]["contract_version"], "f168-20260423")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("chroma", family_ids)
@@ -109,7 +109,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(qwen_edit_entry["max_direct_references"], 1)
         self.assertEqual(qwen_edit_entry["encoder_family"], "qwen_image_edit")
         self.assertEqual(qwen_edit_entry["template_lora_chain_mode"], "single")
-        self.assertEqual(qwen_edit_entry["available_surface_flows"], ["edit"])
+        self.assertEqual(qwen_edit_entry["available_surface_flows"], ["img2img"])
         self.assertTrue(qwen_edit_multi_entry["image_edit_profile"])
         self.assertEqual(qwen_edit_multi_entry["reference_input_mode"], "single")
         self.assertEqual(qwen_edit_multi_entry["max_direct_references"], 1)
@@ -130,7 +130,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(kontext_edit_entry["max_direct_references"], 3)
         self.assertEqual(kontext_edit_entry["encoder_family"], "flux_clip_text")
         self.assertTrue(kontext_edit_entry["flux_guidance_visible"])
-        self.assertEqual(kontext_edit_entry["available_surface_flows"], ["edit"])
+        self.assertEqual(kontext_edit_entry["available_surface_flows"], ["img2img"])
         self.assertTrue(flux2_edit_entry["image_edit_profile"])
         self.assertEqual(flux2_edit_entry["reference_input_mode"], "single")
         self.assertTrue(flux2_edit_entry["edit_megapixels_visible"])

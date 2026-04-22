@@ -1512,7 +1512,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgPresetValues).toContain("sdxl");
     expect(img2imgPresetValues).not.toContain("flux");
     expect(img2imgPresetValues).not.toContain("qwen_image");
-    expect(img2imgPresetValues).not.toContain("qwen_image_edit");
+    expect(img2imgPresetValues).toContain("qwen_image_edit");
     expect(img2imgPresetValues).not.toContain("ernie_image");
     for (const matrixRow of presetClipSkipMatrix.filter((row) => ["sd15", "sdxl"].includes(row.id))) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
@@ -1549,25 +1549,32 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-img2img-generation-mode-batch").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("batch");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(true);
-    document.getElementById("rookieui-img2img-generation-mode-edit").click();
-    expect(document.getElementById("rookieui-img2img-mode").value).toBe("edit");
+    expect(document.getElementById("rookieui-img2img-generation-mode-edit")).toBeNull();
+    document.getElementById("rookieui-img2img-preset").value = "qwen_image_edit";
+    document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(true);
     expect(document.getElementById("rookieui-mask-asset").disabled).toBe(true);
     expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(true);
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(true);
-    expect(document.getElementById("rookieui-mask-asset").placeholder).toBe("not used by edit models");
+    expect(document.getElementById("rookieui-mask-asset").placeholder).toBe("not used by image-edit profiles");
     expect(document.getElementById("rookieui-img2img-mode-note").textContent).toContain(
-      "official edit models do not use mask input",
+      "Image-edit profile: source image required; mask input is not used.",
     );
-    const editPresetValues = Array.from(document.getElementById("rookieui-img2img-preset").options).map(
+    const integratedPresetValues = Array.from(document.getElementById("rookieui-img2img-preset").options).map(
       (option) => option.value,
     );
-    expect(editPresetValues).toEqual(["qwen_image_edit"]);
+    expect(integratedPresetValues).toContain("qwen_image_edit");
     expect(document.getElementById("rookieui-img2img-edit-megapixels").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-template-lora-name").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-template-lora-status").textContent).toContain(
       "Official default active",
     );
+    expect(document.getElementById("rookieui-img2img-reference-section").hidden).toBe(false);
+    expect(document.getElementById("rookieui-img2img-reference-card-2").hidden).toBe(true);
+    expect(document.getElementById("rookieui-img2img-reference-card-3").hidden).toBe(true);
+    expect(document.getElementById("rookieui-img2img-generation-mode-inpaint").disabled).toBe(true);
+    expect(document.getElementById("rookieui-img2img-generation-mode-batch").disabled).toBe(true);
     document.getElementById("rookieui-img2img-template-lora-name").value = "detail_tweaker.safetensors";
     document.getElementById("rookieui-img2img-template-lora-name").dispatchEvent(new Event("input", { bubbles: true }));
     expect(document.getElementById("rookieui-img2img-template-lora-status").textContent).toContain(
@@ -1577,26 +1584,32 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-denoise-strength").disabled).toBe(true);
     document.getElementById("rookieui-img2img-generation-mode-img2img").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+    document.getElementById("rookieui-img2img-preset").value = "sd15";
+    document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("rookieui-img2img-mask-editor").hidden).toBe(false);
     expect(document.getElementById("rookieui-mask-asset").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-mask-file").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-mask-dropzone").hidden).toBe(false);
     expect(document.getElementById("rookieui-img2img-width").disabled).toBe(false);
     expect(document.getElementById("rookieui-denoise-strength").disabled).toBe(false);
-    expect(document.getElementById("rookieui-image-asset").value).toBe("");
+    expect(document.getElementById("rookieui-img2img-reference-section").hidden).toBe(true);
     const restoredPresetValues = Array.from(document.getElementById("rookieui-img2img-preset").options).map(
       (option) => option.value,
     );
     expect(restoredPresetValues).toContain("sd15");
-    expect(restoredPresetValues).not.toContain("qwen_image_edit");
+    expect(restoredPresetValues).toContain("qwen_image_edit");
+    document.getElementById("rookieui-img2img-preset").value = "qwen_image_edit";
+    document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("rookieui-img2img-form").dispatchEvent(
       new Event("submit", { bubbles: true, cancelable: true }),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.getElementById("rookieui-img2img-status").textContent).toContain(
-      "Image asset or uploaded image is required",
+      "Image-edit profiles require a source image in Reference 1.",
     );
     expect(fetchCalls.filter(([url]) => url === "/rookieui/generate/img2img")).toHaveLength(0);
+    document.getElementById("rookieui-img2img-preset").value = "sd15";
+    document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("rookieui-img2img-generation-mode-inpaint").click();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
     document.getElementById("rookieui-img2img-hires-enabled").checked = true;

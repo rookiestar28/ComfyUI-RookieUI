@@ -47,11 +47,11 @@ describe("createImg2ImgModeRouter", () => {
     );
   });
 
-  test("includes edit as a first-class mode", () => {
+  test("normalizes legacy edit mode back to img2img", () => {
     const modeInput = createModeInput("edit");
     const router = createImg2ImgModeRouter({ modeInput });
 
-    expect(router.getActiveTabId()).toBe("edit");
-    expect(router.definitions.map((entry) => entry.id)).toContain("edit");
+    expect(router.getActiveTabId()).toBe("img2img");
+    expect(router.definitions.map((entry) => entry.id)).not.toContain("edit");
   });
 });

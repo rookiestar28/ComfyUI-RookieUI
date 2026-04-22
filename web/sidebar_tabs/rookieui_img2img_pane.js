@@ -129,13 +129,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       return availableSurfaceFlows.includes(surfaceFlow);
     });
   const img2imgVisiblePresets = filterPresetsForSurfaceFlow("img2img");
-  const editVisiblePresets = filterPresetsForSurfaceFlow("edit");
-  const resolveSurfaceFlowForMode = (modeValue) => (resolveImg2ImgExecutionMode(modeValue) === "edit" ? "edit" : "img2img");
-  const resolveVisiblePresetsForMode = (modeValue) => {
-    const surfaceFlow = resolveSurfaceFlowForMode(modeValue);
-    const visiblePresets = surfaceFlow === "edit" ? editVisiblePresets : img2imgVisiblePresets;
-    return visiblePresets.length > 0 ? visiblePresets : rawPresets;
-  };
+  const resolveVisiblePresetsForMode = () => (img2imgVisiblePresets.length > 0 ? img2imgVisiblePresets : rawPresets);
   const profiles = bootstrapState.capabilities.parity?.profiles ?? [];
   const inventory = bootstrapState.models ?? {
     checkpoints: ["__host_default__"],
@@ -212,6 +206,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   let img2imgPreviewBox = null;
   const img2imgModeUi = {
     modeHintNode: null,
+    referenceSection: null,
+    referenceHintNode: null,
+    referenceSlots: [],
     maskDropzone: null,
     maskFileInput: null,
     batchPane: null,
@@ -241,7 +238,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       "rookieui-img2img-mode",
       [
         { value: "img2img", label: "Img2Img" },
-        { value: "edit", label: "Edit" },
         { value: "sketch", label: "Sketch" },
         { value: "inpaint", label: "Inpaint" },
         { value: "inpaint_sketch", label: "Inpaint Sketch" },
@@ -302,6 +298,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     imageData: createInput("hidden", "rookieui-image-data", ""),
     maskAsset: createInput("text", "rookieui-mask-asset", ""),
     maskData: createInput("hidden", "rookieui-mask-data", ""),
+    imageEditProfile: createInput("hidden", "rookieui-img2img-image-edit-profile", "false"),
+    maxDirectReferences: createInput("hidden", "rookieui-img2img-max-direct-references", "0"),
+    mainReferenceIndex: createInput("hidden", "rookieui-img2img-main-reference-index", "0"),
+    referenceAsset2: createInput("text", "rookieui-img2img-reference-asset-2", ""),
+    referenceData2: createInput("hidden", "rookieui-img2img-reference-data-2", ""),
+    referenceAsset3: createInput("text", "rookieui-img2img-reference-asset-3", ""),
+    referenceData3: createInput("hidden", "rookieui-img2img-reference-data-3", ""),
     batchImagesData: createInput("hidden", "rookieui-img2img-batch-images-data", "[]"),
     steps: createInput("number", "rookieui-img2img-steps", "28", { step: 1, min: 1, max: 150 }),
     stepsSlider: createRangeInput("rookieui-img2img-steps-slider", "28", { step: 1, min: 1, max: 150 }),
@@ -541,8 +544,77 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     libraryHeading: null,
     libraryHost: null,
   };
+  const getActiveProfile = () =>
+    profileLookup.get(String(elements.profileState.value ?? "").trim().toLowerCase()) ??
+    profileLookup.get(elements.profileState.value) ??
+    null;
+  const buildImageEditReferencePayload = (referenceLimit = null) => {
+    const resolvedLimit = Math.max(0, Number(referenceLimit ?? elements.maxDirectReferences?.value ?? 0) || 0);
+    if (resolvedLimit <= 0) {
+      return {
+        referenceImages: [],
+        mainReferenceIndex: 0,
+        selectedMainSlot: 0,
+      };
+    }
+    const normalizedLimit = Math.max(1, resolvedLimit);
+    const orderedSlots = [
+      {
+        image_asset: String(elements.imageAsset?.value ?? "").trim(),
+        image_data: String(elements.imageData?.value ?? "").trim(),
+      },
+      {
+        image_asset: String(elements.referenceAsset2?.value ?? "").trim(),
+        image_data: String(elements.referenceData2?.value ?? "").trim(),
+      },
+      {
+        image_asset: String(elements.referenceAsset3?.value ?? "").trim(),
+        image_data: String(elements.referenceData3?.value ?? "").trim(),
+      },
+    ].slice(0, normalizedLimit);
+    const selectedMainSlot = Math.min(
+      Math.max(0, Number(elements.mainReferenceIndex?.value ?? 0) || 0),
+      Math.max(0, normalizedLimit - 1),
+    );
+    const referenceImages = [];
+    let mainReferenceIndex = -1;
+    orderedSlots.forEach((entry, slotIndex) => {
+      if (!entry.image_asset && !entry.image_data) {
+        return;
+      }
+      if (slotIndex === selectedMainSlot) {
+        mainReferenceIndex = referenceImages.length;
+      }
+      referenceImages.push(entry);
+    });
+    return {
+      referenceImages,
+      mainReferenceIndex,
+      selectedMainSlot,
+    };
+  };
+  const syncImageEditProfileState = () => {
+    const activeProfile = getActiveProfile();
+    const imageEditProfile = Boolean(activeProfile?.image_edit_profile);
+    const referenceLimit = imageEditProfile ? Math.max(1, Number(activeProfile?.max_direct_references ?? 0) || 0) : 0;
+    elements.imageEditProfile.value = imageEditProfile ? "true" : "false";
+    elements.maxDirectReferences.value = String(referenceLimit);
+    const normalizedMainSlot = Math.min(
+      Math.max(0, Number(elements.mainReferenceIndex.value ?? 0) || 0),
+      Math.max(0, referenceLimit - 1),
+    );
+    elements.mainReferenceIndex.value = String(normalizedMainSlot);
+    return {
+      activeProfile,
+      imageEditProfile,
+      referenceLimit,
+      normalizedMainSlot,
+    };
+  };
 
-  const buildXYZBaseRequest = () => ({
+  const buildXYZBaseRequest = () => {
+    const imageEditReferencePayload = buildImageEditReferencePayload();
+    return {
     prompt: elements.prompt.value,
     negative_prompt: elements.negativePrompt.value,
     profile: elements.profileState.value,
@@ -554,6 +626,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     image_data: elements.imageData.value,
     mask_asset: elements.maskAsset.value,
     mask_data: elements.maskData.value,
+    reference_images: imageEditReferencePayload.referenceImages,
+    main_reference_index: imageEditReferencePayload.mainReferenceIndex,
     mode: elements.mode.value,
     batch_images: parseStringArrayField(elements.batchImagesData?.value ?? "[]"),
     width: Number(elements.width.value),
@@ -596,7 +670,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     lora_strength_clip: Number(elements.loraStrengthClip.value),
     adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}", {}),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
-  });
+    };
+  };
 
   const quicksettings = document.createElement("div");
   quicksettings.className = "rookieui-shell__quicksettings";
@@ -854,9 +929,48 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     }
     return nextPresetId;
   };
-  const syncImg2ImgModeParameterFields = () => {
-    const executionMode = resolveImg2ImgExecutionMode(elements.mode.value);
-    const editEnabled = executionMode === "edit";
+  const syncImageEditReferenceUi = (profileState = syncImageEditProfileState()) => {
+    const { imageEditProfile, referenceLimit, normalizedMainSlot } = profileState;
+    if (img2imgModeUi.referenceSection) {
+      img2imgModeUi.referenceSection.hidden = !imageEditProfile;
+    }
+    if (img2imgModeUi.referenceHintNode) {
+      img2imgModeUi.referenceHintNode.textContent =
+        referenceLimit > 1
+          ? `Reference 1 uses the source image canvas above. Add up to ${referenceLimit - 1} more ordered references here and choose the main reference.`
+          : "Reference 1 uses the source image canvas above. This profile accepts only one direct reference image.";
+    }
+    img2imgModeUi.referenceSlots.forEach((slot) => {
+      const visible = imageEditProfile && slot.slotIndex < referenceLimit;
+      if (slot.card) {
+        slot.card.hidden = !visible;
+      }
+      if (slot.mainRadio) {
+        slot.mainRadio.disabled = !visible;
+        slot.mainRadio.checked = visible && slot.slotIndex === normalizedMainSlot;
+      }
+      if (slot.assetInput) {
+        slot.assetInput.disabled = !visible;
+      }
+      if (slot.fileInput) {
+        slot.fileInput.disabled = !visible;
+      }
+      slot.updateStatus?.();
+    });
+  };
+  const syncImg2ImgModeAvailability = (profileState = syncImageEditProfileState()) => {
+    if (profileState.imageEditProfile && elements.mode.value !== "img2img") {
+      setElementValue(elements.mode, "img2img");
+      img2imgModeRouter?.activateSubtab?.("img2img", { dispatchChange: false });
+    }
+    img2imgModeUi.modeButtons.forEach((button, tabId) => {
+      const allowed = !profileState.imageEditProfile || tabId === "img2img";
+      button.disabled = !allowed;
+      button.setAttribute("aria-disabled", String(!allowed));
+    });
+  };
+  const syncImg2ImgModeParameterFields = (profileState = syncImageEditProfileState()) => {
+    const editEnabled = profileState.imageEditProfile;
     setFieldVisibility(modeAwareFieldControls.widthField, !editEnabled);
     setFieldVisibility(modeAwareFieldControls.heightField, !editEnabled);
     setFieldVisibility(modeAwareFieldControls.resizeModeField, !editEnabled);
@@ -884,9 +998,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       );
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     }
+    const profileState = syncImageEditProfileState();
+    syncImg2ImgModeAvailability(profileState);
+    syncImageEditReferenceUi(profileState);
     syncTemplateLoraControls();
-    syncImg2ImgModeParameterFields();
+    syncImg2ImgModeParameterFields(profileState);
     syncMaskField(elements.mode, elements.maskAsset, inpaintModeControls, {
+      imageEditProfile: profileState.imageEditProfile,
+      referenceLimit: profileState.referenceLimit,
       modeHintNode: img2imgModeUi.modeHintNode,
       imageAssetField: elements.imageAsset,
       maskDropzone: img2imgModeUi.maskDropzone,
@@ -918,17 +1037,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   });
   img2imgModeRouter.syncFromModeValue();
   elements.preset.addEventListener("change", () => {
-    updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
-    syncFamilyAwareModuleQuicksetting(
-      profileLookup,
-      elements.profileState.value,
-      modulesQuicksetting,
-      modulesQuicksettingLabel,
-      elements.textEncoder,
-    );
-    syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
-    syncTemplateLoraControls();
-    syncImg2ImgModeParameterFields();
+    syncImg2ImgModeSurface();
+  });
+  elements.profileState.addEventListener("change", () => {
+    syncImg2ImgModeSurface();
   });
   elements.mode.addEventListener("change", () => {
     img2imgModeRouter.syncFromModeValue();
@@ -1343,6 +1455,181 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         maskFileInput.accept = "image/png,image/webp,image/jpeg";
         maskDropzone.appendChild(maskFileInput);
 
+        const referenceSection = document.createElement("section");
+        referenceSection.className = "rookieui-shell__section rookieui-shell__section--soft";
+        referenceSection.id = "rookieui-img2img-reference-section";
+        assetSection.appendChild(referenceSection);
+        appendTextElement(referenceSection, "h4", "rookieui-shell__section-title", "Image Edit References");
+        const referenceHintNode = appendTextElement(
+          referenceSection,
+          "p",
+          "rookieui-shell__status",
+          "Reference 1 uses the source image canvas above.",
+          "rookieui-img2img-reference-note",
+        );
+        const referenceGrid = document.createElement("div");
+        referenceGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
+        referenceSection.appendChild(referenceGrid);
+        const primaryReferenceCard = document.createElement("div");
+        primaryReferenceCard.className = "rookieui-shell__section rookieui-shell__section--soft";
+        primaryReferenceCard.id = "rookieui-img2img-reference-card-1";
+        referenceGrid.appendChild(primaryReferenceCard);
+        appendTextElement(primaryReferenceCard, "h5", "rookieui-shell__section-title", "Reference 1");
+        const primaryReferenceMainLabel = document.createElement("label");
+        primaryReferenceMainLabel.className = "rookieui-shell__status";
+        primaryReferenceMainLabel.htmlFor = "rookieui-img2img-reference-main-0";
+        const primaryReferenceMainRadio = document.createElement("input");
+        primaryReferenceMainRadio.type = "radio";
+        primaryReferenceMainRadio.name = "rookieui-img2img-main-reference";
+        primaryReferenceMainRadio.id = "rookieui-img2img-reference-main-0";
+        primaryReferenceMainRadio.value = "0";
+        primaryReferenceMainRadio.checked = true;
+        primaryReferenceMainLabel.appendChild(primaryReferenceMainRadio);
+        primaryReferenceMainLabel.append(" Main reference");
+        primaryReferenceCard.appendChild(primaryReferenceMainLabel);
+        const primaryReferenceStatus = appendTextElement(
+          primaryReferenceCard,
+          "p",
+          "rookieui-shell__status",
+          "Uses the source image canvas and Image Asset field above.",
+          "rookieui-img2img-reference-status-1",
+        );
+        const createAdditionalReferenceSlot = (slotNumber, assetInput, dataInput) => {
+          const card = document.createElement("div");
+          card.className = "rookieui-shell__section rookieui-shell__section--soft";
+          card.id = `rookieui-img2img-reference-card-${slotNumber}`;
+          referenceGrid.appendChild(card);
+          appendTextElement(card, "h5", "rookieui-shell__section-title", `Reference ${slotNumber}`);
+          const mainLabel = document.createElement("label");
+          mainLabel.className = "rookieui-shell__status";
+          mainLabel.htmlFor = `rookieui-img2img-reference-main-${slotNumber - 1}`;
+          const mainRadio = document.createElement("input");
+          mainRadio.type = "radio";
+          mainRadio.name = "rookieui-img2img-main-reference";
+          mainRadio.id = `rookieui-img2img-reference-main-${slotNumber - 1}`;
+          mainRadio.value = String(slotNumber - 1);
+          mainLabel.appendChild(mainRadio);
+          mainLabel.append(" Main reference");
+          card.appendChild(mainLabel);
+          createField(card, `Reference ${slotNumber} Asset`, assetInput);
+          const actionRow = document.createElement("div");
+          card.appendChild(actionRow);
+          const uploadButton = createActionButton(
+            `rookieui-img2img-reference-upload-${slotNumber}`,
+            `Upload Reference ${slotNumber}`,
+          );
+          actionRow.appendChild(uploadButton);
+          const clearButton = createActionButton(
+            `rookieui-img2img-reference-clear-${slotNumber}`,
+            `Clear Reference ${slotNumber}`,
+          );
+          actionRow.appendChild(clearButton);
+          const fileInput = createInput("file", `rookieui-img2img-reference-file-${slotNumber}`, "", {
+            className: "rookieui-shell__file-input",
+          });
+          fileInput.accept = "image/png,image/webp,image/jpeg";
+          fileInput.hidden = true;
+          fileInput.tabIndex = -1;
+          card.appendChild(fileInput);
+          const status = appendTextElement(
+            card,
+            "p",
+            "rookieui-shell__status",
+            "No additional reference selected.",
+            `rookieui-img2img-reference-status-${slotNumber}`,
+          );
+          const updateStatus = () => {
+            const assetValue = String(assetInput.value ?? "").trim();
+            const dataValue = String(dataInput.value ?? "").trim();
+            status.textContent = assetValue
+              ? `Asset: ${assetValue}`
+              : dataValue
+                ? "Uploaded reference image ready."
+                : "No additional reference selected.";
+          };
+          uploadButton.addEventListener("click", () => {
+            fileInput.click();
+          });
+          clearButton.addEventListener("click", () => {
+            assetInput.value = "";
+            dataInput.value = "";
+            syncBoundControls([assetInput, dataInput]);
+            updateStatus();
+            statusNode.textContent = `Cleared Reference ${slotNumber}.`;
+          });
+          assetInput.addEventListener("input", () => {
+            if (String(assetInput.value ?? "").trim()) {
+              dataInput.value = "";
+            }
+            syncBoundControls([assetInput, dataInput]);
+            updateStatus();
+          });
+          fileInput.addEventListener("change", async () => {
+            const [file] = Array.from(fileInput.files ?? []);
+            if (!file) {
+              return;
+            }
+            try {
+              dataInput.value = await readFileAsDataUrl(file);
+              assetInput.value = "";
+              syncBoundControls([assetInput, dataInput]);
+              updateStatus();
+              statusNode.textContent = `Loaded Reference ${slotNumber}: ${file.name}`;
+            } catch (_error) {
+              emitFrontendDebugWarning("shell.img2img_reference_upload", "Reference image upload failed.", _error);
+              statusNode.textContent = `Failed to load Reference ${slotNumber}.`;
+            }
+          });
+          mainRadio.addEventListener("change", () => {
+            if (!mainRadio.checked) {
+              return;
+            }
+            elements.mainReferenceIndex.value = String(slotNumber - 1);
+            syncBoundControls([elements.mainReferenceIndex]);
+          });
+          updateStatus();
+          return {
+            slotIndex: slotNumber - 1,
+            card,
+            mainRadio,
+            assetInput,
+            dataInput,
+            fileInput,
+            statusNode: status,
+            updateStatus,
+          };
+        };
+        primaryReferenceMainRadio.addEventListener("change", () => {
+          if (!primaryReferenceMainRadio.checked) {
+            return;
+          }
+          elements.mainReferenceIndex.value = "0";
+          syncBoundControls([elements.mainReferenceIndex]);
+        });
+        const referenceSlotTwo = createAdditionalReferenceSlot(2, elements.referenceAsset2, elements.referenceData2);
+        const referenceSlotThree = createAdditionalReferenceSlot(3, elements.referenceAsset3, elements.referenceData3);
+        img2imgModeUi.referenceSection = referenceSection;
+        img2imgModeUi.referenceHintNode = referenceHintNode;
+        img2imgModeUi.referenceSlots = [
+          {
+            slotIndex: 0,
+            card: primaryReferenceCard,
+            mainRadio: primaryReferenceMainRadio,
+            statusNode: primaryReferenceStatus,
+            updateStatus: () => {
+              const sourceAsset = String(elements.imageAsset.value ?? "").trim();
+              const sourceData = String(elements.imageData.value ?? "").trim();
+              primaryReferenceStatus.textContent = sourceAsset
+                ? `Uses source asset: ${sourceAsset}`
+                : sourceData
+                  ? "Uploaded source image is ready as Reference 1."
+                  : "Reference 1 uses the source image canvas and Image Asset field above.";
+            },
+          },
+          referenceSlotTwo,
+          referenceSlotThree,
+        ];
+
         const batchPane = document.createElement("section");
         batchPane.className = "rookieui-shell__section rookieui-shell__section--soft";
         batchPane.id = "rookieui-img2img-batch-pane";
@@ -1426,6 +1713,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             // CRITICAL: brush sync runs async image decode; swallow local decode errors so stage-mode rendering never regresses into a dead UI state.
             brushSyncPromise.catch(() => {});
           }
+          img2imgModeUi.referenceSlots[0]?.updateStatus?.();
         };
         refreshSourceCanvasSurface = renderSourceCanvasSurface;
 
@@ -1610,6 +1898,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           idPrefix: "rookieui-img2img-mask-editor",
           parent: assetSection,
           modeInput: elements.mode,
+          imageEditProfileInput: elements.imageEditProfile,
           imageDataInput: elements.imageData,
           imageAssetInput: elements.imageAsset,
           maskDataInput: elements.maskData,
@@ -2069,6 +2358,30 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         elements.batchImagesData.value = JSON.stringify(payload.batch_images);
       } else if (String(payload.mode ?? "").trim().toLowerCase() !== "batch") {
         elements.batchImagesData.value = "[]";
+      }
+      const referenceImages = Array.isArray(payload.reference_images)
+        ? payload.reference_images.filter((entry) => entry && typeof entry === "object")
+        : [];
+      const additionalReferenceSlots = [
+        { assetInput: elements.referenceAsset2, dataInput: elements.referenceData2 },
+        { assetInput: elements.referenceAsset3, dataInput: elements.referenceData3 },
+      ];
+      if (referenceImages.length) {
+        const [primaryReference, ...additionalReferences] = referenceImages;
+        elements.imageAsset.value = String(primaryReference?.image_asset ?? "").trim();
+        elements.imageData.value = String(primaryReference?.image_data ?? "").trim();
+        additionalReferenceSlots.forEach((slot, index) => {
+          const entry = additionalReferences[index] ?? {};
+          slot.assetInput.value = String(entry.image_asset ?? "").trim();
+          slot.dataInput.value = String(entry.image_data ?? "").trim();
+        });
+        elements.mainReferenceIndex.value = String(Math.min(Math.max(0, Number(payload.main_reference_index ?? 0) || 0), 2));
+      } else {
+        additionalReferenceSlots.forEach((slot) => {
+          slot.assetInput.value = "";
+          slot.dataInput.value = "";
+        });
+        elements.mainReferenceIndex.value = "0";
       }
       if (Array.isArray(payload.controlnet_units)) {
         elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);

@@ -47,6 +47,7 @@ const [
 export const {
   appendTextElement,
   bindSliderPair,
+  buildProfileLookup,
   buildCompatibilityList,
   buildFeatureList,
   buildParityList,
@@ -63,6 +64,7 @@ export const {
   generateDeterministicSeed,
   installExplicitFormSubmitShortcuts,
   preventSummaryToggleOnCheckbox,
+  readImg2ImgReferencePayload,
   syncBoundControls,
 } = utilsModule;
 

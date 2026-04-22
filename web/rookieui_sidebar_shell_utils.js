@@ -11,6 +11,91 @@ export function appendTextElement(parent, tagName, className, text, id = "") {
   return node;
 }
 
+export function buildProfileLookup(capabilities) {
+  const profiles = capabilities.parity?.profiles ?? [];
+  const familyEntries = capabilities.model_families?.entries ?? [];
+  const lookup = new Map();
+  profiles.forEach((profile) => {
+    lookup.set(profile.id, profile);
+  });
+  familyEntries.forEach((entry) => {
+    if (!entry || !entry.id) {
+      return;
+    }
+    const merged = {
+      ...(lookup.get(entry.id) ?? {}),
+      id: entry.id,
+      title: entry.title,
+      base_family: entry.translation_base_family || entry.public_base_family || "",
+      public_base_family: entry.public_base_family || "",
+      text_encoder_visible: Boolean(entry.text_encoder_visible),
+      shift_visible: Boolean(entry.shift_visible),
+      default_shift: entry.default_shift ?? null,
+      flux_guidance_visible: Boolean(entry.flux_guidance_visible),
+      default_flux_guidance: entry.default_flux_guidance ?? null,
+      prompt_enhancement_visible: Boolean(entry.prompt_enhancement_visible),
+      default_prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
+      edit_megapixels_visible: Boolean(entry.edit_megapixels_visible),
+      default_edit_megapixels: entry.default_edit_megapixels ?? null,
+      template_lora_visible: Boolean(entry.template_lora_visible),
+      template_lora_override_allowed: Boolean(entry.template_lora_override_allowed),
+      official_template_lora_label: entry.official_template_lora_label || "",
+      primary_model_category: entry.primary_model_category || "",
+      support_tier: entry.support_tier || "",
+      experimental: Boolean(entry.experimental),
+      compatibility_summary: entry.compatibility_summary || "",
+      image_edit_profile: Boolean(entry.image_edit_profile),
+      request_contract_surface: String(entry.request_contract_surface || "").trim().toLowerCase(),
+      reference_input_mode: String(entry.reference_input_mode || "").trim().toLowerCase(),
+      max_direct_references: Number(entry.max_direct_references ?? 0) || 0,
+      encoder_family: String(entry.encoder_family || "").trim().toLowerCase(),
+      template_lora_chain_mode: String(entry.template_lora_chain_mode || "").trim().toLowerCase(),
+      aliases: Array.isArray(entry.aliases) ? entry.aliases : [],
+      available_surface_flows: Array.isArray(entry.available_surface_flows)
+        ? entry.available_surface_flows.map((flow) => String(flow ?? "").trim().toLowerCase()).filter(Boolean)
+        : ["txt2img", "img2img"],
+    };
+    lookup.set(entry.id, merged);
+    (Array.isArray(entry.aliases) ? entry.aliases : []).forEach((alias) => {
+      const normalizedAlias = String(alias ?? "").trim().toLowerCase();
+      if (normalizedAlias) {
+        lookup.set(normalizedAlias, merged);
+      }
+    });
+  });
+  return lookup;
+}
+
+export function readImg2ImgReferencePayload(elements) {
+  const imageEditProfile = String(elements.imageEditProfile?.value ?? "").trim().toLowerCase() === "true";
+  const maxDirectReferences = Math.max(0, Number(elements.maxDirectReferences?.value ?? 0) || 0);
+  const selectedMainSlot = Math.max(0, Number(elements.mainReferenceIndex?.value ?? 0) || 0);
+  const orderedReferenceSlots = imageEditProfile
+    ? [
+        { image_asset: String(elements.imageAsset?.value ?? "").trim(), image_data: String(elements.imageData?.value ?? "").trim() },
+        { image_asset: String(elements.referenceAsset2?.value ?? "").trim(), image_data: String(elements.referenceData2?.value ?? "").trim() },
+        { image_asset: String(elements.referenceAsset3?.value ?? "").trim(), image_data: String(elements.referenceData3?.value ?? "").trim() },
+      ].slice(0, Math.max(1, maxDirectReferences || 1))
+    : [];
+  const referenceImages = [];
+  let mainReferenceIndex = imageEditProfile ? -1 : 0;
+  orderedReferenceSlots.forEach((entry, slotIndex) => {
+    if (!entry.image_asset && !entry.image_data) {
+      return;
+    }
+    if (slotIndex === selectedMainSlot) {
+      mainReferenceIndex = referenceImages.length;
+    }
+    referenceImages.push(entry);
+  });
+  return {
+    imageEditProfile,
+    selectedMainSlot,
+    referenceImages,
+    mainReferenceIndex,
+  };
+}
+
 export function buildFeatureList(parent, features) {
   const list = document.createElement("ul");
   list.className = "rookieui-shell__list";

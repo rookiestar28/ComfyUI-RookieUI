@@ -1,6 +1,7 @@
 import {
   appendTextElement,
   bindSliderPair,
+  buildProfileLookup,
   buildCompatibilityList,
   buildFeatureList,
   buildParityList,
@@ -19,6 +20,7 @@ import {
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
   rookieUIDebugWarn,
+  readImg2ImgReferencePayload,
   createTxt2ImgTabDefinition,
   createImg2ImgTabDefinition,
   createExtrasTabDefinition,
@@ -319,56 +321,6 @@ function readFileAsDataUrl(file) {
     reader.onload = () => resolve(String(reader.result ?? ""));
     reader.readAsDataURL(file);
   });
-}
-
-function buildProfileLookup(capabilities) {
-  const profiles = capabilities.parity?.profiles ?? [];
-  const familyEntries = capabilities.model_families?.entries ?? [];
-  const lookup = new Map();
-  profiles.forEach((profile) => {
-    lookup.set(profile.id, profile);
-  });
-  familyEntries.forEach((entry) => {
-    if (!entry || !entry.id) {
-      return;
-    }
-    const merged = {
-      ...(lookup.get(entry.id) ?? {}),
-      id: entry.id,
-      title: entry.title,
-      base_family: entry.translation_base_family || entry.public_base_family || "",
-      public_base_family: entry.public_base_family || "",
-      text_encoder_visible: Boolean(entry.text_encoder_visible),
-      shift_visible: Boolean(entry.shift_visible),
-      default_shift: entry.default_shift ?? null,
-      flux_guidance_visible: Boolean(entry.flux_guidance_visible),
-      default_flux_guidance: entry.default_flux_guidance ?? null,
-      prompt_enhancement_visible: Boolean(entry.prompt_enhancement_visible),
-      default_prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
-      edit_megapixels_visible: Boolean(entry.edit_megapixels_visible),
-      default_edit_megapixels: entry.default_edit_megapixels ?? null,
-      template_lora_visible: Boolean(entry.template_lora_visible),
-      template_lora_override_allowed: Boolean(entry.template_lora_override_allowed),
-      official_template_lora_label: entry.official_template_lora_label || "",
-      primary_model_category: entry.primary_model_category || "",
-      support_tier: entry.support_tier || "",
-      experimental: Boolean(entry.experimental),
-      compatibility_summary: entry.compatibility_summary || "",
-      aliases: Array.isArray(entry.aliases) ? entry.aliases : [],
-      available_surface_flows: Array.isArray(entry.available_surface_flows)
-        ? entry.available_surface_flows.map((flow) => String(flow ?? "").trim().toLowerCase()).filter(Boolean)
-        : ["txt2img", "img2img"],
-    };
-    lookup.set(entry.id, merged);
-    const aliases = Array.isArray(entry.aliases) ? entry.aliases : [];
-    aliases.forEach((alias) => {
-      const normalizedAlias = String(alias ?? "").trim().toLowerCase();
-      if (normalizedAlias) {
-        lookup.set(normalizedAlias, merged);
-      }
-    });
-  });
-  return lookup;
 }
 
 function buildPresetLookup(presets) {
@@ -745,6 +697,8 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
 }
 
 function readImg2ImgPayload(elements) {
+  const { imageEditProfile, referenceImages, mainReferenceIndex, selectedMainSlot } =
+    readImg2ImgReferencePayload(elements);
   const batchImages = parseJsonArrayField(elements.batchImagesData?.value ?? "[]");
   return {
     prompt: elements.prompt.value,
@@ -759,6 +713,8 @@ function readImg2ImgPayload(elements) {
     image_data: elements.imageData.value,
     mask_asset: elements.maskAsset.value,
     mask_data: elements.maskData.value,
+    reference_images: referenceImages,
+    main_reference_index: mainReferenceIndex,
     mode: elements.mode.value,
     batch_images: batchImages,
     width: Number(elements.width.value),
@@ -799,6 +755,8 @@ function readImg2ImgPayload(elements) {
     lora_strength_clip: Number(elements.loraStrengthClip.value),
     adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
+    _ui_image_edit_profile: imageEditProfile,
+    _ui_selected_main_reference_slot: selectedMainSlot,
   };
 }
 
@@ -837,12 +795,15 @@ function isImg2ImgBatchMode(modeValue) {
 
 function syncMaskField(modeInput, maskField, inpaintControls = [], options = {}) {
   const executionMode = resolveImg2ImgExecutionMode(modeInput.value);
-  const inpaintEnabled = executionMode === "inpaint";
-  const editEnabled = executionMode === "edit";
-  const batchMode = isImg2ImgBatchMode(modeInput.value);
+  const imageEditProfile = Boolean(options.imageEditProfile);
+  const referenceLimit = Math.max(0, Number(options.referenceLimit ?? 0) || 0);
+  const inpaintEnabled = !imageEditProfile && executionMode === "inpaint";
+  const editEnabled = imageEditProfile;
+  const batchMode = !imageEditProfile && isImg2ImgBatchMode(modeInput.value);
   // IMPORTANT: keep mask asset input/upload interactive in every Img2Img mode; users often preload masks before switching to an inpaint execution mode.
   maskField.disabled = editEnabled;
-  maskField.placeholder = inpaintEnabled ? "required for inpaint" : editEnabled ? "not used by edit models" : "optional";
+  maskField.placeholder =
+    inpaintEnabled ? "required for inpaint" : editEnabled ? "not used by image-edit profiles" : "optional";
   inpaintControls.forEach((control) => {
     if (!control) {
       return;
@@ -862,7 +823,11 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
     options.batchFileInput.disabled = !batchMode;
   }
   if (options.imageAssetField) {
-    options.imageAssetField.placeholder = batchMode ? "optional when batch files are loaded" : "required";
+    options.imageAssetField.placeholder = imageEditProfile
+      ? "required as Reference 1"
+      : batchMode
+        ? "optional when batch files are loaded"
+        : "required";
   }
   if (options.modeHintNode) {
     if (batchMode) {
@@ -870,7 +835,10 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
       return;
     }
     if (editEnabled) {
-      options.modeHintNode.textContent = "Edit mode: source image required; official edit models do not use mask input.";
+      options.modeHintNode.textContent =
+        referenceLimit > 1
+          ? `Image-edit profile: Reference 1 plus up to ${referenceLimit - 1} additional ordered references are supported; choose the main reference below and do not use a mask.`
+          : "Image-edit profile: source image required; mask input is not used.";
       return;
     }
     if (inpaintEnabled) {
@@ -892,17 +860,43 @@ async function submitImg2Img(
   statusNode.textContent = "Submitting img2img request...";
 
   const payload = readImg2ImgPayload(elements);
-  const maskCanvasReadiness = maskCanvasContract?.getSubmissionReadiness?.() ?? { ok: true };
+  const imageEditProfile = Boolean(payload._ui_image_edit_profile);
+  delete payload._ui_image_edit_profile;
+  delete payload._ui_selected_main_reference_slot;
+  const maskCanvasReadiness = imageEditProfile ? { ok: true } : maskCanvasContract?.getSubmissionReadiness?.() ?? { ok: true };
   if (!maskCanvasReadiness.ok) {
     statusNode.textContent = maskCanvasReadiness.message ?? "Mask canvas is not ready.";
     return;
   }
-  const executionMode = resolveImg2ImgExecutionMode(payload.mode);
+  if (imageEditProfile) {
+    payload.mode = "img2img";
+    payload.mask_asset = "";
+    payload.mask_data = "";
+  }
+  const executionMode = imageEditProfile ? "edit" : resolveImg2ImgExecutionMode(payload.mode);
   const batchImages = Array.isArray(payload.batch_images) ? payload.batch_images : [];
   payload.image_asset = String(payload.image_asset ?? "").trim();
   payload.image_data = String(payload.image_data ?? "").trim();
   payload.mask_asset = String(payload.mask_asset ?? "").trim();
   payload.mask_data = String(payload.mask_data ?? "").trim();
+  if (imageEditProfile) {
+    const referenceImages = Array.isArray(payload.reference_images) ? payload.reference_images : [];
+    if (!payload.image_asset && !payload.image_data) {
+      statusNode.textContent = "Image-edit profiles require a source image in Reference 1.";
+      return;
+    }
+    if (!referenceImages.length) {
+      statusNode.textContent = "Image-edit profiles require at least one reference image.";
+      return;
+    }
+    if (payload.main_reference_index < 0 || payload.main_reference_index >= referenceImages.length) {
+      statusNode.textContent = "Selected main reference slot does not contain an image.";
+      return;
+    }
+  } else {
+    delete payload.reference_images;
+    delete payload.main_reference_index;
+  }
   if (isImg2ImgBatchMode(payload.mode) && !payload.image_asset && !payload.image_data && batchImages.length) {
     // CRITICAL: batch lane still executes through single-workflow translation today; keep deterministic first-image fallback so submission never loses source input.
     payload.image_data = String(batchImages[0] ?? "").trim();
