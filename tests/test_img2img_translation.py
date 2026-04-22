@@ -277,20 +277,18 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.image_asset, "portrait-input")
 
     def test_normalize_img2img_request_normalizes_ordered_reference_images(self) -> None:
-        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "refresh the storefront signage",
-                    "negative_prompt": "blurry",
-                    "profile": "qwen_image_edit",
-                    "mode": "img2img",
-                    "reference_images": [
-                        {"image_asset": "reference-a"},
-                        {"image_asset": "reference-b"},
-                    ],
-                    "main_reference_index": 1,
-                }
-            )
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "negative_prompt": "blurry",
+                "mode": "img2img",
+                "reference_images": [
+                    {"image_asset": "reference-a"},
+                    {"image_asset": "reference-b"},
+                ],
+                "main_reference_index": 1,
+            }
+        )
 
         self.assertEqual(normalized.reference_image_assets, ["reference-a", "reference-b"])
         self.assertEqual(normalized.main_reference_index, 1)
@@ -688,6 +686,23 @@ class Img2ImgTranslationTests(unittest.TestCase):
             len([node for node in result["workflow"].values() if node["class_type"] == "TextEncodeQwenImageEdit"]),
             2,
         )
+
+    def test_normalize_img2img_request_rejects_qwen_edit_reference_count_above_manifest_limit(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            with self.assertRaisesRegex(ValueError, "supports at most 1 direct reference image"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "refresh the storefront signage",
+                        "negative_prompt": "blurry",
+                        "profile": "qwen_image_edit",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": "portrait-input"},
+                            {"image_asset": "secondary-reference"},
+                        ],
+                        "main_reference_index": 0,
+                    }
+                )
 
     def test_translate_img2img_request_appends_inline_lora_after_template_owned_lora_for_qwen_edit(self) -> None:
         inventory = ModelInventorySnapshot(

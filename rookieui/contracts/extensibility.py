@@ -29,6 +29,7 @@ def build_extensibility_refactor_manifest() -> dict[str, Any]:
                 "rookieui.services.workflow_builders.prompt_conditioning",
                 "rookieui.services.workflow_builders.controlnet",
                 "rookieui.services.workflow_builders.adetailer",
+                "rookieui.services.workflow_builders.image_edit_foundation",
                 "rookieui.services.workflow_builders.output",
             ),
             validation_modes=("full-gate", "translation-topology"),

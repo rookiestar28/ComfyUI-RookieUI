@@ -20,6 +20,10 @@ from rookieui.services.workflow_builders.core import (
     _normalize_encoder_selector_values,
     _to_node_ref,
 )
+from rookieui.services.workflow_builders.image_edit_foundation import (
+    _append_reference_vae_latents,
+    _build_image_edit_reference_bundle,
+)
 from rookieui.services.workflow_builders.output import _build_decode_and_save
 from rookieui.services.workflow_builders import prompt_conditioning
 
@@ -415,60 +419,6 @@ def _append_switch_node(
             "switch": _to_node_ref(switch_id),
             "on_false": _to_node_ref(on_false),
             "on_true": _to_node_ref(on_true),
-        },
-    }
-    return node_id
-
-
-def _append_asset_image_loader_node(
-    workflow: dict[str, object],
-    *,
-    allocator: NodeIdAllocator,
-    image_asset: str,
-) -> str:
-    node_id = allocator.next()
-    workflow[node_id] = {
-        "class_type": "RookieUILoadAssetImage",
-        "inputs": {
-            "asset": image_asset,
-        },
-    }
-    return node_id
-
-
-def _append_image_scale_to_total_pixels_node(
-    workflow: dict[str, object],
-    *,
-    allocator: NodeIdAllocator,
-    image_id: str | list[object],
-    megapixels: float,
-) -> str:
-    node_id = allocator.next()
-    workflow[node_id] = {
-        "class_type": "ImageScaleToTotalPixels",
-        "inputs": {
-            "upscale_method": "lanczos",
-            "megapixels": megapixels,
-            "resolution_steps": 1,
-            "image": _to_node_ref(image_id),
-        },
-    }
-    return node_id
-
-
-def _append_vae_encode_node(
-    workflow: dict[str, object],
-    *,
-    allocator: NodeIdAllocator,
-    image_id: str | list[object],
-    vae_source: list[object],
-) -> str:
-    node_id = allocator.next()
-    workflow[node_id] = {
-        "class_type": "VAEEncode",
-        "inputs": {
-            "pixels": _to_node_ref(image_id),
-            "vae": vae_source,
         },
     }
     return node_id
@@ -1262,19 +1212,22 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
 def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
-    image_id = _append_asset_image_loader_node(
+    references = _build_image_edit_reference_bundle(
         workflow,
         allocator=allocator,
-        image_asset=request.image_asset,
-    )
-    scaled_image_id = _append_image_scale_to_total_pixels_node(
-        workflow,
-        allocator=allocator,
-        image_id=image_id,
+        reference_assets=request.reference_image_assets,
+        main_reference_index=request.main_reference_index,
         megapixels=float(request.edit_megapixels or 1.5),
+        scale_mode="main_only",
     )
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    reference_latent_ids = _append_reference_vae_latents(
+        workflow,
+        allocator=allocator,
+        image_node_ids=references.image_node_ids,
+        vae_source=[vae_id, 0],
+    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -1287,7 +1240,7 @@ def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[s
         prompt_text=request.prompt,
         clip_source=clip_source,
         vae_source=[vae_id, 0],
-        image_id=scaled_image_id,
+        image_id=references.main_image_node_id,
     )
     negative_id = _append_qwen_image_edit_encode_node(
         workflow,
@@ -1295,14 +1248,9 @@ def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[s
         prompt_text=request.negative_prompt,
         clip_source=clip_source,
         vae_source=[vae_id, 0],
-        image_id=scaled_image_id,
+        image_id=references.main_image_node_id,
     )
-    latent_id = _append_vae_encode_node(
-        workflow,
-        allocator=allocator,
-        image_id=scaled_image_id,
-        vae_source=[vae_id, 0],
-    )
+    latent_id = reference_latent_ids[references.main_reference_index]
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
     model_source = _append_model_only_lora_chain(

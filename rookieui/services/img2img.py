@@ -167,6 +167,18 @@ def _is_official_image_edit_profile(profile_id: str) -> bool:
     return str(profile_id or "").strip().lower() in _OFFICIAL_IMAGE_EDIT_PROFILES
 
 
+def _enforce_image_edit_reference_contract(profile_entry: object, reference_image_assets: list[str]) -> None:
+    max_direct_references = int(getattr(profile_entry, "max_direct_references", 0) or 0)
+    if max_direct_references <= 0:
+        return
+    if len(reference_image_assets) <= max_direct_references:
+        return
+    image_label = "image" if max_direct_references == 1 else "images"
+    raise ValueError(
+        f"profile '{getattr(profile_entry, 'id', '')}' supports at most {max_direct_references} direct reference {image_label}."
+    )
+
+
 def _coerce_reference_image_assets(
     *,
     reference_images: object,
@@ -279,6 +291,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         # CRITICAL: batch mode currently executes through single graph translation; seed image must deterministically fall back to first uploaded batch entry.
         legacy_image_data=request.image_data or batch_image_seed,
     )
+    if is_image_edit_profile:
+        _enforce_image_edit_reference_contract(profile_entry, reference_image_assets)
     main_reference_index = _coerce_int(request.main_reference_index, "main_reference_index")
     if main_reference_index < 0 or main_reference_index >= len(reference_image_assets):
         raise ValueError("main_reference_index is out of range for reference_images.")
