@@ -42,6 +42,26 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     vae_name: "qwen_image_vae.safetensors",
     text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
   },
+  flux_kontext_dev_edit: {
+    checkpoint_name: "flux1-dev-kontext_fp8_scaled.safetensors",
+    vae_name: "ae.safetensors",
+    text_encoder_name: "clip_l.safetensors|t5xxl_fp8_e4m3fn_scaled.safetensors",
+  },
+  flux2_image_edit: {
+    checkpoint_name: "flux2_dev_fp8mixed.safetensors",
+    vae_name: "full_encoder_small_decoder.safetensors",
+    text_encoder_name: "mistral_3_small_flux2_bf16.safetensors",
+  },
+  klein_9b_kv_image_edit: {
+    checkpoint_name: "flux-2-klein-9b-kv-fp8.safetensors",
+    vae_name: "flux2-vae.safetensors",
+    text_encoder_name: "qwen_3_8b_fp8mixed.safetensors",
+  },
+  longcat_image_edit: {
+    checkpoint_name: "longcat_image_edit_bf16.safetensors",
+    vae_name: "ae.safetensors",
+    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+  },
   klein_4b_distilled: {
     checkpoint_name: "flux-2-klein-4b.safetensors",
     vae_name: "flux2-vae.safetensors",
@@ -167,6 +187,8 @@ const E2E_PRIMARY_MODEL_CATEGORY_BY_FAMILY = { ...DEFAULT_PRIMARY_MODEL_CATEGORY
 // IMPORTANT: keep this fixture order stable; bootstrap.spec.js pins the diffusion-model selector contract.
 const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux",
+  "flux_kontext_dev_edit",
+  "flux2_image_edit",
   "qwen_image",
   "qwen_image_edit",
   "firered_image_edit",
@@ -174,6 +196,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "klein_4b",
   "klein_9b_distilled",
   "klein_9b",
+  "klein_9b_kv_image_edit",
   "anima",
   "chroma",
   "ernie_image",
@@ -182,6 +205,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "hidream_i1_fast",
   "hidream_i1_full",
   "longcat_image",
+  "longcat_image_edit",
   "z_image",
   "z_image_turbo",
 ]);
@@ -209,6 +233,7 @@ const E2E_TEXT_ENCODER_OPTIONS = [
   "clip_g_hidream.safetensors",
   "ernie-image-prompt-enhancer.safetensors",
   "llama_3.1_8b_instruct_fp8_scaled.safetensors",
+  "mistral_3_small_flux2_bf16.safetensors",
   "ministral-3-3b.safetensors",
   "qwen_2.5_vl_7b_fp8_scaled.safetensors",
   "qwen_3_06b_base.safetensors",

@@ -114,6 +114,14 @@ class ModelInventoryTests(unittest.TestCase):
             payload["catalog"]["primary_model_category_by_family"]["ernie_image"],
             "diffusion_models",
         )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["flux_kontext_dev_edit"],
+            "diffusion_models",
+        )
+        self.assertEqual(
+            payload["catalog"]["primary_model_category_by_family"]["longcat_image_edit"],
+            "diffusion_models",
+        )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
         self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
@@ -490,6 +498,69 @@ class ModelInventoryTests(unittest.TestCase):
             resolve_template_lora_selector_context("qwen_image", snapshot),
             "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
         )
+
+    def test_profile_matrix_uses_family_aligned_defaults_for_first_wave_image_edit_profiles(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": [
+                    "flux\\flux1-dev-kontext_fp8_scaled.safetensors",
+                    "flux\\flux2_dev_fp8mixed.safetensors",
+                    "klein\\flux-2-klein-9b-kv-fp8.safetensors",
+                    "longcat\\longcat_image_edit_bf16.safetensors",
+                ],
+                "vae": [
+                    "ae.safetensors",
+                    "flux2-vae.safetensors",
+                    "full_encoder_small_decoder.safetensors",
+                ],
+                "text_encoders": [
+                    "clip_l.safetensors",
+                    "mistral_3_small_flux2_bf16.safetensors",
+                    "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                    "qwen_3_8b_fp8mixed.safetensors",
+                    "t5xxl_fp8_e4m3fn_scaled.safetensors",
+                ],
+                "loras": ["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+        expectations = {
+            "flux_kontext_dev_edit": {
+                "model": "flux\\flux1-dev-kontext_fp8_scaled.safetensors",
+                "text_encoder": "clip_l.safetensors|t5xxl_fp8_e4m3fn_scaled.safetensors",
+                "vae": "ae.safetensors",
+                "template_lora": "",
+            },
+            "flux2_image_edit": {
+                "model": "flux\\flux2_dev_fp8mixed.safetensors",
+                "text_encoder": "mistral_3_small_flux2_bf16.safetensors",
+                "vae": "full_encoder_small_decoder.safetensors",
+                "template_lora": "",
+            },
+            "klein_9b_kv_image_edit": {
+                "model": "klein\\flux-2-klein-9b-kv-fp8.safetensors",
+                "text_encoder": "qwen_3_8b_fp8mixed.safetensors",
+                "vae": "flux2-vae.safetensors",
+                "template_lora": "",
+            },
+            "longcat_image_edit": {
+                "model": "longcat\\longcat_image_edit_bf16.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "ae.safetensors",
+                "template_lora": "",
+            },
+        }
+
+        for profile_id, expectation in expectations.items():
+            with self.subTest(profile_id=profile_id):
+                category_id, selectors, default_model = resolve_primary_model_selector_context(profile_id, snapshot)
+                self.assertEqual(category_id, "diffusion_models")
+                self.assertIn(default_model, selectors)
+                self.assertEqual(default_model, expectation["model"])
+                self.assertEqual(resolve_text_encoder_selector_context(profile_id, snapshot), expectation["text_encoder"])
+                self.assertEqual(resolve_vae_selector_context(profile_id, snapshot), expectation["vae"])
+                self.assertEqual(resolve_template_lora_selector_context(profile_id, snapshot), expectation["template_lora"])
 
     def test_resolve_template_lora_selector_context_requires_official_template_variants(self) -> None:
         module = types.SimpleNamespace(

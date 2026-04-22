@@ -71,6 +71,7 @@ def _append_image_scale_to_total_pixels_node(
     allocator: NodeIdAllocator,
     image_id: str | list[object],
     megapixels: float,
+    resolution_steps: int = 1,
 ) -> str:
     node_id = allocator.next()
     workflow[node_id] = {
@@ -78,7 +79,7 @@ def _append_image_scale_to_total_pixels_node(
         "inputs": {
             "upscale_method": "lanczos",
             "megapixels": megapixels,
-            "resolution_steps": 1,
+            "resolution_steps": int(resolution_steps),
             "image": _to_node_ref(image_id),
         },
     }
@@ -132,6 +133,7 @@ def _build_image_edit_reference_bundle(
     main_reference_index: int,
     megapixels: float | None = None,
     scale_mode: str = "none",
+    resolution_steps: int = 1,
 ) -> ImageEditReferenceBundle:
     if not reference_assets:
         raise ValueError("reference_assets must contain at least one image.")
@@ -154,6 +156,7 @@ def _build_image_edit_reference_bundle(
                 allocator=allocator,
                 image_id=image_node_ids[main_reference_index],
                 megapixels=megapixels,
+                resolution_steps=resolution_steps,
             )
         elif normalized_scale_mode == "all":
             image_node_ids = [
@@ -162,6 +165,7 @@ def _build_image_edit_reference_bundle(
                     allocator=allocator,
                     image_id=image_node_id,
                     megapixels=megapixels,
+                    resolution_steps=resolution_steps,
                 )
                 for image_node_id in image_node_ids
             ]

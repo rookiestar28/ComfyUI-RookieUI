@@ -44,7 +44,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f165-20260423")
+        self.assertEqual(payload["model_families"]["contract_version"], "f167-20260423")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("chroma", family_ids)
@@ -54,6 +54,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertIn("qwen_image_edit_multi_lora", family_ids)
         self.assertIn("firered_image_edit", family_ids)
         self.assertIn("firered_image_edit_lightning", family_ids)
+        self.assertIn("flux_kontext_dev_edit", family_ids)
+        self.assertIn("flux2_image_edit", family_ids)
+        self.assertIn("klein_9b_kv_image_edit", family_ids)
+        self.assertIn("longcat_image_edit", family_ids)
         self.assertIn("z_image_turbo", family_ids)
         flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
         ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
@@ -78,6 +82,16 @@ class CapabilitySnapshotTests(unittest.TestCase):
         firered_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "firered_image_edit")
         firered_lightning_entry = next(
             entry for entry in payload["model_families"]["entries"] if entry["id"] == "firered_image_edit_lightning"
+        )
+        kontext_edit_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux_kontext_dev_edit"
+        )
+        flux2_edit_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux2_image_edit")
+        klein_kv_edit_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "klein_9b_kv_image_edit"
+        )
+        longcat_edit_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "longcat_image_edit"
         )
         self.assertTrue(chroma_entry["shift_visible"])
         self.assertEqual(chroma_entry["default_shift"], 1.0)
@@ -111,6 +125,25 @@ class CapabilitySnapshotTests(unittest.TestCase):
             "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
         )
         self.assertEqual(firered_lightning_entry["template_lora_chain_mode"], "single")
+        self.assertTrue(kontext_edit_entry["image_edit_profile"])
+        self.assertEqual(kontext_edit_entry["reference_input_mode"], "multi")
+        self.assertEqual(kontext_edit_entry["max_direct_references"], 3)
+        self.assertEqual(kontext_edit_entry["encoder_family"], "flux_clip_text")
+        self.assertTrue(kontext_edit_entry["flux_guidance_visible"])
+        self.assertEqual(kontext_edit_entry["available_surface_flows"], ["edit"])
+        self.assertTrue(flux2_edit_entry["image_edit_profile"])
+        self.assertEqual(flux2_edit_entry["reference_input_mode"], "single")
+        self.assertTrue(flux2_edit_entry["edit_megapixels_visible"])
+        self.assertEqual(flux2_edit_entry["default_edit_megapixels"], 1.0)
+        self.assertTrue(flux2_edit_entry["flux_guidance_visible"])
+        self.assertTrue(klein_kv_edit_entry["image_edit_profile"])
+        self.assertEqual(klein_kv_edit_entry["reference_input_mode"], "multi")
+        self.assertEqual(klein_kv_edit_entry["max_direct_references"], 3)
+        self.assertEqual(klein_kv_edit_entry["encoder_family"], "flux_clip_text")
+        self.assertTrue(longcat_edit_entry["image_edit_profile"])
+        self.assertEqual(longcat_edit_entry["reference_input_mode"], "single")
+        self.assertEqual(longcat_edit_entry["encoder_family"], "qwen_image_edit")
+        self.assertTrue(longcat_edit_entry["flux_guidance_visible"])
         self.assertEqual(z_turbo_entry["public_base_family"], "z_image")
         sd15_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "sd15")
         self.assertEqual(sd15_entry["available_surface_flows"], ["txt2img", "img2img"])

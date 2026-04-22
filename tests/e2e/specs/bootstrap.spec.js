@@ -205,6 +205,8 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   // CRITICAL: this preset matrix pins the clip-skip regression seam; profile switches must never hard-disable input/slider.
   const diffusionModelOptions = [
     "flux1-dev.safetensors",
+    "flux1-dev-kontext_fp8_scaled.safetensors",
+    "flux2_dev_fp8mixed.safetensors",
     "qwen_image_2512_fp8_e4m3fn.safetensors",
     "qwen_image_edit_fp8_e4m3fn.safetensors",
     "FireRed-Image-Edit-1.1-transformer.safetensors",
@@ -212,6 +214,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "flux-2-klein-base-4b.safetensors",
     "flux-2-klein-9b-fp8.safetensors",
     "flux-2-klein-base-9b-fp8.safetensors",
+    "flux-2-klein-9b-kv-fp8.safetensors",
     "anima-preview3-base.safetensors",
     "Chroma1-HD-fp8mixed.safetensors",
     "ernie-image.safetensors",
@@ -220,6 +223,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "hidream_i1_fast_fp8.safetensors",
     "hidream_i1_full_fp8.safetensors",
     "longcat_image_bf16.safetensors",
+    "longcat_image_edit_bf16.safetensors",
     "z_image_bf16.safetensors",
     "z_image_turbo_bf16.safetensors",
   ];
@@ -649,6 +653,10 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "qwen_image_edit_multi_lora",
     "firered_image_edit",
     "firered_image_edit_lightning",
+    "flux_kontext_dev_edit",
+    "flux2_image_edit",
+    "klein_9b_kv_image_edit",
+    "longcat_image_edit",
   ]);
   await expect(page.locator("#rookieui-img2img-edit-megapixels")).toBeEnabled();
   await expect(page.locator("#rookieui-img2img-width")).toBeDisabled();

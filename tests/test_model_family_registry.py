@@ -25,6 +25,10 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("qwen_image_edit_multi_lora", [entry["id"] for entry in payload["entries"]])
         self.assertIn("firered_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("firered_image_edit_lightning", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("flux_kontext_dev_edit", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("flux2_image_edit", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("klein_9b_kv_image_edit", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("longcat_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
@@ -57,6 +61,10 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         qwen_edit_multi_entry = get_model_family_registry_entry("qwen_image_edit_multi_lora")
         firered_entry = get_model_family_registry_entry("firered image edit")
         firered_lightning_entry = get_model_family_registry_entry("firered image edit lightning")
+        kontext_edit_entry = get_model_family_registry_entry("flux kontext edit")
+        flux2_edit_entry = get_model_family_registry_entry("flux2 image edit")
+        klein_kv_edit_entry = get_model_family_registry_entry("klein kv edit")
+        longcat_edit_entry = get_model_family_registry_entry("longcat image edit")
         qwen_entry = get_model_family_registry_entry("qwen_image")
 
         self.assertEqual(qwen_edit_entry.flow_kind, "edit")
@@ -82,6 +90,23 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             firered_lightning_entry.official_template_lora_label,
             "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
         )
+        self.assertEqual(kontext_edit_entry.reference_input_mode, "multi")
+        self.assertEqual(kontext_edit_entry.max_direct_references, 3)
+        self.assertEqual(kontext_edit_entry.encoder_family, "flux_clip_text")
+        self.assertTrue(kontext_edit_entry.flux_guidance_visible)
+        self.assertTrue(model_family_supports_surface_flow("flux_kontext_dev_edit", "edit"))
+        self.assertEqual(flux2_edit_entry.reference_input_mode, "single")
+        self.assertEqual(flux2_edit_entry.max_direct_references, 1)
+        self.assertTrue(flux2_edit_entry.edit_megapixels_visible)
+        self.assertTrue(flux2_edit_entry.flux_guidance_visible)
+        self.assertEqual(klein_kv_edit_entry.reference_input_mode, "multi")
+        self.assertEqual(klein_kv_edit_entry.max_direct_references, 3)
+        self.assertEqual(klein_kv_edit_entry.encoder_family, "flux_clip_text")
+        self.assertTrue(klein_kv_edit_entry.edit_megapixels_visible)
+        self.assertEqual(longcat_edit_entry.reference_input_mode, "single")
+        self.assertEqual(longcat_edit_entry.max_direct_references, 1)
+        self.assertEqual(longcat_edit_entry.encoder_family, "qwen_image_edit")
+        self.assertTrue(longcat_edit_entry.flux_guidance_visible)
         self.assertTrue(qwen_entry.template_lora_visible)
         self.assertTrue(qwen_entry.template_lora_override_allowed)
         self.assertEqual(
@@ -128,6 +153,10 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         firered_lightning_preset = next(
             preset for preset in payload["presets"] if preset["id"] == "firered_image_edit_lightning"
         )
+        kontext_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "flux_kontext_dev_edit")
+        flux2_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "flux2_image_edit")
+        klein_kv_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "klein_9b_kv_image_edit")
+        longcat_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "longcat_image_edit")
         z_turbo_preset = next(preset for preset in payload["presets"] if preset["id"] == "z_image_turbo")
 
         self.assertEqual(flux_preset["profile"], "flux")
@@ -148,5 +177,12 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(firered_preset["reference_input_mode"], "multi")
         self.assertEqual(firered_preset["max_direct_references"], 3)
         self.assertEqual(firered_lightning_preset["template_lora_chain_mode"], "single")
+        self.assertEqual(kontext_edit_preset["reference_input_mode"], "multi")
+        self.assertEqual(kontext_edit_preset["max_direct_references"], 3)
+        self.assertEqual(flux2_edit_preset["reference_input_mode"], "single")
+        self.assertEqual(flux2_edit_preset["edit_megapixels"], 1.0)
+        self.assertEqual(klein_kv_edit_preset["reference_input_mode"], "multi")
+        self.assertEqual(klein_kv_edit_preset["max_direct_references"], 3)
+        self.assertEqual(longcat_edit_preset["flux_guidance"], 4.5)
         self.assertEqual(z_turbo_preset["profile"], "z_image_turbo")
         self.assertEqual(z_turbo_preset["base_family"], "z_image")

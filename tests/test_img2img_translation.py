@@ -62,6 +62,58 @@ class Img2ImgTranslationTests(unittest.TestCase):
             default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
         )
 
+    def _build_flux_kontext_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Flux\\flux1-dev-kontext_fp8_scaled.safetensors"],
+            vae=["ae.safetensors"],
+            text_encoders=["clip_l.safetensors", "t5xxl_fp8_e4m3fn_scaled.safetensors"],
+            loras=[],
+            default_checkpoint="__host_default__",
+            default_vae="ae.safetensors",
+            default_text_encoder="clip_l.safetensors",
+        )
+
+    def _build_flux2_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Flux\\flux2_dev_fp8mixed.safetensors"],
+            vae=["full_encoder_small_decoder.safetensors"],
+            text_encoders=["mistral_3_small_flux2_bf16.safetensors"],
+            loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
+            default_checkpoint="__host_default__",
+            default_vae="full_encoder_small_decoder.safetensors",
+            default_text_encoder="mistral_3_small_flux2_bf16.safetensors",
+        )
+
+    def _build_klein_kv_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Klein\\flux-2-klein-9b-kv-fp8.safetensors"],
+            vae=["flux2-vae.safetensors"],
+            text_encoders=["qwen_3_8b_fp8mixed.safetensors"],
+            loras=[],
+            default_checkpoint="__host_default__",
+            default_vae="flux2-vae.safetensors",
+            default_text_encoder="qwen_3_8b_fp8mixed.safetensors",
+        )
+
+    def _build_longcat_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Longcat\\longcat_image_edit_bf16.safetensors"],
+            vae=["ae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[],
+            default_checkpoint="__host_default__",
+            default_vae="ae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
     def test_normalize_img2img_request_applies_sd15_defaults(self) -> None:
         request = normalize_img2img_request(
             {
@@ -766,6 +818,72 @@ class Img2ImgTranslationTests(unittest.TestCase):
                     }
                 )
 
+    def test_normalize_img2img_request_accepts_flux_kontext_edit_multi_reference_contract(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_flux_kontext_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "blend the two references into one cinematic edit",
+                    "profile": "flux_kontext_dev_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "kontext-a"},
+                        {"image_asset": "kontext-b"},
+                    ],
+                    "main_reference_index": 1,
+                }
+            )
+
+        self.assertEqual(normalized.profile, "flux_kontext_dev_edit")
+        self.assertEqual(normalized.mode, "img2img")
+        self.assertEqual(normalized.execution_mode, "edit")
+        self.assertEqual(normalized.image_asset, "kontext-b")
+        self.assertEqual(normalized.reference_image_assets, ["kontext-a", "kontext-b"])
+        self.assertEqual(normalized.main_reference_index, 1)
+        self.assertEqual(normalized.text_encoder_name, "clip_l.safetensors|t5xxl_fp8_e4m3fn_scaled.safetensors")
+
+    def test_normalize_img2img_request_rejects_flux_kontext_reference_count_above_manifest_limit(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_flux_kontext_edit_inventory(),
+        ):
+            with self.assertRaisesRegex(ValueError, "supports at most 3 direct reference image"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "blend the four references into one cinematic edit",
+                        "profile": "flux_kontext_dev_edit",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": "kontext-a"},
+                            {"image_asset": "kontext-b"},
+                            {"image_asset": "kontext-c"},
+                            {"image_asset": "kontext-d"},
+                        ],
+                        "main_reference_index": 0,
+                    }
+                )
+
+    def test_normalize_img2img_request_rejects_longcat_image_edit_reference_count_above_manifest_limit(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_longcat_edit_inventory(),
+        ):
+            with self.assertRaisesRegex(ValueError, "supports at most 1 direct reference image"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "turn the portrait into a glossy editorial cat poster",
+                        "profile": "longcat_image_edit",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": "longcat-main"},
+                            {"image_asset": "longcat-extra"},
+                        ],
+                        "main_reference_index": 0,
+                    }
+                )
+
     def test_translate_img2img_request_appends_inline_lora_after_template_owned_lora_for_qwen_edit(self) -> None:
         inventory = ModelInventorySnapshot(
             source="host",
@@ -909,6 +1027,152 @@ class Img2ImgTranslationTests(unittest.TestCase):
         )
         self.assertEqual(sampler_node["inputs"]["steps"], 8)
         self.assertEqual(sampler_node["inputs"]["cfg"], 1.0)
+
+    def test_translate_img2img_request_builds_flux_kontext_dev_image_edit_workflow(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_flux_kontext_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "merge the studio portrait with the silk texture reference",
+                    "profile": "flux_kontext_dev_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "kontext-a"},
+                        {"image_asset": "kontext-b"},
+                    ],
+                    "main_reference_index": 1,
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        asset_node_ids = {
+            node["inputs"]["asset"]: node_id
+            for node_id, node in workflow.items()
+            if node["class_type"] == "RookieUILoadAssetImage"
+        }
+        stitch_node = next(node for node in workflow.values() if node["class_type"] == "ImageStitch")
+        clip_node = next(node for node in workflow.values() if node["class_type"] == "DualCLIPLoader")
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+
+        self.assertEqual(result["workflow_kind"], "img2img-flux_kontext_dev_edit")
+        self.assertIn("FluxKontextImageScale", class_types)
+        self.assertIn("ReferenceLatent", class_types)
+        self.assertIn("ConditioningZeroOut", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertEqual(stitch_node["inputs"]["image1"], [asset_node_ids["kontext-b"], 0])
+        self.assertEqual(stitch_node["inputs"]["image2"], [asset_node_ids["kontext-a"], 0])
+        self.assertEqual(clip_node["inputs"]["clip_name1"], "clip_l.safetensors")
+        self.assertEqual(clip_node["inputs"]["clip_name2"], "t5xxl_fp8_e4m3fn_scaled.safetensors")
+        self.assertEqual(sampler_node["inputs"]["steps"], 20)
+        self.assertEqual(sampler_node["inputs"]["cfg"], 1.0)
+
+    def test_translate_img2img_request_builds_flux2_image_edit_workflow(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_flux2_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the product photo lighting",
+                    "profile": "flux2_image_edit",
+                    "mode": "img2img",
+                    "image_asset": "flux2-source",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        scale_node = next(node for node in workflow.values() if node["class_type"] == "ImageScaleToTotalPixels")
+        clip_node = next(node for node in workflow.values() if node["class_type"] == "CLIPLoader")
+        noise_node = next(node for node in workflow.values() if node["class_type"] == "RandomNoise")
+
+        self.assertEqual(result["workflow_kind"], "img2img-flux2_image_edit")
+        self.assertIn("BasicGuider", class_types)
+        self.assertIn("SamplerCustomAdvanced", class_types)
+        self.assertIn("Flux2Scheduler", class_types)
+        self.assertIn("EmptyFlux2LatentImage", class_types)
+        self.assertNotIn("CFGGuider", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertEqual(scale_node["inputs"]["megapixels"], 1.0)
+        self.assertEqual(clip_node["inputs"]["clip_name"], "mistral_3_small_flux2_bf16.safetensors")
+        self.assertEqual(clip_node["inputs"]["type"], "flux2")
+        self.assertEqual(noise_node["inputs"]["noise_seed"], result["normalized_request"]["execution_seed"])
+
+    def test_translate_img2img_request_builds_klein_9b_kv_image_edit_workflow(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_klein_kv_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "combine the outfit reference with the portrait",
+                    "profile": "klein_9b_kv_image_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "klein-main"},
+                        {"image_asset": "klein-style"},
+                    ],
+                    "main_reference_index": 0,
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        cfg_guider = next(node for node in workflow.values() if node["class_type"] == "CFGGuider")
+        kv_cache_node_id = next(node_id for node_id, node in workflow.items() if node["class_type"] == "FluxKVCache")
+        reference_latents = [node for node in workflow.values() if node["class_type"] == "ReferenceLatent"]
+
+        self.assertEqual(result["workflow_kind"], "img2img-klein_9b_kv_image_edit")
+        self.assertIn("SamplerCustomAdvanced", class_types)
+        self.assertIn("Flux2Scheduler", class_types)
+        self.assertIn("ImageScaleToTotalPixels", class_types)
+        self.assertNotIn("BasicGuider", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertEqual(len(reference_latents), 4)
+        self.assertEqual(cfg_guider["inputs"]["cfg"], 1.0)
+        self.assertEqual(cfg_guider["inputs"]["model"], [kv_cache_node_id, 0])
+
+    def test_translate_img2img_request_builds_longcat_image_edit_workflow(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_longcat_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "turn the portrait into a longcat magazine cover",
+                    "negative_prompt": "blurry",
+                    "profile": "longcat_image_edit",
+                    "mode": "img2img",
+                    "image_asset": "longcat-source",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        scale_node = next(node for node in workflow.values() if node["class_type"] == "ImageScaleToTotalPixels")
+        clip_node = next(node for node in workflow.values() if node["class_type"] == "CLIPLoader")
+
+        self.assertEqual(result["workflow_kind"], "img2img-longcat_image_edit")
+        self.assertIn("FluxGuidance", class_types)
+        self.assertIn("FluxKontextMultiReferenceLatentMethod", class_types)
+        self.assertIn("TextEncodeQwenImageEdit", class_types)
+        self.assertIn("KSampler", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertEqual(scale_node["inputs"]["resolution_steps"], 16)
+        self.assertEqual(clip_node["inputs"]["clip_name"], "qwen_2.5_vl_7b_fp8_scaled.safetensors")
+        self.assertEqual(clip_node["inputs"]["type"], "longcat_image")
+        self.assertEqual(
+            len([node for node in workflow.values() if node["class_type"] == "FluxKontextMultiReferenceLatentMethod"]),
+            2,
+        )
+        self.assertEqual(len([node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEdit"]), 2)
 
     def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
         normalized = normalize_img2img_request(

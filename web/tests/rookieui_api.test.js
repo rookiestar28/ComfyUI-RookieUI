@@ -68,7 +68,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f165-20260423");
+    expect(result.data.model_families.contract_version).toBe("f167-20260423");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
@@ -80,6 +80,10 @@ describe("fetchRookieUICapabilities", () => {
     const fireredLightningEntry = result.data.model_families.entries.find(
       (entry) => entry.id === "firered_image_edit_lightning",
     );
+    const kontextEditEntry = result.data.model_families.entries.find((entry) => entry.id === "flux_kontext_dev_edit");
+    const flux2EditEntry = result.data.model_families.entries.find((entry) => entry.id === "flux2_image_edit");
+    const kleinKvEditEntry = result.data.model_families.entries.find((entry) => entry.id === "klein_9b_kv_image_edit");
+    const longcatEditEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image_edit");
     const qwenEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image");
     expect(chromaEntry.shift_visible).toBe(true);
     expect(chromaEntry.default_shift).toBe(1);
@@ -120,6 +124,25 @@ describe("fetchRookieUICapabilities", () => {
     expect(fireredLightningEntry.official_template_lora_label).toBe(
       "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
     );
+    expect(kontextEditEntry.image_edit_profile).toBe(true);
+    expect(kontextEditEntry.reference_input_mode).toBe("multi");
+    expect(kontextEditEntry.max_direct_references).toBe(3);
+    expect(kontextEditEntry.encoder_family).toBe("flux_clip_text");
+    expect(kontextEditEntry.flux_guidance_visible).toBe(true);
+    expect(kontextEditEntry.available_surface_flows).toEqual(["edit"]);
+    expect(flux2EditEntry.image_edit_profile).toBe(true);
+    expect(flux2EditEntry.reference_input_mode).toBe("single");
+    expect(flux2EditEntry.edit_megapixels_visible).toBe(true);
+    expect(flux2EditEntry.default_edit_megapixels).toBe(1);
+    expect(flux2EditEntry.flux_guidance_visible).toBe(true);
+    expect(kleinKvEditEntry.image_edit_profile).toBe(true);
+    expect(kleinKvEditEntry.reference_input_mode).toBe("multi");
+    expect(kleinKvEditEntry.max_direct_references).toBe(3);
+    expect(kleinKvEditEntry.encoder_family).toBe("flux_clip_text");
+    expect(longcatEditEntry.image_edit_profile).toBe(true);
+    expect(longcatEditEntry.reference_input_mode).toBe("single");
+    expect(longcatEditEntry.encoder_family).toBe("qwen_image_edit");
+    expect(longcatEditEntry.flux_guidance_visible).toBe(true);
     expect(result.data.model_families.entries.find((entry) => entry.id === "sd15")?.available_surface_flows).toEqual([
       "txt2img",
       "img2img",
@@ -267,6 +290,10 @@ describe("fetchRookieUICapabilities", () => {
       "qwen_image_edit_multi_lora",
       "firered_image_edit",
       "firered_image_edit_lightning",
+      "flux_kontext_dev_edit",
+      "flux2_image_edit",
+      "klein_9b_kv_image_edit",
+      "longcat_image_edit",
       "z_image",
       "z_image_turbo",
     ]);
@@ -295,6 +322,10 @@ describe("fetchRookieUICapabilities", () => {
       "qwen_image_edit_multi_lora",
       "firered_image_edit",
       "firered_image_edit_lightning",
+      "flux_kontext_dev_edit",
+      "flux2_image_edit",
+      "klein_9b_kv_image_edit",
+      "longcat_image_edit",
       "z_image",
       "z_image_turbo",
     ]);
@@ -329,6 +360,16 @@ describe("fetchRookieUICapabilities", () => {
     expect(
       presets.data.presets.find((preset) => preset.id === "firered_image_edit_lightning")?.template_lora_chain_mode,
     ).toBe("single");
+    expect(presets.data.presets.find((preset) => preset.id === "flux_kontext_dev_edit")?.reference_input_mode).toBe(
+      "multi",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "flux_kontext_dev_edit")?.max_direct_references).toBe(3);
+    expect(presets.data.presets.find((preset) => preset.id === "flux2_image_edit")?.edit_megapixels).toBe(1);
+    expect(presets.data.presets.find((preset) => preset.id === "klein_9b_kv_image_edit")?.reference_input_mode).toBe(
+      "multi",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "klein_9b_kv_image_edit")?.max_direct_references).toBe(3);
+    expect(presets.data.presets.find((preset) => preset.id === "longcat_image_edit")?.flux_guidance).toBe(4.5);
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
     expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);

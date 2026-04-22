@@ -22,7 +22,14 @@ from rookieui.services.workflow_builders.core import (
     _to_node_ref,
 )
 from rookieui.services.workflow_builders.image_edit_foundation import (
+    _append_flux2_advanced_sampler_bundle,
+    _append_flux_kv_cache_node,
+    _append_flux_reference_method_branch,
+    _append_mirrored_reference_latent_chains,
+    _append_reference_latent_chain,
+    _append_reference_vae_latents,
     _append_vae_encode_node,
+    _build_flux_kontext_reference_bundle,
     _build_image_edit_reference_bundle,
 )
 from rookieui.services.workflow_builders.output import _build_decode_and_save
@@ -1396,6 +1403,351 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
     return workflow
 
 
+def _build_flux_kontext_dev_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    references = _build_image_edit_reference_bundle(
+        workflow,
+        allocator=allocator,
+        reference_assets=request.reference_image_assets,
+        main_reference_index=request.main_reference_index,
+        scale_mode="none",
+    )
+    stitched_reference_ids = (references.main_image_node_id,) + tuple(
+        image_node_id
+        for index, image_node_id in enumerate(references.image_node_ids)
+        if index != references.main_reference_index
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    kontext_reference = _build_flux_kontext_reference_bundle(
+        workflow,
+        allocator=allocator,
+        image_node_ids=stitched_reference_ids,
+        vae_source=[vae_id, 0],
+    )
+    encoder_values = _normalize_encoder_selector_values(request.text_encoder_name)
+    if len(encoder_values) != 2:
+        raise ValueError("Flux Kontext image-edit profile requires two ordered text encoders.")
+    clip_source = _build_flux_dual_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name_1=encoder_values[0],
+        clip_name_2=encoder_values[1],
+    )
+    positive_id = prompt_conditioning._append_prompt_encode_node(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        text=request.prompt,
+        prompt_encoder="sd15",
+    )
+    negative_id = _append_conditioning_zero_out_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+    )
+    positive_id = _append_reference_latent_chain(
+        workflow,
+        allocator=allocator,
+        conditioning_source=positive_id,
+        latent_node_ids=(kontext_reference.latent_node_id,),
+    )
+    positive_id = _append_flux_guidance_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+    )
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow,
+        node_id=sampler_id,
+        positive_id=positive_id,
+        negative_id=negative_id,
+        latent_id=kontext_reference.latent_node_id,
+        request=request,
+        denoise=1.0,
+        model_source=model_source,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
+def _build_flux2_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    references = _build_image_edit_reference_bundle(
+        workflow,
+        allocator=allocator,
+        reference_assets=request.reference_image_assets,
+        main_reference_index=request.main_reference_index,
+        megapixels=float(request.edit_megapixels or profile_entry.default_edit_megapixels or 1.0),
+        scale_mode="main_only",
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="flux2",
+    )
+    positive_id = prompt_conditioning._append_prompt_encode_node(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        text=request.prompt,
+        prompt_encoder="sd15",
+    )
+    positive_id = _append_flux_guidance_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+    )
+    reference_latent_id = _append_vae_encode_node(
+        workflow,
+        allocator=allocator,
+        image_id=references.main_image_node_id,
+        vae_source=[vae_id, 0],
+    )
+    positive_id = _append_reference_latent_chain(
+        workflow,
+        allocator=allocator,
+        conditioning_source=positive_id,
+        latent_node_ids=(reference_latent_id,),
+    )
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
+    sampler_bundle = _append_flux2_advanced_sampler_bundle(
+        workflow,
+        allocator=allocator,
+        model_source=model_source,
+        size_image_id=references.main_image_node_id,
+        positive_conditioning_source=positive_id,
+        steps=request.steps,
+        sampler_name=request.sampler_name,
+        noise_seed=request.execution_seed,
+        batch_size=request.batch_size,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_bundle.sampler_node_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
+def _build_klein_9b_kv_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    references = _build_image_edit_reference_bundle(
+        workflow,
+        allocator=allocator,
+        reference_assets=request.reference_image_assets,
+        main_reference_index=request.main_reference_index,
+        megapixels=float(request.edit_megapixels or profile_entry.default_edit_megapixels or 1.0),
+        scale_mode="all",
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="flux2",
+    )
+    positive_id = prompt_conditioning._append_prompt_encode_node(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        text=request.prompt,
+        prompt_encoder="sd15",
+    )
+    negative_id = _append_conditioning_zero_out_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+    )
+    reference_latent_ids = _append_reference_vae_latents(
+        workflow,
+        allocator=allocator,
+        image_node_ids=references.image_node_ids,
+        vae_source=[vae_id, 0],
+    )
+    positive_id, negative_id = _append_mirrored_reference_latent_chains(
+        workflow,
+        allocator=allocator,
+        positive_conditioning_source=positive_id,
+        negative_conditioning_source=negative_id,
+        latent_node_ids=reference_latent_ids,
+    )
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
+    model_source = _append_flux_kv_cache_node(
+        workflow,
+        allocator=allocator,
+        model_source=model_source,
+    )
+    sampler_bundle = _append_flux2_advanced_sampler_bundle(
+        workflow,
+        allocator=allocator,
+        model_source=model_source,
+        size_image_id=references.main_image_node_id,
+        positive_conditioning_source=positive_id,
+        negative_conditioning_source=negative_id,
+        cfg_scale=request.cfg_scale,
+        steps=request.steps,
+        sampler_name=request.sampler_name,
+        noise_seed=request.execution_seed,
+        batch_size=request.batch_size,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_bundle.sampler_node_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
+def _build_longcat_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    references = _build_image_edit_reference_bundle(
+        workflow,
+        allocator=allocator,
+        reference_assets=request.reference_image_assets,
+        main_reference_index=request.main_reference_index,
+        megapixels=float(request.edit_megapixels or profile_entry.default_edit_megapixels or 1.0),
+        scale_mode="main_only",
+        resolution_steps=16,
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="longcat_image",
+    )
+    positive_id = _append_qwen_image_edit_encode_node(
+        workflow,
+        allocator=allocator,
+        prompt_text=request.prompt,
+        clip_source=clip_source,
+        vae_source=[vae_id, 0],
+        image_id=references.main_image_node_id,
+    )
+    negative_id = _append_qwen_image_edit_encode_node(
+        workflow,
+        allocator=allocator,
+        prompt_text=request.negative_prompt,
+        clip_source=clip_source,
+        vae_source=[vae_id, 0],
+        image_id=references.main_image_node_id,
+    )
+    guidance = float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0)
+    positive_id = _append_flux_reference_method_branch(
+        workflow,
+        allocator=allocator,
+        conditioning_source=positive_id,
+        guidance=guidance,
+        reference_method="index",
+    )
+    negative_id = _append_flux_reference_method_branch(
+        workflow,
+        allocator=allocator,
+        conditioning_source=negative_id,
+        guidance=guidance,
+        reference_method="index",
+    )
+    latent_id = _append_vae_encode_node(
+        workflow,
+        allocator=allocator,
+        image_id=references.main_image_node_id,
+        vae_source=[vae_id, 0],
+    )
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        inline_lora_activations=request.lora_activations,
+    )
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow,
+        node_id=sampler_id,
+        positive_id=positive_id,
+        negative_id=negative_id,
+        latent_id=latent_id,
+        request=request,
+        denoise=1.0,
+        model_source=model_source,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
+_NON_SD_EDIT_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedImg2ImgRequest], dict[str, object]]] = {
+    "qwen_image_edit": _build_qwen_family_image_edit_workflow,
+    "flux_kontext_dev_edit": _build_flux_kontext_dev_image_edit_workflow,
+    "flux2_image_edit": _build_flux2_image_edit_workflow,
+    "klein_9b_kv_image_edit": _build_klein_9b_kv_image_edit_workflow,
+    "longcat_image_edit": _build_longcat_image_edit_workflow,
+}
+
+
 def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     profile_id = str(request.profile or "").strip().lower()
     adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
@@ -1408,6 +1760,7 @@ def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str
 def build_non_sd_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     profile_id = str(request.profile or "").strip().lower()
     adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
-    if adapter_id == "qwen_image_edit":
-        return _build_qwen_family_image_edit_workflow(request)
+    builder = _NON_SD_EDIT_RUNTIME_BUILDERS.get(adapter_id)
+    if builder is not None:
+        return builder(request)
     raise ValueError(f"Unsupported official non-SD edit profile: {request.profile}")

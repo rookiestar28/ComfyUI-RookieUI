@@ -53,6 +53,22 @@ class ImageEditFoundationTests(unittest.TestCase):
         self.assertEqual(workflow["3"]["class_type"], "ImageScaleToTotalPixels")
         self.assertEqual(workflow["4"]["class_type"], "ImageScaleToTotalPixels")
 
+    def test_build_reference_bundle_passes_custom_resolution_steps(self) -> None:
+        workflow: dict[str, object] = {}
+        bundle = _build_image_edit_reference_bundle(
+            workflow,
+            allocator=NodeIdAllocator(start=1),
+            reference_assets=["ref-a"],
+            main_reference_index=0,
+            megapixels=1.0,
+            scale_mode="main_only",
+            resolution_steps=16,
+        )
+
+        self.assertEqual(bundle.image_node_ids, ("2",))
+        self.assertEqual(workflow["2"]["class_type"], "ImageScaleToTotalPixels")
+        self.assertEqual(workflow["2"]["inputs"]["resolution_steps"], 16)
+
     def test_append_reference_vae_latents_builds_parallel_latent_nodes(self) -> None:
         workflow: dict[str, object] = {}
         latent_ids = _append_reference_vae_latents(
