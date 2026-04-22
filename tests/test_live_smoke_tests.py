@@ -469,7 +469,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
             },
         )
 
-        self.assertEqual(payload["mode"], "edit")
+        self.assertEqual(payload["mode"], "img2img")
         self.assertEqual(payload["text_encoder_name"], "qwen_2.5_vl_7b_fp8_scaled.safetensors")
         self.assertEqual(payload["vae_name"], "qwen_image_vae.safetensors")
         self.assertEqual(payload["edit_megapixels"], 1.5)
@@ -742,7 +742,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         self.assertEqual(len(submit_calls), 1)
         submit_url, submit_payload = submit_calls[0]
         self.assertEqual(submit_url, "http://127.0.0.1:8188/rookieui/generate/img2img")
-        self.assertEqual(submit_payload["mode"], "edit")
+        self.assertEqual(submit_payload["mode"], "img2img")
         self.assertNotIn("mask_asset", submit_payload)
         self.assertTrue(str(submit_payload["image_data"]).startswith("data:image/png;base64,"))
 

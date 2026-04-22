@@ -3282,7 +3282,7 @@ def _build_edit_payload(
         "prompt": f"[rookieui live smoke] {profile_id} edit",
         "negative_prompt": "",
         "profile": profile_id,
-        "mode": "edit",
+        "mode": "img2img",
         "image_data": _build_png_data_url(color="midnightblue"),
         "checkpoint_name": str(preset.get("checkpoint_name", "")).strip(),
         "vae_name": vae_name,

@@ -237,7 +237,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
                 }
             )
 
-    def test_normalize_img2img_request_accepts_edit_mode_without_mask(self) -> None:
+    def test_normalize_img2img_request_canonicalizes_image_edit_profile_to_img2img_mode_without_mask(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
             normalized = normalize_img2img_request(
                 {
@@ -249,14 +249,52 @@ class Img2ImgTranslationTests(unittest.TestCase):
                 }
             )
 
-        self.assertEqual(normalized.mode, "edit")
+        self.assertEqual(normalized.mode, "img2img")
         self.assertEqual(normalized.execution_mode, "edit")
         self.assertEqual(normalized.mask_asset, "")
         self.assertEqual(normalized.profile, "qwen_image_edit")
+        self.assertEqual(normalized.reference_image_assets, ["portrait-input"])
+        self.assertEqual(normalized.main_reference_index, 0)
         self.assertEqual(
             normalized.template_lora_name,
             "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
         )
+
+    def test_normalize_img2img_request_accepts_image_edit_profile_on_img2img_mode(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "img2img",
+                }
+            )
+
+        self.assertEqual(normalized.mode, "img2img")
+        self.assertEqual(normalized.execution_mode, "edit")
+        self.assertEqual(normalized.image_asset, "portrait-input")
+
+    def test_normalize_img2img_request_normalizes_ordered_reference_images(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "profile": "qwen_image_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "reference-a"},
+                        {"image_asset": "reference-b"},
+                    ],
+                    "main_reference_index": 1,
+                }
+            )
+
+        self.assertEqual(normalized.reference_image_assets, ["reference-a", "reference-b"])
+        self.assertEqual(normalized.main_reference_index, 1)
+        self.assertEqual(normalized.image_asset, "reference-b")
 
     def test_normalize_img2img_request_accepts_template_lora_override_for_qwen_edit(self) -> None:
         inventory = ModelInventorySnapshot(
@@ -291,14 +329,14 @@ class Img2ImgTranslationTests(unittest.TestCase):
             "Qwen-Image\\My-Custom-Qwen-Edit-LoRA.safetensors",
         )
 
-    def test_normalize_img2img_request_rejects_edit_profile_on_legacy_img2img_surface(self) -> None:
-        with self.assertRaisesRegex(ValueError, "not currently exposed on the img2img surface"):
+    def test_normalize_img2img_request_rejects_inpaint_mode_for_image_edit_profile(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unsupported for official image-edit profiles"):
             normalize_img2img_request(
                 {
                     "prompt": "refresh the storefront signage",
                     "image_asset": "portrait-input",
                     "profile": "qwen_image_edit",
-                    "mode": "img2img",
+                    "mode": "inpaint",
                 }
             )
 
@@ -633,14 +671,14 @@ class Img2ImgTranslationTests(unittest.TestCase):
                     "negative_prompt": "blurry",
                     "image_asset": "portrait-input",
                     "profile": "qwen_image_edit",
-                    "mode": "edit",
+                    "mode": "img2img",
                 }
             )
 
         result = translate_img2img_request(normalized).to_payload()
         class_types = {node["class_type"] for node in result["workflow"].values()}
 
-        self.assertEqual(result["workflow_kind"], "edit-qwen_image_edit")
+        self.assertEqual(result["workflow_kind"], "img2img-qwen_image_edit")
         self.assertIn("ImageScaleToTotalPixels", class_types)
         self.assertIn("TextEncodeQwenImageEdit", class_types)
         self.assertIn("LoraLoaderModelOnly", class_types)
@@ -674,7 +712,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
                     "negative_prompt": "blurry",
                     "image_asset": "portrait-input",
                     "profile": "qwen_image_edit",
-                    "mode": "edit",
+                    "mode": "img2img",
                 }
             )
 
@@ -964,7 +1002,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["payload"]["status"], "invalid-request")
         self.assertIn("not currently exposed on the img2img surface", response["payload"]["detail"])
 
-    def test_img2img_route_accepts_edit_mode_without_mask(self) -> None:
+    def test_img2img_route_accepts_image_edit_profile_without_mask_on_img2img_contract(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
             response = asyncio.run(
                 routes.img2img(
@@ -973,7 +1011,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
                             "prompt": "refresh the storefront signage",
                             "image_asset": "img-source",
                             "profile": "qwen_image_edit",
-                            "mode": "edit",
+                            "mode": "img2img",
                             "dry_run": True,
                         }
                     )
@@ -981,7 +1019,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             )
 
         self.assertEqual(response["status"], 200)
-        self.assertEqual(response["payload"]["workflow_kind"], "edit-qwen_image_edit")
+        self.assertEqual(response["payload"]["workflow_kind"], "img2img-qwen_image_edit")
 
     def test_img2img_route_rejects_unknown_asset_handle(self) -> None:
         with mock.patch(

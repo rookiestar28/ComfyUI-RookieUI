@@ -94,7 +94,7 @@ def translate_txt2img_request(request: NormalizedTxt2ImgRequest) -> WorkflowTran
 
 def translate_img2img_request(request: NormalizedImg2ImgRequest) -> WorkflowTranslationResult:
     workflow_kind = (
-        f"edit-{request.profile}"
+        f"img2img-{request.profile}"
         if _should_use_official_non_sd_edit_template(request)
         else f"{request.mode}-{request.base_family}"
     )

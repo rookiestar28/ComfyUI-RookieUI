@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
+from rookieui.contracts.family_template_manifest import list_non_sd_edit_manifest_entries
 from rookieui.contracts.model_family_registry import (
     get_model_family_registry_entry,
     model_family_supports_surface_flow,
@@ -74,6 +75,7 @@ _MAX_HIRES_SCALE = 2.5
 _MIN_HIRES_DENOISE = 0.1
 _MAX_HIRES_DENOISE = 1.0
 _MAX_HIRES_STEPS = 150
+_MAX_REFERENCE_IMAGES = 16
 _DEFAULT_HIRES_SCALE = 1.5
 _DEFAULT_HIRES_DENOISE = 0.35
 _DEFAULT_HIRES_UPSCALE_METHOD = "bislerp"
@@ -93,6 +95,7 @@ _IMG2IMG_MODE_ALIASES = {
     "inpaint_upload": "inpaint",
     "batch": "img2img",
 }
+_OFFICIAL_IMAGE_EDIT_PROFILES = frozenset(entry.id for entry in list_non_sd_edit_manifest_entries())
 
 
 def _is_unresolved_inventory_selector(value: str) -> bool:
@@ -160,6 +163,51 @@ def _coerce_batch_images(batch_images: object) -> list[str]:
     return normalized
 
 
+def _is_official_image_edit_profile(profile_id: str) -> bool:
+    return str(profile_id or "").strip().lower() in _OFFICIAL_IMAGE_EDIT_PROFILES
+
+
+def _coerce_reference_image_assets(
+    *,
+    reference_images: object,
+    legacy_image_asset: object,
+    legacy_image_data: object,
+) -> list[str]:
+    if reference_images in (None, "") or reference_images == []:
+        return [
+            _resolve_input_asset(
+                asset_value=legacy_image_asset,
+                data_value=legacy_image_data,
+                field_name="image_asset",
+                data_field_name="image_data",
+                upload_prefix="rookieui_img2img_input",
+                required=True,
+            )
+        ]
+    if not isinstance(reference_images, list):
+        raise ValueError("reference_images must be an array of objects.")
+
+    normalized_assets: list[str] = []
+    for index, entry in enumerate(reference_images):
+        if index >= _MAX_REFERENCE_IMAGES:
+            raise ValueError(f"reference_images must contain at most {_MAX_REFERENCE_IMAGES} entries.")
+        if not isinstance(entry, dict):
+            raise ValueError("reference_images entries must be objects.")
+        normalized_assets.append(
+            _resolve_input_asset(
+                asset_value=entry.get("image_asset"),
+                data_value=entry.get("image_data"),
+                field_name=f"reference_images[{index}].image_asset",
+                data_field_name=f"reference_images[{index}].image_data",
+                upload_prefix=f"rookieui_img2img_reference_{index + 1}",
+                required=True,
+            )
+        )
+    if not normalized_assets:
+        raise ValueError("reference_images must contain at least one entry.")
+    return normalized_assets
+
+
 def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRequest:
     if not isinstance(payload, dict):
         raise ValueError("Img2Img request payload must be an object.")
@@ -199,25 +247,42 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         explicit_strength_clip=lora_strength_clip,
     )
 
-    mode = normalize_option_label(request.mode, "mode", max_length=24).lower() or "img2img"
-    execution_mode = _IMG2IMG_MODE_ALIASES.get(mode)
+    requested_mode = normalize_option_label(request.mode, "mode", max_length=24).lower() or "img2img"
+    execution_mode = _IMG2IMG_MODE_ALIASES.get(requested_mode)
     if execution_mode is None:
         raise ValueError("mode is unsupported.")
-    requested_surface_flow = "edit" if execution_mode == "edit" else "img2img"
-    if not model_family_supports_surface_flow(profile.id, requested_surface_flow):
+    is_image_edit_profile = _is_official_image_edit_profile(profile.id)
+    if execution_mode == "edit" and not is_image_edit_profile:
+        raise ValueError("mode 'edit' is reserved for official image-edit profiles.")
+    if is_image_edit_profile:
+        if requested_mode in {"inpaint", "inpaint_sketch", "inpaint_upload", "sketch", "batch"}:
+            raise ValueError(f"mode '{requested_mode}' is unsupported for official image-edit profiles.")
+        # IMPORTANT: image-edit profiles now belong to the canonical img2img contract even while the runtime
+        # seam still routes through the existing dedicated edit builder during the transition chain.
+        mode = "img2img"
+        execution_mode = "edit"
+        requested_surface_flow = "img2img"
+    else:
+        mode = requested_mode
+        requested_surface_flow = "img2img" if execution_mode != "edit" else "edit"
+    if not (is_image_edit_profile and requested_surface_flow == "img2img") and not model_family_supports_surface_flow(
+        profile.id,
+        requested_surface_flow,
+    ):
         raise ValueError(f"profile '{profile.id}' is not currently exposed on the {requested_surface_flow} surface.")
     batch_images = _coerce_batch_images(request.batch_images)
     batch_image_seed = batch_images[0] if mode == "batch" and batch_images else ""
 
-    image_asset = _resolve_input_asset(
-        asset_value=request.image_asset,
+    reference_image_assets = _coerce_reference_image_assets(
+        reference_images=request.reference_images,
+        legacy_image_asset=request.image_asset,
         # CRITICAL: batch mode currently executes through single graph translation; seed image must deterministically fall back to first uploaded batch entry.
-        data_value=request.image_data or batch_image_seed,
-        field_name="image_asset",
-        data_field_name="image_data",
-        upload_prefix="rookieui_img2img_input",
-        required=True,
+        legacy_image_data=request.image_data or batch_image_seed,
     )
+    main_reference_index = _coerce_int(request.main_reference_index, "main_reference_index")
+    if main_reference_index < 0 or main_reference_index >= len(reference_image_assets):
+        raise ValueError("main_reference_index is out of range for reference_images.")
+    image_asset = reference_image_assets[main_reference_index]
     mask_asset = _resolve_input_asset(
         asset_value=request.mask_asset,
         data_value=request.mask_data,
@@ -519,6 +584,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         aux_text_encoder_name=aux_text_encoder_name,
         template_lora_name=template_lora_name,
         image_asset=image_asset,
+        reference_image_assets=reference_image_assets,
+        main_reference_index=main_reference_index,
         mask_asset=mask_asset,
         mode=mode,
         execution_mode=execution_mode,

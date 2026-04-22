@@ -63,6 +63,8 @@ class Img2ImgRequest:
     template_lora_name: str | None = None
     image_asset: str = ""
     image_data: str = ""
+    reference_images: list[dict[str, Any]] = field(default_factory=list)
+    main_reference_index: int = 0
     mask_asset: str = ""
     mask_data: str = ""
     mode: str = "img2img"
@@ -179,6 +181,8 @@ class NormalizedImg2ImgRequest:
     aux_text_encoder_name: str
     template_lora_name: str
     image_asset: str
+    reference_image_assets: list[str]
+    main_reference_index: int
     mask_asset: str
     mode: str
     execution_mode: str
