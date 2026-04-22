@@ -35,6 +35,9 @@ class ImageEditFoundationTests(unittest.TestCase):
         self.assertEqual(workflow["1"]["class_type"], "RookieUILoadAssetImage")
         self.assertEqual(workflow["2"]["class_type"], "RookieUILoadAssetImage")
         self.assertEqual(workflow["3"]["class_type"], "RookieUILoadAssetImage")
+        self.assertEqual(workflow["1"]["inputs"]["asset_handle"], "ref-a")
+        self.assertEqual(workflow["2"]["inputs"]["asset_handle"], "ref-b")
+        self.assertEqual(workflow["3"]["inputs"]["asset_handle"], "ref-c")
         self.assertEqual(workflow["4"]["class_type"], "ImageScaleToTotalPixels")
         self.assertEqual(workflow["4"]["inputs"]["image"], ["2", 0])
 
@@ -249,3 +252,4 @@ class ImageEditFoundationTests(unittest.TestCase):
         self.assertEqual(workflow["103"]["class_type"], "CFGGuider")
         self.assertEqual(workflow["103"]["inputs"]["positive"], ["8", 0])
         self.assertEqual(workflow["103"]["inputs"]["negative"], ["9", 0])
+        self.assertEqual(workflow["105"]["inputs"]["steps"], 4)

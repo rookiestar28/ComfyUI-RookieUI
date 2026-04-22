@@ -59,7 +59,8 @@ def _append_asset_image_loader_node(
     workflow[node_id] = {
         "class_type": "RookieUILoadAssetImage",
         "inputs": {
-            "asset": image_asset,
+            # IMPORTANT: Comfy prompt validation calls VALIDATE_INPUTS with declared input names; this must stay aligned with RookieUILoadAssetImage.INPUT_TYPES.
+            "asset_handle": image_asset,
         },
     }
     return node_id
@@ -545,7 +546,7 @@ def _append_flux2_scheduler_node(
     workflow[node_id] = {
         "class_type": "Flux2Scheduler",
         "inputs": {
-            "steps": _to_node_ref(steps),
+            "steps": steps if isinstance(steps, int) else _to_node_ref(steps),
             "width": _to_node_ref(width),
             "height": _to_node_ref(height),
         },

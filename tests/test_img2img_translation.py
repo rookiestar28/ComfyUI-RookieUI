@@ -1050,7 +1050,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
         workflow = result["workflow"]
         class_types = {node["class_type"] for node in workflow.values()}
         asset_node_ids = {
-            node["inputs"]["asset"]: node_id
+            node["inputs"]["asset_handle"]: node_id
             for node_id, node in workflow.items()
             if node["class_type"] == "RookieUILoadAssetImage"
         }
@@ -1137,6 +1137,17 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(len(reference_latents), 4)
         self.assertEqual(cfg_guider["inputs"]["cfg"], 1.0)
         self.assertEqual(cfg_guider["inputs"]["model"], [kv_cache_node_id, 0])
+        self.assertTrue(
+            all(
+                node["inputs"]["asset_handle"].startswith("klein-")
+                for node in workflow.values()
+                if node["class_type"] == "RookieUILoadAssetImage"
+            )
+        )
+        self.assertEqual(
+            next(node for node in workflow.values() if node["class_type"] == "Flux2Scheduler")["inputs"]["steps"],
+            4,
+        )
 
     def test_translate_img2img_request_builds_longcat_image_edit_workflow(self) -> None:
         with mock.patch(
@@ -1168,6 +1179,12 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(scale_node["inputs"]["resolution_steps"], 16)
         self.assertEqual(clip_node["inputs"]["clip_name"], "qwen_2.5_vl_7b_fp8_scaled.safetensors")
         self.assertEqual(clip_node["inputs"]["type"], "longcat_image")
+        self.assertEqual(
+            next(node for node in workflow.values() if node["class_type"] == "RookieUILoadAssetImage")["inputs"][
+                "asset_handle"
+            ],
+            "longcat-source",
+        )
         self.assertEqual(
             len([node for node in workflow.values() if node["class_type"] == "FluxKontextMultiReferenceLatentMethod"]),
             2,
