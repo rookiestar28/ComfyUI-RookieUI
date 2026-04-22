@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f158-20260419"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f163-20260423"
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,12 @@ class FamilyTemplateManifestEntry:
     experimental: bool = False
     aliases: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
+    image_edit_profile: bool = False
+    request_contract_surface: str = ""
+    reference_input_mode: str = "none"
+    max_direct_references: int = 0
+    encoder_family: str = ""
+    template_lora_chain_mode: str = "none"
     flow_kind: str = "txt2img"
     available_surface_flows: tuple[str, ...] = ("txt2img", "img2img")
     runtime_adapter_id: str = ""
@@ -88,6 +94,12 @@ class FamilyTemplateManifestEntry:
             "experimental": self.experimental,
             "aliases": list(self.aliases),
             "notes": list(self.notes),
+            "image_edit_profile": self.image_edit_profile,
+            "request_contract_surface": self.request_contract_surface,
+            "reference_input_mode": self.reference_input_mode,
+            "max_direct_references": self.max_direct_references,
+            "encoder_family": self.encoder_family,
+            "template_lora_chain_mode": self.template_lora_chain_mode,
             "available_surface_flows": list(self.available_surface_flows),
         }
 
@@ -119,6 +131,12 @@ class FamilyTemplateManifestEntry:
             "clip_skip": self.default_clip_skip,
             "prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
             "edit_megapixels": self.default_edit_megapixels,
+            "image_edit_profile": self.image_edit_profile,
+            "request_contract_surface": self.request_contract_surface,
+            "reference_input_mode": self.reference_input_mode,
+            "max_direct_references": self.max_direct_references,
+            "encoder_family": self.encoder_family,
+            "template_lora_chain_mode": self.template_lora_chain_mode,
         }
 
 
@@ -186,6 +204,12 @@ def _template_entry(
     compatibility_summary: str,
     aliases: tuple[str, ...] = (),
     notes: tuple[str, ...] = (),
+    image_edit_profile: bool = False,
+    request_contract_surface: str = "",
+    reference_input_mode: str = "none",
+    max_direct_references: int = 0,
+    encoder_family: str = "",
+    template_lora_chain_mode: str = "none",
     shift_visible: bool = False,
     default_shift: float | None = None,
     flux_guidance_visible: bool = False,
@@ -245,6 +269,12 @@ def _template_entry(
         experimental=True,
         aliases=aliases,
         notes=notes,
+        image_edit_profile=image_edit_profile,
+        request_contract_surface=request_contract_surface,
+        reference_input_mode=reference_input_mode,
+        max_direct_references=max_direct_references,
+        encoder_family=encoder_family,
+        template_lora_chain_mode=template_lora_chain_mode,
         flow_kind=flow_kind,
         available_surface_flows=available_surface_flows,
         runtime_adapter_id=runtime_adapter_id,
@@ -777,6 +807,12 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "The current RookieUI edit surface ships the single-reference official template path only.",
             "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
         ),
+        image_edit_profile=True,
+        request_contract_surface="img2img",
+        reference_input_mode="single",
+        max_direct_references=1,
+        encoder_family="qwen_image_edit",
+        template_lora_chain_mode="single",
         shift_visible=True,
         default_shift=3.0,
         edit_megapixels_visible=True,

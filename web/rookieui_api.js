@@ -1,7 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
-const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f158-20260419";
+const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f163-20260423";
 export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
   {
     id: "sd15",
@@ -607,6 +607,12 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     template_lora_visible: true,
     template_lora_override_allowed: true,
     official_template_lora_label: "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+    image_edit_profile: true,
+    request_contract_surface: "img2img",
+    reference_input_mode: "single",
+    max_direct_references: 1,
+    encoder_family: "qwen_image_edit",
+    template_lora_chain_mode: "single",
     available_surface_flows: ["edit"],
   },
   z_image: { shift_visible: true, default_shift: 3.0 },
@@ -626,6 +632,12 @@ export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
     template_lora_visible: false,
     template_lora_override_allowed: false,
     official_template_lora_label: "",
+    image_edit_profile: false,
+    request_contract_surface: "",
+    reference_input_mode: "none",
+    max_direct_references: 0,
+    encoder_family: "",
+    template_lora_chain_mode: "none",
     available_surface_flows: entry.support_tier === "parity" ? ["txt2img", "img2img"] : ["txt2img"],
     ...entry,
     ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
@@ -665,6 +677,12 @@ const DEFAULT_PRESETS = Object.freeze(
     clip_skip: entry.default_clip_skip,
     prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
     edit_megapixels: entry.default_edit_megapixels ?? null,
+    image_edit_profile: Boolean(entry.image_edit_profile),
+    request_contract_surface: entry.request_contract_surface ?? "",
+    reference_input_mode: entry.reference_input_mode ?? "none",
+    max_direct_references: entry.max_direct_references ?? 0,
+    encoder_family: entry.encoder_family ?? "",
+    template_lora_chain_mode: entry.template_lora_chain_mode ?? "none",
   })),
 );
 

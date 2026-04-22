@@ -124,6 +124,12 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "official_template_lora_label": normalize_metadata_text(
                     entry.get("official_template_lora_label", "")
                 ),
+                "image_edit_profile": bool(entry.get("image_edit_profile", False)),
+                "request_contract_surface": normalize_metadata_text(entry.get("request_contract_surface", "")),
+                "reference_input_mode": normalize_metadata_text(entry.get("reference_input_mode", "")),
+                "max_direct_references": int(entry.get("max_direct_references", 0) or 0),
+                "encoder_family": normalize_metadata_text(entry.get("encoder_family", "")),
+                "template_lora_chain_mode": normalize_metadata_text(entry.get("template_lora_chain_mode", "")),
                 "available_surface_flows": _normalize_metadata_list(
                     entry.get("available_surface_flows", [])
                 ),

@@ -187,6 +187,12 @@ class PresetDefinition:
     flux_guidance: float | None = None
     prompt_enhancement_enabled: bool = False
     edit_megapixels: float | None = None
+    image_edit_profile: bool = False
+    request_contract_surface: str = ""
+    reference_input_mode: str = "none"
+    max_direct_references: int = 0
+    encoder_family: str = ""
+    template_lora_chain_mode: str = "none"
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

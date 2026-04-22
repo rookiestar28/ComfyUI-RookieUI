@@ -68,7 +68,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f158-20260419");
+    expect(result.data.model_families.contract_version).toBe("f163-20260423");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
@@ -97,6 +97,12 @@ describe("fetchRookieUICapabilities", () => {
     expect(qwenEditEntry.official_template_lora_label).toBe(
       "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
     );
+    expect(qwenEditEntry.image_edit_profile).toBe(true);
+    expect(qwenEditEntry.request_contract_surface).toBe("img2img");
+    expect(qwenEditEntry.reference_input_mode).toBe("single");
+    expect(qwenEditEntry.max_direct_references).toBe(1);
+    expect(qwenEditEntry.encoder_family).toBe("qwen_image_edit");
+    expect(qwenEditEntry.template_lora_chain_mode).toBe("single");
     expect(result.data.model_families.entries.find((entry) => entry.id === "sd15")?.available_surface_flows).toEqual([
       "txt2img",
       "img2img",
@@ -276,6 +282,20 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.image_edit_profile).toBe(true);
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.request_contract_surface).toBe(
+      "img2img",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.reference_input_mode).toBe(
+      "single",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.max_direct_references).toBe(1);
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.encoder_family).toBe(
+      "qwen_image_edit",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_chain_mode).toBe(
+      "single",
+    );
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
     expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);
