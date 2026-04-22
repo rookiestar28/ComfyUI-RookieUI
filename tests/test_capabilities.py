@@ -44,13 +44,16 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f163-20260423")
+        self.assertEqual(payload["model_families"]["contract_version"], "f165-20260423")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("chroma", family_ids)
         self.assertIn("flux", family_ids)
         self.assertIn("ernie_image", family_ids)
         self.assertIn("qwen_image_edit", family_ids)
+        self.assertIn("qwen_image_edit_multi_lora", family_ids)
+        self.assertIn("firered_image_edit", family_ids)
+        self.assertIn("firered_image_edit_lightning", family_ids)
         self.assertIn("z_image_turbo", family_ids)
         flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
         ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
@@ -69,6 +72,13 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertTrue(ernie_entry["prompt_enhancement_visible"])
         chroma_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "chroma")
         qwen_edit_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit")
+        qwen_edit_multi_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit_multi_lora"
+        )
+        firered_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "firered_image_edit")
+        firered_lightning_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "firered_image_edit_lightning"
+        )
         self.assertTrue(chroma_entry["shift_visible"])
         self.assertEqual(chroma_entry["default_shift"], 1.0)
         self.assertTrue(qwen_edit_entry["edit_megapixels_visible"])
@@ -86,6 +96,21 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(qwen_edit_entry["encoder_family"], "qwen_image_edit")
         self.assertEqual(qwen_edit_entry["template_lora_chain_mode"], "single")
         self.assertEqual(qwen_edit_entry["available_surface_flows"], ["edit"])
+        self.assertTrue(qwen_edit_multi_entry["image_edit_profile"])
+        self.assertEqual(qwen_edit_multi_entry["reference_input_mode"], "single")
+        self.assertEqual(qwen_edit_multi_entry["max_direct_references"], 1)
+        self.assertEqual(qwen_edit_multi_entry["template_lora_chain_mode"], "triple")
+        self.assertTrue(firered_entry["image_edit_profile"])
+        self.assertEqual(firered_entry["reference_input_mode"], "multi")
+        self.assertEqual(firered_entry["max_direct_references"], 3)
+        self.assertEqual(firered_entry["encoder_family"], "qwen_image_edit_plus")
+        self.assertFalse(firered_entry["template_lora_visible"])
+        self.assertTrue(firered_lightning_entry["template_lora_visible"])
+        self.assertEqual(
+            firered_lightning_entry["official_template_lora_label"],
+            "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+        )
+        self.assertEqual(firered_lightning_entry["template_lora_chain_mode"], "single")
         self.assertEqual(z_turbo_entry["public_base_family"], "z_image")
         sd15_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "sd15")
         self.assertEqual(sd15_entry["available_surface_flows"], ["txt2img", "img2img"])

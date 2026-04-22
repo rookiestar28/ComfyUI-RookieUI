@@ -43,6 +43,25 @@ class Img2ImgTranslationTests(unittest.TestCase):
             default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
         )
 
+    def _build_qwen_plus_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=[
+                "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                "Qwen\\FireRed-Image-Edit-1.1-transformer.safetensors",
+            ],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[
+                "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                "Qwen\\FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+            ],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
     def test_normalize_img2img_request_applies_sd15_defaults(self) -> None:
         request = normalize_img2img_request(
             {
@@ -704,6 +723,49 @@ class Img2ImgTranslationTests(unittest.TestCase):
                     }
                 )
 
+    def test_normalize_img2img_request_accepts_firered_multi_reference_contract(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "merge the travelers into one poster frame",
+                    "negative_prompt": "blurry",
+                    "profile": "firered_image_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "traveler-a"},
+                        {"image_asset": "traveler-b"},
+                        {"image_asset": "traveler-c"},
+                    ],
+                    "main_reference_index": 1,
+                }
+            )
+
+        self.assertEqual(normalized.profile, "firered_image_edit")
+        self.assertEqual(normalized.mode, "img2img")
+        self.assertEqual(normalized.execution_mode, "edit")
+        self.assertEqual(normalized.image_asset, "traveler-b")
+        self.assertEqual(normalized.reference_image_assets, ["traveler-a", "traveler-b", "traveler-c"])
+        self.assertEqual(normalized.main_reference_index, 1)
+
+    def test_normalize_img2img_request_rejects_firered_reference_count_above_manifest_limit(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):
+            with self.assertRaisesRegex(ValueError, "supports at most 3 direct reference image"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "merge the travelers into one poster frame",
+                        "negative_prompt": "blurry",
+                        "profile": "firered_image_edit",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": "traveler-a"},
+                            {"image_asset": "traveler-b"},
+                            {"image_asset": "traveler-c"},
+                            {"image_asset": "traveler-d"},
+                        ],
+                        "main_reference_index": 0,
+                    }
+                )
+
     def test_translate_img2img_request_appends_inline_lora_after_template_owned_lora_for_qwen_edit(self) -> None:
         inventory = ModelInventorySnapshot(
             source="host",
@@ -753,6 +815,100 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(lora_nodes[inline_node_id]["inputs"]["strength_model"], 0.6)
         model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
         self.assertEqual(model_sampling_node["inputs"]["model"], [inline_node_id, 0])
+
+    def test_translate_img2img_request_builds_qwen_image_edit_multi_lora_workflow(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit_multi_lora",
+                    "mode": "img2img",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        self.assertEqual(result["workflow_kind"], "img2img-qwen_image_edit_multi_lora")
+        model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
+        chained_model_ref = model_sampling_node["inputs"]["model"]
+        chain_depth = 0
+        while workflow[chained_model_ref[0]]["class_type"] == "LoraLoaderModelOnly":
+            node = workflow[chained_model_ref[0]]
+            self.assertEqual(node["inputs"]["lora_name"], "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors")
+            chain_depth += 1
+            chained_model_ref = node["inputs"]["model"]
+        self.assertEqual(chain_depth, 3)
+        self.assertEqual(workflow[chained_model_ref[0]]["class_type"], "UNETLoader")
+
+    def test_translate_img2img_request_builds_firered_image_edit_workflow_with_three_references(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "merge the travelers into one poster frame",
+                    "negative_prompt": "blurry",
+                    "profile": "firered_image_edit",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "traveler-a"},
+                        {"image_asset": "traveler-b"},
+                        {"image_asset": "traveler-c"},
+                    ],
+                    "main_reference_index": 1,
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        scale_node_ids = sorted(
+            [node_id for node_id, node in workflow.items() if node["class_type"] == "ImageScaleToTotalPixels"],
+            key=int,
+        )
+        encode_nodes = [node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEditPlus"]
+
+        self.assertEqual(result["workflow_kind"], "img2img-firered_image_edit")
+        self.assertIn("TextEncodeQwenImageEditPlus", class_types)
+        self.assertNotIn("RookieUILoadAssetMask", class_types)
+        self.assertNotIn("LoraLoaderModelOnly", class_types)
+        self.assertEqual(len(scale_node_ids), 3)
+        self.assertEqual(len(encode_nodes), 2)
+        self.assertEqual(encode_nodes[0]["inputs"]["image1"], [scale_node_ids[0], 0])
+        self.assertEqual(encode_nodes[0]["inputs"]["image2"], [scale_node_ids[1], 0])
+        self.assertEqual(encode_nodes[0]["inputs"]["image3"], [scale_node_ids[2], 0])
+        vae_encode_node = next(node for node in workflow.values() if node["class_type"] == "VAEEncode")
+        self.assertEqual(vae_encode_node["inputs"]["pixels"], [scale_node_ids[1], 0])
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+        self.assertEqual(sampler_node["inputs"]["steps"], 40)
+        self.assertEqual(sampler_node["inputs"]["cfg"], 4.0)
+
+    def test_translate_img2img_request_builds_firered_lightning_workflow_with_template_lora(self) -> None:
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "turn the portrait into a dramatic editorial frame",
+                    "negative_prompt": "blurry",
+                    "profile": "firered_image_edit_lightning",
+                    "mode": "img2img",
+                    "reference_images": [{"image_asset": "portrait-input"}],
+                    "main_reference_index": 0,
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        lora_nodes = [node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly"]
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+
+        self.assertEqual(result["workflow_kind"], "img2img-firered_image_edit_lightning")
+        self.assertEqual(len(lora_nodes), 1)
+        self.assertEqual(
+            lora_nodes[0]["inputs"]["lora_name"],
+            "Qwen\\FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+        )
+        self.assertEqual(sampler_node["inputs"]["steps"], 8)
+        self.assertEqual(sampler_node["inputs"]["cfg"], 1.0)
 
     def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
         normalized = normalize_img2img_request(

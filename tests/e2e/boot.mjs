@@ -27,6 +27,21 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     vae_name: "qwen_image_vae.safetensors",
     text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
   },
+  qwen_image_edit_multi_lora: {
+    checkpoint_name: "qwen_image_edit_fp8_e4m3fn.safetensors",
+    vae_name: "qwen_image_vae.safetensors",
+    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+  },
+  firered_image_edit: {
+    checkpoint_name: "FireRed-Image-Edit-1.1-transformer.safetensors",
+    vae_name: "qwen_image_vae.safetensors",
+    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+  },
+  firered_image_edit_lightning: {
+    checkpoint_name: "FireRed-Image-Edit-1.1-transformer.safetensors",
+    vae_name: "qwen_image_vae.safetensors",
+    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+  },
   klein_4b_distilled: {
     checkpoint_name: "flux-2-klein-4b.safetensors",
     vae_name: "flux2-vae.safetensors",
@@ -154,6 +169,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux",
   "qwen_image",
   "qwen_image_edit",
+  "firered_image_edit",
   "klein_4b_distilled",
   "klein_4b",
   "klein_9b_distilled",
@@ -562,7 +578,11 @@ window.fetch = async (url, options = {}) => {
         vae: E2E_VAE_OPTIONS,
         text_encoders: E2E_TEXT_ENCODER_OPTIONS,
         embeddings: ["badhandv4.pt"],
-        loras: ["detail_tweaker.safetensors", "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+        loras: [
+          "detail_tweaker.safetensors",
+          "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+          "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+        ],
         ultralytics: ["sam2_b.pt"],
         unet: [],
         upscale_models: ["4x-UltraSharp.pth"],

@@ -207,6 +207,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "flux1-dev.safetensors",
     "qwen_image_2512_fp8_e4m3fn.safetensors",
     "qwen_image_edit_fp8_e4m3fn.safetensors",
+    "FireRed-Image-Edit-1.1-transformer.safetensors",
     "flux-2-klein-4b.safetensors",
     "flux-2-klein-base-4b.safetensors",
     "flux-2-klein-9b-fp8.safetensors",
@@ -643,7 +644,12 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const editPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
     options.map((option) => option.value),
   );
-  expect(editPresetValues).toEqual(["qwen_image_edit"]);
+  expect(editPresetValues).toEqual([
+    "qwen_image_edit",
+    "qwen_image_edit_multi_lora",
+    "firered_image_edit",
+    "firered_image_edit_lightning",
+  ]);
   await expect(page.locator("#rookieui-img2img-edit-megapixels")).toBeEnabled();
   await expect(page.locator("#rookieui-img2img-width")).toBeDisabled();
   await expect(page.locator("#rookieui-denoise-strength")).toBeDisabled();

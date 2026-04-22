@@ -68,13 +68,18 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f163-20260423");
+    expect(result.data.model_families.contract_version).toBe("f165-20260423");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
     const fluxEntry = result.data.model_families.entries.find((entry) => entry.id === "flux");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
     const qwenEditEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit");
+    const qwenEditMultiEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit_multi_lora");
+    const fireredEntry = result.data.model_families.entries.find((entry) => entry.id === "firered_image_edit");
+    const fireredLightningEntry = result.data.model_families.entries.find(
+      (entry) => entry.id === "firered_image_edit_lightning",
+    );
     const qwenEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image");
     expect(chromaEntry.shift_visible).toBe(true);
     expect(chromaEntry.default_shift).toBe(1);
@@ -103,6 +108,18 @@ describe("fetchRookieUICapabilities", () => {
     expect(qwenEditEntry.max_direct_references).toBe(1);
     expect(qwenEditEntry.encoder_family).toBe("qwen_image_edit");
     expect(qwenEditEntry.template_lora_chain_mode).toBe("single");
+    expect(qwenEditMultiEntry.image_edit_profile).toBe(true);
+    expect(qwenEditMultiEntry.reference_input_mode).toBe("single");
+    expect(qwenEditMultiEntry.max_direct_references).toBe(1);
+    expect(qwenEditMultiEntry.template_lora_chain_mode).toBe("triple");
+    expect(fireredEntry.reference_input_mode).toBe("multi");
+    expect(fireredEntry.max_direct_references).toBe(3);
+    expect(fireredEntry.encoder_family).toBe("qwen_image_edit_plus");
+    expect(fireredEntry.template_lora_visible).toBe(false);
+    expect(fireredLightningEntry.template_lora_visible).toBe(true);
+    expect(fireredLightningEntry.official_template_lora_label).toBe(
+      "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+    );
     expect(result.data.model_families.entries.find((entry) => entry.id === "sd15")?.available_surface_flows).toEqual([
       "txt2img",
       "img2img",
@@ -247,6 +264,9 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
+      "qwen_image_edit_multi_lora",
+      "firered_image_edit",
+      "firered_image_edit_lightning",
       "z_image",
       "z_image_turbo",
     ]);
@@ -272,6 +292,9 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
+      "qwen_image_edit_multi_lora",
+      "firered_image_edit",
+      "firered_image_edit_lightning",
       "z_image",
       "z_image_turbo",
     ]);
@@ -296,6 +319,16 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_chain_mode).toBe(
       "single",
     );
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit_multi_lora")?.template_lora_chain_mode).toBe(
+      "triple",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "firered_image_edit")?.reference_input_mode).toBe(
+      "multi",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "firered_image_edit")?.max_direct_references).toBe(3);
+    expect(
+      presets.data.presets.find((preset) => preset.id === "firered_image_edit_lightning")?.template_lora_chain_mode,
+    ).toBe("single");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.profile).toBe("ernie_image");
     expect(presets.data.presets.find((preset) => preset.id === "ernie_image")?.prompt_enhancement_enabled).toBe(true);
     expect(presets.data.presets.find((preset) => preset.id === "longcat_image")?.flux_guidance).toBe(4);

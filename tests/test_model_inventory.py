@@ -146,6 +146,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "flux1-dev.safetensors",
                     "qwen_image_2512_fp8_e4m3fn.safetensors",
                     "qwen_image_edit_fp8_e4m3fn.safetensors",
+                    "FireRed-Image-Edit-1.1-transformer.safetensors",
                     "z_image_bf16.safetensors",
                     "z_image_turbo_bf16.safetensors",
                     "Chroma1-HD-fp8mixed.safetensors",
@@ -169,6 +170,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "Flux_2-Turbo-LoRA_comfyui.safetensors",
                     "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
                     "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                    "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
                 ],
             }.get(folder_name, [])
         )
@@ -219,6 +221,27 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(
             preset_lookup["qwen_image_edit"]["template_lora_name"],
             "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["qwen_image_edit_multi_lora"]["checkpoint_name"],
+            "qwen_image_edit_fp8_e4m3fn.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["qwen_image_edit_multi_lora"]["template_lora_name"],
+            "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["firered_image_edit"]["checkpoint_name"],
+            "FireRed-Image-Edit-1.1-transformer.safetensors",
+        )
+        self.assertEqual(preset_lookup["firered_image_edit"]["template_lora_name"], "")
+        self.assertEqual(
+            preset_lookup["firered_image_edit_lightning"]["checkpoint_name"],
+            "FireRed-Image-Edit-1.1-transformer.safetensors",
+        )
+        self.assertEqual(
+            preset_lookup["firered_image_edit_lightning"]["template_lora_name"],
+            "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
         )
         self.assertEqual(
             preset_lookup["z_image"]["text_encoder_name"],
@@ -475,7 +498,7 @@ class ModelInventoryTests(unittest.TestCase):
                 "diffusion_models": [
                     "flux\\flux1-dev.safetensors",
                     "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
-                    "Qwen\\FireRed-Image-Edit-1.0-transformer.safetensors",
+                    "Qwen\\FireRed-Image-Edit-1.1-transformer.safetensors",
                     "qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
                 ],
                 "vae": ["qwen_image_vae.safetensors"],
@@ -487,6 +510,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "Qwen-image\\Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
                     "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
                     "Qwen-image\\Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
+                    "Qwen-image\\FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
                 ],
             }.get(folder_name, [])
         )
@@ -504,11 +528,24 @@ class ModelInventoryTests(unittest.TestCase):
             resolve_template_lora_selector_context("qwen_image_edit", snapshot),
             "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
         )
+        self.assertEqual(
+            resolve_template_lora_selector_context("qwen_image_edit_multi_lora", snapshot),
+            "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+        )
+        self.assertEqual(resolve_template_lora_selector_context("firered_image_edit", snapshot), "")
+        self.assertEqual(
+            resolve_template_lora_selector_context("firered_image_edit_lightning", snapshot),
+            "Qwen-image\\FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+        )
 
         category_id, selectors, default_model = resolve_primary_model_selector_context("qwen_image_edit", snapshot)
         self.assertEqual(category_id, "diffusion_models")
         self.assertIn(default_model, selectors)
         self.assertEqual(default_model, "qwen\\qwen_image_edit_fp8_e4m3fn.safetensors")
+        category_id, selectors, default_model = resolve_primary_model_selector_context("firered_image_edit", snapshot)
+        self.assertEqual(category_id, "diffusion_models")
+        self.assertIn(default_model, selectors)
+        self.assertEqual(default_model, "Qwen\\FireRed-Image-Edit-1.1-transformer.safetensors")
 
     def test_resolve_primary_model_selector_prefers_non_lightning_qwen_default(self) -> None:
         module = types.SimpleNamespace(

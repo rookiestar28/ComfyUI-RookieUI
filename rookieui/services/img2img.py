@@ -560,10 +560,10 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
             raise ValueError(
                 f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
-        if profile.id == "qwen_image" and not template_lora_name:
-            raise ValueError("template_lora_name requires the official Qwen-Image template LoRA in host inventory.")
-        if profile.id == "qwen_image_edit" and not template_lora_name:
-            raise ValueError("template_lora_name requires the official Qwen-Image Edit template LoRA in host inventory.")
+        if profile_entry.template_lora_visible and profile_entry.official_template_lora_label and not template_lora_name:
+            raise ValueError(
+                f"template_lora_name requires the official {profile_entry.title} template LoRA in host inventory."
+            )
 
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)

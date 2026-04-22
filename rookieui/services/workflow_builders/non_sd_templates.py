@@ -8,6 +8,7 @@ from rookieui.contracts.family_template_manifest import (
     build_non_sd_txt2img_profile_ids,
 )
 from rookieui.contracts.generation import NormalizedImg2ImgRequest, NormalizedTxt2ImgRequest
+from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
@@ -21,7 +22,7 @@ from rookieui.services.workflow_builders.core import (
     _to_node_ref,
 )
 from rookieui.services.workflow_builders.image_edit_foundation import (
-    _append_reference_vae_latents,
+    _append_vae_encode_node,
     _build_image_edit_reference_bundle,
 )
 from rookieui.services.workflow_builders.output import _build_decode_and_save
@@ -302,15 +303,25 @@ def _append_model_only_lora_chain(
     allocator: NodeIdAllocator,
     model_source: list[object],
     template_lora_name: str = "",
+    template_lora_names: list[str] | tuple[str, ...] | None = None,
     inline_lora_activations: list[PromptLoraActivation] | None = None,
 ) -> list[object]:
     chained_model_source = model_source
-    if template_lora_name:
+    effective_template_lora_names = [
+        str(candidate or "").strip()
+        for candidate in (
+            template_lora_names
+            if template_lora_names is not None
+            else ([template_lora_name] if template_lora_name else [])
+        )
+        if str(candidate or "").strip()
+    ]
+    for effective_lora_name in effective_template_lora_names:
         chained_model_source = _append_lora_loader_model_only_node(
             workflow,
             allocator=allocator,
             model_source=chained_model_source,
-            lora_name=template_lora_name,
+            lora_name=effective_lora_name,
         )
     for activation in inline_lora_activations or []:
         chained_model_source = _append_lora_loader_model_only_node(
@@ -321,6 +332,71 @@ def _append_model_only_lora_chain(
             strength_model=activation.strength_model,
         )
     return chained_model_source
+
+
+def _resolve_template_owned_lora_chain_names(template_lora_name: str, *, chain_mode: str) -> tuple[str, ...]:
+    effective_template_lora_name = str(template_lora_name or "").strip()
+    normalized_chain_mode = str(chain_mode or "").strip().lower() or "none"
+    if not effective_template_lora_name:
+        return ()
+    if normalized_chain_mode == "single":
+        return (effective_template_lora_name,)
+    if normalized_chain_mode == "triple":
+        return (effective_template_lora_name, effective_template_lora_name, effective_template_lora_name)
+    if normalized_chain_mode == "none":
+        return ()
+    raise ValueError(f"Unsupported template-owned LoRA chain mode: {chain_mode}")
+
+
+def _build_qwen_family_conditioning_nodes(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedImg2ImgRequest,
+    profile_entry: object,
+    clip_source: list[object],
+    vae_source: list[object],
+    reference_image_node_ids: tuple[str, ...],
+    main_image_node_id: str,
+) -> tuple[str, str]:
+    encoder_family = str(getattr(profile_entry, "encoder_family", "") or "").strip().lower()
+    if encoder_family == "qwen_image_edit_plus":
+        positive_id = _append_qwen_image_edit_plus_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_ids=reference_image_node_ids,
+        )
+        negative_id = _append_qwen_image_edit_plus_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.negative_prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_ids=reference_image_node_ids,
+        )
+        return positive_id, negative_id
+    if encoder_family == "qwen_image_edit":
+        positive_id = _append_qwen_image_edit_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_id=main_image_node_id,
+        )
+        negative_id = _append_qwen_image_edit_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.negative_prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_id=main_image_node_id,
+        )
+        return positive_id, negative_id
+    raise ValueError(f"Unsupported Qwen-family image-edit encoder family: {getattr(profile_entry, 'encoder_family', '')}")
 
 
 def _append_string_replace_node(
@@ -442,6 +518,32 @@ def _append_qwen_image_edit_encode_node(
             "vae": vae_source,
             "image": _to_node_ref(image_id),
         },
+    }
+    return node_id
+
+
+def _append_qwen_image_edit_plus_encode_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    prompt_text: str,
+    clip_source: list[object],
+    vae_source: list[object],
+    image_ids: tuple[str, ...],
+) -> str:
+    if len(image_ids) > 3:
+        raise ValueError("TextEncodeQwenImageEditPlus supports at most 3 direct reference images.")
+    node_id = allocator.next()
+    inputs: dict[str, object] = {
+        "prompt": prompt_text,
+        "clip": clip_source,
+        "vae": vae_source,
+    }
+    for image_index, image_id in enumerate(image_ids, start=1):
+        inputs[f"image{image_index}"] = _to_node_ref(image_id)
+    workflow[node_id] = {
+        "class_type": "TextEncodeQwenImageEditPlus",
+        "inputs": inputs,
     }
     return node_id
 
@@ -1209,7 +1311,10 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
 }
 
 
-def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    encoder_family = str(profile_entry.encoder_family or "").strip().lower()
+    scale_mode = "all" if encoder_family == "qwen_image_edit_plus" else "main_only"
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
     references = _build_image_edit_reference_bundle(
@@ -1217,47 +1322,43 @@ def _build_qwen_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[s
         allocator=allocator,
         reference_assets=request.reference_image_assets,
         main_reference_index=request.main_reference_index,
-        megapixels=float(request.edit_megapixels or 1.5),
-        scale_mode="main_only",
+        megapixels=float(request.edit_megapixels or profile_entry.default_edit_megapixels or 1.0),
+        scale_mode=scale_mode,
     )
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
-    reference_latent_ids = _append_reference_vae_latents(
-        workflow,
-        allocator=allocator,
-        image_node_ids=references.image_node_ids,
-        vae_source=[vae_id, 0],
-    )
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
         clip_name=request.text_encoder_name,
         clip_type="qwen_image",
     )
-    positive_id = _append_qwen_image_edit_encode_node(
+    positive_id, negative_id = _build_qwen_family_conditioning_nodes(
         workflow,
         allocator=allocator,
-        prompt_text=request.prompt,
+        request=request,
+        profile_entry=profile_entry,
         clip_source=clip_source,
         vae_source=[vae_id, 0],
-        image_id=references.main_image_node_id,
+        reference_image_node_ids=references.image_node_ids,
+        main_image_node_id=references.main_image_node_id,
     )
-    negative_id = _append_qwen_image_edit_encode_node(
+    latent_id = _append_vae_encode_node(
         workflow,
         allocator=allocator,
-        prompt_text=request.negative_prompt,
-        clip_source=clip_source,
-        vae_source=[vae_id, 0],
         image_id=references.main_image_node_id,
+        vae_source=[vae_id, 0],
     )
-    latent_id = reference_latent_ids[references.main_reference_index]
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
     model_source = _append_model_only_lora_chain(
         workflow,
         allocator=allocator,
         model_source=[unet_id, 0],
-        template_lora_name=request.template_lora_name,
+        template_lora_names=_resolve_template_owned_lora_chain_names(
+            request.template_lora_name,
+            chain_mode=profile_entry.template_lora_chain_mode,
+        ),
         inline_lora_activations=request.lora_activations,
     )
     model_source = _append_model_sampling_node(
@@ -1308,5 +1409,5 @@ def build_non_sd_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, o
     profile_id = str(request.profile or "").strip().lower()
     adapter_id = _NON_SD_RUNTIME_ADAPTER_BY_PROFILE.get(profile_id, "")
     if adapter_id == "qwen_image_edit":
-        return _build_qwen_image_edit_workflow(request)
+        return _build_qwen_family_image_edit_workflow(request)
     raise ValueError(f"Unsupported official non-SD edit profile: {request.profile}")

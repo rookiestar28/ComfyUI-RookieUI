@@ -22,6 +22,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("chroma", [entry["id"] for entry in payload["entries"]])
         self.assertIn("flux", [entry["id"] for entry in payload["entries"]])
         self.assertIn("ernie_image", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("qwen_image_edit_multi_lora", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("firered_image_edit", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("firered_image_edit_lightning", [entry["id"] for entry in payload["entries"]])
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
@@ -51,6 +54,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
 
     def test_edit_profile_is_exposed_only_on_edit_surface(self) -> None:
         qwen_edit_entry = get_model_family_registry_entry("qwen_image_edit")
+        qwen_edit_multi_entry = get_model_family_registry_entry("qwen_image_edit_multi_lora")
+        firered_entry = get_model_family_registry_entry("firered image edit")
+        firered_lightning_entry = get_model_family_registry_entry("firered image edit lightning")
         qwen_entry = get_model_family_registry_entry("qwen_image")
 
         self.assertEqual(qwen_edit_entry.flow_kind, "edit")
@@ -64,6 +70,18 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertFalse(model_family_supports_surface_flow("qwen_image_edit", "txt2img"))
         self.assertFalse(model_family_supports_surface_flow("qwen_image_edit", "img2img"))
         self.assertTrue(model_family_supports_surface_flow("qwen_image_edit", "edit"))
+        self.assertEqual(qwen_edit_multi_entry.public_base_family, "qwen_image_edit")
+        self.assertEqual(qwen_edit_multi_entry.template_lora_chain_mode, "triple")
+        self.assertEqual(firered_entry.reference_input_mode, "multi")
+        self.assertEqual(firered_entry.max_direct_references, 3)
+        self.assertEqual(firered_entry.encoder_family, "qwen_image_edit_plus")
+        self.assertFalse(firered_entry.template_lora_visible)
+        self.assertTrue(model_family_supports_surface_flow("firered_image_edit", "edit"))
+        self.assertTrue(firered_lightning_entry.template_lora_visible)
+        self.assertEqual(
+            firered_lightning_entry.official_template_lora_label,
+            "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+        )
         self.assertTrue(qwen_entry.template_lora_visible)
         self.assertTrue(qwen_entry.template_lora_override_allowed)
         self.assertEqual(
@@ -103,6 +121,13 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         ernie_preset = next(preset for preset in payload["presets"] if preset["id"] == "ernie_image")
         qwen_preset = next(preset for preset in payload["presets"] if preset["id"] == "qwen_image")
         qwen_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "qwen_image_edit")
+        qwen_edit_multi_preset = next(
+            preset for preset in payload["presets"] if preset["id"] == "qwen_image_edit_multi_lora"
+        )
+        firered_preset = next(preset for preset in payload["presets"] if preset["id"] == "firered_image_edit")
+        firered_lightning_preset = next(
+            preset for preset in payload["presets"] if preset["id"] == "firered_image_edit_lightning"
+        )
         z_turbo_preset = next(preset for preset in payload["presets"] if preset["id"] == "z_image_turbo")
 
         self.assertEqual(flux_preset["profile"], "flux")
@@ -118,5 +143,10 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(qwen_edit_preset["request_contract_surface"], "img2img")
         self.assertEqual(qwen_edit_preset["reference_input_mode"], "single")
         self.assertEqual(qwen_edit_preset["max_direct_references"], 1)
+        self.assertEqual(qwen_edit_multi_preset["template_lora_chain_mode"], "triple")
+        self.assertEqual(firered_preset["base_family"], "firered_image_edit")
+        self.assertEqual(firered_preset["reference_input_mode"], "multi")
+        self.assertEqual(firered_preset["max_direct_references"], 3)
+        self.assertEqual(firered_lightning_preset["template_lora_chain_mode"], "single")
         self.assertEqual(z_turbo_preset["profile"], "z_image_turbo")
         self.assertEqual(z_turbo_preset["base_family"], "z_image")
