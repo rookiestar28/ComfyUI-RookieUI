@@ -284,8 +284,12 @@ def _normalize_session_axes(raw_axes: object, *, mode: str) -> list[dict[str, An
         runtime_axis = _axis_runtime_payload(axis_id)
         if not runtime_axis.get("session_runner_support", False):
             raise ValueError(f"xyz_plot axis {axis_id} is not session-runnable yet.")
-        choices = runtime_axis.get("choices", [])
-        parsed_values = parse_xyz_axis_values(raw_axis.get("values", ""), contract, choices=choices if isinstance(choices, list) else [])
+        choices = runtime_axis.get("choice_entries", [])
+        parsed_values = parse_xyz_axis_values(
+            raw_axis.get("values", ""),
+            contract,
+            choices=choices if isinstance(choices, list) else [],
+        )
         normalized_axes.append(
             {
                 "slot": _XYZ_SLOT_LABELS[index],
@@ -366,7 +370,9 @@ def _apply_axis_binding(request_payload: dict[str, Any], binding: dict[str, Any]
         request_payload["checkpoint_name"] = str(axis_value)
         return
     if axis_id == "vae":
-        request_payload["vae_name"] = str(axis_value)
+        # IMPORTANT: XYZ parity accepts A1111-style "None" alongside "Automatic", but RookieUI's
+        # current integrated request normalizers intentionally collapse both to host-default VAE selection.
+        request_payload["vae_name"] = "Automatic" if str(axis_value).strip().lower() == "none" else str(axis_value)
         return
     if axis_id == "clip_skip":
         request_payload["clip_skip"] = int(axis_value)

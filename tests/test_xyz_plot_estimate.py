@@ -4,7 +4,7 @@ import unittest
 
 from rookieui.services.xyz_plot_estimate import build_xyz_plot_estimate_payload
 from rookieui.services.xyz_plot_values import parse_xyz_axis_values
-from rookieui.services.xyz_plot_axes import resolve_xyz_axis_contract
+from rookieui.services.xyz_plot_axes import get_xyz_axis_choice_entries, resolve_xyz_axis_contract
 
 
 class XYZPlotValueParserTests(unittest.TestCase):
@@ -56,6 +56,61 @@ class XYZPlotValueParserTests(unittest.TestCase):
             ],
         )
         self.assertEqual([entry.label for entry in entries], ["cat", "dog", "fox"])
+
+    def test_parse_sampler_accepts_a1111_label_and_resolves_to_canonical_id(self) -> None:
+        axis = resolve_xyz_axis_contract("sampler")
+
+        entries = parse_xyz_axis_values(
+            "Euler a, dpmpp_2m",
+            axis,
+            choices=get_xyz_axis_choice_entries("sampler"),
+        )
+
+        self.assertEqual(
+            [entry.value for entry in entries],
+            ["euler_ancestral", "dpmpp_2m"],
+        )
+        self.assertEqual(
+            [entry.label for entry in entries],
+            ["Euler a", "DPM++ 2M"],
+        )
+
+    def test_parse_scheduler_accepts_automatic_label(self) -> None:
+        axis = resolve_xyz_axis_contract("scheduler")
+
+        entries = parse_xyz_axis_values(
+            "Automatic, Karras",
+            axis,
+            choices=get_xyz_axis_choice_entries("scheduler"),
+        )
+
+        self.assertEqual([entry.value for entry in entries], ["normal", "karras"])
+        self.assertEqual([entry.label for entry in entries], ["Automatic", "Karras"])
+
+    def test_parse_checkpoint_accepts_unique_partial_fragment(self) -> None:
+        axis = resolve_xyz_axis_contract("checkpoint_name")
+
+        entries = parse_xyz_axis_values(
+            "pony",
+            axis,
+            choices=[
+                {
+                    "value": "checkpoints/ponyDiffusion.safetensors",
+                    "label": "checkpoints/ponyDiffusion.safetensors",
+                    "aliases": ["ponyDiffusion.safetensors"],
+                    "allow_partial_match": True,
+                },
+                {
+                    "value": "checkpoints/sdxlBase.safetensors",
+                    "label": "checkpoints/sdxlBase.safetensors",
+                    "aliases": ["sdxlBase.safetensors"],
+                    "allow_partial_match": True,
+                },
+            ],
+        )
+
+        self.assertEqual(entries[0].value, "checkpoints/ponyDiffusion.safetensors")
+        self.assertEqual(entries[0].label, "checkpoints/ponyDiffusion.safetensors")
 
 
 class XYZPlotEstimateTests(unittest.TestCase):

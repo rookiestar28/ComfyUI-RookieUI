@@ -9,14 +9,26 @@ from rookieui.services import xyz_plot_axes
 class XYZPlotAxisRegistryTests(unittest.TestCase):
     def test_axis_payload_includes_dynamic_choices_from_inventory_and_compatibility(self) -> None:
         with (
-            mock.patch.object(xyz_plot_axes, "_compatibility_sampler_choices", return_value=["euler", "dpmpp_2m"]),
-            mock.patch.object(xyz_plot_axes, "_compatibility_scheduler_choices", return_value=["normal", "karras"]),
+            mock.patch.object(
+                xyz_plot_axes,
+                "build_compatibility_payload",
+                return_value={
+                    "samplers": [
+                        {"id": "euler_ancestral", "title": "Euler a", "aliases": ["euler a"]},
+                        {"id": "dpmpp_2m", "title": "DPM++ 2M", "aliases": []},
+                    ],
+                    "schedulers": [
+                        {"id": "normal", "title": "Normal", "aliases": ["automatic"]},
+                        {"id": "karras", "title": "Karras", "aliases": []},
+                    ],
+                },
+            ),
             mock.patch.object(
                 xyz_plot_axes,
                 "discover_model_inventory",
                 return_value=mock.Mock(
                     checkpoints=["dreamshaper.safetensors"],
-                    vae=["Automatic"],
+                    vae=["anime.vae.safetensors"],
                     upscale_models=["4x-UltraSharp"],
                 ),
             ),
@@ -24,9 +36,10 @@ class XYZPlotAxisRegistryTests(unittest.TestCase):
             payload = xyz_plot_axes.build_xyz_plot_axes_payload()
 
         self.assertEqual(payload["contract"]["surface"], "xyz_plot_axes")
-        self.assertEqual(payload["axes"]["sampler"]["choices"], ["euler", "dpmpp_2m"])
-        self.assertEqual(payload["axes"]["scheduler"]["choices"], ["normal", "karras"])
+        self.assertEqual(payload["axes"]["sampler"]["choices"], ["Euler a", "DPM++ 2M"])
+        self.assertEqual(payload["axes"]["scheduler"]["choices"], ["Automatic", "Karras"])
         self.assertEqual(payload["axes"]["checkpoint_name"]["choices"], ["dreamshaper.safetensors"])
+        self.assertEqual(payload["axes"]["vae"]["choices"][:3], ["Automatic", "None", "anime.vae.safetensors"])
         self.assertEqual(payload["axes"]["hires_upscaler"]["choices"], ["4x-UltraSharp"])
 
     def test_axis_summary_preserves_truthfulness_tiers(self) -> None:

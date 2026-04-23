@@ -129,16 +129,89 @@ def _expand_float_range(token: str, *, field_name: str) -> list[float]:
     return [coerce_float(token, field_name, via_str=True, precision=6)]
 
 
-def _resolve_choice_token(token: str, choices: list[str], *, field_name: str) -> str:
-    if not choices:
-        return token
-    direct_match = [choice for choice in choices if choice == token]
-    if len(direct_match) == 1:
-        return direct_match[0]
+def _normalize_choice_catalog(raw_choices: object) -> list[dict[str, Any]]:
+    if not isinstance(raw_choices, list):
+        return []
+    normalized_entries: list[dict[str, Any]] = []
+    for raw_entry in raw_choices:
+        if isinstance(raw_entry, dict):
+            value = str(raw_entry.get("value", "")).strip()
+            label = str(raw_entry.get("label", "") or value).strip()
+            aliases = [
+                str(alias).strip()
+                for alias in raw_entry.get("aliases", []) or []
+                if str(alias).strip()
+            ]
+            allow_partial_match = bool(raw_entry.get("allow_partial_match", False))
+            if value and label:
+                normalized_entries.append(
+                    {
+                        "value": value,
+                        "label": label,
+                        "aliases": aliases,
+                        "allow_partial_match": allow_partial_match,
+                    }
+                )
+            continue
+        normalized_value = str(raw_entry).strip()
+        if normalized_value:
+            normalized_entries.append(
+                {
+                    "value": normalized_value,
+                    "label": normalized_value,
+                    "aliases": [],
+                    "allow_partial_match": False,
+                }
+            )
+    return normalized_entries
+
+
+def _resolve_choice_token(
+    token: str,
+    choices: object,
+    *,
+    field_name: str,
+) -> ParsedXYZAxisEntry:
+    catalog = _normalize_choice_catalog(choices)
+    if not catalog:
+        return ParsedXYZAxisEntry(value=token, label=token)
+
+    direct_matches = [
+        entry
+        for entry in catalog
+        if token in {entry["label"], entry["value"], *entry["aliases"]}
+    ]
+    if len(direct_matches) == 1:
+        return ParsedXYZAxisEntry(value=direct_matches[0]["value"], label=direct_matches[0]["label"])
+
     folded_token = token.casefold()
-    folded_matches = [choice for choice in choices if choice.casefold() == folded_token]
+    folded_matches = [
+        entry
+        for entry in catalog
+        if folded_token
+        in {
+            entry["label"].casefold(),
+            entry["value"].casefold(),
+            *[alias.casefold() for alias in entry["aliases"]],
+        }
+    ]
     if len(folded_matches) == 1:
-        return folded_matches[0]
+        return ParsedXYZAxisEntry(value=folded_matches[0]["value"], label=folded_matches[0]["label"])
+
+    partial_matches = [
+        entry
+        for entry in catalog
+        if entry.get("allow_partial_match")
+        and folded_token
+        and (
+            folded_token in entry["label"].casefold()
+            or folded_token in entry["value"].casefold()
+            or any(folded_token in alias.casefold() for alias in entry["aliases"])
+        )
+    ]
+    if len(partial_matches) == 1:
+        return ParsedXYZAxisEntry(value=partial_matches[0]["value"], label=partial_matches[0]["label"])
+
     raise ValueError(f"{field_name} contains an unknown choice: {token}")
 
 
@@ -177,7 +250,7 @@ def parse_xyz_axis_values(
     raw_value: object,
     axis: XYZPlotAxisContract,
     *,
-    choices: list[str] | None = None,
+    choices: object = None,
 ) -> list[ParsedXYZAxisEntry]:
     field_name = f"{axis.axis_id}_values"
     tokens = _split_csv_tokens(raw_value)
@@ -186,8 +259,6 @@ def parse_xyz_axis_values(
 
     parsed_entries: list[ParsedXYZAxisEntry] = []
     mode = axis.value_input_mode
-    available_choices = [choice for choice in (choices or []) if isinstance(choice, str) and choice.strip()]
-
     if mode == "prompt_sr_csv":
         return _parse_prompt_sr_entries(tokens, field_name=field_name)
 
@@ -207,8 +278,8 @@ def parse_xyz_axis_values(
                 _append_checked(parsed_entries, ParsedXYZAxisEntry(value=value, label=str(value)), field_name=field_name)
             continue
         if mode == "choices_or_csv":
-            resolved = _resolve_choice_token(token, available_choices, field_name=field_name)
-            _append_checked(parsed_entries, ParsedXYZAxisEntry(value=resolved, label=resolved), field_name=field_name)
+            resolved = _resolve_choice_token(token, choices, field_name=field_name)
+            _append_checked(parsed_entries, resolved, field_name=field_name)
             continue
         if mode == "size_csv":
             size_value = _parse_size_value(token, field_name=field_name)

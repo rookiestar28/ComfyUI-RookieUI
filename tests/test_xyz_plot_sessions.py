@@ -486,6 +486,20 @@ class XYZPlotSessionTests(unittest.TestCase):
 
         self.assertEqual(payload["prompt"], "wide shot, dog, cat, dramatic light")
 
+    def test_vae_axis_maps_a1111_none_to_host_default_selection(self) -> None:
+        payload = {}
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "vae",
+                "value": "None",
+            },
+            mode="txt2img",
+        )
+
+        self.assertEqual(payload["vae_name"], "Automatic")
+
     def test_load_xyz_plot_store_quarantines_corrupt_json(self) -> None:
         state_path = xyz_plot_sessions._xyz_plot_state_path()
         state_path.parent.mkdir(parents=True, exist_ok=True)

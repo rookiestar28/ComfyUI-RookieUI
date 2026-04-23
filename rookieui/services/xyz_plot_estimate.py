@@ -5,7 +5,7 @@ from typing import Any
 
 from rookieui.contracts.xyz_plot import build_xyz_plot_contract_meta
 from rookieui.services.coercion import coerce_int
-from rookieui.services.xyz_plot_axes import get_xyz_axis_choices, resolve_xyz_axis_contract
+from rookieui.services.xyz_plot_axes import get_xyz_axis_choice_entries, resolve_xyz_axis_contract
 from rookieui.services.xyz_plot_values import ParsedXYZAxisEntry, parse_xyz_axis_values
 
 XYZ_PLOT_MAX_TOTAL_CELLS = 4096
@@ -57,7 +57,7 @@ def _normalize_estimate_axes(raw_axes: object, *, mode: str) -> list[dict[str, A
         parsed_values = parse_xyz_axis_values(
             raw_axis.get("values", ""),
             contract,
-            choices=get_xyz_axis_choices(axis_id),
+            choices=get_xyz_axis_choice_entries(axis_id),
         )
         normalized_axes.append(
             {
