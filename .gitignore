@@ -19,6 +19,8 @@ htmlcov/
 coverage.xml
 *.cover
 .planning/
+ROA*.md
+roa*.md
 reference/
 scripts/sync_split.py
 tests_output.txt
