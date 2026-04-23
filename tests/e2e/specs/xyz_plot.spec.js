@@ -91,11 +91,21 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(controlSurfaceMetrics.rowLeftDelta).toBeLessThanOrEqual(1);
   expect(controlSurfaceMetrics.rowRightDelta).toBeLessThanOrEqual(1);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-select").selectOption("checkpoint_name");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();
   const txt2imgCheckpointChoices = await page
     .locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input")
     .evaluateAll((nodes) => nodes.map((node) => node.value).slice(0, 2));
+  await page.locator("#rookieui-txt2img-xyz-plot-csv-mode").check();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeHidden();
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toHaveValue(txt2imgCheckpointChoices.join(", "));
+  await page.locator("#rookieui-txt2img-xyz-plot-csv-mode").uncheck();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-summary").click();
   const choicePanelLayout = await page.evaluate(() => {
     const summary = document.getElementById("rookieui-txt2img-xyz-plot-axis-z-values-summary");
@@ -125,9 +135,9 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await page.keyboard.press("Escape");
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).not.toHaveAttribute("open", "");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
-  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
-  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(0);
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-summary").click();
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[0]}"]`).check();
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[1]}"]`).check();

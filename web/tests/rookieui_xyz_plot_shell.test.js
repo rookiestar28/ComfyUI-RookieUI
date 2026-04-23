@@ -287,6 +287,7 @@ describe("xyz plot shell", () => {
     document.getElementById("txt2img-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("txt2img-xyz-axis-z-values").hidden).toBe(true);
     expect(document.getElementById("txt2img-xyz-axis-z-values-multiselect").hidden).toBe(false);
+    expect(document.getElementById("txt2img-xyz-axis-z-fill").hidden).toBe(false);
     expect(document.getElementById("txt2img-xyz-axis-z-fill").disabled).toBe(false);
     expect(document.getElementById("txt2img-xyz-axis-z-values-summary").textContent).toContain("Select values");
     document.getElementById("txt2img-xyz-axis-z-fill").click();
@@ -486,6 +487,54 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("swap-xyz-axis-x-values").hidden).toBe(false);
   });
 
+  test("switches choice axes between dropdown and text modes like a1111 csv mode", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const bootstrapState = createBootstrapState();
+
+    createXYZPlotShell({
+      idPrefix: "csv-mode-xyz",
+      parent,
+      mode: "txt2img",
+      bootstrapState,
+      buildBaseRequest: () => ({ prompt: "city" }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("csv-mode-xyz-axis-z-select").value = "checkpoint_name";
+    document.getElementById("csv-mode-xyz-axis-z-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector("#csv-mode-xyz-axis-z-values-options input[value='model-a.safetensors']").checked = true;
+    document.querySelector("#csv-mode-xyz-axis-z-values-options input[value='model-a.safetensors']").dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector("#csv-mode-xyz-axis-z-values-options input[value='model-b.safetensors']").checked = true;
+    document.querySelector("#csv-mode-xyz-axis-z-values-options input[value='model-b.safetensors']").dispatchEvent(new Event("change", { bubbles: true }));
+
+    document.getElementById("csv-mode-xyz-csv-mode").checked = true;
+    document.getElementById("csv-mode-xyz-csv-mode").dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(document.getElementById("csv-mode-xyz-axis-z-values").hidden).toBe(false);
+    expect(document.getElementById("csv-mode-xyz-axis-z-values-multiselect").hidden).toBe(true);
+    expect(document.getElementById("csv-mode-xyz-axis-z-values").value).toBe("model-a.safetensors, model-b.safetensors");
+
+    document.getElementById("csv-mode-xyz-axis-z-fill").click();
+    expect(document.getElementById("csv-mode-xyz-axis-z-values").value).toBe(
+      "model-a.safetensors, model-b.safetensors",
+    );
+
+    document.getElementById("csv-mode-xyz-csv-mode").checked = false;
+    document.getElementById("csv-mode-xyz-csv-mode").dispatchEvent(new Event("change", { bubbles: true }));
+
+    expect(document.getElementById("csv-mode-xyz-axis-z-values").hidden).toBe(true);
+    expect(document.getElementById("csv-mode-xyz-axis-z-values-multiselect").hidden).toBe(false);
+    expect(
+      Array.from(
+        document.querySelectorAll("#csv-mode-xyz-axis-z-values-options input:checked"),
+      ).map((input) => input.value),
+    ).toEqual(["model-a.safetensors", "model-b.safetensors"]);
+  });
+
   test("uses dropdown mode for whitelisted choice axes including hires upscaler", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
@@ -508,6 +557,7 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-hires-axis-z-values").hidden).toBe(true);
     expect(document.getElementById("txt2img-hires-axis-z-values-multiselect").hidden).toBe(false);
     expect(document.getElementById("txt2img-hires-axis-z-values-summary").textContent).toContain("Select values");
+    expect(document.getElementById("txt2img-hires-axis-z-fill").hidden).toBe(false);
     expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(false);
   });
 
@@ -549,7 +599,7 @@ describe("xyz plot shell", () => {
     );
   });
 
-  test("fills prompt axes with a1111-style csv examples", async () => {
+  test("keeps prompt-axis examples in placeholders while hiding fill", async () => {
     const parent = document.createElement("div");
     document.body.appendChild(parent);
 
@@ -567,13 +617,13 @@ describe("xyz plot shell", () => {
 
     document.getElementById("prompt-xyz-axis-x-select").value = "prompt_sr";
     document.getElementById("prompt-xyz-axis-x-select").dispatchEvent(new Event("change", { bubbles: true }));
-    document.getElementById("prompt-xyz-axis-x-fill").click();
-    expect(document.getElementById("prompt-xyz-axis-x-values").value).toBe("cat, dog, fox");
+    expect(document.getElementById("prompt-xyz-axis-x-values").placeholder).toBe("cat, dog, fox");
+    expect(document.getElementById("prompt-xyz-axis-x-fill").hidden).toBe(true);
 
     document.getElementById("prompt-xyz-axis-y-select").value = "prompt_order";
     document.getElementById("prompt-xyz-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
-    document.getElementById("prompt-xyz-axis-y-fill").click();
-    expect(document.getElementById("prompt-xyz-axis-y-values").value).toBe("cat, dog, bird");
+    expect(document.getElementById("prompt-xyz-axis-y-values").placeholder).toBe("cat, dog, bird");
+    expect(document.getElementById("prompt-xyz-axis-y-fill").hidden).toBe(true);
   });
 
   test("wires the results preview into the shared fullscreen viewer", async () => {

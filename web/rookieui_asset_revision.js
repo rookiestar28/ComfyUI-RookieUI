@@ -1,5 +1,5 @@
 // IMPORTANT: bump this token whenever shipped frontend module wiring changes; otherwise Comfy-host browser caches can mask live UI fixes.
-export const ROOKIEUI_ASSET_REVISION = "20260423-f176-xyz-a1111-prompt-axis-alignment-h67a83cb1d6"; // pragma: allowlist secret
+export const ROOKIEUI_ASSET_REVISION = "20260423-f177-xyz-choice-axis-csv-mode-parity-h24cfc5f69e"; // pragma: allowlist secret
 
 export function buildRevisionedModuleUrl(specifier, metaUrl = import.meta.url) {
   const moduleUrl = new URL(specifier, metaUrl);
