@@ -1591,6 +1591,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(img2imgPresetValues).not.toContain("flux");
     expect(img2imgPresetValues).not.toContain("qwen_image");
     expect(img2imgPresetValues).toContain("qwen_image_edit");
+    expect(img2imgPresetValues).not.toContain("qwen_image_edit_multi_lora");
     expect(img2imgPresetValues).not.toContain("ernie_image");
     for (const matrixRow of presetClipSkipMatrix.filter((row) => ["sd15", "sdxl"].includes(row.id))) {
       document.getElementById("rookieui-img2img-preset").value = matrixRow.id;
@@ -1643,6 +1644,7 @@ describe("registerRookieUIBootstrapExtension", () => {
       (option) => option.value,
     );
     expect(integratedPresetValues).toContain("qwen_image_edit");
+    expect(integratedPresetValues).not.toContain("qwen_image_edit_multi_lora");
     expect(document.getElementById("rookieui-img2img-edit-megapixels").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-template-lora-name").disabled).toBe(false);
     expect(document.getElementById("rookieui-img2img-template-lora-status").textContent).toContain(
@@ -1676,6 +1678,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     );
     expect(restoredPresetValues).toContain("sd15");
     expect(restoredPresetValues).toContain("qwen_image_edit");
+    expect(restoredPresetValues).not.toContain("qwen_image_edit_multi_lora");
     document.getElementById("rookieui-img2img-preset").value = "qwen_image_edit";
     document.getElementById("rookieui-img2img-preset").dispatchEvent(new Event("change", { bubbles: true }));
     document.getElementById("rookieui-img2img-form").dispatchEvent(

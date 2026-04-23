@@ -15,7 +15,7 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 - **integrated ControlNet and ADetailer behavior**
 - **PNG metadata round-trip and apply workflow**
 - **Prompt Workbench authoring tools and XYZ Plot sweep sessions**
-- **queue / progress / result UX and host-embedded validation coverage**
+- **queue / progress / result UX and host-integrated workflow behavior**
 
 <br>
 
@@ -25,12 +25,12 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Official image-edit workflow expansion and live-host acceptance closure (new functionality/stability)</strong></summary>
+<summary><strong>Official image-edit workflow expansion (new functionality/stability)</strong></summary>
 
 - RookieUI now treats official image-edit workflows as `img2img`-owned image-edit subtypes instead of routing them through a dedicated visible `Edit` mode or a legacy SD-style inpaint fallback.
 - The shipped first-wave official image-edit matrix now includes `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- The separate visible `Qwen-Image Edit Multi-LoRA` `Img2Img` preset is now retired; keep using `Qwen-Image Edit` with prompt-inline multi-`<lora:...>` chaining while the backend compatibility profile remains available for truthful runtime compatibility.
 - Image-edit flows now follow bounded official semantics directly in RookieUI: they do not require user masks, preserve ordered `reference_images` plus `main_reference_index`, and support bounded multi-reference input where the official template family requires it.
-- Live-host acceptance for the new image-edit surface now includes restarted-host report/execute proof for the current asset-ready subset `Flux.2 Klein 9B KV Image Edit` and `Longcat Image Edit`, while Qwen edit variants remain explicitly classified as host-prerequisite gaps when the active host only exposes a drifted lightning LoRA label.
 
 </details>
 
@@ -48,7 +48,8 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <summary><strong>Official img2img/edit flow split and template-owned LoRA truthfulness (new functionality/stability)</strong></summary>
 
-- Split RookieUI's image-input workspace into truthful flow-aware surfaces: generic `img2img` now hides unaligned official non-SD presets, while shipped official edit workflows move onto a dedicated edit-aware path instead of falling back to the legacy SD-style i2i graph.
+- Split RookieUI's image-input workspace into truthful flow-aware surfaces: generic `img2img` now hides unaligned official non-SD presets, while shipped official edit workflows use dedicated image-edit handling on the shared `img2img` surface instead of falling back to the legacy SD-style i2i graph.
+- RookieUI's image-input workspace now keeps generic SD-family `img2img` modes and official image-edit profiles on one truthful `img2img` surface, while still hiding unaligned official non-SD presets so they cannot fall back into the legacy SD-style i2i graph.
 - Added the first shipped official edit preset, `Qwen-Image Edit`, following the official ComfyUI `imageEdit` template as a no-mask image-edit workflow rather than an inpaint-first surface.
 - Official templates that preload a fixed LoRA are now exposed as template-owned defaults instead of silent hidden dependencies: RookieUI explicitly shows the official default, allows override with parity-drift messaging, and validates host readiness against the official LoRA asset.
 - The current shipped template-owned LoRA handling applies to `Flux.1 Dev FP8`, `Qwen-Image 2512`, and `Qwen-Image Edit`.
@@ -62,8 +63,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Expanded RookieUI's non-SD preset matrix to the official ComfyUI text-to-image templates currently tracked in `reference/workflow_templates`, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
 - Shipped official non-SD template paths now also support prompt-inline `<lora:model_name:weight>` chaining, preserving any template-owned LoRA first and then appending user inline LoRAs through model-only `Load LoRA` nodes before host submission.
-- Tightened live-host catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
-- Completed restarted-host catalog/execute proof for the current asset-ready official non-SD subset: `Anima`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Z-Image`, and `Z-Image Turbo`.
+- Tightened catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
 
 </details>
 
@@ -74,18 +74,14 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Added a truthful `Upsample Tags` editor-toolbar action to `Prompt Workbench`, backed by a dedicated RookieUI `/rookieui/prompt-tools/upsample` route and host-node detection against the active ComfyUI registry.
 - The new action applies returned prompt text back into the active `Prompt Workbench` draft and bound prompt input without changing existing translation, AI-assist, history/favorites, or formatting behavior.
 - When the host-side Danbooru upsampler node is missing or unavailable, RookieUI now reports explicit disabled-state and route-level `host-unavailable` behavior instead of implying the action is always present.
-- Prompt Workbench live-host validation now covers the Danbooru host-action path, and restarted-host `full-pipeline` report/execute acceptance now includes the prompt-workbench lane.
-
 </details>
 
 <details>
 
-<summary><strong>Stateful-surface durability and live-host freshness hardening (stability/tooling)</strong></summary>
+<summary><strong>Stateful-surface durability and runtime freshness hardening (stability/tooling)</strong></summary>
 
 - Hardened `Prompt Workbench` and `XYZ Plot` persisted state with atomic JSON writes and corrupt-state quarantine instead of silent reset-on-parse-failure behavior.
 - Added `XYZ Plot` async session-state coordination and bounded stale-session pruning so long-running hosts keep queue-backed sweep state consistent without unbounded retained history.
-- Added backend runtime build fingerprint metadata on RookieUI bootstrap/capability payloads and a live-host freshness hard gate in `scripts/run_live_smoke_tests.py`.
-- Live-host acceptance now refuses stale or not-yet-restarted ComfyUI processes before any validation lane executes, then revalidates `full-pipeline` report/execute on the restarted in-sync host.
 
 </details>
 
@@ -96,7 +92,6 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Shipped an integrated `Prompt Workbench` in the `txt2img` and `img2img` prompt band, with persisted prompt/negative namespaces, quick-insert catalogs, translation tooling, AI assist delivery, history/favorites, and blacklist-aware formatting.
 - Shipped a built-in `XYZ Plot` sweep surface for `txt2img` and `img2img`, including axis registry, estimate checks, queue-backed session runs, main-grid/sub-grid assembly, primary-preview synchronization, fullscreen result inspection, and metadata-aware result delivery.
 - Added recent `XYZ Plot` parity follow-ups for choice-axis multiselect entry, running partial-grid preview delivery, A1111-style seed-policy controls (`Keep -1 for seeds` plus per-axis seed variation toggles), and output mirroring for assembled grids.
-- Added dedicated live-host smoke lanes for `Prompt Workbench` and `XYZ Plot`, so route/state/session behavior is validated against the restarted ComfyUI host before acceptance.
 
 </details>
 
@@ -106,8 +101,8 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - Extracted shared workflow graph builders into `rookieui/services/workflow_builders/*`, keeping `workflow_translation.py` as the stable orchestration façade instead of a regrowing graph monolith.
 - Split `ControlNet` and `ADetailer` backend ownership into focused catalog, normalization, runtime/refinement, and warning modules behind stable route-facing façades.
-- Added backend/frontend integrated feature registries so sidebar bootstrap ownership and validation-lane linkage no longer depend on ad-hoc one-off wiring.
-- Added manifest-backed architecture guardrails, import-cycle checks, façade size budgets, and final live-host `full-pipeline` validation to keep the refactor honest as these high-churn surfaces continue to expand.
+- Added backend/frontend integrated feature registries so sidebar bootstrap ownership no longer depends on ad-hoc one-off wiring.
+- Added manifest-backed architecture guardrails, import-cycle checks, and façade size budgets to keep the refactor honest as these high-churn surfaces continue to expand.
 
 **Architecture**
 
@@ -137,7 +132,6 @@ ComfyUI process (single runtime)
    |  +- integrated_feature_registry.py
    |
    +- workflow submission into host ComfyUI queue
-   +- live-host validation lanes for prompt parity and integrated pipelines
 ```
 
 Current extension seams:
@@ -145,18 +139,7 @@ Current extension seams:
 - `workflow_translation.py` is now a stable orchestration facade that delegates graph-building work into `rookieui/services/workflow_builders/*`.
 - `controlnet.py` and `adetailer.py` stay as route-facing facades while catalog, normalization, runtime/refinement, and warning ownership live in focused vertical modules.
 - `web/rookieui_extension.js` and `web/rookieui_feature_registry.js` now own integrated bootstrap loading explicitly, instead of scattering one-off feature fetch wiring through the extension entrypoint.
-- The refactor is guarded by manifest-backed boundary checks, facade size budgets, import-cycle regression coverage, and live-host `full-pipeline` validation.
-
-</details>
-
-<details>
-
-<summary><strong>Live-host validation expansion and full-pipeline closure (stability/tooling)</strong></summary>
-
-- Added dedicated live-host validation lanes for shipped `ControlNet` and `ADetailer`, covering host-context truthfulness, dry-run workflow checks, and execute-level completion on the current ComfyUI host.
-- Added an auxiliary live-host validation lane for synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back behavior, and explicit queue/history assertions tied to real RookieUI-origin jobs.
-- Added shared queue/post-state closure with explicit `/rookieui/queue` and `/rookieui/queue/{prompt_id}` validation plus reusable-output checks across the phase-58 auxiliary execute lanes.
-- Added an aggregate `full-pipeline` live-host mode that replays the accepted `ControlNet`, `ADetailer`, and auxiliary validation lanes end-to-end against the restarted host.
+- The refactor is guarded by manifest-backed boundary checks, facade size budgets, and import-cycle regression coverage.
 
 </details>
 
@@ -167,7 +150,7 @@ Current extension seams:
 - Added inventory-aware embeddings / textual inversion handling on the shipped SD-family prompt path, with canonical host-compatible `embedding:<name>` tokens and explicit missing-reference diagnostics.
 - Added A1111-style alternate prompt scheduling for forms such as `[a|b]`, while keeping `BREAK`, `AND`, scheduling slices, and attention markers on RookieUI-owned SD-family encoder seams.
 - Hardened SD-family token chunk behavior with recent comma backtrack and grouped textual-inversion boundary preservation when the active host tokenizer exposes word-id metadata, with safe fallback on hosts that do not.
-- Added shared golden fixtures, reference-backed token differential coverage, and local live-host prompt-parity smoke validation (`dry-run` plus `execute`) for the shipped SD-family parity surface.
+- Added shared golden fixtures and reference-backed token differential coverage for the shipped SD-family parity surface.
 
 </details>
 
@@ -334,7 +317,6 @@ Current extension seams:
   - [Support for Other Extensions](#support-for-other-extensions)
 - [Runtime and Host Integration](#runtime-and-host-integration)
   - [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
-  - [Live-Host Validation Coverage](#live-host-validation-coverage)
   - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [License](#license)
 
@@ -392,8 +374,15 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Image-Edit Workflows
 
+<br>
+<div align="left">
+  <img src="assets/edit.png" width="100%" />
+</div>
+<br>
+
 - official image-edit workflows now live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
 - shipped first-wave image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
+- `Qwen-Image Edit Multi-LoRA` remains backend/runtime-compatible, but the separate visible `Img2Img` preset is retired; the canonical UI path is `Qwen-Image Edit` plus prompt-inline multi-`<lora:...>` chaining
 - image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
 - image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
 - family-specific edit builders now cover template-owned LoRA chaining, Qwen/Qwen+ edit encoders, Flux/Klein multi-reference latent setup, and Longcat edit guidance on dedicated non-SD runtime paths
@@ -453,11 +442,12 @@ If your host or Manager install path does not automatically install custom-node 
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
-- Official `Edit` workflows are now being added through a dedicated image-edit surface rather than the generic `img2img` preset list. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
+- Official `Edit` workflows now ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
 - RookieUI now ships first-wave official ComfyUI `imageEdit` coverage for `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- The `Qwen-Image Edit Multi-LoRA` backend profile remains shipped for compatibility, but RookieUI no longer exposes it as a separate visible `Img2Img` preset because prompt-inline multi-`<lora:...>` chaining is the canonical UI path.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
 - Multi-reference image-edit families now use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded first-wave support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` now hides official non-SD presets that are not yet aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
@@ -471,9 +461,6 @@ If your host or Manager install path does not automatically install custom-node 
   - `Qwen-Image Edit`
   - `Qwen-Image Edit Multi-LoRA`
   - `FireRed Image Edit Lightning`
-- Current restarted-host execute proof on the validation lane covers the asset-ready image-edit subset:
-  - `Flux.2 Klein 9B KV Image Edit`
-  - `Longcat Image Edit`
 - Other official image-edit presets may still remain host prerequisites on a given environment until the exact upstream model, text encoder, VAE, and template-owned LoRA labels required by the official template are installed on that host.
 
 ---
@@ -543,7 +530,6 @@ Behavior and compatibility:
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, deferred, reference-only, or otherwise unavailable on the current host/setup.
 - The current shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist currently uses the OpenAI-compatible provider contract.
-- The shipped live-host smoke lane validates config/state payloads, provider/catalog/analyze responses, history/favorites/blacklist persistence, translation behavior, AI-assist truthfulness, and the Danbooru host-action path against the current host.
 
 #### Prompt Workbench Danbooru Upsampler Action
 
@@ -588,7 +574,6 @@ Behavior and compatibility:
 - Choice-backed axes use a RookieUI-owned multiselect dropdown with fill/clear behavior instead of forcing CSV-only entry for every choice axis.
 - The current shipped seed-policy surface includes `Keep -1 for seeds`, per-axis `Vary seeds for X/Y/Z` toggles, and truthful fixed-seed/session metadata.
 - Delivered results include a main grid, optional sub-grids, lone cell images, attached XYZ metadata for later inspection/reuse, and fullscreen zoom inspection through the shared preview viewer.
-- The shipped live-host smoke lane validates route contract drift, estimate payloads, session launch, terminal session state, and grid asset delivery against the current host.
 
 ---
 
@@ -620,7 +605,6 @@ Behavior and compatibility:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
 - ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
-- The shipped live-host smoke lane now validates detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure against the current host.
 
 ---
 
@@ -648,7 +632,6 @@ Behavior and compatibility:
 - ControlNet coupling supports `none`, `passthrough`, and `custom` modes inside the refinement context.
 - Native detector runtime uses RookieUI's packaged Python dependencies together with host model inventory, so matching detector/model files must still exist in the host environment.
 - Availability guidance and warning diagnostics are exposed when detector/model/runtime dependencies are degraded.
-- The shipped live-host smoke lane now validates catalog/runtime truthfulness, refinement-topology dry-run behavior, and fallback-safe execute completion against the current host.
 
 ### Support for Other Extensions
 
@@ -675,42 +658,8 @@ Runtime and validation notes:
 
 - `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
 - Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
-- The shipped parity surface is backed by golden parser/translator fixtures plus local live-host smoke validation (`dry-run` and `execute`) against the current ComfyUI host.
+- The shipped parity surface is backed by golden parser/translator fixtures and reference-backed differential coverage.
 - Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
-
-### Live-Host Validation Coverage
-
-RookieUI now ships internal live-host smoke lanes in [`scripts/run_live_smoke_tests.py`](scripts/run_live_smoke_tests.py) for acceptance against a restarted ComfyUI host. These lanes are developer/acceptance tooling rather than end-user UI toggles, but they document the current level of host-embedded proof behind the shipped surfaces.
-
-Freshness note:
-
-- Live-host validation is now hard-gated by backend runtime fingerprint metadata exposed from the active ComfyUI process.
-- If the host has not restarted onto the current RookieUI code, the smoke runner fails before any validation lane executes instead of treating stale-host results as valid acceptance evidence.
-
-Current live-host coverage:
-
-- `catalog`: validates preset/bootstrap truth plus official non-SD family/template readiness; hosts that are missing required template assets are reported as host-prerequisite gaps instead of repo regressions or silent fallback passes.
-- `prompt-parity`: validates SD-family prompt dry-run and execute behavior on the shipped RookieUI-owned parity encode seam.
-- `prompt-workbench`: validates config/state truthfulness, provider/catalog/analyze payloads, persisted history/favorites/blacklist behavior, translation execution, AI-assist delivery semantics, and the Danbooru `Upsample Tags` host-action path.
-- `xyz-plot`: validates axis/estimate contracts plus queue-backed session execution, terminal results, and assembled grid asset delivery.
-- `controlnet`: validates host-context compatibility, detect-route behavior, dry-run workflow topology, and execute-level queue/post-state closure.
-- `adetailer`: validates catalog/runtime truthfulness, dry-run refinement topology, fallback-safe execute behavior, and explicit queue/post-state closure.
-- `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
-- `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, `xyz-plot`, and `prompt-workbench` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
-
-Current official non-SD txt2img execute-proven subset on the acceptance host:
-
-- `anima`
-- `ernie_image`
-- `ernie_image_turbo`
-- `flux`
-- `z_image`
-- `z_image_turbo`
-
-Current official image-edit execute-proven subset on the acceptance host:
-
-- `klein_9b_kv_image_edit`
-- `longcat_image_edit`
 
 Other official non-SD or image-edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
 

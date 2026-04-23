@@ -117,6 +117,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const profileLookup = buildProfileLookup(bootstrapState.capabilities);
   const rawPresets = bootstrapState.presets?.presets ?? [];
   const presetLookup = buildPresetLookup(rawPresets);
+  const retiredVisibleImg2ImgPresetIds = new Set(["qwen_image_edit_multi_lora"]);
   const filterPresetsForSurfaceFlow = (surfaceFlow) =>
     rawPresets.filter((preset) => {
       const profile = profileLookup.get(String(preset?.profile ?? "").trim().toLowerCase()) ?? profileLookup.get(preset?.profile);
@@ -126,7 +127,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       const availableSurfaceFlows = Array.isArray(profile?.available_surface_flows)
         ? profile.available_surface_flows
         : [];
-      return availableSurfaceFlows.includes(surfaceFlow);
+      if (!availableSurfaceFlows.includes(surfaceFlow)) {
+        return false;
+      }
+      // CRITICAL: keep retired image-edit presets backend-compatible while removing them from the visible img2img dropdown.
+      return surfaceFlow !== "img2img" || !retiredVisibleImg2ImgPresetIds.has(String(preset?.id ?? "").trim());
     });
   const img2imgVisiblePresets = filterPresetsForSurfaceFlow("img2img");
   const resolveVisiblePresetsForMode = () => (img2imgVisiblePresets.length > 0 ? img2imgVisiblePresets : rawPresets);
@@ -912,10 +917,16 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     const visiblePresets = resolveVisiblePresetsForMode(modeValue);
     const currentPresetId = String(elements.preset.value ?? "").trim();
     const currentProfileId = String(elements.profileState.value ?? "").trim().toLowerCase();
+    const hiddenCompatiblePresetId =
+      retiredVisibleImg2ImgPresetIds.has(currentPresetId) && presetLookup.has(currentPresetId)
+        ? currentPresetId
+        : retiredVisibleImg2ImgPresetIds.has(currentProfileId) && presetLookup.has(currentProfileId)
+          ? currentProfileId
+          : "";
     const nextPresetId =
       visiblePresets.some((preset) => preset.id === currentPresetId)
         ? currentPresetId
-        : findPresetIdForProfile(visiblePresets, currentProfileId) ?? visiblePresets[0]?.id ?? "";
+        : hiddenCompatiblePresetId || findPresetIdForProfile(visiblePresets, currentProfileId) || visiblePresets[0]?.id || "";
 
     elements.preset.replaceChildren();
     visiblePresets.forEach((preset) => {
@@ -924,6 +935,16 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       option.textContent = preset.title;
       elements.preset.appendChild(option);
     });
+    if (hiddenCompatiblePresetId && nextPresetId === hiddenCompatiblePresetId) {
+      const hiddenPreset = presetLookup.get(hiddenCompatiblePresetId);
+      if (hiddenPreset) {
+        const option = document.createElement("option");
+        option.value = hiddenPreset.id;
+        option.textContent = hiddenPreset.title;
+        option.hidden = true;
+        elements.preset.appendChild(option);
+      }
+    }
     if (nextPresetId) {
       setElementValue(elements.preset, nextPresetId);
     }
