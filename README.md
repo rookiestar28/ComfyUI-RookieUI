@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Official image-edit workflow expansion and live-host acceptance closure (new functionality/stability)</strong></summary>
+
+- RookieUI now treats official image-edit workflows as `img2img`-owned image-edit subtypes instead of routing them through a dedicated visible `Edit` mode or a legacy SD-style inpaint fallback.
+- The shipped first-wave official image-edit matrix now includes `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- Image-edit flows now follow bounded official semantics directly in RookieUI: they do not require user masks, preserve ordered `reference_images` plus `main_reference_index`, and support bounded multi-reference input where the official template family requires it.
+- Live-host acceptance for the new image-edit surface now includes restarted-host report/execute proof for the current asset-ready subset `Flux.2 Klein 9B KV Image Edit` and `Longcat Image Edit`, while Qwen edit variants remain explicitly classified as host-prerequisite gaps when the active host only exposes a drifted lightning LoRA label.
+
+</details>
+
+<details>
+
 <summary><strong>Non-SD official template inline LoRA chaining (new functionality/stability)</strong></summary>
 
 - RookieUI now supports prompt-inline `<lora:model_name:weight>` chaining on shipped official non-SD template workflows instead of limiting those families to hidden template defaults only.
@@ -311,7 +322,8 @@ Current extension seams:
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
-  - [Current Official Edit Preset Coverage and Template-Owned LoRAs](#current-official-edit-preset-coverage-and-template-owned-loras)
+  - [Image-Edit Workflows](#image-edit-workflows)
+  - [Current Official Image-Edit Coverage and Template-Owned LoRAs](#current-official-image-edit-coverage-and-template-owned-loras)
   - [Official Non-SD Inline LoRA Support](#official-non-sd-inline-lora-support)
 - [Extensions](#extensions)
   - [Prompt Workbench](#prompt-workbench)
@@ -378,6 +390,14 @@ If your host or Manager install path does not automatically install custom-node 
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
+### Image-Edit Workflows
+
+- official image-edit workflows now live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
+- shipped first-wave image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
+- image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
+- image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
+- family-specific edit builders now cover template-owned LoRA chaining, Qwen/Qwen+ edit encoders, Flux/Klein multi-reference latent setup, and Longcat edit guidance on dedicated non-SD runtime paths
+
 ### Prompt Workbench
 
 - integrated prompt-band workbench in `txt2img` and `img2img`
@@ -435,10 +455,11 @@ If your host or Manager install path does not automatically install custom-node 
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
 - Official `Edit` workflows are now being added through a dedicated image-edit surface rather than the generic `img2img` preset list. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
 
-### Current Official Edit Preset Coverage and Template-Owned LoRAs
+### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
-- RookieUI now ships the first official ComfyUI `imageEdit` preset, `Qwen-Image Edit`, on a dedicated edit-aware image-input path.
-- Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The current shipped edit path does not require mask input.
+- RookieUI now ships first-wave official ComfyUI `imageEdit` coverage for `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
+- Multi-reference image-edit families now use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded first-wave support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` now hides official non-SD presets that are not yet aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
 - Official templates that preload a fixed LoRA are treated as template-owned dependencies rather than silent hidden assets:
   - RookieUI shows the official default explicitly
@@ -448,7 +469,12 @@ If your host or Manager install path does not automatically install custom-node 
   - `Flux.1 Dev FP8`
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
-- Additional official edit models are planned incrementally, including single-image and multi-reference-image workflows. Multiple-reference edit flows will land on a richer edit-specific payload/runtime path rather than being squeezed into the current single-image `img2img` contract.
+  - `Qwen-Image Edit Multi-LoRA`
+  - `FireRed Image Edit Lightning`
+- Current restarted-host execute proof on the validation lane covers the asset-ready image-edit subset:
+  - `Flux.2 Klein 9B KV Image Edit`
+  - `Longcat Image Edit`
+- Other official image-edit presets may still remain host prerequisites on a given environment until the exact upstream model, text encoder, VAE, and template-owned LoRA labels required by the official template are installed on that host.
 
 ---
 
@@ -672,15 +698,21 @@ Current live-host coverage:
 - `auxiliary-pipelines`: validates synchronous `Extras` execution, `PNG Info` parse / inspect / apply-back semantics, and queue/job lookup against a real RookieUI-origin job.
 - `full-pipeline`: aggregates the accepted `controlnet`, `adetailer`, `auxiliary-pipelines`, `xyz-plot`, and `prompt-workbench` lanes under one shared queue/post-state closure, including explicit reusable-output assertions.
 
-Current official non-SD execute-proven subset on the acceptance host:
+Current official non-SD txt2img execute-proven subset on the acceptance host:
 
 - `anima`
 - `ernie_image`
 - `ernie_image_turbo`
+- `flux`
 - `z_image`
 - `z_image_turbo`
 
-Other official non-SD or edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
+Current official image-edit execute-proven subset on the acceptance host:
+
+- `klein_9b_kv_image_edit`
+- `longcat_image_edit`
+
+Other official non-SD or image-edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
 
 ### Default Model Read Paths (Host ComfyUI)
 
