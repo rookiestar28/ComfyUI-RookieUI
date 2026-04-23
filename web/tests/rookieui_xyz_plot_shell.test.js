@@ -80,7 +80,7 @@ function createBootstrapState(overrides = {}) {
           support_tier: "adapted",
           mode_scopes: ["txt2img"],
           value_input_mode: "choices_or_csv",
-          choices: ["nearest", "lanczos"],
+          choices: ["Latent", "Latent (bicubic)", "Bislerp"],
           session_runner_support: true,
           a1111_reference_label: "Hires upscaler",
           notes: [],
@@ -94,6 +94,17 @@ function createBootstrapState(overrides = {}) {
           choices: [],
           session_runner_support: true,
           a1111_reference_label: "Denoising",
+          notes: [],
+        },
+        hires_steps: {
+          axis_id: "hires_steps",
+          title: "Hires Steps",
+          support_tier: "adapted",
+          mode_scopes: ["txt2img"],
+          value_input_mode: "int_csv_or_range",
+          choices: [],
+          session_runner_support: true,
+          a1111_reference_label: "Hires steps",
           notes: [],
         },
         prompt_sr: {
@@ -559,6 +570,9 @@ describe("xyz plot shell", () => {
     expect(document.getElementById("txt2img-hires-axis-z-values-summary").textContent).toContain("Select values");
     expect(document.getElementById("txt2img-hires-axis-z-fill").hidden).toBe(false);
     expect(document.getElementById("txt2img-hires-axis-z-fill").disabled).toBe(false);
+    expect(
+      Array.from(document.querySelectorAll("#txt2img-hires-axis-z-values-options input")).map((input) => input.value),
+    ).toEqual(["Latent", "Latent (bicubic)", "Bislerp"]);
   });
 
   test("serializes xyz seed-policy controls into the run payload", async () => {
@@ -624,6 +638,32 @@ describe("xyz plot shell", () => {
     document.getElementById("prompt-xyz-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("prompt-xyz-axis-y-values").placeholder).toBe("cat, dog, bird");
     expect(document.getElementById("prompt-xyz-axis-y-fill").hidden).toBe(true);
+  });
+
+  test("uses A1111 hires examples and user-facing input-mode hints", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+
+    createXYZPlotShell({
+      idPrefix: "hires-hint-xyz",
+      parent,
+      mode: "txt2img",
+      bootstrapState: createBootstrapState(),
+      buildBaseRequest: () => ({ prompt: "city" }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("hires-hint-xyz-axis-x-select").value = "hires_steps";
+    document.getElementById("hires-hint-xyz-axis-x-select").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("hires-hint-xyz-axis-x-values").placeholder).toBe("0, 10, 20");
+    expect(document.getElementById("hires-hint-xyz-axis-x-hint").textContent).toContain("CSV values or ranges");
+
+    document.getElementById("hires-hint-xyz-axis-y-select").value = "prompt_sr";
+    document.getElementById("hires-hint-xyz-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("hires-hint-xyz-axis-y-hint").textContent).toContain("SOURCE, TARGET1, TARGET2");
   });
 
   test("wires the results preview into the shared fullscreen viewer", async () => {

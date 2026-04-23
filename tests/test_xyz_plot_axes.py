@@ -40,7 +40,11 @@ class XYZPlotAxisRegistryTests(unittest.TestCase):
         self.assertEqual(payload["axes"]["scheduler"]["choices"], ["Automatic", "Karras"])
         self.assertEqual(payload["axes"]["checkpoint_name"]["choices"], ["dreamshaper.safetensors"])
         self.assertEqual(payload["axes"]["vae"]["choices"][:3], ["Automatic", "None", "anime.vae.safetensors"])
-        self.assertEqual(payload["axes"]["hires_upscaler"]["choices"], ["4x-UltraSharp"])
+        self.assertEqual(
+            payload["axes"]["hires_upscaler"]["choices"],
+            ["Latent", "Latent (bicubic)", "Latent (nearest-exact)", "Area", "Bislerp"],
+        )
+        self.assertEqual(payload["axes"]["hires_upscaler"]["choice_source"], "rookieui.fixed.hires_upscale_method")
 
     def test_axis_summary_preserves_truthfulness_tiers(self) -> None:
         payload = xyz_plot_axes.build_xyz_plot_axes_payload()

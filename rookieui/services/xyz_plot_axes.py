@@ -38,6 +38,13 @@ _XYZ_AXIS_COSTS = {
     "fp8_mode": "not_supported",
 }
 _XYZ_SESSION_RUNNER_UNSUPPORTED_AXES = {"var_seed", "var_strength"}
+_HIRES_UPSCALER_CHOICE_SPECS = (
+    ("bilinear", "Latent", ["bilinear", "Bilinear"]),
+    ("bicubic", "Latent (bicubic)", ["bicubic", "Bicubic"]),
+    ("nearest-exact", "Latent (nearest-exact)", ["nearest-exact", "nearest exact", "Nearest Exact"]),
+    ("area", "Area", ["area"]),
+    ("bislerp", "Bislerp", ["bislerp"]),
+)
 
 
 def _dedupe_preserve_order(values: list[str]) -> list[str]:
@@ -155,6 +162,13 @@ def _vae_choice_entries() -> list[dict[str, Any]]:
     return entries
 
 
+def _hires_upscaler_choice_entries() -> list[dict[str, Any]]:
+    return [
+        _build_choice_entry(value=value, label=label, aliases=aliases)
+        for value, label, aliases in _HIRES_UPSCALER_CHOICE_SPECS
+    ]
+
+
 def _axis_choice_entries(axis_id: str) -> list[dict[str, Any]]:
     if axis_id == "sampler":
         return _compatibility_sampler_choice_entries()
@@ -164,6 +178,8 @@ def _axis_choice_entries(axis_id: str) -> list[dict[str, Any]]:
         return _checkpoint_choice_entries()
     if axis_id == "vae":
         return _vae_choice_entries()
+    if axis_id == "hires_upscaler":
+        return _hires_upscaler_choice_entries()
     return []
 
 
@@ -178,7 +194,7 @@ def _axis_dynamic_choices(axis_id: str) -> tuple[list[str], str]:
     if axis_id == "vae":
         return ([entry["label"] for entry in _vae_choice_entries()], "model_inventory.vae")
     if axis_id == "hires_upscaler":
-        return (list(inventory.upscale_models or []), "model_inventory.upscale_models")
+        return ([entry["label"] for entry in _hires_upscaler_choice_entries()], "rookieui.fixed.hires_upscale_method")
     if axis_id == "clip_skip":
         return (["1", "2", "3", "4"], "rookieui.fixed.clip_skip")
     return ([], "")

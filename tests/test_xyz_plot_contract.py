@@ -56,6 +56,10 @@ class XYZPlotContractTests(unittest.TestCase):
         self.assertIn("Euler a", axes["sampler"]["choices"])
         self.assertIn("Automatic", axes["scheduler"]["choices"])
         self.assertEqual(axes["vae"]["choices"][:2], ["Automatic", "None"])
+        self.assertEqual(
+            axes["hires_upscaler"]["choices"][:3],
+            ["Latent", "Latent (bicubic)", "Latent (nearest-exact)"],
+        )
 
     def test_adaptation_rules_pin_rookieui_native_direction(self) -> None:
         payload = xyz_plot.build_xyz_plot_contract_meta()

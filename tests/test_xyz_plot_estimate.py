@@ -112,6 +112,18 @@ class XYZPlotValueParserTests(unittest.TestCase):
         self.assertEqual(entries[0].value, "checkpoints/ponyDiffusion.safetensors")
         self.assertEqual(entries[0].label, "checkpoints/ponyDiffusion.safetensors")
 
+    def test_parse_hires_upscaler_accepts_a1111_facing_label_and_runtime_alias(self) -> None:
+        axis = resolve_xyz_axis_contract("hires_upscaler")
+
+        entries = parse_xyz_axis_values(
+            "Latent, Bislerp",
+            axis,
+            choices=get_xyz_axis_choice_entries("hires_upscaler"),
+        )
+
+        self.assertEqual([entry.value for entry in entries], ["bilinear", "bislerp"])
+        self.assertEqual([entry.label for entry in entries], ["Latent", "Bislerp"])
+
 
 class XYZPlotEstimateTests(unittest.TestCase):
     def test_estimate_counts_cells_and_steps(self) -> None:
@@ -153,3 +165,16 @@ class XYZPlotEstimateTests(unittest.TestCase):
                     "axes": [{"axis_id": "denoising_strength", "values": "0.4,0.6"}],
                 }
             )
+
+    def test_estimate_treats_hires_steps_zero_as_same_as_current_steps(self) -> None:
+        payload = build_xyz_plot_estimate_payload(
+            {
+                "mode": "txt2img",
+                "base_request": {"steps": 24, "hires_enabled": True, "hires_steps": 0},
+                "axes": [{"axis_id": "hires_steps", "values": "0,12"}],
+            }
+        )
+
+        self.assertTrue(payload["can_run"])
+        self.assertEqual(payload["estimate"]["cell_count"], 2)
+        self.assertEqual(payload["estimate"]["total_step_estimate"], 84)

@@ -153,8 +153,10 @@ def _coerce_hires_steps(
         applied_defaults.append("hires_steps")
         value = default_value
     normalized = _coerce_int(value, "hires_steps")
-    if normalized < _MIN_STEPS or normalized > _MAX_STEPS:
-        raise ValueError(f"hires_steps must be between {_MIN_STEPS} and {_MAX_STEPS}.")
+    # IMPORTANT: A1111 treats hires_steps=0 as "reuse the original step count"; XYZ parity
+    # and shared txt2img/img2img normalization must preserve that sentinel instead of rejecting it.
+    if normalized < 0 or normalized > _MAX_STEPS:
+        raise ValueError(f"hires_steps must be between 0 and {_MAX_STEPS}.")
     return normalized
 
 
@@ -458,6 +460,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         if hires_scale < _MIN_HIRES_SCALE or hires_scale > _MAX_HIRES_SCALE:
             raise ValueError(f"hires_scale must be between {_MIN_HIRES_SCALE} and {_MAX_HIRES_SCALE}.")
         hires_steps = _coerce_hires_steps(request.hires_steps, default_hires_steps, applied_defaults)
+        if hires_steps == 0:
+            hires_steps = steps
         hires_denoise = round(_coerce_float(request.hires_denoise, "hires_denoise"), 2)
         if hires_denoise < _MIN_HIRES_DENOISE or hires_denoise > _MAX_HIRES_DENOISE:
             raise ValueError(

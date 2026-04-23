@@ -56,9 +56,25 @@ function buildFallbackValues(axis) {
     return "0.35, 0.5, 0.65";
   }
   if (axisId === "hires_steps") {
-    return "8, 12, 16";
+    return "0, 10, 20";
   }
   return "";
+}
+
+function describeInputMode(mode) {
+  const normalizedMode = String(mode ?? "").trim();
+  if (!normalizedMode) {
+    return "";
+  }
+  const labels = {
+    int_csv_or_range: "CSV values or ranges",
+    float_csv_or_range: "CSV values or ranges",
+    size_csv: "WIDTHxHEIGHT CSV",
+    choices_or_csv: "dropdown values or CSV text",
+    prompt_sr_csv: "SOURCE, TARGET1, TARGET2",
+    permutation_csv: "comma-separated prompt tokens",
+  };
+  return labels[normalizedMode] ?? normalizedMode.replaceAll("_", " ");
 }
 
 function buildAxisHint(axis) {
@@ -69,7 +85,7 @@ function buildAxisHint(axis) {
   const tier = String(axis.support_tier ?? "").trim();
   const mode = String(axis.value_input_mode ?? "").trim();
   const notes = Array.isArray(axis.notes) ? axis.notes.filter(Boolean) : [];
-  const summary = [`${reference || axis.title}`, `${tier} parity`, mode.replaceAll("_", " ")];
+  const summary = [`${reference || axis.title}`, `${tier} parity`, describeInputMode(mode)];
   if (notes[0]) {
     summary.push(notes[0]);
   }

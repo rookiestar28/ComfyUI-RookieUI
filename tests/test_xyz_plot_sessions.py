@@ -500,6 +500,21 @@ class XYZPlotSessionTests(unittest.TestCase):
 
         self.assertEqual(payload["vae_name"], "Automatic")
 
+    def test_hires_steps_axis_preserves_a1111_zero_sentinel_for_normalization(self) -> None:
+        payload = {}
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "hires_steps",
+                "value": 0,
+            },
+            mode="txt2img",
+        )
+
+        self.assertTrue(payload["hires_enabled"])
+        self.assertEqual(payload["hires_steps"], 0)
+
     def test_load_xyz_plot_store_quarantines_corrupt_json(self) -> None:
         state_path = xyz_plot_sessions._xyz_plot_state_path()
         state_path.parent.mkdir(parents=True, exist_ok=True)
