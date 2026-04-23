@@ -376,7 +376,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 <br>
 <div align="left">
-  <img src="assets/edit.png" width="100%" />
+  <img src="assets/edit.png" width="30%" />
 </div>
 <br>
 
