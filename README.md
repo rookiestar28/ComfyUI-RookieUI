@@ -21,7 +21,7 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 
 The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Even so, RookieUI supports more than just the Stable Diffusion family.
 
-<details><summary><h2>Last Update - Click to expand</h2></summary>
+<details><summary><h2>Last updates - Click to expand</h2></summary>
 
 <details>
 
@@ -36,11 +36,11 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Official image-edit workflow expansion (new functionality/stability)</strong></summary>
+<summary><strong>Official image-edit workflow coverage (new functionality/stability)</strong></summary>
 
 - RookieUI now treats official image-edit workflows as `img2img`-owned image-edit subtypes instead of routing them through a dedicated visible `Edit` mode or a legacy SD-style inpaint fallback.
-- The shipped first-wave official image-edit matrix now includes `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
-- The separate visible `Qwen-Image Edit Multi-LoRA` `Img2Img` preset is now retired; keep using `Qwen-Image Edit` with prompt-inline multi-`<lora:...>` chaining while the backend compatibility profile remains available for truthful runtime compatibility.
+- The shipped official image-edit profile set includes `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- The `Qwen-Image Edit Multi-LoRA` backend profile remains available for compatibility, but it is no longer exposed as a separate visible `Img2Img` preset; use `Qwen-Image Edit` with prompt-inline multi-`<lora:...>` chaining for the normal UI path.
 - Image-edit flows now follow bounded official semantics directly in RookieUI: they do not require user masks, preserve ordered `reference_images` plus `main_reference_index`, and support bounded multi-reference input where the official template family requires it.
 
 </details>
@@ -57,21 +57,9 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Official img2img/edit flow split and template-owned LoRA truthfulness (new functionality/stability)</strong></summary>
-
-- Split RookieUI's image-input workspace into truthful flow-aware surfaces: generic `img2img` now hides unaligned official non-SD presets, while shipped official edit workflows use dedicated image-edit handling on the shared `img2img` surface instead of falling back to the legacy SD-style i2i graph.
-- RookieUI's image-input workspace now keeps generic SD-family `img2img` modes and official image-edit profiles on one truthful `img2img` surface, while still hiding unaligned official non-SD presets so they cannot fall back into the legacy SD-style i2i graph.
-- Added the first shipped official edit preset, `Qwen-Image Edit`, following the official ComfyUI `imageEdit` template as a no-mask image-edit workflow rather than an inpaint-first surface.
-- Official templates that preload a fixed LoRA are now exposed as template-owned defaults instead of silent hidden dependencies: RookieUI explicitly shows the official default, allows override with parity-drift messaging, and validates host readiness against the official LoRA asset.
-- The current shipped template-owned LoRA handling applies to `Flux.1 Dev FP8`, `Qwen-Image 2512`, and `Qwen-Image Edit`.
-
-</details>
-
-<details>
-
 <summary><strong>Official non-SD template preset expansion, inline LoRA chaining, and truthful host gating (new functionality/stability)</strong></summary>
 
-- Expanded RookieUI's non-SD preset matrix to the official ComfyUI text-to-image templates currently tracked in `reference/workflow_templates`, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- Expanded RookieUI's non-SD preset matrix to official ComfyUI text-to-image template families, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
 - Shipped official non-SD template paths now also support prompt-inline `<lora:model_name:weight>` chaining, preserving any template-owned LoRA first and then appending user inline LoRAs through model-only `Load LoRA` nodes before host submission.
 - Tightened catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
@@ -224,17 +212,6 @@ Current extension seams:
 
 <details>
 
-<summary><strong>Diffusion-family decode integrity and selector hardening (bugfix/stability)</strong></summary>
-
-- Fixed a diffusion-family decode mismatch path where sampler preview could look normal but final output degraded due to incompatible fallback VAE pairing.
-- Enforced family-specific selector resolution for diffusion-model profiles so `vae_name` and `text_encoder_name` no longer rely on a global default fallback.
-- Added fail-fast normalization checks for unresolved diffusion-family selectors to surface configuration problems before workflow translation/runtime execution.
-- Expanded regression coverage across Flux, Qwen-Image, Klein, Lumina, ZiT, Wan, and Anima selector/normalization matrices.
-
-</details>
-
-<details>
-
 <summary><strong>ControlNet A1111-native parity (new functionality)</strong></summary>
 
 - Added A1111-style multi-unit ControlNet editing surface in generation panes (`txt2img` and `img2img`).
@@ -288,17 +265,6 @@ Current extension seams:
 
 <details>
 
-<summary><strong>Extras Hires recovery and secondary family preset expansion</strong></summary>
-
-- Restored a visible A1111-style `Hires. fix` section in Extras, including collapsible chrome and a functional `Enable Hires` toggle wired to the real upscale execution path.
-- Reorganized Extras upscale controls into the recovered Hires section so the UI surface matches active backend behavior instead of acting as decorative duplicates.
-- Expanded secondary preset/profile lanes with new family entries: `Klein (Flux.2)`, `Lumina`, `ZiT (Z-Image-Turbo)`, `Wan`, and `Anima`.
-- Updated model-family catalog mapping and compatibility listings so the new secondary families resolve consistently in the shared RookieUI payload surfaces.
-
-</details>
-
-<details>
-
 <summary><strong>Img2Img workflow expansion and interaction polish</strong></summary>
 
 - Added an embedded Img2Img in-app mask canvas with core controls: brush/eraser, size/opacity, undo/redo, clear/invert, zoom/pan/fit, and explicit `Apply Mask`.
@@ -312,7 +278,7 @@ Current extension seams:
 
 ## Table of Contents
 
-- [Last Update](#last-update---click-to-expand)
+- [Current Status](#current-status---click-to-expand)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
@@ -335,8 +301,8 @@ Current extension seams:
 ## Installation
 
 1. Install via ComfyUI-Manager (recommended)
-   Update ComfyUI-Manager to the latest version first, then search for `ComfyUI-RookieUI` in Manager and install it.
-   RookieUI now ships a root `requirements.txt` so Manager-style installs can resolve the extension's extra Python dependencies in the host environment.
+   Search for `ComfyUI-RookieUI` in Manager and install it. If the package does not appear, update ComfyUI-Manager and refresh its custom-node list.
+   RookieUI includes a root `requirements.txt` so Manager-style installs can resolve the extension's extra Python dependencies in the host environment.
 
 2. Install as a ComfyUI custom node (manual)
 
@@ -391,8 +357,8 @@ If your host or Manager install path does not automatically install custom-node 
 </div>
 <br>
 
-- official image-edit workflows now live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
-- shipped first-wave image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
+- official image-edit workflows live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
+- shipped image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
 - `Qwen-Image Edit Multi-LoRA` remains backend/runtime-compatible, but the separate visible `Img2Img` preset is retired; the canonical UI path is `Qwen-Image Edit` plus prompt-inline multi-`<lora:...>` chaining
 - image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
 - image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
@@ -405,7 +371,7 @@ If your host or Manager install path does not automatically install custom-node 
 - quick-insert catalogs for group tags, prompt-library entries, embeddings, and LoRA references
 - translation, prompt analysis, AI assist delivery, and blacklist-aware formatting tools
 - truthful Danbooru host-action support for `Upsample Tags` when the host-side upsampler node is installed and available
-- provider truthfulness for shipped, deferred, reference-only, and misconfigured Prompt Workbench provider states
+- provider truthfulness for shipped, reference-only, unavailable, and misconfigured Prompt Workbench provider states
 
 ### XYZ Plot
 
@@ -447,26 +413,26 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Official Non-SD Template Presets
 
-- RookieUI now ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - These presets follow official template defaults for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
-- Family-specific controls are now preserved where the official workflows require them:
+- Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
-- Official `Edit` workflows now ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI. `Flux.2 Dev`, whose official graph includes `LoadImage` / `VAEEncode`, remains classified outside the current txt2img preset rollout.
+- Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
-- RookieUI now ships first-wave official ComfyUI `imageEdit` coverage for `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- RookieUI ships official ComfyUI `imageEdit` coverage for `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
 - The `Qwen-Image Edit Multi-LoRA` backend profile remains shipped for compatibility, but RookieUI no longer exposes it as a separate visible `Img2Img` preset because prompt-inline multi-`<lora:...>` chaining is the canonical UI path.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
-- Multi-reference image-edit families now use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded first-wave support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
-- Generic `img2img` now hides official non-SD presets that are not yet aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
+- Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
+- Generic `img2img` hides official non-SD presets that are not aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
 - Official templates that preload a fixed LoRA are treated as template-owned dependencies rather than silent hidden assets:
   - RookieUI shows the official default explicitly
   - allows manual override
   - and warns when a custom override no longer matches the official ComfyUI template exactly
-- The current shipped template-owned LoRA pattern applies to:
+- Template-owned LoRA controls are exposed for:
   - `Flux.1 Dev FP8`
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
@@ -490,7 +456,7 @@ If your host or Manager install path does not automatically install custom-node 
   - `Load Diffusion Model`
   - template-owned `Load LoRA` nodes
   - prompt-inline `Load LoRA` nodes
-- This support is intended for shipped official non-SD template txt2img/edit builders such as the current `Flux.1 Dev FP8`, `Qwen-Image 2512`, and `Qwen-Image Edit` paths.
+- This support applies to shipped official non-SD template txt2img and image-edit builders.
 
 Simple usage:
 
@@ -500,7 +466,7 @@ Simple usage:
 
 Behavior and limits:
 
-- On non-SD official templates, inline LoRAs are currently treated as model-only LoRAs.
+- On non-SD official templates, inline LoRAs are treated as model-only LoRAs.
 - If the prompt requests different model-side and clip/text-encoder-side strengths, RookieUI warns about parity drift and applies the model-side strength only.
 - Template-owned official defaults remain the source of truth for official-template parity. Adding extra inline LoRAs is treated as extending the official template, not as strict unchanged parity.
 
@@ -508,11 +474,11 @@ Behavior and limits:
 
 - Stable Diffusion family
 - Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1` / `Flux.2 Klein`, `HiDream i1`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
-- `Z-Image` also covers the current Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
+- `Z-Image` also covers the Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
 
 Prompt semantics note:
 
-- Exact A1111-style prompt parsing and conditioning parity is currently targeted at the Stable Diffusion family.
+- Exact A1111-style prompt parsing and conditioning parity is targeted at the Stable Diffusion family.
 - Newer/non-SD families continue to use their native ComfyUI execution semantics even when exposed in the same RookieUI interface.
 
 ## Extensions
@@ -539,8 +505,8 @@ Behavior and compatibility:
 - `Prompt Workbench` is built directly into RookieUI's prompt band instead of relying on an A1111 textarea hijack or a separate external extension surface.
 - State is persisted separately for the shipped `txt2img` / `img2img` prompt and negative namespaces.
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
-- Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, deferred, reference-only, or otherwise unavailable on the current host/setup.
-- The current shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist currently uses the OpenAI-compatible provider contract.
+- Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, reference-only, or otherwise unavailable on the current host/setup.
+- Shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist uses the OpenAI-compatible provider contract.
 
 #### Prompt Workbench Danbooru Upsampler Action
 
@@ -554,7 +520,7 @@ Simple usage:
 Behavior and compatibility:
 
 - `Upsample Tags` is a host action, not a translation provider or AI-assist provider.
-- The action is currently limited to the primary `Prompt` scope; it is intentionally disabled on the `Negative` scope.
+- The action is limited to the primary `Prompt` scope; it is intentionally disabled on the `Negative` scope.
 - RookieUI only enables the action when the active ComfyUI host exposes a compatible Danbooru upsampler node alias.
 - If the host node is missing or unavailable, the toolbar remains truthful through disabled-state messaging and the backend route returns explicit `host-unavailable` status instead of pretending the feature exists.
 
@@ -585,7 +551,7 @@ Behavior and compatibility:
 - Choice-backed axes use a RookieUI-owned multiselect dropdown with fill/clear behavior by default, but the shipped surface also supports a global A1111-style text-input mode for raw CSV entry.
 - `Prompt S/R` now uses A1111-style CSV input, `Prompt order` follows A1111-style prompt-token reordering semantics, and sampler/scheduler/checkpoint/VAE/hires axes now accept A1111-facing labels or selector forms where applicable.
 - `Hires steps` accepts `0` to reuse the same step count as the base image pass, matching A1111's visible input behavior, and the `Hires upscaler` axis now exposes truthful built-in upscaler choices instead of unrelated inventory upscaler names.
-- The current shipped seed-policy surface includes `Keep -1 for seeds`, per-axis `Vary seeds for X/Y/Z` toggles, and truthful fixed-seed/session metadata.
+- The shipped seed-policy surface includes `Keep -1 for seeds`, per-axis `Vary seeds for X/Y/Z` toggles, and truthful fixed-seed/session metadata.
 - Delivered results include a main grid, optional sub-grids, lone cell images, attached XYZ metadata for later inspection/reuse, and fullscreen zoom inspection through the shared preview viewer.
 
 ---
@@ -593,7 +559,7 @@ Behavior and compatibility:
 ### ControlNet Support
 
 <div align="left">
-  <img src="assets/controlnet.png" width="80%" />
+  <img src="assets/controlnet.png" width="100%" />
 </div>
 <br>
 
@@ -648,7 +614,7 @@ Behavior and compatibility:
 
 ### Support for Other Extensions
 
-- Additional extension-style surfaces beyond the currently shipped `ControlNet`, `ADetailer`, `Prompt Workbench`, and `XYZ Plot` tooling will be added incrementally.
+- Extension-style surfaces currently shipped in RookieUI are `ControlNet`, `ADetailer`, `Prompt Workbench`, and `XYZ Plot`.
 
 ---
 
