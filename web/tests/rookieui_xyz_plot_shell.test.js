@@ -96,6 +96,28 @@ function createBootstrapState(overrides = {}) {
           a1111_reference_label: "Denoising",
           notes: [],
         },
+        prompt_sr: {
+          axis_id: "prompt_sr",
+          title: "Prompt S/R",
+          support_tier: "adapted",
+          mode_scopes: ["txt2img", "img2img"],
+          value_input_mode: "prompt_sr_csv",
+          choices: [],
+          session_runner_support: true,
+          a1111_reference_label: "Prompt S/R",
+          notes: [],
+        },
+        prompt_order: {
+          axis_id: "prompt_order",
+          title: "Prompt order",
+          support_tier: "adapted",
+          mode_scopes: ["txt2img", "img2img"],
+          value_input_mode: "permutation_csv",
+          choices: [],
+          session_runner_support: true,
+          a1111_reference_label: "Prompt order",
+          notes: [],
+        },
       },
     },
     estimateXYZPlotRequest: vi.fn(async (payload) => ({
@@ -525,6 +547,33 @@ describe("xyz plot shell", () => {
         vary_seeds_z: true,
       }),
     );
+  });
+
+  test("fills prompt axes with a1111-style csv examples", async () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+
+    createXYZPlotShell({
+      idPrefix: "prompt-xyz",
+      parent,
+      mode: "txt2img",
+      bootstrapState: createBootstrapState(),
+      buildBaseRequest: () => ({ prompt: "cat portrait" }),
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+
+    document.getElementById("prompt-xyz-axis-x-select").value = "prompt_sr";
+    document.getElementById("prompt-xyz-axis-x-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("prompt-xyz-axis-x-fill").click();
+    expect(document.getElementById("prompt-xyz-axis-x-values").value).toBe("cat, dog, fox");
+
+    document.getElementById("prompt-xyz-axis-y-select").value = "prompt_order";
+    document.getElementById("prompt-xyz-axis-y-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("prompt-xyz-axis-y-fill").click();
+    expect(document.getElementById("prompt-xyz-axis-y-values").value).toBe("cat, dog, bird");
   });
 
   test("wires the results preview into the shared fullscreen viewer", async () => {

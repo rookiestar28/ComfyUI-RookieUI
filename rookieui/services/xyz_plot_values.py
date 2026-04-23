@@ -156,19 +156,21 @@ def _parse_size_value(token: str, *, field_name: str) -> dict[str, int]:
     }
 
 
-def _parse_csv_pairs(token: str, *, field_name: str) -> dict[str, str]:
-    for separator in ("->", "=>", "|"):
-        if separator in token:
-            left, right = token.split(separator, 1)
-            source = left.strip()
-            target = right.strip()
-            if not source or not target:
-                break
-            return {
-                "source": source,
-                "target": target,
-            }
-    raise ValueError(f"{field_name} pair values must use SOURCE->TARGET syntax.")
+def _parse_prompt_sr_entries(tokens: list[str], *, field_name: str) -> list[ParsedXYZAxisEntry]:
+    if not tokens:
+        raise ValueError(f"{field_name} must contain at least one value.")
+    source = tokens[0]
+    parsed_entries: list[ParsedXYZAxisEntry] = []
+    for token in tokens:
+        _append_checked(
+            parsed_entries,
+            ParsedXYZAxisEntry(
+                value={"source": source, "target": token},
+                label=token,
+            ),
+            field_name=field_name,
+        )
+    return parsed_entries
 
 
 def parse_xyz_axis_values(
@@ -186,9 +188,10 @@ def parse_xyz_axis_values(
     mode = axis.value_input_mode
     available_choices = [choice for choice in (choices or []) if isinstance(choice, str) and choice.strip()]
 
+    if mode == "prompt_sr_csv":
+        return _parse_prompt_sr_entries(tokens, field_name=field_name)
+
     if mode == "permutation_csv":
-        if len(tokens) < 2:
-            raise ValueError(f"{field_name} must contain at least two tokens for permutation mode.")
         for permutation in itertools.permutations(tokens):
             label = ", ".join(part.strip() for part in permutation if part.strip())
             _append_checked(parsed_entries, ParsedXYZAxisEntry(value=list(permutation), label=label), field_name=field_name)
@@ -211,11 +214,6 @@ def parse_xyz_axis_values(
             size_value = _parse_size_value(token, field_name=field_name)
             label = f'{size_value["width"]}x{size_value["height"]}'
             _append_checked(parsed_entries, ParsedXYZAxisEntry(value=size_value, label=label), field_name=field_name)
-            continue
-        if mode == "csv_pairs":
-            pair_value = _parse_csv_pairs(token, field_name=field_name)
-            label = f'{pair_value["source"]}->{pair_value["target"]}'
-            _append_checked(parsed_entries, ParsedXYZAxisEntry(value=pair_value, label=label), field_name=field_name)
             continue
         raise ValueError(f"{field_name} uses an unsupported input mode: {mode}")
 

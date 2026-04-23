@@ -34,8 +34,8 @@ function buildFallbackValues(axis) {
   if (inputMode === "size_csv") {
     return "512x512, 768x768, 1024x1024";
   }
-  if (inputMode === "csv_pairs") {
-    return "cat -> dog, dusk -> dawn";
+  if (inputMode === "prompt_sr_csv") {
+    return "cat, dog, fox";
   }
   if (inputMode === "permutation_csv") {
     return "cat, dog, bird";

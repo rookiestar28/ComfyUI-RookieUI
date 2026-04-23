@@ -34,6 +34,29 @@ class XYZPlotValueParserTests(unittest.TestCase):
         self.assertEqual(len(entries), 6)
         self.assertIn(["cat", "dog", "bird"], [entry.value for entry in entries])
 
+    def test_parse_prompt_order_allows_single_token(self) -> None:
+        axis = resolve_xyz_axis_contract("prompt_order")
+
+        entries = parse_xyz_axis_values("cat", axis)
+
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].value, ["cat"])
+
+    def test_parse_prompt_sr_uses_first_token_as_search_source(self) -> None:
+        axis = resolve_xyz_axis_contract("prompt_sr")
+
+        entries = parse_xyz_axis_values("cat, dog, fox", axis)
+
+        self.assertEqual(
+            [entry.value for entry in entries],
+            [
+                {"source": "cat", "target": "cat"},
+                {"source": "cat", "target": "dog"},
+                {"source": "cat", "target": "fox"},
+            ],
+        )
+        self.assertEqual([entry.label for entry in entries], ["cat", "dog", "fox"])
+
 
 class XYZPlotEstimateTests(unittest.TestCase):
     def test_estimate_counts_cells_and_steps(self) -> None:

@@ -27,6 +27,7 @@ class XYZPlotContractTests(unittest.TestCase):
         self.assertEqual(axes["face_restore"]["support_tier"], "not_supported_yet")
         self.assertEqual(axes["denoising_strength"]["mode_scopes"], ["img2img"])
         self.assertEqual(axes["hires_steps"]["mode_scopes"], ["txt2img"])
+        self.assertEqual(axes["prompt_sr"]["value_input_mode"], "prompt_sr_csv")
         self.assertEqual(axes["prompt_order"]["value_input_mode"], "permutation_csv")
 
     def test_axis_support_summary_matches_frozen_examples(self) -> None:

@@ -196,7 +196,7 @@ def _axis_contracts() -> tuple[XYZPlotAxisContract, ...]:
             title="Prompt S/R",
             support_tier="adapted",
             mode_scopes=("txt2img", "img2img"),
-            value_input_mode="csv_pairs",
+            value_input_mode="prompt_sr_csv",
             a1111_reference_label="Prompt S/R",
             notes=("Must reuse RookieUI prompt normalization rather than raw prompt string mutation only.",),
         ),
