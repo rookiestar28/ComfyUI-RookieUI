@@ -90,12 +90,40 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   expect(Math.max(...controlSurfaceMetrics.actionWidths) - Math.min(...controlSurfaceMetrics.actionWidths)).toBeLessThanOrEqual(1);
   expect(controlSurfaceMetrics.rowLeftDelta).toBeLessThanOrEqual(1);
   expect(controlSurfaceMetrics.rowRightDelta).toBeLessThanOrEqual(1);
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-x-select").selectOption("prompt_sr");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-x-values")).toHaveAttribute("placeholder", "cat, dog, fox");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-x-fill")).toHaveAttribute("hidden", "");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-x-hint")).toContainText("SOURCE, TARGET1, TARGET2");
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-y-select").selectOption("prompt_order");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-y-values")).toHaveAttribute("placeholder", "cat, dog, bird");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-y-fill")).toHaveAttribute("hidden", "");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-y-hint")).toContainText("comma-separated prompt tokens");
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-select").selectOption("hires_upscaler");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
+  const txt2imgHiresChoices = await page
+    .locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input")
+    .evaluateAll((nodes) => nodes.map((node) => node.value));
+  expect(txt2imgHiresChoices.slice(0, 3)).toEqual(["Latent", "Latent (bicubic)", "Latent (nearest-exact)"]);
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-x-select").selectOption("hires_steps");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-x-values")).toHaveAttribute("placeholder", "0, 10, 20");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-x-hint")).toContainText("CSV values or ranges");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-select").selectOption("checkpoint_name");
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();
   const txt2imgCheckpointChoices = await page
     .locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input")
     .evaluateAll((nodes) => nodes.map((node) => node.value).slice(0, 2));
+  await page.locator("#rookieui-txt2img-xyz-plot-csv-mode").check();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeHidden();
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toHaveValue(txt2imgCheckpointChoices.join(", "));
+  await page.locator("#rookieui-txt2img-xyz-plot-csv-mode").uncheck();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values")).toBeHidden();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-summary").click();
   const choicePanelLayout = await page.evaluate(() => {
     const summary = document.getElementById("rookieui-txt2img-xyz-plot-axis-z-values-summary");
@@ -125,13 +153,15 @@ test("renders XYZ Plot at the bottom of txt2img and img2img and runs a sweep", a
   await page.keyboard.press("Escape");
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-multiselect")).not.toHaveAttribute("open", "");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
-  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
-  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
   await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(0);
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-z-fill").click();
+  await expect(page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-options input:checked")).toHaveCount(txt2imgCheckpointChoices.length);
   await page.locator("#rookieui-txt2img-xyz-plot-axis-z-values-summary").click();
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[0]}"]`).check();
   await page.locator(`#rookieui-txt2img-xyz-plot-axis-z-values-options input[value="${txt2imgCheckpointChoices[1]}"]`).check();
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-x-select").selectOption("steps");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-x-values").fill("20, 28, 36");
+  await page.locator("#rookieui-txt2img-xyz-plot-axis-y-select").selectOption("cfg_scale");
   await page.locator("#rookieui-txt2img-xyz-plot-axis-y-values").fill("5.5, 7, 8.5");
   await page.locator("#rookieui-txt2img-xyz-plot-keep-negative-one-seed").check();
   await page.locator("#rookieui-txt2img-xyz-plot-vary-seeds-y").check();

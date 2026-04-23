@@ -1022,6 +1022,18 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.hires_denoise, 1.0)
 
+    def test_normalize_txt2img_request_treats_hires_steps_zero_as_same_as_base_steps(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "steps": 24,
+                "hires_enabled": True,
+                "hires_steps": 0,
+            }
+        )
+
+        self.assertEqual(request.hires_steps, 24)
+
     def test_normalize_txt2img_request_does_not_require_hires_values_when_disabled(self) -> None:
         request = normalize_txt2img_request(
             {

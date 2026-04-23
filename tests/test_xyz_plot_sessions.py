@@ -438,6 +438,83 @@ class XYZPlotSessionTests(unittest.TestCase):
         asyncio.run(_run_overlap())
         self.assertEqual(max_refreshes, 1)
 
+    def test_prompt_sr_replaces_first_token_source_like_a1111(self) -> None:
+        payload = {
+            "prompt": "cat portrait",
+            "negative_prompt": "low quality cat",
+        }
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "prompt_sr",
+                "value": {"source": "cat", "target": "dog"},
+            },
+            mode="txt2img",
+        )
+
+        self.assertEqual(payload["prompt"], "dog portrait")
+        self.assertEqual(payload["negative_prompt"], "low quality dog")
+
+    def test_prompt_sr_raises_when_search_term_is_missing_everywhere(self) -> None:
+        with self.assertRaisesRegex(ValueError, 'Prompt S/R did not find "cat"'):
+            xyz_plot_sessions._apply_axis_binding(
+                {
+                    "prompt": "dog portrait",
+                    "negative_prompt": "low quality",
+                },
+                {
+                    "axis_id": "prompt_sr",
+                    "value": {"source": "cat", "target": "fox"},
+                },
+                mode="txt2img",
+            )
+
+    def test_prompt_order_reorders_by_substring_position_like_a1111(self) -> None:
+        payload = {
+            "prompt": "wide shot, cat, dog, dramatic light",
+        }
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "prompt_order",
+                "value": ["dog", "cat"],
+            },
+            mode="txt2img",
+        )
+
+        self.assertEqual(payload["prompt"], "wide shot, dog, cat, dramatic light")
+
+    def test_vae_axis_maps_a1111_none_to_host_default_selection(self) -> None:
+        payload = {}
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "vae",
+                "value": "None",
+            },
+            mode="txt2img",
+        )
+
+        self.assertEqual(payload["vae_name"], "Automatic")
+
+    def test_hires_steps_axis_preserves_a1111_zero_sentinel_for_normalization(self) -> None:
+        payload = {}
+
+        xyz_plot_sessions._apply_axis_binding(
+            payload,
+            {
+                "axis_id": "hires_steps",
+                "value": 0,
+            },
+            mode="txt2img",
+        )
+
+        self.assertTrue(payload["hires_enabled"])
+        self.assertEqual(payload["hires_steps"], 0)
+
     def test_load_xyz_plot_store_quarantines_corrupt_json(self) -> None:
         state_path = xyz_plot_sessions._xyz_plot_state_path()
         state_path.parent.mkdir(parents=True, exist_ok=True)

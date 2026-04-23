@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>XYZ Plot full A1111 input-parity alignment (new functionality/stability)</strong></summary>
+
+- `XYZ Plot` input behavior now follows A1111 more closely across the shipped sweep surface instead of keeping RookieUI-local syntax for prompt, choice, and hires axes.
+- `Prompt S/R` now uses A1111-style CSV search/replace input (`SOURCE, TARGET1, TARGET2, ...`), `Prompt order` follows A1111-style prompt-token reordering semantics, and missing `Prompt S/R` search terms now fail explicitly instead of silently no-oping.
+- Choice-backed axes now support a global `Use text inputs instead of dropdowns` toggle, while sampler/scheduler labels, checkpoint fragment matching, and VAE `Automatic` / `None` input behavior now align with A1111-facing usage.
+- `Hires steps` now accepts the A1111-style `0` sentinel to reuse the base step count, and the `Hires upscaler` axis now exposes truthful built-in upscaler choices instead of unrelated inventory upscaler names.
+
+</details>
+
+<details>
+
 <summary><strong>Official image-edit workflow expansion (new functionality/stability)</strong></summary>
 
 - RookieUI now treats official image-edit workflows as `img2img`-owned image-edit subtypes instead of routing them through a dedicated visible `Edit` mode or a legacy SD-style inpaint fallback.
@@ -560,7 +571,7 @@ Behavior and compatibility:
 Simple usage:
 
 1. Open `txt2img` or `img2img`, scroll below `Hires.fix`, `ADetailer`, and `ControlNet`, then expand `XYZ Plot`.
-2. Start from the current form as the base request, choose the `X`, `Y`, and optional `Z` axis types, then enter the values to sweep. Choice-backed axes use the built-in multiselect dropdown, while free-text axes still accept manual value entry.
+2. Start from the current form as the base request, choose the `X`, `Y`, and optional `Z` axis types, then enter the values to sweep. Choice-backed axes use the built-in multiselect dropdown by default, and you can switch to raw A1111-style CSV entry with `Use text inputs instead of dropdowns`.
 3. Review the seed controls when your sweep depends on deterministic or coordinate-varying seeds. RookieUI now supports `Keep -1 for seeds` plus separate `Vary seeds for X/Y/Z` toggles.
 4. Run an estimate first to review generated image count, session warnings, and whether the current axis combination can execute.
 5. Start the session and watch the session panel for progress. Running sessions can surface partial main-grid preview before the final assembled result is ready.
@@ -571,7 +582,9 @@ Behavior and compatibility:
 - `XYZ Plot` is integrated into RookieUI instead of being exposed as an A1111 script runner, but it stays as a dedicated bottom-mounted sweep surface in the generation panes.
 - The surface is intentionally mounted below the `ADetailer` and `ControlNet` blocks and now follows the same collapsed-by-default section behavior as the surrounding extension panels.
 - Runs are queue-backed sessions rather than a single monolithic prompt submission, so RookieUI can track per-session progress, cancellation, seed materialization, and grid assembly explicitly.
-- Choice-backed axes use a RookieUI-owned multiselect dropdown with fill/clear behavior instead of forcing CSV-only entry for every choice axis.
+- Choice-backed axes use a RookieUI-owned multiselect dropdown with fill/clear behavior by default, but the shipped surface also supports a global A1111-style text-input mode for raw CSV entry.
+- `Prompt S/R` now uses A1111-style CSV input, `Prompt order` follows A1111-style prompt-token reordering semantics, and sampler/scheduler/checkpoint/VAE/hires axes now accept A1111-facing labels or selector forms where applicable.
+- `Hires steps` accepts `0` to reuse the same step count as the base image pass, matching A1111's visible input behavior, and the `Hires upscaler` axis now exposes truthful built-in upscaler choices instead of unrelated inventory upscaler names.
 - The current shipped seed-policy surface includes `Keep -1 for seeds`, per-axis `Vary seeds for X/Y/Z` toggles, and truthful fixed-seed/session metadata.
 - Delivered results include a main grid, optional sub-grids, lone cell images, attached XYZ metadata for later inspection/reuse, and fullscreen zoom inspection through the shared preview viewer.
 

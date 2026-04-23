@@ -5,7 +5,7 @@ from typing import Any
 
 from rookieui.contracts.xyz_plot import build_xyz_plot_contract_meta
 from rookieui.services.coercion import coerce_int
-from rookieui.services.xyz_plot_axes import get_xyz_axis_choices, resolve_xyz_axis_contract
+from rookieui.services.xyz_plot_axes import get_xyz_axis_choice_entries, resolve_xyz_axis_contract
 from rookieui.services.xyz_plot_values import ParsedXYZAxisEntry, parse_xyz_axis_values
 
 XYZ_PLOT_MAX_TOTAL_CELLS = 4096
@@ -57,7 +57,7 @@ def _normalize_estimate_axes(raw_axes: object, *, mode: str) -> list[dict[str, A
         parsed_values = parse_xyz_axis_values(
             raw_axis.get("values", ""),
             contract,
-            choices=get_xyz_axis_choices(axis_id),
+            choices=get_xyz_axis_choice_entries(axis_id),
         )
         normalized_axes.append(
             {
@@ -74,9 +74,13 @@ def _estimate_cell_steps(base_steps: int, base_hires_steps: int, axis_value_map:
     steps = base_steps
     if "steps" in axis_value_map:
         steps = int(axis_value_map["steps"].value)
+    hires_enabled = base_hires_steps > 0
     hires_steps = base_hires_steps
     if "hires_steps" in axis_value_map:
         hires_steps = int(axis_value_map["hires_steps"].value)
+        hires_enabled = True
+    if hires_enabled and hires_steps == 0:
+        hires_steps = steps
     return max(0, steps) + max(0, hires_steps)
 
 
@@ -108,6 +112,8 @@ def build_xyz_plot_estimate_payload(payload: object) -> dict[str, Any]:
     base_height = _coerce_base_dimension(base_request, "height", default=_DEFAULT_BASE_HEIGHT)
     base_steps = _coerce_non_negative_int(base_request, "steps", default=_DEFAULT_BASE_STEPS)
     base_hires_steps = _coerce_non_negative_int(base_request, "hires_steps", default=_DEFAULT_BASE_HIRES_STEPS)
+    if bool(base_request.get("hires_enabled")) and base_hires_steps == 0:
+        base_hires_steps = base_steps
     normalized_axes = _normalize_estimate_axes(payload.get("axes", []), mode=mode)
 
     axis_value_counts = [len(entry["parsed_values"]) for entry in normalized_axes] or [1]

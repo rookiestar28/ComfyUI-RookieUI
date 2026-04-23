@@ -477,6 +477,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         if hires_scale < _MIN_HIRES_SCALE or hires_scale > _MAX_HIRES_SCALE:
             raise ValueError(f"hires_scale must be between {_MIN_HIRES_SCALE} and {_MAX_HIRES_SCALE}.")
         hires_steps = _coerce_hires_steps(request.hires_steps, default_hires_steps, applied_defaults)
+        if hires_steps == 0:
+            hires_steps = steps
         hires_denoise = round(_coerce_float(request.hires_denoise, "hires_denoise"), 2)
         if hires_denoise < _MIN_HIRES_DENOISE or hires_denoise > _MAX_HIRES_DENOISE:
             raise ValueError(

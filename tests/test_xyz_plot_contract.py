@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from rookieui.contracts import xyz_plot
+from rookieui.services.xyz_plot_axes import build_xyz_plot_axes_payload
 
 
 class XYZPlotContractTests(unittest.TestCase):
@@ -27,6 +28,7 @@ class XYZPlotContractTests(unittest.TestCase):
         self.assertEqual(axes["face_restore"]["support_tier"], "not_supported_yet")
         self.assertEqual(axes["denoising_strength"]["mode_scopes"], ["img2img"])
         self.assertEqual(axes["hires_steps"]["mode_scopes"], ["txt2img"])
+        self.assertEqual(axes["prompt_sr"]["value_input_mode"], "prompt_sr_csv")
         self.assertEqual(axes["prompt_order"]["value_input_mode"], "permutation_csv")
 
     def test_axis_support_summary_matches_frozen_examples(self) -> None:
@@ -46,6 +48,18 @@ class XYZPlotContractTests(unittest.TestCase):
         self.assertEqual(payload["session_model"]["queue_ownership"], "session_owned_prompt_metadata")
         self.assertEqual(payload["grid_delivery"]["metadata_embedding"], "xyz_plot_axis_labels_and_values")
         self.assertTrue(payload["axis_support"])
+
+    def test_runtime_axis_payload_uses_a1111_facing_choice_labels(self) -> None:
+        payload = build_xyz_plot_axes_payload()
+        axes = payload["axes"]
+
+        self.assertIn("Euler a", axes["sampler"]["choices"])
+        self.assertIn("Automatic", axes["scheduler"]["choices"])
+        self.assertEqual(axes["vae"]["choices"][:2], ["Automatic", "None"])
+        self.assertEqual(
+            axes["hires_upscaler"]["choices"][:3],
+            ["Latent", "Latent (bicubic)", "Latent (nearest-exact)"],
+        )
 
     def test_adaptation_rules_pin_rookieui_native_direction(self) -> None:
         payload = xyz_plot.build_xyz_plot_contract_meta()

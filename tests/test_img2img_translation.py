@@ -163,6 +163,19 @@ class Img2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.hires_denoise, 1.0)
 
+    def test_normalize_img2img_request_treats_hires_steps_zero_as_same_as_base_steps(self) -> None:
+        request = normalize_img2img_request(
+            {
+                "prompt": "city skyline",
+                "image_asset": "input-image",
+                "steps": 24,
+                "hires_enabled": True,
+                "hires_steps": 0,
+            }
+        )
+
+        self.assertEqual(request.hires_steps, 24)
+
     def test_normalize_img2img_request_normalizes_adetailer_block(self) -> None:
         request = normalize_img2img_request(
             {

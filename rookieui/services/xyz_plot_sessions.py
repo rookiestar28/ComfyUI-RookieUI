@@ -284,8 +284,12 @@ def _normalize_session_axes(raw_axes: object, *, mode: str) -> list[dict[str, An
         runtime_axis = _axis_runtime_payload(axis_id)
         if not runtime_axis.get("session_runner_support", False):
             raise ValueError(f"xyz_plot axis {axis_id} is not session-runnable yet.")
-        choices = runtime_axis.get("choices", [])
-        parsed_values = parse_xyz_axis_values(raw_axis.get("values", ""), contract, choices=choices if isinstance(choices, list) else [])
+        choices = runtime_axis.get("choice_entries", [])
+        parsed_values = parse_xyz_axis_values(
+            raw_axis.get("values", ""),
+            contract,
+            choices=choices if isinstance(choices, list) else [],
+        )
         normalized_axes.append(
             {
                 "slot": _XYZ_SLOT_LABELS[index],
@@ -309,13 +313,21 @@ def _apply_prompt_sr(prompt_text: str, replacement: dict[str, Any]) -> str:
 
 
 def _apply_prompt_order(prompt_text: str, ordered_tokens: list[str]) -> str:
-    if not prompt_text.strip():
+    if not prompt_text.strip() or not ordered_tokens:
         return prompt_text
-    segments = [segment.strip() for segment in prompt_text.split(",") if segment.strip()]
-    if any(token not in segments for token in ordered_tokens):
-        raise ValueError("prompt_order tokens must all exist as comma-separated prompt segments.")
-    remaining = [segment for segment in segments if segment not in ordered_tokens]
-    return ", ".join(list(ordered_tokens) + remaining)
+    mutable_prompt = prompt_text
+    token_order = [(mutable_prompt.find(token), token) for token in ordered_tokens]
+    token_order.sort(key=lambda entry: entry[0])
+    prompt_parts: list[str] = []
+    for _, token in token_order:
+        token_index = mutable_prompt.find(token)
+        prompt_parts.append(mutable_prompt[0:token_index])
+        mutable_prompt = mutable_prompt[token_index + len(token) :]
+    reordered_prompt = ""
+    for index, part in enumerate(prompt_parts):
+        reordered_prompt += part
+        reordered_prompt += ordered_tokens[index]
+    return reordered_prompt + mutable_prompt
 
 
 def _resolve_seed_binding_value(
@@ -358,7 +370,9 @@ def _apply_axis_binding(request_payload: dict[str, Any], binding: dict[str, Any]
         request_payload["checkpoint_name"] = str(axis_value)
         return
     if axis_id == "vae":
-        request_payload["vae_name"] = str(axis_value)
+        # IMPORTANT: XYZ parity accepts A1111-style "None" alongside "Automatic", but RookieUI's
+        # current integrated request normalizers intentionally collapse both to host-default VAE selection.
+        request_payload["vae_name"] = "Automatic" if str(axis_value).strip().lower() == "none" else str(axis_value)
         return
     if axis_id == "clip_skip":
         request_payload["clip_skip"] = int(axis_value)
@@ -381,8 +395,13 @@ def _apply_axis_binding(request_payload: dict[str, Any], binding: dict[str, Any]
         request_payload["hires_upscale_method"] = str(axis_value)
         return
     if axis_id == "prompt_sr" and isinstance(axis_value, dict):
-        request_payload["prompt"] = _apply_prompt_sr(str(request_payload.get("prompt", "")), axis_value)
-        request_payload["negative_prompt"] = _apply_prompt_sr(str(request_payload.get("negative_prompt", "")), axis_value)
+        prompt_text = str(request_payload.get("prompt", ""))
+        negative_prompt_text = str(request_payload.get("negative_prompt", ""))
+        source = str(axis_value.get("source", "")).strip()
+        if source and source not in prompt_text and source not in negative_prompt_text:
+            raise ValueError(f'Prompt S/R did not find "{source}" in either prompt or negative prompt.')
+        request_payload["prompt"] = _apply_prompt_sr(prompt_text, axis_value)
+        request_payload["negative_prompt"] = _apply_prompt_sr(negative_prompt_text, axis_value)
         return
     if axis_id == "prompt_order" and isinstance(axis_value, list):
         request_payload["prompt"] = _apply_prompt_order(str(request_payload.get("prompt", "")), [str(token) for token in axis_value])

@@ -34,8 +34,8 @@ function buildFallbackValues(axis) {
   if (inputMode === "size_csv") {
     return "512x512, 768x768, 1024x1024";
   }
-  if (inputMode === "csv_pairs") {
-    return "cat -> dog, dusk -> dawn";
+  if (inputMode === "prompt_sr_csv") {
+    return "cat, dog, fox";
   }
   if (inputMode === "permutation_csv") {
     return "cat, dog, bird";
@@ -56,9 +56,25 @@ function buildFallbackValues(axis) {
     return "0.35, 0.5, 0.65";
   }
   if (axisId === "hires_steps") {
-    return "8, 12, 16";
+    return "0, 10, 20";
   }
   return "";
+}
+
+function describeInputMode(mode) {
+  const normalizedMode = String(mode ?? "").trim();
+  if (!normalizedMode) {
+    return "";
+  }
+  const labels = {
+    int_csv_or_range: "CSV values or ranges",
+    float_csv_or_range: "CSV values or ranges",
+    size_csv: "WIDTHxHEIGHT CSV",
+    choices_or_csv: "dropdown values or CSV text",
+    prompt_sr_csv: "SOURCE, TARGET1, TARGET2",
+    permutation_csv: "comma-separated prompt tokens",
+  };
+  return labels[normalizedMode] ?? normalizedMode.replaceAll("_", " ");
 }
 
 function buildAxisHint(axis) {
@@ -69,7 +85,7 @@ function buildAxisHint(axis) {
   const tier = String(axis.support_tier ?? "").trim();
   const mode = String(axis.value_input_mode ?? "").trim();
   const notes = Array.isArray(axis.notes) ? axis.notes.filter(Boolean) : [];
-  const summary = [`${reference || axis.title}`, `${tier} parity`, mode.replaceAll("_", " ")];
+  const summary = [`${reference || axis.title}`, `${tier} parity`, describeInputMode(mode)];
   if (notes[0]) {
     summary.push(notes[0]);
   }
@@ -114,11 +130,15 @@ const XYZ_DROPDOWN_AXIS_IDS = new Set([
   "hires_upscaler",
 ]);
 
-function axisUsesChoiceDropdown(axis) {
+function axisHasChoices(axis) {
   const axisId = String(axis?.axis_id ?? "").trim();
   const inputMode = String(axis?.value_input_mode ?? "").trim();
   const choices = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
   return XYZ_DROPDOWN_AXIS_IDS.has(axisId) && inputMode === "choices_or_csv" && choices.length > 0;
+}
+
+function axisUsesChoiceDropdown(axis, csvModeEnabled) {
+  return axisHasChoices(axis) && !csvModeEnabled;
 }
 
 function parseChoiceValueList(value) {
@@ -347,6 +367,7 @@ export function createXYZPlotShell({
 
     const fillButton = createActionButton(`${idPrefix}-axis-${slot.toLowerCase()}-fill`, "Fill");
     fillButton.classList.add("rookieui-shell__button--secondary");
+    fillButton.hidden = true;
     row.appendChild(fillButton);
 
     const hint = appendTextElement(row, "p", "rookieui-shell__xyz-plot-axis-hint", "Select an axis to sweep.");
@@ -405,6 +426,11 @@ export function createXYZPlotShell({
     "Keep -1 for seeds",
     false,
   );
+  const csvMode = createCheckboxRow(
+    `${idPrefix}-csv-mode`,
+    "Use text inputs instead of dropdowns",
+    false,
+  );
   const varySeedsX = createCheckboxRow(`${idPrefix}-vary-seeds-x`, "Vary seeds for X", false);
   const varySeedsY = createCheckboxRow(`${idPrefix}-vary-seeds-y`, "Vary seeds for Y", false);
   const varySeedsZ = createCheckboxRow(`${idPrefix}-vary-seeds-z`, "Vary seeds for Z", false);
@@ -413,6 +439,7 @@ export function createXYZPlotShell({
     includeLoneImages.root,
     includeSubGrids.root,
     keepNegativeOneSeed.root,
+    csvMode.root,
     varySeedsX.root,
     varySeedsY.root,
     varySeedsZ.root,
@@ -565,12 +592,13 @@ export function createXYZPlotShell({
 
   function syncAxisRow(row) {
     const axis = axisLookup.get(String(row.select.value ?? "").trim());
-    row.usesChoiceDropdown = axisUsesChoiceDropdown(axis);
+    const hasChoices = axisHasChoices(axis);
     const nextValue = getAxisRowValue(row);
+    row.usesChoiceDropdown = axisUsesChoiceDropdown(axis, csvMode.input.checked);
     row.valueInput.hidden = row.usesChoiceDropdown;
     row.choiceRoot.hidden = !row.usesChoiceDropdown;
     row.valueInput.disabled = !axis || row.usesChoiceDropdown;
-    row.valueInput.placeholder = axis ? buildFallbackValues(axis) : "";
+    row.valueInput.placeholder = axis && !row.usesChoiceDropdown ? buildFallbackValues(axis) : "";
     if (row.usesChoiceDropdown) {
       const choices = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
       rebuildAxisRowChoiceOptions(row, choices);
@@ -581,7 +609,8 @@ export function createXYZPlotShell({
       row.choiceOptions = [];
       row.valueInput.value = nextValue;
     }
-    row.fillButton.disabled = !axis;
+    row.fillButton.hidden = !hasChoices;
+    row.fillButton.disabled = !hasChoices;
     row.hint.textContent = buildAxisHint(axis);
   }
 
@@ -704,11 +733,21 @@ export function createXYZPlotShell({
       if (row.usesChoiceDropdown) {
         const choiceValues = Array.isArray(axis?.choices) ? axis.choices.filter(Boolean) : [];
         setAxisRowValue(row, axisRowHasAllChoicesSelected(row) ? [] : choiceValues);
-      } else {
+      } else if (axisHasChoices(axis)) {
         setAxisRowValue(row, buildFallbackValues(axis));
       }
       onStatusMessage?.(`Filled ${row.slot} axis values`);
     });
+  });
+
+  csvMode.input.addEventListener("change", () => {
+    closeChoiceDropdowns();
+    axisRows.forEach((row) => syncAxisRow(row));
+    onStatusMessage?.(
+      csvMode.input.checked
+        ? "XYZ choice axes switched to text input mode"
+        : "XYZ choice axes switched to dropdown mode",
+    );
   });
 
   // IMPORTANT: native details/summary does not auto-collapse on outside click here; keep explicit document-level close handling.
