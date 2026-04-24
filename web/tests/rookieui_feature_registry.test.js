@@ -51,6 +51,7 @@ describe("rookieui feature registry", () => {
             control_type_order: ["All", "Canny"],
             default_type: "All",
             control_types: { Canny: { module_list: ["none", "canny"], model_list: ["canny.safetensors"] } },
+            preprocessor_profiles: { canny: { option_key: "canny", parameter_labels: { threshold_a: "Low Threshold" } } },
           },
         },
       ),
@@ -64,6 +65,7 @@ describe("rookieui feature registry", () => {
       default_module: "none",
       default_model: "canny.safetensors",
       control_types: { Canny: { module_list: ["none", "canny"], model_list: ["canny.safetensors"] } },
+      preprocessor_profiles: { canny: { option_key: "canny", parameter_labels: { threshold_a: "Low Threshold" } } },
     });
   });
 

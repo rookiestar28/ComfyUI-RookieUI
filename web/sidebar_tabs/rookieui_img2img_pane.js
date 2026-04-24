@@ -1272,7 +1272,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             statusNode.textContent = message;
           },
         });
-        img2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
+        img2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog, controlnetCatalog.preprocessor_profiles);
 
         createSliderField(
           generationGrid,

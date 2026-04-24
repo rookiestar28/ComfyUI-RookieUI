@@ -677,7 +677,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
             statusNode.textContent = message;
           },
         });
-        txt2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog);
+        txt2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog, controlnetCatalog.preprocessor_profiles);
 
         const rightColumn = document.createElement("div");
         rightColumn.className = "rookieui-shell__workspace-column";

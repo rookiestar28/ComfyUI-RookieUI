@@ -197,6 +197,83 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     expect(moduleSelect.value).toBe("depth_anything_v2");
   });
 
+  test("applies preprocessor profile labels, field visibility, and detect request flags", async () => {
+    const fetchMock = vi.fn(async (_url, options) => {
+      const body = JSON.parse(options.body);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            images: ["data:image/png;base64,cHJldmlldw=="],
+            module: body.controlnet_module,
+            processor: "DWPreprocessor",
+            detect_backend: "comfy_host_preprocessor",
+            openpose_json: ['[{"people":[]}]'],
+          };
+        },
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { host, editor } = buildEditor("rookieui-txt2img-controlnet");
+    document.body.appendChild(host);
+
+    editor.setControlTypeCatalog(
+      {
+        All: {
+          module_list: ["none", "canny", "openpose_dw"],
+          model_list: [],
+          default_option: "none",
+        },
+        OpenPose: {
+          module_list: ["none", "openpose_dw"],
+          model_list: [],
+          default_option: "openpose_dw",
+        },
+      },
+      {
+        openpose_dw: {
+          option_key: "openpose_dw",
+          control_type: "OpenPose",
+          ui_fields: ["processor_res", "pixel_perfect"],
+          parameter_labels: { processor_res: "Pose Resolution" },
+          secondary_outputs: ["openpose_json"],
+        },
+      },
+    );
+
+    const openposeRadio = host.querySelector("#rookieui-txt2img-controlnet-control-type-0-openpose");
+    const moduleSelect = host.querySelector("#rookieui-txt2img-controlnet-module-0");
+    const imageData = host.querySelector("#rookieui-txt2img-controlnet-image-data-0");
+    const pixelPerfect = host.querySelector("#rookieui-txt2img-controlnet-pixel-perfect-0");
+    const runButton = host.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0");
+    expect(openposeRadio).not.toBeNull();
+    expect(moduleSelect).not.toBeNull();
+
+    openposeRadio.click();
+    expect(moduleSelect.value).toBe("openpose_dw");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-processor-res-field-0")?.hidden).toBe(false);
+    expect(
+      host.querySelector("#rookieui-txt2img-controlnet-processor-res-field-0 .rookieui-shell__field-label")?.textContent,
+    ).toBe("Pose Resolution");
+    expect(host.querySelector("#rookieui-txt2img-controlnet-threshold-a-field-0")?.hidden).toBe(true);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-threshold-b-field-0")?.hidden).toBe(true);
+
+    imageData.value = "data:image/png;base64,aW1hZ2U=";
+    imageData.dispatchEvent(new Event("input", { bubbles: true }));
+    pixelPerfect.checked = true;
+    pixelPerfect.dispatchEvent(new Event("change", { bubbles: true }));
+    runButton.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(requestBody.controlnet_module).toBe("openpose_dw");
+    expect(requestBody.controlnet_pixel_perfect).toBe(true);
+    expect(requestBody.controlnet_resize_mode).toBe("crop_and_resize");
+  });
+
   test("pins selector row order, icon semantics, and full-width weight lane for txt2img", () => {
     const { host } = buildEditor("rookieui-txt2img-controlnet");
     const selectorRow = host.querySelector("#rookieui-txt2img-controlnet-selector-row-0");

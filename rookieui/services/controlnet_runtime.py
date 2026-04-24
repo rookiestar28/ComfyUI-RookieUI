@@ -10,6 +10,12 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from rookieui.services.controlnet_profiles import (
+    ControlNetPreprocessorProfile,
+    get_preprocessor_profile,
+    resolve_effective_processor_resolution,
+)
+
 try:
     import numpy as np
 except Exception:  # pragma: no cover - optional runtime dependency
@@ -351,6 +357,7 @@ class ControlNetRuntimeResult:
     processor_name: str
     used_fallback: bool
     diagnostics: tuple[str, ...] = ()
+    secondary_outputs: dict[str, tuple[object, ...]] | None = None
 
 
 def runtime_dependencies_available() -> bool:
@@ -379,8 +386,9 @@ def normalize_module_key(module_value: object) -> str:
 
 def _resolve_module_dispatch(module_value: object) -> tuple[str, str, tuple[str, ...]]:
     option_key = normalize_preprocessor_option_key(module_value)
-    module_key = _PREPROCESSOR_OPTION_BASE_MODULE.get(option_key, option_key or "none")
-    preferred_candidates = _PREPROCESSOR_OPTION_PREFERRED_HOST_CANDIDATES.get(option_key, ())
+    profile = get_preprocessor_profile(option_key)
+    module_key = profile.base_module
+    preferred_candidates = profile.preferred_host_nodes
     return option_key, module_key, preferred_candidates
 
 
@@ -420,11 +428,27 @@ def preprocess_controlnet_tensor(
     threshold_a: float,
     threshold_b: float,
     mask_tensor: "torch.Tensor | np.ndarray | Image.Image | None" = None,
+    pixel_perfect: bool = False,
+    target_width: int | None = None,
+    target_height: int | None = None,
+    resize_mode: str = "crop_and_resize",
 ) -> ControlNetRuntimeResult:
     _require_runtime_dependencies()
     selected_preprocessor, normalized_module, preferred_host_candidates = _resolve_module_dispatch(module)
+    profile = get_preprocessor_profile(selected_preprocessor)
     source = _coerce_image_tensor(image_tensor)
     normalized_mask = _coerce_mask_tensor(mask_tensor, image_tensor=source) if mask_tensor is not None else None
+    image_width, image_height = _image_tensor_dimensions(source)
+    effective_processor_res = resolve_effective_processor_resolution(
+        requested_processor_res=processor_res,
+        pixel_perfect=pixel_perfect,
+        image_width=image_width,
+        image_height=image_height,
+        target_width=target_width or image_width,
+        target_height=target_height or image_height,
+        resize_mode=resize_mode,
+        profile=profile,
+    )
     diagnostics: list[str] = []
 
     if normalized_module in _PASSTHROUGH_MODULES:
@@ -434,6 +458,7 @@ def preprocess_controlnet_tensor(
             processor_name=normalized_module,
             used_fallback=False,
             diagnostics=(),
+            secondary_outputs={},
         )
 
     host_mappings = _resolve_host_node_class_mappings()
@@ -468,16 +493,17 @@ def preprocess_controlnet_tensor(
                 break
             host_probe_attempts += 1
             try:
-                processed = _run_host_node_preprocessor(
+                processed, secondary_outputs = _run_profile_host_node_preprocessor(
                     node_name=node_name,
                     node_cls=host_mappings[node_name],
                     image_tensor=source,
                     mask_tensor=normalized_mask,
                     module_key=normalized_module,
-                    processor_res=processor_res,
+                    processor_res=effective_processor_res,
                     threshold_a=threshold_a,
                     threshold_b=threshold_b,
                     aio_preprocessor_name=None,
+                    profile=profile,
                 )
                 # DEBUG HOTSPOT: host execution succeeded but visual result may still be effectively blank.
                 # Mark this seam explicitly so detect-layer warnings can distinguish "pipeline failure" vs "empty detection result".
@@ -489,6 +515,7 @@ def preprocess_controlnet_tensor(
                     processor_name=node_name,
                     used_fallback=False,
                     diagnostics=tuple(diagnostics),
+                    secondary_outputs=secondary_outputs,
                 )
             except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                 diagnostics.append(f"{node_name}: {exc}")
@@ -500,16 +527,17 @@ def preprocess_controlnet_tensor(
                 aio_name = _select_aio_preprocessor_name(aio_cls, normalized_module)
                 if aio_name:
                     try:
-                        processed = _run_host_node_preprocessor(
+                        processed, secondary_outputs = _run_profile_host_node_preprocessor(
                             node_name="AIO_Preprocessor",
                             node_cls=aio_cls,
                             image_tensor=source,
                             mask_tensor=normalized_mask,
                             module_key=normalized_module,
-                            processor_res=processor_res,
+                            processor_res=effective_processor_res,
                             threshold_a=threshold_a,
                             threshold_b=threshold_b,
                             aio_preprocessor_name=aio_name,
+                            profile=profile,
                         )
                         # DEBUG HOTSPOT: same near-empty visibility check for AIO branch; keep diagnostics symmetric with direct-host branch.
                         if _is_visually_empty_image_tensor(processed):
@@ -520,6 +548,7 @@ def preprocess_controlnet_tensor(
                             processor_name=aio_name,
                             used_fallback=False,
                             diagnostics=tuple(diagnostics),
+                            secondary_outputs=secondary_outputs,
                         )
                     except Exception as exc:  # pragma: no cover - runtime-dependent host node behavior
                         diagnostics.append(f"AIO_Preprocessor({aio_name}): {exc}")
@@ -539,7 +568,7 @@ def preprocess_controlnet_tensor(
         fallback = _apply_fallback_filters(
             source,
             module_key=normalized_module,
-            processor_res=processor_res,
+            processor_res=effective_processor_res,
             threshold_a=threshold_a,
             threshold_b=threshold_b,
         )
@@ -549,6 +578,7 @@ def preprocess_controlnet_tensor(
             processor_name=normalized_module,
             used_fallback=True,
             diagnostics=tuple(diagnostics),
+            secondary_outputs={},
         )
     finally:
         _restore_prompt_server_last_prompt_id(prompt_server_instance, shim_applied, shim_value)
@@ -578,6 +608,18 @@ def _env_flag(name: str, *, default: bool) -> bool:
 
 def _is_aio_preprocessor_enabled() -> bool:
     return _env_flag(ROOKIEUI_CONTROLNET_AIO_PREPROCESSOR_ENABLED_ENV, default=False)
+
+
+def _image_tensor_dimensions(image_tensor: object) -> tuple[int | None, int | None]:
+    shape = getattr(image_tensor, "shape", None)
+    if not isinstance(shape, (tuple, list)) or len(shape) < 3:
+        return None, None
+    try:
+        if len(shape) >= 4:
+            return int(shape[2]), int(shape[1])
+        return int(shape[1]), int(shape[0])
+    except (TypeError, ValueError):
+        return None, None
 
 
 def _resolve_prompt_server_instance() -> Any | None:
@@ -810,8 +852,11 @@ def _build_node_parameter_value(
     threshold_a: float,
     threshold_b: float,
     aio_preprocessor_name: str | None,
+    profile: ControlNetPreprocessorProfile | None = None,
 ) -> object:
     key = str(parameter_name or "").strip()
+    if profile is not None and key in profile.parameter_defaults:
+        return profile.parameter_defaults[key]
     if key == "image":
         return image_tensor
     if key == "mask":
@@ -871,6 +916,74 @@ def _run_host_node_preprocessor(
     threshold_b: float,
     aio_preprocessor_name: str | None,
 ) -> "torch.Tensor":
+    output, _secondary = _run_host_node_preprocessor_payload(
+        node_name=node_name,
+        node_cls=node_cls,
+        image_tensor=image_tensor,
+        mask_tensor=mask_tensor,
+        module_key=module_key,
+        processor_res=processor_res,
+        threshold_a=threshold_a,
+        threshold_b=threshold_b,
+        aio_preprocessor_name=aio_preprocessor_name,
+        profile=None,
+    )
+    return output
+
+
+def _run_profile_host_node_preprocessor(
+    *,
+    node_name: str,
+    node_cls: type[Any],
+    image_tensor: "torch.Tensor",
+    mask_tensor: "torch.Tensor | None",
+    module_key: str,
+    processor_res: int,
+    threshold_a: float,
+    threshold_b: float,
+    aio_preprocessor_name: str | None,
+    profile: ControlNetPreprocessorProfile,
+) -> tuple["torch.Tensor", dict[str, tuple[object, ...]]]:
+    if profile.secondary_outputs:
+        return _run_host_node_preprocessor_payload(
+            node_name=node_name,
+            node_cls=node_cls,
+            image_tensor=image_tensor,
+            mask_tensor=mask_tensor,
+            module_key=module_key,
+            processor_res=processor_res,
+            threshold_a=threshold_a,
+            threshold_b=threshold_b,
+            aio_preprocessor_name=aio_preprocessor_name,
+            profile=profile,
+        )
+    output = _run_host_node_preprocessor(
+        node_name=node_name,
+        node_cls=node_cls,
+        image_tensor=image_tensor,
+        mask_tensor=mask_tensor,
+        module_key=module_key,
+        processor_res=processor_res,
+        threshold_a=threshold_a,
+        threshold_b=threshold_b,
+        aio_preprocessor_name=aio_preprocessor_name,
+    )
+    return output, {}
+
+
+def _run_host_node_preprocessor_payload(
+    *,
+    node_name: str,
+    node_cls: type[Any],
+    image_tensor: "torch.Tensor",
+    mask_tensor: "torch.Tensor | None",
+    module_key: str,
+    processor_res: int,
+    threshold_a: float,
+    threshold_b: float,
+    aio_preprocessor_name: str | None,
+    profile: ControlNetPreprocessorProfile | None,
+) -> tuple["torch.Tensor", dict[str, tuple[object, ...]]]:
     required_schema, optional_schema = _extract_node_input_schema(node_cls)
     inputs: dict[str, object] = {}
 
@@ -883,6 +996,7 @@ def _run_host_node_preprocessor(
             threshold_a=threshold_a,
             threshold_b=threshold_b,
             aio_preprocessor_name=aio_preprocessor_name,
+            profile=profile,
         )
         if resolved is _MISSING:
             default_value = _extract_default_from_schema(required_spec)
@@ -901,6 +1015,7 @@ def _run_host_node_preprocessor(
             threshold_a=threshold_a,
             threshold_b=threshold_b,
             aio_preprocessor_name=aio_preprocessor_name,
+            profile=profile,
         )
         if resolved is not _MISSING:
             inputs[str(optional_name)] = resolved
@@ -913,7 +1028,33 @@ def _run_host_node_preprocessor(
     # DEBUG HOTSPOT: this invocation is the exact seam where host-runtime preprocessor classes differ by signature.
     result = function(**inputs)
     primary = _extract_primary_node_output_payload(result)
-    return _coerce_image_tensor(primary)
+    secondary = _extract_declared_secondary_outputs(result, profile=profile)
+    return _coerce_image_tensor(primary), secondary
+
+
+def _extract_declared_secondary_outputs(
+    result: object,
+    *,
+    profile: ControlNetPreprocessorProfile | None,
+) -> dict[str, tuple[object, ...]]:
+    if profile is None or not profile.secondary_outputs or not isinstance(result, dict):
+        return {}
+    ui_payload = result.get("ui")
+    if not isinstance(ui_payload, dict):
+        return {}
+
+    secondary: dict[str, tuple[object, ...]] = {}
+    for key in profile.secondary_outputs:
+        raw_value = ui_payload.get(key)
+        if isinstance(raw_value, (list, tuple)):
+            values = tuple(raw_value[:16])
+        elif raw_value is None:
+            values = ()
+        else:
+            values = (raw_value,)
+        if values:
+            secondary[key] = values
+    return secondary
 
 
 def _extract_primary_node_output_payload(result: object) -> object:

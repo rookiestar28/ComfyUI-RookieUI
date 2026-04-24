@@ -381,6 +381,9 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         preprocess_node = workflow[preprocess_node_id]
         self.assertEqual(preprocess_node["inputs"]["module"], "depth")
         self.assertEqual(preprocess_node["inputs"]["processor_res"], 640)
+        self.assertFalse(preprocess_node["inputs"]["pixel_perfect"])
+        self.assertEqual(preprocess_node["inputs"]["target_width"], normalized.width)
+        self.assertEqual(preprocess_node["inputs"]["target_height"], normalized.height)
         self.assertTrue(preprocess_node["inputs"]["use_mask"])
         self.assertIn("mask", preprocess_node["inputs"])
 
@@ -393,6 +396,34 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(apply_node["inputs"]["image"], [preprocess_node_id, 0])
         self.assertEqual(apply_node["inputs"]["weight_preset"], "balanced")
         self.assertEqual(apply_node["inputs"]["layer_weights_json"], "[]")
+
+    def test_txt2img_translation_passes_controlnet_pixel_perfect_to_preprocess_node(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "width": 768,
+                "height": 512,
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "pixel_perfect": True,
+                        "resize_mode": "resize_and_fill",
+                        "processor_res": 320,
+                    }
+                ],
+            }
+        )
+
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        preprocess_node = next(node for node in workflow.values() if node["class_type"] == "RookieUIControlNetPreprocess")
+
+        self.assertTrue(preprocess_node["inputs"]["pixel_perfect"])
+        self.assertEqual(preprocess_node["inputs"]["target_width"], 768)
+        self.assertEqual(preprocess_node["inputs"]["target_height"], 512)
+        self.assertEqual(preprocess_node["inputs"]["resize_mode"], "resize_and_fill")
 
     def test_txt2img_translation_does_not_wire_mask_when_use_mask_disabled(self) -> None:
         normalized = normalize_txt2img_request(
@@ -822,6 +853,12 @@ class ControlNetRouteTests(unittest.TestCase):
         )
         self.assertIn("lineart_anime", payload["control_types"]["Lineart"]["module_list"])
         self.assertIn("lineart_standard", payload["control_types"]["Lineart"]["module_list"])
+        self.assertEqual(payload["preprocessor_profiles"]["openpose_dw"]["control_type"], "OpenPose")
+        self.assertEqual(payload["preprocessor_profiles"]["openpose_dw"]["secondary_outputs"], ["openpose_json"])
+        self.assertEqual(
+            payload["preprocessor_profiles"]["depth_anything_v2"]["preferred_host_nodes"],
+            ["DepthAnythingV2Preprocessor"],
+        )
 
     def test_detect_payload_preserves_selected_preprocessor_variant_for_runtime_dispatch(self) -> None:
         preprocess_mock = mock.Mock(
@@ -851,6 +888,72 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(preprocess_mock.call_args.kwargs["module"], "lineart_anime")
         self.assertEqual(payload["module"], "lineart_anime")
         self.assertEqual(payload["processor"], "AnimeLineArtPreprocessor")
+        self.assertEqual(payload["preprocessor_profile"]["option_key"], "lineart_anime")
+
+    def test_detect_payload_applies_pixel_perfect_processor_resolution(self) -> None:
+        preprocess_mock = mock.Mock(
+            return_value=ControlNetRuntimeResult(
+                image=mock.Mock(),
+                backend="comfy_host_preprocessor",
+                processor_name="CannyEdgePreprocessor",
+                used_fallback=False,
+                diagnostics=(),
+            )
+        )
+        runtime_image = mock.Mock()
+        runtime_image.shape = (1, 768, 1024, 3)
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=runtime_image):
+                with mock.patch("rookieui.services.controlnet.preprocess_controlnet_tensor", preprocess_mock):
+                    with mock.patch(
+                        "rookieui.services.controlnet.image_tensor_to_data_url",
+                        return_value="data:image/png;base64,cHJldmlldw==",
+                    ):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "canny",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_pixel_perfect": True,
+                                "controlnet_resize_mode": "resize_and_fill",
+                                "target_width": 512,
+                                "target_height": 512,
+                                "controlnet_processor_res": 999,
+                            }
+                        )
+
+        preprocess_mock.assert_called_once()
+        self.assertEqual(preprocess_mock.call_args.kwargs["processor_res"], 384)
+        self.assertEqual(payload["processor_res"], 384)
+        self.assertTrue(payload["pixel_perfect"])
+
+    def test_detect_payload_preserves_bounded_openpose_json_metadata(self) -> None:
+        preprocess_mock = mock.Mock(
+            return_value=ControlNetRuntimeResult(
+                image=mock.Mock(),
+                backend="comfy_host_preprocessor",
+                processor_name="DWPreprocessor",
+                used_fallback=False,
+                diagnostics=(),
+                secondary_outputs={"openpose_json": ('[{"people":[]}]',)},
+            )
+        )
+        with mock.patch("rookieui.services.controlnet.runtime_dependencies_available", return_value=True):
+            with mock.patch("rookieui.services.controlnet.image_tensor_from_bytes", return_value=mock.Mock()):
+                with mock.patch("rookieui.services.controlnet.preprocess_controlnet_tensor", preprocess_mock):
+                    with mock.patch(
+                        "rookieui.services.controlnet.image_tensor_to_data_url",
+                        return_value="data:image/png;base64,cHJldmlldw==",
+                    ):
+                        payload = build_controlnet_detect_payload(
+                            {
+                                "controlnet_module": "openpose_dw",
+                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                            }
+                        )
+
+        self.assertEqual(payload["processor"], "DWPreprocessor")
+        self.assertEqual(payload["secondary_outputs"]["openpose_json"], ['[{"people":[]}]'])
+        self.assertEqual(payload["openpose_json"], ['[{"people":[]}]'])
 
     def test_detect_payload_supports_depth_module_dispatch(self) -> None:
         payload = build_controlnet_detect_payload(

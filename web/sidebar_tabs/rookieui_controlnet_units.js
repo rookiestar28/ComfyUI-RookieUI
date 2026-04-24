@@ -703,6 +703,53 @@ function normalizeControlTypeCatalog(rawCatalog, allModelValues, controlTypeOpti
   return normalizedCatalog;
 }
 
+function normalizePreprocessorProfiles(rawProfiles = {}) {
+  const normalized = {};
+  MODULE_OPTIONS.forEach((entry) => {
+    const value = String(entry.value ?? "").trim();
+    if (!value) {
+      return;
+    }
+    normalized[value] = {
+      option_key: value,
+      ui_fields: value === "none" ? [] : ["processor_res", "threshold_a", "threshold_b", "pixel_perfect"],
+      parameter_labels: {
+        processor_res: "Processor Res",
+        threshold_a: "Threshold A",
+        threshold_b: "Threshold B",
+      },
+      secondary_outputs: [],
+    };
+  });
+
+  Object.entries(rawProfiles && typeof rawProfiles === "object" ? rawProfiles : {}).forEach(([profileKey, rawProfile]) => {
+    if (!rawProfile || typeof rawProfile !== "object") {
+      return;
+    }
+    const optionKey = String(rawProfile.option_key ?? profileKey ?? "").trim();
+    if (!optionKey) {
+      return;
+    }
+    const fallback = normalized[optionKey] ?? normalized.none;
+    normalized[optionKey] = {
+      ...fallback,
+      ...rawProfile,
+      option_key: optionKey,
+      ui_fields: Array.isArray(rawProfile.ui_fields)
+        ? rawProfile.ui_fields.map((value) => String(value ?? "").trim()).filter(Boolean)
+        : fallback.ui_fields,
+      parameter_labels:
+        rawProfile.parameter_labels && typeof rawProfile.parameter_labels === "object"
+          ? { ...fallback.parameter_labels, ...rawProfile.parameter_labels }
+          : fallback.parameter_labels,
+      secondary_outputs: Array.isArray(rawProfile.secondary_outputs)
+        ? rawProfile.secondary_outputs.map((value) => String(value ?? "").trim()).filter(Boolean)
+        : fallback.secondary_outputs,
+    };
+  });
+  return normalized;
+}
+
 function normalizeUnitPayload(rawUnit = {}) {
   const normalizedType = String(rawUnit.control_type ?? rawUnit.type ?? DEFAULT_CONTROL_TYPE).trim();
   return {
@@ -947,6 +994,7 @@ export function createControlNetUnitEditor({
   let currentModelValues = modelOptions.map((entry) => String(entry.value ?? "")).filter(Boolean);
   const controlTypeOptions = normalizeControlTypeOrder(controlTypeOrder);
   let controlTypeCatalog = normalizeControlTypeCatalog({}, currentModelValues, controlTypeOptions);
+  let preprocessorProfileCatalog = normalizePreprocessorProfiles({});
 
   const unitRows = [];
   const tabButtons = [];
@@ -1017,6 +1065,40 @@ export function createControlNetUnitEditor({
 
     const modelEntries = [{ value: "", label: "(Select ControlNet Model)" }, ...toOptionEntries(modelValues)];
     setSelectOptions(row.model, modelEntries, preserveSelection ? row.model.value : "");
+    applyPreprocessorProfileToRow(row);
+  };
+
+  const applyPreprocessorProfileToRow = (row) => {
+    if (!row?.module) {
+      return;
+    }
+    const moduleName = String(row.module.value ?? "none").trim() || "none";
+    const profile = preprocessorProfileCatalog[moduleName] ?? preprocessorProfileCatalog.none ?? {};
+    const uiFields = new Set(Array.isArray(profile.ui_fields) ? profile.ui_fields : []);
+    const labels = profile.parameter_labels && typeof profile.parameter_labels === "object" ? profile.parameter_labels : {};
+    const setVisible = (field, visible) => {
+      if (!field) {
+        return;
+      }
+      field.hidden = !visible;
+      field.style.display = visible ? "" : "none";
+    };
+    const setLabel = (field, fallback, key) => {
+      const label = field?.querySelector?.(".rookieui-shell__field-label");
+      if (label) {
+        label.textContent = String(labels[key] ?? fallback);
+      }
+    };
+
+    setVisible(row.pixelPerfectField, uiFields.has("pixel_perfect"));
+    setVisible(row.processorResField, uiFields.has("processor_res"));
+    setVisible(row.thresholdAField, uiFields.has("threshold_a"));
+    setVisible(row.thresholdBField, uiFields.has("threshold_b"));
+    setLabel(row.processorResField, "Processor Res", "processor_res");
+    setLabel(row.thresholdAField, "Threshold A", "threshold_a");
+    setLabel(row.thresholdBField, "Threshold B", "threshold_b");
+    row.module.dataset.controlType = String(profile.control_type ?? "");
+    row.module.dataset.secondaryOutputs = Array.isArray(profile.secondary_outputs) ? profile.secondary_outputs.join(",") : "";
   };
 
   const bindSyncHandlers = (row) => {
@@ -1151,6 +1233,8 @@ export function createControlNetUnitEditor({
           controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
           controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
           controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
+          controlnet_pixel_perfect: row.pixelPerfect.checked,
+          controlnet_resize_mode: row.resizeMode.value,
           controlnet_masks: maskImage ? [maskImage] : [],
           low_vram: false,
         }),
@@ -1298,7 +1382,12 @@ export function createControlNetUnitEditor({
     createCompactCheckboxField(primaryGrid, "Enable", enabled, `${idPrefix}-enabled-field-${index}`);
 
     const pixelPerfect = createCheckbox(`${idPrefix}-pixel-perfect-${index}`, false);
-    createCompactCheckboxField(primaryGrid, "Pixel Perfect", pixelPerfect, `${idPrefix}-pixel-perfect-field-${index}`);
+    const pixelPerfectField = createCompactCheckboxField(
+      primaryGrid,
+      "Pixel Perfect",
+      pixelPerfect,
+      `${idPrefix}-pixel-perfect-field-${index}`,
+    );
 
     const allowPreview = createCheckbox(`${idPrefix}-allow-preview-${index}`, false);
     createCompactCheckboxField(primaryGrid, "Allow Preview", allowPreview, `${idPrefix}-allow-preview-field-${index}`);
@@ -1452,7 +1541,8 @@ export function createControlNetUnitEditor({
       step: 8,
       inputMode: "numeric",
     });
-    createField(settingsGrid, "Processor Res", processorResInput);
+    const processorResField = createField(settingsGrid, "Processor Res", processorResInput);
+    processorResField.id = `${idPrefix}-processor-res-field-${index}`;
 
     const thresholdAInput = createInput("number", `${idPrefix}-threshold-a-${index}`, "64", {
       min: 0,
@@ -1460,7 +1550,8 @@ export function createControlNetUnitEditor({
       step: 1,
       inputMode: "numeric",
     });
-    createField(settingsGrid, "Threshold A", thresholdAInput);
+    const thresholdAField = createField(settingsGrid, "Threshold A", thresholdAInput);
+    thresholdAField.id = `${idPrefix}-threshold-a-field-${index}`;
 
     const thresholdBInput = createInput("number", `${idPrefix}-threshold-b-${index}`, "64", {
       min: 0,
@@ -1468,7 +1559,8 @@ export function createControlNetUnitEditor({
       step: 1,
       inputMode: "numeric",
     });
-    createField(settingsGrid, "Threshold B", thresholdBInput);
+    const thresholdBField = createField(settingsGrid, "Threshold B", thresholdBInput);
+    thresholdBField.id = `${idPrefix}-threshold-b-field-${index}`;
 
     const controlModeInput = createSelect(`${idPrefix}-control-mode-${index}`, CONTROL_MODE_OPTIONS, "balanced");
     controlModeInput.hidden = true;
@@ -1552,6 +1644,7 @@ export function createControlNetUnitEditor({
     rowElements = {
       enabled,
       pixelPerfect,
+      pixelPerfectField,
       allowPreview,
       useMask,
       preview,
@@ -1570,8 +1663,11 @@ export function createControlNetUnitEditor({
       controlMode: controlModeInput,
       controlModeBridge,
       processorRes: processorResInput,
+      processorResField,
       thresholdA: thresholdAInput,
+      thresholdAField,
       thresholdB: thresholdBInput,
+      thresholdBField,
       ensureGuidanceBounds,
       hrOption,
       imageAsset,
@@ -1722,7 +1818,10 @@ export function createControlNetUnitEditor({
     setControlNetGeneratedPreview(preview, { imageData: "", visible: false });
     rowElements.sourceBrush.syncSourceData("");
 
-    moduleSelect.addEventListener("change", syncHiddenField);
+    moduleSelect.addEventListener("change", () => {
+      applyPreprocessorProfileToRow(rowElements);
+      syncHiddenField();
+    });
     modelSelect.addEventListener("change", syncHiddenField);
 
     attachUploadHandler(maskUploadControl.fileInput, {
@@ -1946,6 +2045,7 @@ export function createControlNetUnitEditor({
       applyCatalogToRow(row, false);
 
       row.module.value = unit.module;
+      applyPreprocessorProfileToRow(row);
       row.model.value = unit.model;
       row.weight.value = String(unit.weight);
       row.weightSlider.value = String(unit.weight);
@@ -1996,7 +2096,10 @@ export function createControlNetUnitEditor({
     syncHiddenField();
   };
 
-  const setControlTypeCatalog = (rawControlTypes = {}) => {
+  const setControlTypeCatalog = (rawControlTypes = {}, rawPreprocessorProfiles = null) => {
+    if (rawPreprocessorProfiles && typeof rawPreprocessorProfiles === "object") {
+      preprocessorProfileCatalog = normalizePreprocessorProfiles(rawPreprocessorProfiles);
+    }
     controlTypeCatalog = normalizeControlTypeCatalog(rawControlTypes, currentModelValues, controlTypeOptions);
     unitRows.forEach((row) => {
       applyCatalogToRow(row, false);

@@ -51,6 +51,41 @@ class _FakeDictResultNode:
         return {"result": (image,)}
 
 
+class _FakeOpenPoseJsonNode:
+    FUNCTION = "estimate_pose"
+
+    @staticmethod
+    def INPUT_TYPES() -> dict[str, object]:
+        return {
+            "required": {"image": ("IMAGE",)},
+            "optional": {
+                "detect_hand": (["enable", "disable"], {"default": "enable"}),
+                "detect_body": (["enable", "disable"], {"default": "enable"}),
+                "detect_face": (["enable", "disable"], {"default": "enable"}),
+                "resolution": ("INT", {"default": 512}),
+            },
+        }
+
+    def estimate_pose(
+        self,
+        image: object,
+        detect_hand: str = "disable",
+        detect_body: str = "disable",
+        detect_face: str = "disable",
+        resolution: int = 0,
+    ) -> dict[str, object]:
+        self.inputs = {
+            "detect_hand": detect_hand,
+            "detect_body": detect_body,
+            "detect_face": detect_face,
+            "resolution": resolution,
+        }
+        return {
+            "ui": {"openpose_json": ['[{"people":[]}]']},
+            "result": (image, [{"people": []}]),
+        }
+
+
 class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
     def test_normalize_preprocessor_option_key_preserves_lineart_variant(self) -> None:
         normalized = runtime.normalize_preprocessor_option_key("lineart_anime_denoise")
@@ -88,6 +123,43 @@ class ControlNetRuntimeHeuristicsTests(unittest.TestCase):
                 aio_preprocessor_name=None,
             )
         self.assertIs(output, marker)
+
+    def test_profile_parameter_defaults_bind_dwpose_string_toggles(self) -> None:
+        profile = runtime.get_preprocessor_profile("openpose_dw")
+
+        self.assertEqual(
+            runtime._build_node_parameter_value(
+                "detect_hand",
+                image_tensor=object(),
+                mask_tensor=None,
+                processor_res=512,
+                threshold_a=64.0,
+                threshold_b=64.0,
+                aio_preprocessor_name=None,
+                profile=profile,
+            ),
+            "enable",
+        )
+
+    def test_run_host_node_preprocessor_payload_extracts_declared_openpose_json(self) -> None:
+        marker = object()
+        profile = runtime.get_preprocessor_profile("openpose_dw")
+        with mock.patch.object(runtime, "_coerce_image_tensor", side_effect=lambda value: value):
+            output, secondary = runtime._run_host_node_preprocessor_payload(
+                node_name="DWPreprocessor",
+                node_cls=_FakeOpenPoseJsonNode,
+                image_tensor=marker,
+                mask_tensor=None,
+                module_key="openpose",
+                processor_res=640,
+                threshold_a=64.0,
+                threshold_b=64.0,
+                aio_preprocessor_name=None,
+                profile=profile,
+            )
+
+        self.assertIs(output, marker)
+        self.assertEqual(secondary["openpose_json"], ('[{"people":[]}]',))
 
     def test_discover_dynamic_host_preprocessors_skips_heavy_depth_candidates(self) -> None:
         discovered = runtime._discover_dynamic_host_preprocessors(

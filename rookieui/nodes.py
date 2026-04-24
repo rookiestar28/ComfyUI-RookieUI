@@ -321,6 +321,10 @@ class RookieUIControlNetPreprocess:
                 "processor_res": ("INT", {"default": 512, "min": 64, "max": 2048, "step": 1}),
                 "threshold_a": ("FLOAT", {"default": 64.0, "min": 0.0, "max": 255.0, "step": 0.01}),
                 "threshold_b": ("FLOAT", {"default": 64.0, "min": 0.0, "max": 255.0, "step": 0.01}),
+                "pixel_perfect": ("BOOLEAN", {"default": False}),
+                "target_width": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 1}),
+                "target_height": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 1}),
+                "resize_mode": (["crop_and_resize", "just_resize", "resize_and_fill"],),
                 "use_mask": ("BOOLEAN", {"default": False}),
             },
             "optional": {
@@ -363,7 +367,20 @@ class RookieUIControlNetPreprocess:
         ).squeeze(1)
         return torch.clamp(resized, 0.0, 1.0)
 
-    def preprocess(self, image, module="none", processor_res=512, threshold_a=64.0, threshold_b=64.0, use_mask=False, mask=None):
+    def preprocess(
+        self,
+        image,
+        module="none",
+        processor_res=512,
+        threshold_a=64.0,
+        threshold_b=64.0,
+        pixel_perfect=False,
+        target_width=512,
+        target_height=512,
+        resize_mode="crop_and_resize",
+        use_mask=False,
+        mask=None,
+    ):
         _require_runtime_dependencies()
         module_key = self._normalize_module(module)
         runtime_mask = mask if use_mask and mask is not None else None
@@ -374,6 +391,10 @@ class RookieUIControlNetPreprocess:
             threshold_a=float(threshold_a),
             threshold_b=float(threshold_b),
             mask_tensor=runtime_mask,
+            pixel_perfect=bool(pixel_perfect),
+            target_width=int(target_width),
+            target_height=int(target_height),
+            resize_mode=str(resize_mode or "crop_and_resize"),
         )
         output = runtime_result.image.to(dtype=image.dtype, device=image.device)
         if runtime_result.used_fallback and runtime_result.diagnostics:

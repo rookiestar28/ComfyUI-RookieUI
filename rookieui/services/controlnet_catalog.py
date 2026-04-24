@@ -7,6 +7,10 @@ from rookieui.contracts.controlnet_integrated import (
     CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER,
 )
 from rookieui.security.request_guard import normalize_option_label
+from rookieui.services.controlnet_profiles import (
+    get_preprocessor_profile,
+    serialize_preprocessor_profiles,
+)
 from rookieui.services.controlnet_runtime import (
     CONTROLNET_PREPROCESSOR_OPTION_ORDER,
     normalize_preprocessor_option_key,
@@ -167,17 +171,33 @@ def filter_models_by_keywords(model_list: list[str], keywords: tuple[str, ...]) 
     return [model for model in model_list if any(keyword in str(model).lower() for keyword in lowered_keywords)]
 
 
+def _control_type_model_keywords(control_type: str) -> tuple[str, ...]:
+    profile_keywords: list[str] = []
+    for profile in (get_preprocessor_profile(module) for module in CONTROLNET_PREPROCESSOR_OPTION_ORDER):
+        if profile.control_type != control_type:
+            continue
+        for keyword in profile.model_keywords:
+            if keyword and keyword not in profile_keywords:
+                profile_keywords.append(keyword)
+    return tuple(profile_keywords) or _CONTROL_TYPE_MODEL_KEYWORDS.get(control_type, ())
+
+
 def build_type_module_list(control_type: str, module_list: list[str]) -> list[str]:
     if control_type == "All":
         return list(module_list)
 
-    hints = _CONTROL_TYPE_MODULE_HINTS.get(control_type, ())
-    if not hints:
-        return list(module_list)
-
-    filtered = [
-        module for module in module_list if module == DEFAULT_CONTROLNET_MODULE or any(hint in module for hint in hints)
-    ]
+    filtered = []
+    for module in module_list:
+        if module == DEFAULT_CONTROLNET_MODULE:
+            filtered.append(module)
+            continue
+        if get_preprocessor_profile(module).control_type == control_type:
+            filtered.append(module)
+    if not filtered:
+        hints = _CONTROL_TYPE_MODULE_HINTS.get(control_type, ())
+        filtered = [
+            module for module in module_list if module == DEFAULT_CONTROLNET_MODULE or any(hint in module for hint in hints)
+        ]
     if not filtered:
         return list(module_list)
     if DEFAULT_CONTROLNET_MODULE not in filtered:
@@ -228,7 +248,7 @@ def build_control_types_payload(
     for control_type in CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER:
         type_module_list = build_type_module_list(control_type, module_list)
         type_model_list = (
-            filter_models_by_keywords(model_list, _CONTROL_TYPE_MODEL_KEYWORDS.get(control_type, ()))
+            filter_models_by_keywords(model_list, _control_type_model_keywords(control_type))
             if control_type != "All"
             else list(model_list)
         )
@@ -252,4 +272,5 @@ def build_control_types_payload(
         "control_type_order": list(CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER),
         "default_type": "All",
         "control_types": control_types,
+        "preprocessor_profiles": serialize_preprocessor_profiles(),
     }

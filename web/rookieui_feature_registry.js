@@ -16,6 +16,10 @@ export function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
     typeResult?.data?.control_types && typeof typeResult.data.control_types === "object"
       ? typeResult.data.control_types
       : {};
+  const preprocessorProfiles =
+    typeResult?.data?.preprocessor_profiles && typeof typeResult.data.preprocessor_profiles === "object"
+      ? typeResult.data.preprocessor_profiles
+      : {};
 
   return {
     source: String(typeResult?.data?.source ?? modelResult?.data?.source ?? moduleResult?.data?.source ?? "fallback"),
@@ -34,6 +38,7 @@ export function buildControlNetCatalog(modelResult, moduleResult, typeResult) {
     default_module: String(moduleResult?.data?.default_module ?? "none"),
     default_model: String(modelResult?.data?.default_model ?? ""),
     control_types: controlTypes,
+    preprocessor_profiles: preprocessorProfiles,
   };
 }
 

@@ -94,6 +94,10 @@ def _apply_controlnet_unit_entries(
             "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
             "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
             "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
+            "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
+            "target_width": int(request.width),
+            "target_height": int(request.height),
+            "resize_mode": str(_read_controlnet_unit_value(unit, "resize_mode") or getattr(request, "resize_mode", "crop_and_resize")),
             "use_mask": bool(use_mask and mask_ref),
         }
         if use_mask and mask_ref is not None:
