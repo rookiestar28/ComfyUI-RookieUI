@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>ControlNet profile-aware preprocessing and pixel-perfect preview alignment (new functionality/stability)</strong></summary>
+
+- ControlNet preprocessors now use a RookieUI-owned profile registry, so preprocessor variants carry truthful metadata for host annotator preference, control type, parameter labels, UI fields, and optional secondary outputs.
+- `Pixel Perfect` now affects preprocessor preview/runtime resolution when target and source dimensions are known, instead of being stored as inert UI state.
+- The integrated ControlNet editor now updates visible controls and labels based on the selected preprocessor profile, reducing misleading generic threshold fields for preprocessors that do not use them.
+- Pose-capable preprocessors can preserve bounded OpenPose-format JSON metadata when the host backend returns it, while keeping this metadata optional and scoped to pose preprocessors only.
+
+</details>
+
+<details>
+
 <summary><strong>XYZ Plot full A1111 input-parity alignment (new functionality/stability)</strong></summary>
 
 - `XYZ Plot` input behavior now follows A1111 more closely across the shipped sweep surface instead of keeping RookieUI-local syntax for prompt, choice, and hires axes.
@@ -39,8 +50,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>Official image-edit workflow coverage (new functionality/stability)</strong></summary>
 
 - RookieUI now treats official image-edit workflows as `img2img`-owned image-edit subtypes instead of routing them through a dedicated visible `Edit` mode or a legacy SD-style inpaint fallback.
-- The shipped official image-edit profile set includes `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
-- The `Qwen-Image Edit Multi-LoRA` backend profile remains available for compatibility, but it is no longer exposed as a separate visible `Img2Img` preset; use `Qwen-Image Edit` with prompt-inline multi-`<lora:...>` chaining for the normal UI path.
+- The visible official image-edit profile set includes `Qwen-Image Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
 - Image-edit flows now follow bounded official semantics directly in RookieUI: they do not require user masks, preserve ordered `reference_images` plus `main_reference_index`, and support bounded multi-reference input where the official template family requires it.
 
 </details>
@@ -278,7 +288,7 @@ Current extension seams:
 
 ## Table of Contents
 
-- [Current Status](#current-status---click-to-expand)
+- [Last updates](#last-updates---click-to-expand)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
@@ -358,8 +368,7 @@ If your host or Manager install path does not automatically install custom-node 
 <br>
 
 - official image-edit workflows live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
-- shipped image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
-- `Qwen-Image Edit Multi-LoRA` remains backend/runtime-compatible, but the separate visible `Img2Img` preset is retired; the canonical UI path is `Qwen-Image Edit` plus prompt-inline multi-`<lora:...>` chaining
+- visible image-edit profiles: `Qwen-Image Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
 - image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
 - image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
 - family-specific edit builders now cover template-owned LoRA chaining, Qwen/Qwen+ edit encoders, Flux/Klein multi-reference latent setup, and Longcat edit guidance on dedicated non-SD runtime paths
@@ -423,8 +432,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
-- RookieUI ships official ComfyUI `imageEdit` coverage for `Qwen-Image Edit`, `Qwen-Image Edit Multi-LoRA`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
-- The `Qwen-Image Edit Multi-LoRA` backend profile remains shipped for compatibility, but RookieUI no longer exposes it as a separate visible `Img2Img` preset because prompt-inline multi-`<lora:...>` chaining is the canonical UI path.
+- RookieUI's visible official ComfyUI `imageEdit` coverage includes `Qwen-Image Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
 - Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` hides official non-SD presets that are not aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
@@ -432,13 +440,12 @@ If your host or Manager install path does not automatically install custom-node 
   - RookieUI shows the official default explicitly
   - allows manual override
   - and warns when a custom override no longer matches the official ComfyUI template exactly
-- Template-owned LoRA controls are exposed for:
+- Template-owned LoRA controls are exposed for visible profiles:
   - `Flux.1 Dev FP8`
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
-  - `Qwen-Image Edit Multi-LoRA`
   - `FireRed Image Edit Lightning`
-- Other official image-edit presets may still remain host prerequisites on a given environment until the exact upstream model, text encoder, VAE, and template-owned LoRA labels required by the official template are installed on that host.
+- A visible official image-edit profile may still remain unavailable on a given environment until the exact upstream model, text encoder, VAE, and template-owned LoRA labels required by the official template are installed on that host.
 
 ---
 
@@ -577,7 +584,10 @@ Behavior and compatibility:
 - A1111-style multi-unit ControlNet editor is available in `txt2img` and `img2img`.
 - Backend execution uses native ComfyUI ControlNet nodes with deterministic multi-unit apply order.
 - RookieUI ships its own integrated ControlNet request/runtime layer, so the feature does not depend on installing a separate external ControlNet UI extension.
+- Selected preprocessor variants are driven by RookieUI's preprocessor profile registry, which supplies truthful control-type grouping, preferred host annotator nodes, parameter labels, UI field visibility, and optional secondary output capabilities.
+- `Pixel Perfect` is wired into preprocessor preview/runtime resolution when source and target dimensions are available, matching ControlNet-style aspect-ratio behavior for crop/resize and resize/fill modes.
 - Selected preprocessor variants are dispatched to matching host annotator nodes when available, including exact OpenPose-family variant routing.
+- Pose-capable preprocessors can return bounded OpenPose-format JSON metadata through the detect payload when the active host annotator exposes it; non-pose preprocessors do not claim this output.
 - Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
