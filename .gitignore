@@ -18,10 +18,10 @@ htmlcov/
 .coverage.*
 coverage.xml
 *.cover
-.planning/
+.pla*/
 ROA*.md
 roa*.md
-reference/
+ref*/
 scripts/sync_split.py
 tests_output.txt
 node_modules/
