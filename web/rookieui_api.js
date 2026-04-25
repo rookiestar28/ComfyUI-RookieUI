@@ -1305,79 +1305,228 @@ async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.
   }
 }
 
-export async function fetchRookieUIModels(fetchImpl = globalThis.fetch) {
-  return fetchRookieUIResource(
-    "/rookieui/models",
-    {
-      // IMPORTANT: __host_default__ is an inventory-discovery fallback, not a valid model choice;
-      // if it reaches the UI, debug /rookieui/models before changing preset defaults.
-      source: "fallback",
-      checkpoints: ["__host_default__"],
-      clip: [],
-      clip_vision: [],
-      controlnet: [],
-      diffusion_models: [],
-      vae: ["Automatic"],
-      text_encoders: ["Automatic"],
-      embeddings: [],
-      loras: [],
-      ultralytics: [],
-      unet: [],
-      upscale_models: [],
-      default_checkpoint: "__host_default__",
-      default_vae: "Automatic",
-      default_text_encoder: "Automatic",
-      catalog: {
-        surface_groups: [
-          {
-            id: "sd_generation",
-            title: "SD Generation",
-            categories: ["checkpoints", "diffusion_models", "vae", "text_encoders", "embeddings", "loras"],
-          },
-        ],
-        primary_model_category_by_family: { ...DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY },
-        categories: {
-          checkpoints: {
-            title: "Checkpoints",
-            items: ["__host_default__"],
-            default_value: "__host_default__",
-            sidebar_visible: true,
-          },
-          diffusion_models: {
-            title: "Diffusion Models",
-            items: [],
-            default_value: "",
-            sidebar_visible: false,
-          },
-          vae: {
-            title: "VAE",
-            items: ["Automatic"],
-            default_value: "Automatic",
-            sidebar_visible: true,
-          },
-          text_encoders: {
-            title: "Text Encoders",
-            items: ["Automatic"],
-            default_value: "Automatic",
-            sidebar_visible: true,
-          },
-          embeddings: {
-            title: "Embeddings",
-            items: [],
-            default_value: "",
-            sidebar_visible: true,
-          },
-          loras: {
-            title: "LoRAs",
-            items: [],
-            default_value: "",
-            sidebar_visible: true,
-          },
+function createFallbackModelInventory() {
+  return {
+    // IMPORTANT: __host_default__ is an inventory-discovery fallback, not a valid model choice;
+    // if it reaches the UI, debug /rookieui/models and /object_info before changing preset defaults.
+    source: "fallback",
+    checkpoints: ["__host_default__"],
+    clip: [],
+    clip_vision: [],
+    controlnet: [],
+    diffusion_models: [],
+    vae: ["Automatic"],
+    text_encoders: ["Automatic"],
+    embeddings: [],
+    loras: [],
+    ultralytics: [],
+    unet: [],
+    upscale_models: [],
+    default_checkpoint: "__host_default__",
+    default_vae: "Automatic",
+    default_text_encoder: "Automatic",
+    catalog: {
+      surface_groups: [
+        {
+          id: "sd_generation",
+          title: "SD Generation",
+          categories: ["checkpoints", "diffusion_models", "vae", "text_encoders", "embeddings", "loras"],
+        },
+      ],
+      primary_model_category_by_family: { ...DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY },
+      categories: {
+        checkpoints: {
+          title: "Checkpoints",
+          items: ["__host_default__"],
+          default_value: "__host_default__",
+          sidebar_visible: true,
+        },
+        diffusion_models: {
+          title: "Diffusion Models",
+          items: [],
+          default_value: "",
+          sidebar_visible: false,
+        },
+        vae: {
+          title: "VAE",
+          items: ["Automatic"],
+          default_value: "Automatic",
+          sidebar_visible: true,
+        },
+        text_encoders: {
+          title: "Text Encoders",
+          items: ["Automatic"],
+          default_value: "Automatic",
+          sidebar_visible: true,
+        },
+        embeddings: {
+          title: "Embeddings",
+          items: [],
+          default_value: "",
+          sidebar_visible: true,
+        },
+        loras: {
+          title: "LoRAs",
+          items: [],
+          default_value: "",
+          sidebar_visible: true,
         },
       },
     },
-    fetchImpl,
+  };
+}
+
+function dedupeStringChoices(values) {
+  const result = [];
+  const seen = new Set();
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const normalized = value.trim();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function extractObjectInfoInputChoices(objectInfo, className, fieldName) {
+  const nodeInfo = objectInfo?.[className];
+  const inputSpec = nodeInfo?.input ?? nodeInfo?.inputs;
+  const required = inputSpec?.required && typeof inputSpec.required === "object" ? inputSpec.required : {};
+  const optional = inputSpec?.optional && typeof inputSpec.optional === "object" ? inputSpec.optional : {};
+  const fieldSpec = required[fieldName] ?? optional[fieldName];
+  const choices = Array.isArray(fieldSpec) && Array.isArray(fieldSpec[0]) ? fieldSpec[0] : fieldSpec;
+  return Array.isArray(choices) ? dedupeStringChoices(choices) : [];
+}
+
+function mergeObjectInfoInputChoices(objectInfo, entries) {
+  return dedupeStringChoices(
+    entries.flatMap(([className, fieldName]) => extractObjectInfoInputChoices(objectInfo, className, fieldName)),
   );
+}
+
+function buildObjectInfoModelInventory(objectInfo) {
+  const checkpoints = mergeObjectInfoInputChoices(objectInfo, [["CheckpointLoaderSimple", "ckpt_name"]]);
+  const vae = mergeObjectInfoInputChoices(objectInfo, [["VAELoader", "vae_name"]]);
+  const diffusionModels = mergeObjectInfoInputChoices(objectInfo, [["UNETLoader", "unet_name"]]);
+  const textEncoders = mergeObjectInfoInputChoices(objectInfo, [
+    ["CLIPLoader", "clip_name"],
+    ["DualCLIPLoader", "clip_name1"],
+    ["DualCLIPLoader", "clip_name2"],
+    ["TripleCLIPLoader", "clip_name1"],
+    ["TripleCLIPLoader", "clip_name2"],
+    ["TripleCLIPLoader", "clip_name3"],
+    ["QuadrupleCLIPLoader", "clip_name1"],
+    ["QuadrupleCLIPLoader", "clip_name2"],
+    ["QuadrupleCLIPLoader", "clip_name3"],
+    ["QuadrupleCLIPLoader", "clip_name4"],
+  ]);
+  const loras = mergeObjectInfoInputChoices(objectInfo, [["LoraLoader", "lora_name"]]);
+  const controlnet = mergeObjectInfoInputChoices(objectInfo, [["ControlNetLoader", "control_net_name"]]);
+  const upscaleModels = mergeObjectInfoInputChoices(objectInfo, [["UpscaleModelLoader", "model_name"]]);
+  if (checkpoints.length === 0 && vae.length === 0 && diffusionModels.length === 0) {
+    return null;
+  }
+
+  const fallback = createFallbackModelInventory();
+  const resolvedCheckpoints = checkpoints.length > 0 ? checkpoints : fallback.checkpoints;
+  const resolvedVae = vae.length > 0 ? vae : fallback.vae;
+  const resolvedTextEncoders = textEncoders.length > 0 ? textEncoders : fallback.text_encoders;
+  return {
+    ...fallback,
+    source: "host-object-info",
+    checkpoints: resolvedCheckpoints,
+    controlnet,
+    diffusion_models: diffusionModels,
+    vae: resolvedVae,
+    text_encoders: resolvedTextEncoders,
+    loras,
+    unet: diffusionModels,
+    upscale_models: upscaleModels,
+    default_checkpoint: resolvedCheckpoints[0],
+    default_vae: resolvedVae[0],
+    default_text_encoder: resolvedTextEncoders[0],
+    catalog: {
+      ...fallback.catalog,
+      categories: {
+        ...fallback.catalog.categories,
+        checkpoints: {
+          ...fallback.catalog.categories.checkpoints,
+          items: resolvedCheckpoints,
+          default_value: resolvedCheckpoints[0],
+        },
+        controlnet: {
+          title: "ControlNet",
+          items: controlnet,
+          default_value: "",
+          sidebar_visible: false,
+        },
+        diffusion_models: {
+          ...fallback.catalog.categories.diffusion_models,
+          items: diffusionModels,
+          default_value: diffusionModels[0] ?? "",
+        },
+        loras: {
+          ...fallback.catalog.categories.loras,
+          items: loras,
+        },
+        text_encoders: {
+          ...fallback.catalog.categories.text_encoders,
+          items: resolvedTextEncoders,
+          default_value: resolvedTextEncoders[0],
+        },
+        upscale_models: {
+          title: "Upscale Models",
+          items: upscaleModels,
+          default_value: "",
+          sidebar_visible: false,
+        },
+        vae: {
+          ...fallback.catalog.categories.vae,
+          items: resolvedVae,
+          default_value: resolvedVae[0],
+        },
+      },
+    },
+  };
+}
+
+async function fetchObjectInfoModelInventory(fetchImpl) {
+  if (typeof fetchImpl !== "function") {
+    return null;
+  }
+  try {
+    // CRITICAL: this is the frontend safety net when RookieUI's Python /models route is stale or unavailable;
+    // ComfyUI core still exposes loader selector choices through /object_info.
+    const response = await fetchImpl("/object_info", {
+      headers: { Accept: "application/json" },
+    });
+    if (!response?.ok) {
+      throw new Error(`Request failed with status ${response?.status ?? "unknown"}`);
+    }
+    const inventory = buildObjectInfoModelInventory(await response.json());
+    if (!inventory) {
+      throw new Error("object_info did not expose model loader choices");
+    }
+    return { ok: true, source: "host-object-info", data: inventory };
+  } catch (_error) {
+    rookieUIDebugWarn("api.models.object_info", "Host object_info inventory fallback failed.", {
+      error: toErrorDetail(_error),
+    });
+    return null;
+  }
+}
+
+export async function fetchRookieUIModels(fetchImpl = globalThis.fetch) {
+  const result = await fetchRookieUIResource("/rookieui/models", createFallbackModelInventory(), fetchImpl);
+  if (result.ok) {
+    return result;
+  }
+  return (await fetchObjectInfoModelInventory(fetchImpl)) ?? result;
 }
 
 export async function fetchRookieUIPresets(fetchImpl = globalThis.fetch) {

@@ -11,6 +11,7 @@ const surface = params.get("surface") === "desktop" ? "desktop" : "standalone-we
 const sidebar = params.get("sidebar") !== "0";
 const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
 const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
+const rejectRookieModels = params.get("rejectRookieModels") === "1";
 
 const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
   sd15: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
@@ -700,6 +701,12 @@ async function handleE2EFetch(url, options = {}) {
   }
 
   if (url === "/rookieui/models") {
+    if (rejectRookieModels) {
+      return new Response(JSON.stringify({ status: "not-found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response(
       JSON.stringify({
         source: "host",
@@ -743,6 +750,60 @@ async function handleE2EFetch(url, options = {}) {
               items: E2E_DIFFUSION_MODELS,
               default_value: E2E_DIFFUSION_MODELS[0],
               sidebar_visible: false,
+            },
+          },
+        },
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (url === "/object_info") {
+    return new Response(
+      JSON.stringify({
+        CheckpointLoaderSimple: {
+          input: {
+            required: {
+              ckpt_name: [["realvisxl.safetensors"], {}],
+            },
+          },
+        },
+        VAELoader: {
+          input: {
+            required: {
+              vae_name: [E2E_VAE_OPTIONS, {}],
+            },
+          },
+        },
+        UNETLoader: {
+          input: {
+            required: {
+              unet_name: [E2E_DIFFUSION_MODELS, {}],
+            },
+          },
+        },
+        DualCLIPLoader: {
+          input: {
+            required: {
+              clip_name1: [E2E_TEXT_ENCODER_OPTIONS, {}],
+              clip_name2: [E2E_TEXT_ENCODER_OPTIONS, {}],
+            },
+          },
+        },
+        LoraLoader: {
+          input: {
+            required: {
+              lora_name: [
+                [
+                  "detail_tweaker.safetensors",
+                  "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
+                  "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
+                ],
+                {},
+              ],
             },
           },
         },

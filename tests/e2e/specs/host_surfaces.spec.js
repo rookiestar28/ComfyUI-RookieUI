@@ -28,3 +28,25 @@ test("submits txt2img through the ComfyUI runtime API resolver when root API pat
   const submittedPrompts = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__?.txt2img?.map((entry) => entry.prompt));
   expect(submittedPrompts).toContain("proxy-safe cat");
 });
+
+test("recovers model selectors from ComfyUI object_info when RookieUI models route is unavailable", async ({ page }) => {
+  await page.goto("test-harness.html?rejectRookieModels=1");
+  await expect(page.locator("#rookieui-shell-title")).toHaveText("RookieUI");
+  await expect(page.locator("#rookieui-checkpoint option")).toHaveCount(1);
+  const checkpointOptions = await page.locator("#rookieui-checkpoint option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(checkpointOptions).toEqual(["realvisxl.safetensors"]);
+  expect(checkpointOptions).not.toContain("__host_default__");
+  const vaeOptions = await page.locator("#rookieui-vae option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(vaeOptions).toContain("ae.safetensors");
+  expect(vaeOptions).toContain("qwen_image_vae.safetensors");
+  await page.locator("#rookieui-preset").selectOption("flux");
+  await expect(page.locator("#rookieui-checkpoint")).toHaveAttribute("data-model-category", "diffusion_models");
+  const diffusionOptions = await page.locator("#rookieui-checkpoint option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(diffusionOptions).toContain("flux1-dev.safetensors");
+});

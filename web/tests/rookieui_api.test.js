@@ -385,6 +385,67 @@ describe("fetchRookieUICapabilities", () => {
     expect(queue.data.queue_remaining).toBe(0);
   });
 
+  test("recovers model inventory from host object_info when RookieUI models route is unavailable", async () => {
+    const calls = [];
+    const result = await fetchRookieUIModels(async (url) => {
+      calls.push(url);
+      if (url === "/rookieui/models") {
+        return {
+          ok: false,
+          status: 404,
+          async json() {
+            return {};
+          },
+        };
+      }
+      if (url === "/object_info") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              CheckpointLoaderSimple: {
+                input: {
+                  required: {
+                    ckpt_name: [["realvisxl.safetensors", "sd15/dreamshaper.safetensors"], {}],
+                  },
+                },
+              },
+              VAELoader: {
+                input: {
+                  required: {
+                    vae_name: [["ae.safetensors", "vae-ft-mse.safetensors"], {}],
+                  },
+                },
+              },
+              UNETLoader: {
+                input: {
+                  required: {
+                    unet_name: [["flux1-dev.safetensors"], {}],
+                  },
+                },
+              },
+            };
+          },
+        };
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+
+    expect(calls).toEqual(["/rookieui/models", "/object_info"]);
+    expect(result.ok).toBe(true);
+    expect(result.source).toBe("host-object-info");
+    expect(result.data.checkpoints).toEqual(["realvisxl.safetensors", "sd15/dreamshaper.safetensors"]);
+    expect(result.data.default_checkpoint).toBe("realvisxl.safetensors");
+    expect(result.data.vae).toEqual(["ae.safetensors", "vae-ft-mse.safetensors"]);
+    expect(result.data.default_vae).toBe("ae.safetensors");
+    expect(result.data.diffusion_models).toEqual(["flux1-dev.safetensors"]);
+    expect(result.data.catalog.categories.checkpoints.items).toEqual([
+      "realvisxl.safetensors",
+      "sd15/dreamshaper.safetensors",
+    ]);
+  });
+
   test("loads prompt-workbench bootstrap config with fallback masking contract", async () => {
     const result = await fetchRookieUIPromptWorkbenchConfig(async () => {
       throw new Error("offline");
