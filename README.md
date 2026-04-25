@@ -25,6 +25,16 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Testing workflow and hosted API regression hardening (stability/tooling)</strong></summary>
+
+- Updated the repository testing SOPs to make problem reproduction the first goal of every bugfix or high-risk validation flow, so new tests are expected to fail for the user-visible bug class they guard.
+- Expanded frontend and E2E coverage for hosted ComfyUI API integration, including runtime API resolver submission paths, model inventory recovery from ComfyUI `object_info`, and full txt2img/img2img submission payload drift.
+- Hardened the standard test workflow around deterministic Windows/WSL execution, project-local Python environments, Node version checks, pre-commit hygiene, and full unit plus Playwright E2E validation.
+
+</details>
+
+<details>
+
 <summary><strong>ControlNet profile-aware preprocessing and pixel-perfect preview alignment (new functionality/stability)</strong></summary>
 
 - ControlNet preprocessors now use a RookieUI-owned profile registry, so preprocessor variants carry truthful metadata for host annotator preference, control type, parameter labels, UI fields, and optional secondary outputs.
