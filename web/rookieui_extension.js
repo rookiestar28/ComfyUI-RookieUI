@@ -52,6 +52,14 @@ function createRookieUIClientId(windowRef, runtimeApi = null) {
   return `rookieui-${Date.now().toString(36)}-${suffix}`;
 }
 
+export function createRookieUIHostFetch(fetchImpl = globalThis.fetch, runtimeApi = null) {
+  if (typeof runtimeApi?.fetchApi === "function") {
+    // CRITICAL: use ComfyUI's API resolver when available; root-relative fetch breaks under proxied or subpath-mounted hosts.
+    return (path, options = {}) => runtimeApi.fetchApi(path, options);
+  }
+  return fetchImpl;
+}
+
 function enforceSidebarMinWidth(container) {
   if (!container?.style) {
     return;
@@ -147,9 +155,10 @@ export function registerRookieUIBootstrapExtension({
 
     async setup() {
       const runtimeApi = app?.api ?? windowRef?.app?.api ?? null;
+      const apiFetch = createRookieUIHostFetch(fetchImpl, runtimeApi);
       const hostSurface = detectHostSurface(windowRef);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
-      const bootstrapData = await loadRookieUIBootstrapData(fetchImpl, { clientId });
+      const bootstrapData = await loadRookieUIBootstrapData(apiFetch, { clientId });
       if (clientId && windowRef?.sessionStorage?.setItem) {
         try {
           // IMPORTANT: persist the active host client id so queue polling and runtime events stay on the same session boundary after host reconnects.
@@ -169,21 +178,21 @@ export function registerRookieUIBootstrapExtension({
         ...bootstrapData,
         clientId,
         runtimeApi,
-        fetchQueueRequest: (scopeClientId = clientId) => fetchRookieUIQueue(fetchImpl, { clientId: scopeClientId }),
+        fetchQueueRequest: (scopeClientId = clientId) => fetchRookieUIQueue(apiFetch, { clientId: scopeClientId }),
         fetchQueueJobRequest: (promptId, scopeClientId = clientId) =>
-          fetchRookieUIQueueJob(promptId, { clientId: scopeClientId }, fetchImpl),
-        fetchPromptHistoryRequest: (promptId) => fetchRookieUIHistoryPrompt(promptId, fetchImpl),
-        submitTxt2ImgRequest: (payload) => submitRookieUITxt2Img(payload, fetchImpl),
-        submitImg2ImgRequest: (payload) => submitRookieUIImg2Img(payload, fetchImpl),
-        inspectPngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, fetchImpl),
-        parsePngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, fetchImpl),
-        submitExtrasRequest: (payload) => submitRookieUIExtras(payload, fetchImpl),
-        fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(fetchImpl),
-        fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(fetchImpl),
-        fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(fetchImpl),
-        fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(fetchImpl),
-        ...createPromptWorkbenchRequestBindings(fetchImpl),
-        ...createXYZPlotRequestBindings(fetchImpl),
+          fetchRookieUIQueueJob(promptId, { clientId: scopeClientId }, apiFetch),
+        fetchPromptHistoryRequest: (promptId) => fetchRookieUIHistoryPrompt(promptId, apiFetch),
+        submitTxt2ImgRequest: (payload) => submitRookieUITxt2Img(payload, apiFetch),
+        submitImg2ImgRequest: (payload) => submitRookieUIImg2Img(payload, apiFetch),
+        inspectPngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, apiFetch),
+        parsePngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, apiFetch),
+        submitExtrasRequest: (payload) => submitRookieUIExtras(payload, apiFetch),
+        fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(apiFetch),
+        fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(apiFetch),
+        fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(apiFetch),
+        fetchADetailerCatalogRequest: () => fetchRookieUIADetailerCatalog(apiFetch),
+        ...createPromptWorkbenchRequestBindings(apiFetch),
+        ...createXYZPlotRequestBindings(apiFetch),
       };
 
       if (app?.extensionManager?.registerSidebarTab) {

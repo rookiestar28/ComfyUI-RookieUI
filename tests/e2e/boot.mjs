@@ -9,6 +9,8 @@ import { createMockComfyUIApp } from "./mocks/comfyui-app.js";
 const params = new URLSearchParams(window.location.search);
 const surface = params.get("surface") === "desktop" ? "desktop" : "standalone-web";
 const sidebar = params.get("sidebar") !== "0";
+const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
+const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 
 const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
   sd15: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
@@ -263,7 +265,7 @@ window.__ROOKIEUI_E2E_XYZ__ = {
   sessions: {},
 };
 
-window.fetch = async (url, options = {}) => {
+async function handleE2EFetch(url, options = {}) {
   if (url === "/rookieui/generate/txt2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.txt2img.push(payload);
@@ -874,9 +876,26 @@ window.fetch = async (url, options = {}) => {
       headers: { "Content-Type": "application/json" },
     },
   );
+}
+
+window.fetch = async (url, options = {}) => {
+  if (rejectRootApiFetch && typeof url === "string" && url.startsWith("/rookieui/")) {
+    throw new TypeError(`Root-relative RookieUI API fetch rejected by E2E harness: ${url}`);
+  }
+  return handleE2EFetch(url, options);
 };
 
-const app = createMockComfyUIApp({ sidebar });
+const app = createMockComfyUIApp({
+  sidebar,
+  api: runtimeApiFetch
+    ? {
+        clientId: "e2e-runtime-api-client",
+        addEventListener() {},
+        removeEventListener() {},
+        fetchApi: handleE2EFetch,
+      }
+    : null,
+});
 await registerRookieUIBootstrapExtension({
   app,
   windowRef: window,

@@ -1,9 +1,13 @@
-export function createMockComfyUIApp({ sidebar = true } = {}) {
+export function createMockComfyUIApp({ sidebar = true, api = null } = {}) {
   const app = {
     registerExtension({ setup }) {
       return Promise.resolve(setup());
     },
   };
+
+  if (api) {
+    app.api = api;
+  }
 
   if (sidebar) {
     app.extensionManager = {

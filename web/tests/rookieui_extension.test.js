@@ -2,13 +2,78 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
-import { registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
+import { createRookieUIHostFetch, registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
 
 describe("registerRookieUIBootstrapExtension", () => {
   beforeEach(() => {
     delete window.__ROOKIEUI_BOOTSTRAP__;
     document.head.innerHTML = "";
     document.body.innerHTML = "";
+  });
+
+  test("prefers ComfyUI runtime fetchApi so custom base paths do not break txt2img submission", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("root fetch should not be used");
+    });
+    const fetchApiCalls = [];
+    const apiResponse = (payload) => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return payload;
+      },
+    });
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-prefixed",
+        addEventListener() {},
+        removeEventListener() {},
+        fetchApi: vi.fn(async (path, options = {}) => {
+          fetchApiCalls.push([path, options]);
+          if (path === "/rookieui/capabilities") {
+            return apiResponse(createDefaultCapabilities());
+          }
+          if (path === "/rookieui/generate/txt2img") {
+            return apiResponse({
+              mode: "queued",
+              workflow_kind: "txt2img-sd15",
+              submission: { accepted: true, prompt_id: "prompt-prefixed" },
+            });
+          }
+          return apiResponse({});
+        }),
+      },
+      extensionManager: {
+        registerSidebarTab() {},
+      },
+    };
+
+    await registerRookieUIBootstrapExtension({ app, fetchImpl });
+    const result = await window.__ROOKIEUI_BOOTSTRAP__.submitTxt2ImgRequest({ prompt: "cat" });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(app.api.fetchApi).toHaveBeenCalledWith("/rookieui/generate/txt2img", expect.objectContaining({ method: "POST" }));
+    expect(fetchApiCalls.map(([path]) => path)).toContain("/rookieui/capabilities");
+    expect(result.ok).toBe(true);
+    expect(result.data.submission.prompt_id).toBe("prompt-prefixed");
+  });
+
+  test("falls back to the injected fetch implementation when ComfyUI fetchApi is unavailable", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return { status: "ok" };
+      },
+    }));
+    const hostFetch = createRookieUIHostFetch(fetchImpl, { clientId: "socket-client-no-fetch-api" });
+
+    await hostFetch("/rookieui/health", { headers: { Accept: "application/json" } });
+
+    expect(fetchImpl).toHaveBeenCalledWith("/rookieui/health", { headers: { Accept: "application/json" } });
   });
 
   test("registers a sidebar tab and renders the rookie shell", async () => {
