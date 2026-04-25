@@ -4,6 +4,23 @@ import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
 import { createRookieUIHostFetch, registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
 
+const EXPECTED_DTYPE_PROFILE_IDS = [
+  "automatic",
+  "automatic_fp16_lora",
+  "nf4",
+  "fp4",
+  "float8_e4m3fn",
+  "float8_e5m2",
+];
+const FULL_DTYPE_PROFILES = [
+  { id: "automatic", title: "Automatic", default: true },
+  { id: "automatic_fp16_lora", title: "Automatic (fp16 LoRA)", default: false },
+  { id: "nf4", title: "NF4", default: false },
+  { id: "fp4", title: "FP4", default: false },
+  { id: "float8_e4m3fn", title: "Float8 E4M3FN", default: false },
+  { id: "float8_e5m2", title: "Float8 E5M2", default: false },
+];
+
 describe("registerRookieUIBootstrapExtension", () => {
   beforeEach(() => {
     delete window.__ROOKIEUI_BOOTSTRAP__;
@@ -445,16 +462,7 @@ describe("registerRookieUIBootstrapExtension", () => {
                   aliases: [],
                 },
               ],
-              dtype_profiles: [
-                {
-                  id: "automatic",
-                  title: "Automatic",
-                  summary: "Use the host default diffusion weight dtype policy.",
-                  default: true,
-                  experimental: false,
-                  aliases: [],
-                },
-              ],
+              dtype_profiles: FULL_DTYPE_PROFILES,
               newer_family_profiles: [
                 {
                   id: "flux",
@@ -1225,6 +1233,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-view-github").textContent).toBe("View on GitHub");
     expect(document.getElementById("rookieui-txt2img-quicksettings")).not.toBeNull();
     expect(document.getElementById("rookieui-low-bits-quicksetting")).not.toBeNull();
+    expect(Array.from(document.getElementById("rookieui-low-bits").options).map((option) => option.value)).toEqual(
+      EXPECTED_DTYPE_PROFILE_IDS,
+    );
+    expect(Array.from(document.getElementById("rookieui-checkpoint").options).map((option) => option.value)).toEqual([
+      "dreamshaper.safetensors",
+    ]);
+    expect(Array.from(document.getElementById("rookieui-vae").options).map((option) => option.value)).toEqual([
+      "Automatic",
+      "ae.safetensors",
+      "qwen_image_vae.safetensors",
+    ]);
     expect(document.getElementById("rookieui-modules-quicksetting").textContent).toContain("VAE");
     expect(document.getElementById("rookieui-modules-quicksetting").textContent).not.toContain(
       "VAE / Text Encoder",
@@ -1301,6 +1320,14 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview-img2img").click();
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+    expect(
+      Array.from(document.getElementById("rookieui-img2img-low-bits").options).map((option) => option.value),
+    ).toEqual(EXPECTED_DTYPE_PROFILE_IDS);
+    expect(Array.from(document.getElementById("rookieui-img2img-vae").options).map((option) => option.value)).toEqual([
+      "Automatic",
+      "ae.safetensors",
+      "qwen_image_vae.safetensors",
+    ]);
     document.getElementById("rookieui-tab-txt2img").click();
     const txt2imgGenerationSection = document.getElementById("rookieui-txt2img-generation-section");
     const txt2imgHiresControls = document.getElementById("rookieui-advanced-controls");

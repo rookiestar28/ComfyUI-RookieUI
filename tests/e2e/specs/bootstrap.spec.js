@@ -1,5 +1,21 @@
 const { test, expect } = require("@playwright/test");
 
+const E2E_DTYPE_PROFILE_IDS = [
+  "automatic",
+  "automatic_fp16_lora",
+  "nf4",
+  "fp4",
+  "float8_e4m3fn",
+  "float8_e5m2",
+];
+const E2E_VAE_OPTIONS = [
+  "Automatic",
+  "ae.safetensors",
+  "flux2-vae.safetensors",
+  "full_encoder_small_decoder.safetensors",
+  "qwen_image_vae.safetensors",
+];
+
 test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.goto("test-harness.html");
   await page.evaluate(() => {
@@ -33,6 +49,19 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#mock-sidebar-tabs")).not.toContainText("Server capabilities");
   await expect(page.locator("#rookieui-txt2img-quicksettings")).toBeVisible();
   await expect(page.locator("#rookieui-low-bits-quicksetting")).toBeVisible();
+  const txt2imgLowBitsOptions = await page.locator("#rookieui-low-bits option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(txt2imgLowBitsOptions).toEqual(E2E_DTYPE_PROFILE_IDS);
+  const txt2imgCheckpointOptions = await page.locator("#rookieui-checkpoint option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(txt2imgCheckpointOptions).toContain("realvisxl.safetensors");
+  expect(txt2imgCheckpointOptions).not.toContain("__host_default__");
+  const txt2imgVaeOptions = await page.locator("#rookieui-vae option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(txt2imgVaeOptions).toEqual(E2E_VAE_OPTIONS);
   await expect(page.locator("#rookieui-preset")).toHaveCSS("min-height", "28px");
   await expect(page.locator("#rookieui-checkpoint")).toHaveCSS("min-height", "28px");
   await expect(page.locator("#rookieui-preset-quicksetting .rookieui-shell__quicksetting-label")).toHaveCSS(
@@ -301,6 +330,14 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
 
   await page.locator("#rookieui-txt2img-preview-img2img").click();
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  const img2imgLowBitsOptions = await page.locator("#rookieui-img2img-low-bits option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(img2imgLowBitsOptions).toEqual(E2E_DTYPE_PROFILE_IDS);
+  const img2imgVaeOptions = await page.locator("#rookieui-img2img-vae option").evaluateAll((options) =>
+    options.map((option) => option.value),
+  );
+  expect(img2imgVaeOptions).toEqual(E2E_VAE_OPTIONS);
   const img2imgPresetValues = await page.locator("#rookieui-img2img-preset option").evaluateAll((options) =>
     options.map((option) => option.value),
   );

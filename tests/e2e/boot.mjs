@@ -245,6 +245,58 @@ const E2E_TEXT_ENCODER_OPTIONS = [
   "t5xxl_fp8_e4m3fn_scaled.safetensors",
 ];
 
+// DEBUG HOTSPOT: keep this host fixture broad enough to catch compatibility-dropdown regressions.
+const E2E_DTYPE_PROFILES = [
+  {
+    id: "automatic",
+    title: "Automatic",
+    summary: "Use the host default diffusion weight dtype policy.",
+    default: true,
+    experimental: false,
+    aliases: [],
+  },
+  {
+    id: "automatic_fp16_lora",
+    title: "Automatic (fp16 LoRA)",
+    summary: "Keep the host default dtype while preferring fp16 LoRA execution.",
+    default: false,
+    experimental: false,
+    aliases: [],
+  },
+  {
+    id: "nf4",
+    title: "NF4",
+    summary: "Optional low-bit diffusion storage hint.",
+    default: false,
+    experimental: true,
+    aliases: [],
+  },
+  {
+    id: "fp4",
+    title: "FP4",
+    summary: "Optional fp4 diffusion storage hint.",
+    default: false,
+    experimental: true,
+    aliases: [],
+  },
+  {
+    id: "float8_e4m3fn",
+    title: "Float8 E4M3FN",
+    summary: "Optional float8-e4m3fn storage hint.",
+    default: false,
+    experimental: true,
+    aliases: ["float8-e4m3fn"],
+  },
+  {
+    id: "float8_e5m2",
+    title: "Float8 E5M2",
+    summary: "Optional float8-e5m2 storage hint.",
+    default: false,
+    experimental: true,
+    aliases: ["float8-e5m2"],
+  },
+];
+
 if (surface === "desktop") {
   window.__COMFYUI_DESKTOP__ = true;
   window.electronAPI = {};
@@ -724,16 +776,7 @@ async function handleE2EFetch(url, options = {}) {
             aliases: [],
           },
         ],
-        dtype_profiles: [
-          {
-            id: "automatic",
-            title: "Automatic",
-            summary: "Use the host default diffusion weight dtype policy.",
-            default: true,
-            experimental: false,
-            aliases: [],
-          },
-        ],
+        dtype_profiles: E2E_DTYPE_PROFILES,
         newer_family_profiles: E2E_NEWER_FAMILY_PROFILES,
       }),
       {
