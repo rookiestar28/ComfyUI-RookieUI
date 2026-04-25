@@ -310,7 +310,9 @@ window.__ROOKIEUI_E2E_REQUESTS__ = {
   txt2img: [],
   img2img: [],
   extras: [],
+  fetchApiRoutes: [],
   fetchApiNetworkPaths: [],
+  rootFetchPaths: [],
   xyzPlot: {
     estimate: [],
     run: [],
@@ -989,6 +991,7 @@ async function handleE2EFetch(url, options = {}) {
 
 window.fetch = async (url, options = {}) => {
   if (rejectRootApiFetch && typeof url === "string" && url.startsWith("/rookieui/")) {
+    window.__ROOKIEUI_E2E_REQUESTS__.rootFetchPaths.push(url);
     throw new TypeError(`Root-relative RookieUI API fetch rejected by E2E harness: ${url}`);
   }
   return handleE2EFetch(url, options);
@@ -1003,6 +1006,7 @@ const app = createMockComfyUIApp({
         removeEventListener() {},
         fetchApi: (route, options = {}) => {
           const networkPath = apiURL(route);
+          window.__ROOKIEUI_E2E_REQUESTS__.fetchApiRoutes.push(route);
           window.__ROOKIEUI_E2E_REQUESTS__.fetchApiNetworkPaths.push(networkPath);
           return handleE2EFetch(networkPath, options);
         },

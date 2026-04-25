@@ -26,9 +26,11 @@ test("submits txt2img through the ComfyUI runtime API resolver when root API pat
   await page.locator("#rookieui-txt2img-submit").click();
   await expect(page.locator("#rookieui-txt2img-status")).toContainText(/(Queued prompt|Completed:) e2e-prompt-123/);
   const submittedPrompts = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__?.txt2img?.map((entry) => entry.prompt));
-  const fetchApiNetworkPaths = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__?.fetchApiNetworkPaths ?? []);
+  const requestCapture = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__ ?? {});
   expect(submittedPrompts).toContain("proxy-safe cat");
-  expect(fetchApiNetworkPaths).toContain("/api/rookieui/generate/txt2img");
+  expect(requestCapture.fetchApiRoutes).toContain("/rookieui/generate/txt2img");
+  expect(requestCapture.fetchApiNetworkPaths).toContain("/api/rookieui/generate/txt2img");
+  expect(requestCapture.rootFetchPaths).toEqual([]);
 });
 
 test("recovers model selectors from ComfyUI object_info when RookieUI models route is unavailable", async ({ page }) => {
