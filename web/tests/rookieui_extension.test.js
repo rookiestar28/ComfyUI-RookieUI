@@ -40,6 +40,38 @@ describe("registerRookieUIBootstrapExtension", () => {
         return payload;
       },
     });
+    const apiURL = (route) => (route.startsWith("/api") ? route : `/api${route}`);
+    const responseByNetworkPath = new Map([
+      ["/api/rookieui/capabilities", apiResponse(createDefaultCapabilities())],
+      [
+        "/api/rookieui/generate/txt2img",
+        apiResponse({
+          mode: "queued",
+          workflow_kind: "txt2img-sd15",
+          submission: { accepted: true, prompt_id: "prompt-prefixed" },
+        }),
+      ],
+      [
+        "/api/rookieui/generate/img2img",
+        apiResponse({
+          mode: "queued",
+          workflow_kind: "img2img-sd15",
+          submission: { accepted: true, prompt_id: "img2img-prefixed" },
+        }),
+      ],
+      ["/api/rookieui/pnginfo/inspect", apiResponse({ status: "ok", payload: {} })],
+      [
+        "/api/rookieui/extras/run",
+        apiResponse({
+          mode: "queued",
+          workflow_kind: "extras",
+          submission: { accepted: true, prompt_id: "extras-prefixed" },
+        }),
+      ],
+      ["/api/rookieui/controlnet/model_list", apiResponse({ model_list: [] })],
+      ["/api/rookieui/prompt-tools/providers", apiResponse({ surfaces: {} })],
+      ["/api/rookieui/xyz-plot/estimate", apiResponse({ status: "ok", estimate: { total_jobs: 1 } })],
+    ]);
     const app = {
       registerExtension(definition) {
         return Promise.resolve(definition.setup());
@@ -49,47 +81,12 @@ describe("registerRookieUIBootstrapExtension", () => {
         addEventListener() {},
         removeEventListener() {},
         fetchApi: vi.fn(async (path, options = {}) => {
-          fetchApiCalls.push([path, options]);
-          if (path === "/rookieui/capabilities") {
-            return apiResponse(createDefaultCapabilities());
-          }
-          if (path === "/rookieui/generate/txt2img") {
-            return apiResponse({
-              mode: "queued",
-              workflow_kind: "txt2img-sd15",
-              submission: { accepted: true, prompt_id: "prompt-prefixed" },
-            });
-          }
-          if (path === "/rookieui/generate/img2img") {
-            return apiResponse({
-              mode: "queued",
-              workflow_kind: "img2img-sd15",
-              submission: { accepted: true, prompt_id: "img2img-prefixed" },
-            });
-          }
-          if (path === "/rookieui/pnginfo/inspect") {
-            return apiResponse({ status: "ok", payload: {} });
-          }
-          if (path === "/rookieui/extras/run") {
-            return apiResponse({
-              mode: "queued",
-              workflow_kind: "extras",
-              submission: { accepted: true, prompt_id: "extras-prefixed" },
-            });
-          }
-          if (typeof path === "string" && path.startsWith("/rookieui/queue")) {
+          const networkPath = apiURL(path);
+          fetchApiCalls.push([path, networkPath, options]);
+          if (typeof networkPath === "string" && networkPath.startsWith("/api/rookieui/queue")) {
             return apiResponse({ jobs: [] });
           }
-          if (path === "/rookieui/controlnet/model_list") {
-            return apiResponse({ model_list: [] });
-          }
-          if (path === "/rookieui/prompt-tools/providers") {
-            return apiResponse({ surfaces: {} });
-          }
-          if (path === "/rookieui/xyz-plot/estimate") {
-            return apiResponse({ status: "ok", estimate: { total_jobs: 1 } });
-          }
-          return apiResponse({});
+          return responseByNetworkPath.get(networkPath) ?? apiResponse({});
         }),
       },
       extensionManager: {
@@ -121,7 +118,14 @@ describe("registerRookieUIBootstrapExtension", () => {
         "/rookieui/xyz-plot/estimate",
       ]),
     );
-    expect(fetchApiCalls.some(([path]) => typeof path === "string" && path.startsWith("/rookieui/queue"))).toBe(true);
+    expect(fetchApiCalls.map(([, networkPath]) => networkPath)).toEqual(
+      expect.arrayContaining([
+        "/api/rookieui/capabilities",
+        "/api/rookieui/generate/txt2img",
+        "/api/rookieui/generate/img2img",
+      ]),
+    );
+    expect(fetchApiCalls.some(([, networkPath]) => typeof networkPath === "string" && networkPath.startsWith("/api/rookieui/queue"))).toBe(true);
     expect(result.ok).toBe(true);
     expect(result.data.submission.prompt_id).toBe("prompt-prefixed");
   });

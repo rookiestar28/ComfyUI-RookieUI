@@ -19,6 +19,7 @@ class RouteGuardTests(unittest.TestCase):
 
     def test_accepts_internal_route_path(self) -> None:
         self.assertEqual(validate_internal_route_path("/rookieui/health"), "/rookieui/health")
+        self.assertEqual(validate_internal_route_path("/api/rookieui/health"), "/api/rookieui/health")
 
     def test_rejects_external_route_path(self) -> None:
         with self.assertRaises(ValueError):

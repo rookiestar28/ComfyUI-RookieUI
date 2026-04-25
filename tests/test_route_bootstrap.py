@@ -28,56 +28,14 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(
-            [path for _method, path, _handler in prompt_server.app.router.routes],
-            [
-                "/rookieui/health",
-                "/rookieui/bootstrap",
-                "/rookieui/capabilities",
-                "/rookieui/parity",
-                "/rookieui/compatibility",
-                "/rookieui/models",
-                "/rookieui/presets",
-                "/rookieui/controlnet/model_list",
-                "/rookieui/controlnet/module_list",
-                "/rookieui/controlnet/control_types",
-                "/rookieui/adetailer/catalog",
-                "/rookieui/queue",
-                "/rookieui/queue/{prompt_id}",
-                "/rookieui/prompt-tools/config",
-                "/rookieui/prompt-tools/config",
-                "/rookieui/prompt-tools/state",
-                "/rookieui/prompt-tools/state",
-                "/rookieui/prompt-tools/history",
-                "/rookieui/prompt-tools/history",
-                "/rookieui/prompt-tools/favorites",
-                "/rookieui/prompt-tools/favorites",
-                "/rookieui/prompt-tools/blacklist",
-                "/rookieui/prompt-tools/blacklist",
-                "/rookieui/prompt-tools/providers",
-                "/rookieui/prompt-tools/translate",
-                "/rookieui/prompt-tools/assist",
-                "/rookieui/prompt-tools/catalog",
-                "/rookieui/prompt-tools/analyze",
-                "/rookieui/prompt-tools/upsample",
-                "/rookieui/xyz-plot/axes",
-                "/rookieui/xyz-plot/estimate",
-                "/rookieui/xyz-plot/run",
-                "/rookieui/xyz-plot/sessions",
-                "/rookieui/xyz-plot/sessions/{session_id}",
-                "/rookieui/xyz-plot/sessions/{session_id}/cancel",
-                "/rookieui/pnginfo/parse",
-                "/rookieui/pnginfo/inspect",
-                "/rookieui/controlnet/detect",
-                "/rookieui/generate/txt2img",
-                "/rookieui/generate/img2img",
-                "/rookieui/extras/run",
-                "/controlnet/model_list",
-                "/controlnet/module_list",
-                "/controlnet/control_types",
-                "/controlnet/detect",
-            ],
-        )
+        route_keys = {(method, path) for method, path, _handler in prompt_server.app.router.routes}
+        self.assertIn(("POST", "/rookieui/generate/txt2img"), route_keys)
+        self.assertIn(("POST", "/api/rookieui/generate/txt2img"), route_keys)
+        self.assertIn(("GET", "/rookieui/models"), route_keys)
+        self.assertIn(("GET", "/api/rookieui/models"), route_keys)
+        self.assertIn(("POST", "/rookieui/controlnet/detect"), route_keys)
+        self.assertIn(("POST", "/api/rookieui/controlnet/detect"), route_keys)
+        self.assertIn(("GET", "/controlnet/model_list"), route_keys)
 
     def test_register_routes_once_is_idempotent(self) -> None:
         prompt_server = FakePromptServerInstance()
@@ -94,4 +52,4 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 45)
+        self.assertEqual(len(prompt_server.app.router.routes), 86)

@@ -27,6 +27,7 @@ class Txt2ImgRequest:
     cfg_scale: float | None = None
     shift: float | None = None
     flux_guidance: float | None = None
+    edit_megapixels: float | None = None
     sampler_name: str | None = None
     scheduler_name: str | None = None
     prompt_enhancement_enabled: bool | None = None
@@ -134,6 +135,7 @@ class NormalizedTxt2ImgRequest:
     cfg_scale: float
     shift: float | None
     flux_guidance: float | None
+    edit_megapixels: float | None
     sampler_name: str
     scheduler_name: str
     prompt_enhancement_enabled: bool

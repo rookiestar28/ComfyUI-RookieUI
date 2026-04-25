@@ -62,6 +62,8 @@ _MIN_SHIFT = 0.0
 _MAX_SHIFT = 20.0
 _MIN_FLUX_GUIDANCE = 0.0
 _MAX_FLUX_GUIDANCE = 20.0
+_MIN_EDIT_MEGAPIXELS = 0.25
+_MAX_EDIT_MEGAPIXELS = 8.0
 _DTYPE_PROFILE_ALIASES = {
     "automatic": {"automatic"},
     "automatic_fp16_lora": {"automatic_fp16_lora", "automatic (fp16 lora)", "automatic fp16 lora"},
@@ -327,6 +329,16 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         minimum=_MIN_FLUX_GUIDANCE,
         maximum=_MAX_FLUX_GUIDANCE,
     )
+    # CRITICAL: txt2img receives the same frontend preset payload shape as non-SD edit flows.
+    # Keep this field contract-visible so hidden/empty controls do not crash before validation.
+    edit_megapixels = _coerce_optional_profile_float(
+        request.edit_megapixels,
+        profile_entry.default_edit_megapixels,
+        applied_defaults,
+        field_name="edit_megapixels",
+        minimum=_MIN_EDIT_MEGAPIXELS,
+        maximum=_MAX_EDIT_MEGAPIXELS,
+    )
 
     sampler_input = normalize_option_label(request.sampler_name, "sampler_name")
     if not sampler_input:
@@ -509,6 +521,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         cfg_scale=cfg_scale,
         shift=shift,
         flux_guidance=flux_guidance,
+        edit_megapixels=edit_megapixels,
         sampler_name=sampler_name,
         scheduler_name=scheduler_name,
         prompt_enhancement_enabled=prompt_enhancement_enabled,

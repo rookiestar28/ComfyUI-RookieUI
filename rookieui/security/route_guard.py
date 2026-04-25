@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 INTERNAL_ROUTE_PREFIX = "/rookieui"
+API_INTERNAL_ROUTE_PREFIX = f"/api{INTERNAL_ROUTE_PREFIX}"
 _registered_route_keys: set[tuple[str, str]] = set()
 
 
@@ -28,7 +29,7 @@ def validate_route_path(path: str, *, allowed_prefixes: tuple[str, ...]) -> str:
 
 
 def validate_internal_route_path(path: str) -> str:
-    return validate_route_path(path, allowed_prefixes=(INTERNAL_ROUTE_PREFIX,))
+    return validate_route_path(path, allowed_prefixes=(INTERNAL_ROUTE_PREFIX, API_INTERNAL_ROUTE_PREFIX))
 
 
 class SafeRouteRegistrar:

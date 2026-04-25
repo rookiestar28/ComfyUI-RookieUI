@@ -62,7 +62,7 @@ from rookieui.services.controlnet import (
 from rookieui.services.adetailer import build_adetailer_catalog_payload
 from rookieui.security.asset_guard import normalize_metadata_text
 from rookieui.security.request_guard import normalize_client_id, normalize_option_label
-from rookieui.security.route_guard import INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
+from rookieui.security.route_guard import API_INTERNAL_ROUTE_PREFIX, INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
 
 INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/health",
@@ -1117,49 +1117,70 @@ def _register_controlnet_alias_routes(prompt_server: Any) -> None:
     alias_registrar.add_post("/controlnet/detect", controlnet_detect)
 
 
+def _register_rookieui_route_pair(registrar: SafeRouteRegistrar, method: str, suffix: str, handler: Any) -> None:
+    for prefix in (INTERNAL_ROUTE_PREFIX, API_INTERNAL_ROUTE_PREFIX):
+        path = f"{prefix}{suffix}"
+        if method == "GET":
+            registrar.add_get(path, handler)
+        elif method == "POST":
+            registrar.add_post(path, handler)
+        else:
+            raise ValueError(f"Unsupported RookieUI route method: {method}")
+
+
+def _register_rookieui_get(registrar: SafeRouteRegistrar, suffix: str, handler: Any) -> None:
+    _register_rookieui_route_pair(registrar, "GET", suffix, handler)
+
+
+def _register_rookieui_post(registrar: SafeRouteRegistrar, suffix: str, handler: Any) -> None:
+    _register_rookieui_route_pair(registrar, "POST", suffix, handler)
+
+
 def register_routes(prompt_server: Any) -> None:
-    registrar = SafeRouteRegistrar(prompt_server.app.router)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/health", health)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/bootstrap", bootstrap)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/capabilities", capabilities)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/parity", parity)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/compatibility", compatibility)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/models", models)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/presets", presets)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/model_list", controlnet_model_list)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/module_list", controlnet_module_list)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/controlnet/control_types", controlnet_control_types)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/adetailer/catalog", adetailer_catalog)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue", queue)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/queue/{{prompt_id}}", queue_prompt)
+    registrar = SafeRouteRegistrar(prompt_server.app.router, allowed_prefixes=(INTERNAL_ROUTE_PREFIX, API_INTERNAL_ROUTE_PREFIX))
+    # CRITICAL: ComfyUI app.api.fetchApi('/rookieui/...') resolves to '/api/rookieui/...'.
+    # Direct custom-node app.router registration does not get ComfyUI's automatic /api route clone.
+    _register_rookieui_get(registrar, "/health", health)
+    _register_rookieui_get(registrar, "/bootstrap", bootstrap)
+    _register_rookieui_get(registrar, "/capabilities", capabilities)
+    _register_rookieui_get(registrar, "/parity", parity)
+    _register_rookieui_get(registrar, "/compatibility", compatibility)
+    _register_rookieui_get(registrar, "/models", models)
+    _register_rookieui_get(registrar, "/presets", presets)
+    _register_rookieui_get(registrar, "/controlnet/model_list", controlnet_model_list)
+    _register_rookieui_get(registrar, "/controlnet/module_list", controlnet_module_list)
+    _register_rookieui_get(registrar, "/controlnet/control_types", controlnet_control_types)
+    _register_rookieui_get(registrar, "/adetailer/catalog", adetailer_catalog)
+    _register_rookieui_get(registrar, "/queue", queue)
+    _register_rookieui_get(registrar, "/queue/{prompt_id}", queue_prompt)
     # IMPORTANT: keep prompt-workbench tooling under one coherent /prompt-tools/* family; scattering these routes
     # would reopen the phase-60 ownership contract before the workbench ships.
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/config", prompt_tools_config)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/config", prompt_tools_config_update)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/state", prompt_tools_state)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/state", prompt_tools_state_update)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history", prompt_tools_history)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/history", prompt_tools_history_update)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites", prompt_tools_favorites)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites", prompt_tools_favorites_update)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist", prompt_tools_blacklist_update)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/providers", prompt_tools_providers)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/translate", prompt_tools_translate)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist", prompt_tools_assist)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog", prompt_tools_catalog)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/analyze", prompt_tools_analyze)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/upsample", prompt_tools_upsample)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/axes", xyz_plot_axes)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/estimate", xyz_plot_estimate)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/run", xyz_plot_run)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions", xyz_plot_sessions)
-    registrar.add_get(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}", xyz_plot_session_detail)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/xyz-plot/sessions/{{session_id}}/cancel", xyz_plot_session_cancel)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/parse", pnginfo_parse)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/pnginfo/inspect", pnginfo_inspect)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/controlnet/detect", controlnet_detect)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/txt2img", txt2img)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/generate/img2img", img2img)
-    registrar.add_post(f"{INTERNAL_ROUTE_PREFIX}/extras/run", extras_run)
+    _register_rookieui_get(registrar, "/prompt-tools/config", prompt_tools_config)
+    _register_rookieui_post(registrar, "/prompt-tools/config", prompt_tools_config_update)
+    _register_rookieui_get(registrar, "/prompt-tools/state", prompt_tools_state)
+    _register_rookieui_post(registrar, "/prompt-tools/state", prompt_tools_state_update)
+    _register_rookieui_get(registrar, "/prompt-tools/history", prompt_tools_history)
+    _register_rookieui_post(registrar, "/prompt-tools/history", prompt_tools_history_update)
+    _register_rookieui_get(registrar, "/prompt-tools/favorites", prompt_tools_favorites)
+    _register_rookieui_post(registrar, "/prompt-tools/favorites", prompt_tools_favorites_update)
+    _register_rookieui_get(registrar, "/prompt-tools/blacklist", prompt_tools_blacklist)
+    _register_rookieui_post(registrar, "/prompt-tools/blacklist", prompt_tools_blacklist_update)
+    _register_rookieui_get(registrar, "/prompt-tools/providers", prompt_tools_providers)
+    _register_rookieui_post(registrar, "/prompt-tools/translate", prompt_tools_translate)
+    _register_rookieui_post(registrar, "/prompt-tools/assist", prompt_tools_assist)
+    _register_rookieui_get(registrar, "/prompt-tools/catalog", prompt_tools_catalog)
+    _register_rookieui_post(registrar, "/prompt-tools/analyze", prompt_tools_analyze)
+    _register_rookieui_post(registrar, "/prompt-tools/upsample", prompt_tools_upsample)
+    _register_rookieui_get(registrar, "/xyz-plot/axes", xyz_plot_axes)
+    _register_rookieui_post(registrar, "/xyz-plot/estimate", xyz_plot_estimate)
+    _register_rookieui_post(registrar, "/xyz-plot/run", xyz_plot_run)
+    _register_rookieui_get(registrar, "/xyz-plot/sessions", xyz_plot_sessions)
+    _register_rookieui_get(registrar, "/xyz-plot/sessions/{session_id}", xyz_plot_session_detail)
+    _register_rookieui_post(registrar, "/xyz-plot/sessions/{session_id}/cancel", xyz_plot_session_cancel)
+    _register_rookieui_post(registrar, "/pnginfo/parse", pnginfo_parse)
+    _register_rookieui_post(registrar, "/pnginfo/inspect", pnginfo_inspect)
+    _register_rookieui_post(registrar, "/controlnet/detect", controlnet_detect)
+    _register_rookieui_post(registrar, "/generate/txt2img", txt2img)
+    _register_rookieui_post(registrar, "/generate/img2img", img2img)
+    _register_rookieui_post(registrar, "/extras/run", extras_run)
     _register_controlnet_alias_routes(prompt_server)

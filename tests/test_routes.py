@@ -8,9 +8,17 @@ from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.services.version import resolve_runtime_build_fingerprint, resolve_shell_version
+from rookieui.security.route_guard import reset_registered_routes_for_tests
+from tests.helpers.fake_prompt_server import FakePromptServerInstance
 
 
 class RoutePayloadTests(unittest.TestCase):
+    def setUp(self) -> None:
+        reset_registered_routes_for_tests()
+
+    def tearDown(self) -> None:
+        reset_registered_routes_for_tests()
+
     def test_health_payload_shape(self) -> None:
         self.assertEqual(
             routes.build_health_payload(),
@@ -174,3 +182,14 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_catalog")
         self.assertTrue(payload["group_tags"]["groups"])
         self.assertTrue(payload["prompt_library"]["sections"])
+
+    def test_register_routes_exposes_api_prefixed_rookieui_routes_for_fetch_api(self) -> None:
+        prompt_server = FakePromptServerInstance()
+
+        routes.register_routes(prompt_server)
+
+        route_keys = {(method, path) for method, path, _ in prompt_server.app.router.routes}
+        self.assertIn(("POST", "/rookieui/generate/txt2img"), route_keys)
+        self.assertIn(("POST", "/api/rookieui/generate/txt2img"), route_keys)
+        self.assertIn(("GET", "/rookieui/models"), route_keys)
+        self.assertIn(("GET", "/api/rookieui/models"), route_keys)

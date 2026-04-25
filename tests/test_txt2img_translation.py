@@ -44,6 +44,17 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(request.dtype_profile, "automatic_fp16_lora")
 
+    def test_normalize_txt2img_request_accepts_frontend_edit_megapixels_field(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "profile": "sd15",
+                "edit_megapixels": None,
+            }
+        )
+
+        self.assertIsNone(request.edit_megapixels)
+
     def test_normalize_txt2img_request_normalizes_adetailer_block(self) -> None:
         request = normalize_txt2img_request(
             {
