@@ -189,7 +189,19 @@ class RoutePayloadTests(unittest.TestCase):
         routes.register_routes(prompt_server)
 
         route_keys = {(method, path) for method, path, _ in prompt_server.app.router.routes}
-        self.assertIn(("POST", "/rookieui/generate/txt2img"), route_keys)
-        self.assertIn(("POST", "/api/rookieui/generate/txt2img"), route_keys)
-        self.assertIn(("GET", "/rookieui/models"), route_keys)
-        self.assertIn(("GET", "/api/rookieui/models"), route_keys)
+        rookieui_route_keys = {
+            (method, path)
+            for method, path in route_keys
+            if path.startswith("/rookieui/")
+        }
+        self.assertGreater(len(rookieui_route_keys), 30)
+        for method, path in rookieui_route_keys:
+            with self.subTest(method=method, path=path):
+                self.assertIn((method, f"/api{path}"), route_keys)
+
+        api_route_keys = {
+            (method, path)
+            for method, path in route_keys
+            if path.startswith("/api/rookieui/")
+        }
+        self.assertEqual(len(api_route_keys), len(rookieui_route_keys))

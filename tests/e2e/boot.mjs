@@ -13,6 +13,9 @@ const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
 const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 const rejectRookieModels = params.get("rejectRookieModels") === "1";
 
+const apiURL = (route) => (typeof route === "string" && route.startsWith("/api") ? route : `/api${route}`);
+const normalizeE2EApiRoute = (url) => (typeof url === "string" && url.startsWith("/api/") ? url.slice(4) : url);
+
 const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
   sd15: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
   sdxl: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
@@ -307,6 +310,7 @@ window.__ROOKIEUI_E2E_REQUESTS__ = {
   txt2img: [],
   img2img: [],
   extras: [],
+  fetchApiNetworkPaths: [],
   xyzPlot: {
     estimate: [],
     run: [],
@@ -319,7 +323,8 @@ window.__ROOKIEUI_E2E_XYZ__ = {
 };
 
 async function handleE2EFetch(url, options = {}) {
-  if (url === "/rookieui/generate/txt2img") {
+  const route = normalizeE2EApiRoute(url);
+  if (route === "/rookieui/generate/txt2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.txt2img.push(payload);
     return new Response(
@@ -338,7 +343,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/generate/img2img") {
+  if (route === "/rookieui/generate/img2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.img2img.push(payload);
     return new Response(
@@ -357,7 +362,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/pnginfo/inspect") {
+  if (route === "/rookieui/pnginfo/inspect") {
     return new Response(
       JSON.stringify({
         service: "rookieui",
@@ -389,7 +394,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/extras/run") {
+  if (route === "/rookieui/extras/run") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.extras.push(payload);
     return new Response(
@@ -408,7 +413,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/xyz-plot/axes") {
+  if (route === "/rookieui/xyz-plot/axes") {
     return new Response(
       JSON.stringify({
         contract: {
@@ -536,7 +541,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/xyz-plot/estimate") {
+  if (route === "/rookieui/xyz-plot/estimate") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.estimate.push(payload);
     const axisCount = Array.isArray(payload.axes) ? payload.axes.length : 0;
@@ -559,7 +564,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/xyz-plot/run") {
+  if (route === "/rookieui/xyz-plot/run") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run.push(payload);
     const sessionId = `xyz-e2e-${window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.run.length}`;
@@ -601,8 +606,8 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/rookieui/xyz-plot/sessions/") && url.endsWith("/cancel")) {
-    const sessionId = url.split("/").at(-2);
+  if (route.startsWith("/rookieui/xyz-plot/sessions/") && route.endsWith("/cancel")) {
+    const sessionId = route.split("/").at(-2);
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.xyzPlot.cancel.push({ sessionId, payload });
     const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
@@ -632,8 +637,8 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/rookieui/xyz-plot/sessions/")) {
-    const sessionId = url.split("?")[0].split("/").pop();
+  if (route.startsWith("/rookieui/xyz-plot/sessions/")) {
+    const sessionId = route.split("?")[0].split("/").pop();
     const session = window.__ROOKIEUI_E2E_XYZ__.sessions[sessionId] ?? {
       session_id: sessionId,
       status: "completed",
@@ -688,7 +693,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/rookieui/xyz-plot/sessions")) {
+  if (route.startsWith("/rookieui/xyz-plot/sessions")) {
     return new Response(
       JSON.stringify({
         sessions: Object.values(window.__ROOKIEUI_E2E_XYZ__.sessions),
@@ -700,7 +705,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/models") {
+  if (route === "/rookieui/models") {
     if (rejectRookieModels) {
       return new Response(JSON.stringify({ status: "not-found" }), {
         status: 404,
@@ -761,7 +766,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/object_info") {
+  if (route === "/object_info") {
     return new Response(
       JSON.stringify({
         CheckpointLoaderSimple: {
@@ -815,7 +820,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/compatibility") {
+  if (route === "/rookieui/compatibility") {
     return new Response(
       JSON.stringify({
         source: "internal",
@@ -847,8 +852,8 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/rookieui/queue/")) {
-    const promptId = url.split("?")[0].split("/").pop();
+  if (route.startsWith("/rookieui/queue/")) {
+    const promptId = route.split("?")[0].split("/").pop();
     return new Response(
       JSON.stringify({
         source: "host",
@@ -867,8 +872,8 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/history/")) {
-    const promptId = url.split("/").pop();
+  if (route.startsWith("/history/")) {
+    const promptId = route.split("/").pop();
     return new Response(
       JSON.stringify({
         [promptId]: {
@@ -886,7 +891,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url.startsWith("/rookieui/queue")) {
+  if (route.startsWith("/rookieui/queue")) {
     return new Response(
       JSON.stringify({
         source: "host",
@@ -907,7 +912,7 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
-  if (url === "/rookieui/presets") {
+  if (route === "/rookieui/presets") {
     return new Response(
       JSON.stringify({
         source: "host",
@@ -996,7 +1001,11 @@ const app = createMockComfyUIApp({
         clientId: "e2e-runtime-api-client",
         addEventListener() {},
         removeEventListener() {},
-        fetchApi: handleE2EFetch,
+        fetchApi: (route, options = {}) => {
+          const networkPath = apiURL(route);
+          window.__ROOKIEUI_E2E_REQUESTS__.fetchApiNetworkPaths.push(networkPath);
+          return handleE2EFetch(networkPath, options);
+        },
       }
     : null,
 });

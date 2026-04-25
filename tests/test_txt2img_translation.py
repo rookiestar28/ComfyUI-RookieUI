@@ -1241,6 +1241,56 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["payload"]["normalized_request"]["dtype_profile"], "automatic")
         self.assertEqual(response["payload"]["submission"]["mode"], "dry-run")
 
+    def test_txt2img_route_accepts_full_frontend_submit_payload(self) -> None:
+        response = asyncio.run(
+            routes.txt2img(
+                _FakeJsonRequest(
+                    {
+                        "prompt": "forest shrine",
+                        "negative_prompt": "low quality",
+                        "profile": "sd15",
+                        "dtype_profile": "Automatic",
+                        "checkpoint_name": "__host_default__",
+                        "vae_name": "Automatic",
+                        "text_encoder_name": "Automatic",
+                        "template_lora_name": "",
+                        "lora_name": "",
+                        "lora_strength_model": 1.0,
+                        "lora_strength_clip": 1.0,
+                        "width": 512,
+                        "height": 512,
+                        "steps": 20,
+                        "cfg_scale": 7.0,
+                        "shift": None,
+                        "flux_guidance": None,
+                        "edit_megapixels": None,
+                        "sampler_name": "Euler a",
+                        "scheduler_name": "normal",
+                        "prompt_enhancement_enabled": None,
+                        "seed": -1,
+                        "seed_extra": False,
+                        "batch_size": 1,
+                        "batch_count": 1,
+                        "clip_skip": 1,
+                        "hires_enabled": False,
+                        "hires_scale": 1.5,
+                        "hires_steps": None,
+                        "hires_denoise": 0.35,
+                        "hires_upscale_method": "bislerp",
+                        "adetailer": {"enabled": False, "units": []},
+                        "controlnet_units": [],
+                        "alwayson_scripts": {},
+                        "dry_run": True,
+                    }
+                )
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        normalized = response["payload"]["normalized_request"]
+        self.assertEqual(normalized["profile"], "sd15")
+        self.assertIsNone(normalized["edit_megapixels"])
+
     def test_txt2img_route_keeps_legacy_truthy_dry_run_string_behavior(self) -> None:
         response = asyncio.run(
             routes.txt2img(
