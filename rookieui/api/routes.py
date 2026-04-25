@@ -316,7 +316,8 @@ async def adetailer_catalog(request: Any) -> Any:
 async def queue(request: Any) -> Any:
     try:
         client_id = normalize_client_id(_read_request_query_value(request, "client_id"))
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
+        # DEBUG HOTSPOT: frontend Extras payload drift must be contained as JSON invalid-request.
         return _json_response(
             {
                 "service": normalize_metadata_text("rookieui"),
@@ -1032,7 +1033,8 @@ async def txt2img(request: Any) -> Any:
         client_id = normalize_client_id(request_payload.pop("client_id", None))
         normalized = normalize_txt2img_request(request_payload)
         translation = translate_txt2img_request(normalized)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
+        # DEBUG HOTSPOT: route-entry payload drift must return JSON invalid-request, not an aiohttp traceback.
         _LOGGER.warning("RookieUI txt2img rejected invalid request: %s", str(exc))
         return _json_response(
             {
@@ -1061,7 +1063,8 @@ async def img2img(request: Any) -> Any:
         client_id = normalize_client_id(request_payload.pop("client_id", None))
         normalized = normalize_img2img_request(request_payload)
         translation = translate_img2img_request(normalized)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
+        # DEBUG HOTSPOT: route-entry payload drift must return JSON invalid-request, not an aiohttp traceback.
         _LOGGER.warning("RookieUI img2img rejected invalid request: %s", str(exc))
         return _json_response(
             {

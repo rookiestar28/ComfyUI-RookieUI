@@ -1268,6 +1268,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           appendTextElement,
           readFileAsDataUrl,
           syncBoundControls,
+          detectControlNetRequest: bootstrapState.detectControlNetRequest,
           onStatusMessage: (message) => {
             statusNode.textContent = message;
           },

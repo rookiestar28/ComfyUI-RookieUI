@@ -8,6 +8,7 @@ import {
   fetchRookieUIHistoryPrompt,
   fetchRookieUIQueue,
   fetchRookieUIQueueJob,
+  detectRookieUIControlNet,
   inspectRookieUIPngInfo,
   submitRookieUIExtras,
   submitRookieUIImg2Img,
@@ -152,7 +153,6 @@ export function registerRookieUIBootstrapExtension({
 
   return app.registerExtension({
     name: "ComfyUI-RookieUI",
-
     async setup() {
       const runtimeApi = app?.api ?? windowRef?.app?.api ?? null;
       const apiFetch = createRookieUIHostFetch(fetchImpl, runtimeApi);
@@ -179,14 +179,14 @@ export function registerRookieUIBootstrapExtension({
         clientId,
         runtimeApi,
         fetchQueueRequest: (scopeClientId = clientId) => fetchRookieUIQueue(apiFetch, { clientId: scopeClientId }),
-        fetchQueueJobRequest: (promptId, scopeClientId = clientId) =>
-          fetchRookieUIQueueJob(promptId, { clientId: scopeClientId }, apiFetch),
+        fetchQueueJobRequest: (promptId, scopeClientId = clientId) => fetchRookieUIQueueJob(promptId, { clientId: scopeClientId }, apiFetch),
         fetchPromptHistoryRequest: (promptId) => fetchRookieUIHistoryPrompt(promptId, apiFetch),
         submitTxt2ImgRequest: (payload) => submitRookieUITxt2Img(payload, apiFetch),
         submitImg2ImgRequest: (payload) => submitRookieUIImg2Img(payload, apiFetch),
         inspectPngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, apiFetch),
         parsePngInfoRequest: (payload) => inspectRookieUIPngInfo(payload, apiFetch),
         submitExtrasRequest: (payload) => submitRookieUIExtras(payload, apiFetch),
+        detectControlNetRequest: (payload) => detectRookieUIControlNet(payload, apiFetch),
         fetchControlNetModelListRequest: () => fetchRookieUIControlNetModels(apiFetch),
         fetchControlNetModuleListRequest: () => fetchRookieUIControlNetModules(apiFetch),
         fetchControlNetTypeListRequest: () => fetchRookieUIControlNetTypes(apiFetch),

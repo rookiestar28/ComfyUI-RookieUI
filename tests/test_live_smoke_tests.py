@@ -38,6 +38,27 @@ def _build_bootstrap_payload(*, build_fingerprint: str | None = None) -> dict[st
 
 
 class LiveSmokeFreshnessTests(unittest.TestCase):
+    def test_normalize_base_url_keeps_direct_route_mode_unprefixed(self) -> None:
+        self.assertEqual(
+            live_smoke._normalize_base_url("http://127.0.0.1:8188/", route_mode="direct"),
+            "http://127.0.0.1:8188",
+        )
+
+    def test_normalize_base_url_applies_hosted_api_route_mode_once(self) -> None:
+        self.assertEqual(
+            live_smoke._normalize_base_url("http://127.0.0.1:8188/", route_mode="hosted-api"),
+            "http://127.0.0.1:8188/api",
+        )
+        self.assertEqual(
+            live_smoke._normalize_base_url("http://127.0.0.1:8188/api/", route_mode="hosted-api"),
+            "http://127.0.0.1:8188/api",
+        )
+
+    def test_parser_accepts_explicit_live_route_mode(self) -> None:
+        args = live_smoke._build_parser().parse_args(["--route-mode", "hosted-api"])
+
+        self.assertEqual(args.route_mode, "hosted-api")
+
     def test_validate_live_host_freshness_reports_build_fingerprint_drift(self) -> None:
         errors = live_smoke._validate_live_host_freshness(
             live_smoke.LiveHostFreshnessContext(

@@ -943,6 +943,7 @@ export function createControlNetUnitEditor({
   appendTextElement,
   readFileAsDataUrl,
   syncBoundControls,
+  detectControlNetRequest = null,
   onStatusMessage = null,
   unitCount = DEFAULT_UNIT_COUNT,
   controlTypeOrder = DEFAULT_CONTROL_TYPE_OPTIONS,
@@ -1197,7 +1198,8 @@ export function createControlNetUnitEditor({
       return;
     }
 
-    if (typeof globalThis.fetch !== "function") {
+    const apiDetect = typeof detectControlNetRequest === "function" ? detectControlNetRequest : null;
+    if (!apiDetect && typeof globalThis.fetch !== "function") {
       if (onStatusMessage) {
         onStatusMessage("ControlNet preprocessor is unavailable because fetch() is not available.");
       }
@@ -1220,26 +1222,35 @@ export function createControlNetUnitEditor({
       }, RUN_PREPROCESSOR_TIMEOUT_MS);
     }
     try {
-      const response = await globalThis.fetch("/rookieui/controlnet/detect", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          controlnet_module: moduleName,
-          controlnet_model: selectedControlModel,
-          controlnet_input_images: [sourceImage],
-          controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
-          controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
-          controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
-          controlnet_pixel_perfect: row.pixelPerfect.checked,
-          controlnet_resize_mode: row.resizeMode.value,
-          controlnet_masks: maskImage ? [maskImage] : [],
-          low_vram: false,
-        }),
-        signal: abortController?.signal,
-      });
+      const detectPayload = {
+        controlnet_module: moduleName,
+        controlnet_model: selectedControlModel,
+        controlnet_input_images: [sourceImage],
+        controlnet_processor_res: Math.round(normalizeNumber(row.processorRes.value, 512)),
+        controlnet_threshold_a: normalizeNumber(row.thresholdA.value, 64),
+        controlnet_threshold_b: normalizeNumber(row.thresholdB.value, 64),
+        controlnet_pixel_perfect: row.pixelPerfect.checked,
+        controlnet_resize_mode: row.resizeMode.value,
+        controlnet_masks: maskImage ? [maskImage] : [],
+        low_vram: false,
+      };
+      // CRITICAL: use the bootstrap API binding when present; direct global fetch breaks under ComfyUI /api-hosted deployments.
+      const apiResult = apiDetect ? await apiDetect(detectPayload) : null;
+      const response = apiResult
+        ? {
+            ok: Boolean(apiResult.ok),
+            status: Number(apiResult.status ?? 0),
+            json: async () => apiResult.data ?? {},
+          }
+        : await globalThis.fetch("/rookieui/controlnet/detect", {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(detectPayload),
+            signal: abortController?.signal,
+          });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = String(data?.detail ?? "").trim();

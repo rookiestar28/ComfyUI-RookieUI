@@ -33,6 +33,68 @@ test("submits txt2img through the ComfyUI runtime API resolver when root API pat
   expect(requestCapture.rootFetchPaths).toEqual([]);
 });
 
+test("routes bootstrap request bindings through the ComfyUI runtime API resolver", async ({ page }) => {
+  await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1");
+  await expect(page.locator("#rookieui-root")).toContainText('"clientId":"e2e-runtime-api-client"');
+  await page.evaluate(async () => {
+    await window.__ROOKIEUI_BOOTSTRAP__.submitImg2ImgRequest({
+      prompt: "runtime-bound variation",
+      image_asset: "input.png",
+      profile: "sd15",
+    });
+    await window.__ROOKIEUI_BOOTSTRAP__.inspectPngInfoRequest({ image_data: "data:image/png;base64,ZmFrZQ==" });
+    await window.__ROOKIEUI_BOOTSTRAP__.submitExtrasRequest({
+      mode: "single_image",
+      image_data: "data:image/png;base64,ZmFrZQ==",
+    });
+    await window.__ROOKIEUI_BOOTSTRAP__.fetchQueueRequest("e2e-runtime-api-client");
+    await window.__ROOKIEUI_BOOTSTRAP__.fetchControlNetModelListRequest();
+    await window.__ROOKIEUI_BOOTSTRAP__.estimateXYZPlotRequest({ mode: "txt2img", axes: [] });
+  });
+
+  const requestCapture = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__ ?? {});
+  expect(requestCapture.fetchApiRoutes).toEqual(
+    expect.arrayContaining([
+      "/rookieui/generate/img2img",
+      "/rookieui/pnginfo/inspect",
+      "/rookieui/extras/run",
+      "/rookieui/controlnet/model_list",
+      "/rookieui/xyz-plot/estimate",
+    ]),
+  );
+  expect(requestCapture.fetchApiNetworkPaths).toEqual(
+    expect.arrayContaining([
+      "/api/rookieui/generate/img2img",
+      "/api/rookieui/pnginfo/inspect",
+      "/api/rookieui/extras/run",
+      "/api/rookieui/controlnet/model_list",
+      "/api/rookieui/xyz-plot/estimate",
+    ]),
+  );
+  expect(requestCapture.fetchApiNetworkPaths.some((path) => path.startsWith("/api/rookieui/queue"))).toBe(true);
+  expect(requestCapture.rootFetchPaths).toEqual([]);
+});
+
+test("runs ControlNet preprocessor through the ComfyUI runtime API resolver", async ({ page }) => {
+  await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1");
+  await expect(page.locator("#rookieui-root")).toContainText('"clientId":"e2e-runtime-api-client"');
+  await page.locator("#rookieui-txt2img-controlnet-section").evaluate((details) => {
+    details.open = true;
+  });
+  await page.locator("#rookieui-txt2img-controlnet-image-data-0").evaluate((input) => {
+    input.value = "data:image/png;base64,aW1hZ2UtY29udHJvbA==";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.locator("#rookieui-txt2img-controlnet-module-0").selectOption("depth");
+  await page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0").click();
+
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("preprocessor completed");
+  const requestCapture = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__ ?? {});
+  expect(requestCapture.fetchApiRoutes).toContain("/rookieui/controlnet/detect");
+  expect(requestCapture.fetchApiNetworkPaths).toContain("/api/rookieui/controlnet/detect");
+  expect(requestCapture.rootFetchPaths).toEqual([]);
+});
+
 test("recovers model selectors from ComfyUI object_info when RookieUI models route is unavailable", async ({ page }) => {
   await page.goto("test-harness.html?rejectRookieModels=1");
   await expect(page.locator("#rookieui-shell-title")).toHaveText("RookieUI");
