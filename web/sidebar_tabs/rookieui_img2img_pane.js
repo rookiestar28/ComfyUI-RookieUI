@@ -904,7 +904,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       return;
     }
     if (!officialResolved) {
-      templateLoraControls.statusNode.textContent = `Official template LoRA '${officialLabel || "template-owned LoRA"}' is not available on the current host. Choose an override to continue with a non-official variant.`;
+      templateLoraControls.statusNode.textContent = `Official template LoRA '${officialLabel || "template-owned LoRA"}' is not available on the current host. Generation can continue; to add a LoRA manually, use <lora:model_name:1> in the prompt.`;
       return;
     }
     if (!currentValue || currentValue === presetDefault) {
@@ -1268,6 +1268,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           appendTextElement,
           readFileAsDataUrl,
           syncBoundControls,
+          detectControlNetRequest: bootstrapState.detectControlNetRequest,
           onStatusMessage: (message) => {
             statusNode.textContent = message;
           },

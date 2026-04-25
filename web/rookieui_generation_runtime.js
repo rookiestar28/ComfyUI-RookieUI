@@ -81,6 +81,11 @@ function formatGenerationProgress(status, progressValue, progressMax) {
   return safeStatus.replace("_", " ");
 }
 
+function appendStatusSuffix(statusText, suffix) {
+  const normalizedSuffix = typeof suffix === "string" ? suffix.trim() : "";
+  return normalizedSuffix ? `${statusText} | ${normalizedSuffix}` : statusText;
+}
+
 function extractRuntimePromptId(detail) {
   if (!detail || typeof detail !== "object") {
     return "";
@@ -364,7 +369,7 @@ export function createGenerationRuntimeHelpers({
     }
   };
 
-  const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox) => {
+  const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "") => {
     if (!runtimeState || !promptId) {
       return;
     }
@@ -403,7 +408,10 @@ export function createGenerationRuntimeHelpers({
       runtimeState.progressValue = typeof detail.value === "number" ? detail.value : runtimeState.progressValue;
       runtimeState.progressMax = typeof detail.max === "number" ? detail.max : runtimeState.progressMax;
       runtimeState.progressSeen = true;
-      statusNode.textContent = formatGenerationProgress("in_progress", runtimeState.progressValue, runtimeState.progressMax);
+      statusNode.textContent = appendStatusSuffix(
+        formatGenerationProgress("in_progress", runtimeState.progressValue, runtimeState.progressMax),
+        statusSuffix,
+      );
     });
     const applyPreviewEvent = (event) => {
       if (runtimeState.runToken !== runToken) {
@@ -440,24 +448,29 @@ export function createGenerationRuntimeHelpers({
         const scopedClientId = resolveActiveClientId(bootstrapState);
         const jobResult = await bootstrapState.fetchQueueJobRequest(promptId, scopedClientId);
         if (!jobResult.ok) {
-          statusNode.textContent = "Waiting for queue sync...";
+          statusNode.textContent = appendStatusSuffix("Waiting for queue sync...", statusSuffix);
           await new Promise((resolve) => setTimeout(resolve, 800));
           continue;
         }
         const queueJob = jobResult.data?.job ?? null;
         if (!queueJob) {
-          statusNode.textContent = "Waiting for queue registration...";
+          statusNode.textContent = appendStatusSuffix("Waiting for queue registration...", statusSuffix);
           await new Promise((resolve) => setTimeout(resolve, 800));
           continue;
         }
 
         finalStatus = String(queueJob.status ?? "pending");
-        statusNode.textContent = formatGenerationProgress(finalStatus, runtimeState.progressValue, runtimeState.progressMax);
+        statusNode.textContent = appendStatusSuffix(
+          formatGenerationProgress(finalStatus, runtimeState.progressValue, runtimeState.progressMax),
+          statusSuffix,
+        );
         if (runtimeState.progressSeen && !runtimeState.previewFrameSeen && Date.now() - startTime >= 4000) {
           // CRITICAL: when host runs with --preview-method none, progress updates still arrive but live preview frames never do; keep an explicit diagnostic instead of silent placeholder stalling.
-          statusNode.textContent =
+          statusNode.textContent = appendStatusSuffix(
             `${formatGenerationProgress(finalStatus, runtimeState.progressValue, runtimeState.progressMax)} | ` +
-            "Live preview frames unavailable (host preview may be disabled).";
+              "Live preview frames unavailable (host preview may be disabled).",
+            statusSuffix,
+          );
         }
         if (["completed", "failed", "cancelled"].includes(finalStatus)) {
           break;
@@ -488,21 +501,21 @@ export function createGenerationRuntimeHelpers({
       const finalImageUrl = buildComfyViewUrl(outputImage);
       if (finalImageUrl) {
         setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
-        statusNode.textContent = `Completed: ${promptId}`;
+        statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
         return;
       }
-      statusNode.textContent = `Completed: ${promptId} (no image output found)`;
+      statusNode.textContent = appendStatusSuffix(`Completed: ${promptId} (no image output found)`, statusSuffix);
       return;
     }
     if (finalStatus === "failed") {
-      statusNode.textContent = `Generation failed: ${promptId}`;
+      statusNode.textContent = appendStatusSuffix(`Generation failed: ${promptId}`, statusSuffix);
       return;
     }
     if (finalStatus === "cancelled") {
-      statusNode.textContent = `Generation cancelled: ${promptId}`;
+      statusNode.textContent = appendStatusSuffix(`Generation cancelled: ${promptId}`, statusSuffix);
       return;
     }
-    statusNode.textContent = `Runtime sync timed out: ${promptId}`;
+    statusNode.textContent = appendStatusSuffix(`Runtime sync timed out: ${promptId}`, statusSuffix);
   };
 
   return {

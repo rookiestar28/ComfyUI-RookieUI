@@ -604,6 +604,56 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             "Qwen-image\\My-Custom-Qwen-Image-LoRA.safetensors",
         )
 
+    def test_missing_official_template_lora_warns_and_allows_txt2img_generation(self) -> None:
+        cases = [
+            (
+                "flux",
+                "Flux\\flux1-dev.safetensors",
+                "clip_l.safetensors|t5xxl_fp8_e4m3fn.safetensors",
+                "ae.safetensors",
+            ),
+            (
+                "qwen_image",
+                "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "qwen_image_vae.safetensors",
+            ),
+        ]
+
+        for profile_id, checkpoint_name, text_encoder_name, vae_name in cases:
+            with self.subTest(profile_id=profile_id):
+                mocked_inventory = mock.Mock(
+                    source="host",
+                    checkpoints=["SDXL\\realvisxl.safetensors"],
+                    diffusion_models=[checkpoint_name],
+                    vae=[vae_name],
+                    text_encoders=text_encoder_name.split("|"),
+                    loras=[],
+                    default_checkpoint="SDXL\\realvisxl.safetensors",
+                    default_vae=vae_name,
+                    default_text_encoder=text_encoder_name.split("|")[0],
+                    controlnet=[],
+                )
+
+                with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=mocked_inventory):
+                    normalized = normalize_txt2img_request(
+                        {
+                            "prompt": "matrix smoke",
+                            "profile": profile_id,
+                            "checkpoint_name": checkpoint_name,
+                            "text_encoder_name": "",
+                            "vae_name": vae_name,
+                        }
+                    )
+
+                self.assertEqual(normalized.template_lora_name, "")
+                self.assertIn("TEMPLATE_LORA_MISSING", normalized.prompt_warning_codes)
+                warning_text = "\n".join(normalized.prompt_warnings)
+                self.assertIn("<lora:model_name:1>", warning_text)
+                workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+                lora_nodes = [node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly"]
+                self.assertEqual(lora_nodes, [])
+
     def test_translate_txt2img_request_chains_inline_and_selected_loras(self) -> None:
         normalized = normalize_txt2img_request(
             {

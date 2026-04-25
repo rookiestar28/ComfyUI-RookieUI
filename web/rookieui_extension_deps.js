@@ -36,6 +36,7 @@ export const {
   submitRookieUIXYZPlotRun,
   assistRookieUIPromptWorkbench,
   cancelRookieUIXYZPlotSession,
+  detectRookieUIControlNet,
   translateRookieUIPromptWorkbench,
   upsampleRookieUIPromptWorkbench,
   updateRookieUIPromptWorkbenchBlacklist,

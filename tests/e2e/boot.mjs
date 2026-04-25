@@ -415,6 +415,25 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
+  if (route === "/rookieui/controlnet/detect") {
+    return new Response(
+      JSON.stringify({
+        service: "rookieui",
+        status: "ok",
+        images: ["data:image/png;base64,cHJlcHJvY2Vzc29yLXByZXZpZXc="],
+        detect_backend: "comfy_host_preprocessor",
+        processor: "DepthAnythingV2",
+        requested_module: "depth",
+        warning_codes: [],
+        warnings: [],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   if (route === "/rookieui/xyz-plot/axes") {
     return new Response(
       JSON.stringify({

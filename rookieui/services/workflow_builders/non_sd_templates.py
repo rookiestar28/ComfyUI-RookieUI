@@ -40,8 +40,6 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     "请据此扩写为一段内容丰富、细节充分的视觉描述，以帮助文生图模型生成高质量的图片。仅输出增强后的描述，"
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
-_FLUX_TEMPLATE_LORA_NAME = "Flux_2-Turbo-LoRA_comfyui.safetensors"
-_QWEN_TEMPLATE_LORA_NAME = "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors"
 _OFFICIAL_NON_SD_TXT2IMG_PROFILES = frozenset(build_non_sd_txt2img_profile_ids())
 _OFFICIAL_NON_SD_EDIT_PROFILES = frozenset(entry.id for entry in list_non_sd_edit_manifest_entries())
 _NON_SD_RUNTIME_ADAPTER_BY_PROFILE = build_non_sd_runtime_adapter_map()
@@ -323,6 +321,7 @@ def _append_model_only_lora_chain(
         )
         if str(candidate or "").strip()
     ]
+    # CRITICAL: do not synthesize official template LoRA names here; ComfyUI Load LoRA raises on missing files.
     for effective_lora_name in effective_template_lora_names:
         chained_model_source = _append_lora_loader_model_only_node(
             workflow,
@@ -700,7 +699,7 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         workflow,
         allocator=allocator,
         model_source=[unet_id, 0],
-        template_lora_name=request.template_lora_name or _FLUX_TEMPLATE_LORA_NAME,
+        template_lora_name=request.template_lora_name,
         inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_flux_dual_clip_source(
@@ -980,7 +979,7 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
         workflow,
         allocator=allocator,
         model_source=[unet_id, 0],
-        template_lora_name=request.template_lora_name or _QWEN_TEMPLATE_LORA_NAME,
+        template_lora_name=request.template_lora_name,
         inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_single_clip_source(

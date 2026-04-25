@@ -52,4 +52,11 @@ class RouteBootstrapTests(unittest.TestCase):
         finally:
             sys.modules.pop("server", None)
 
-        self.assertEqual(len(prompt_server.app.router.routes), 86)
+        route_keys = [(method, path) for method, path, _handler in prompt_server.app.router.routes]
+        self.assertEqual(
+            len(route_keys),
+            len(set(route_keys)),
+            "register_routes_once() must not duplicate route registrations",
+        )
+        self.assertIn(("POST", "/rookieui/generate/txt2img"), route_keys)
+        self.assertIn(("POST", "/api/rookieui/generate/txt2img"), route_keys)

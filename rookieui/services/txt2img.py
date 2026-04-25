@@ -452,10 +452,20 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
             raise ValueError(
                 f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
-        if profile.id == "flux" and not template_lora_name:
-            raise ValueError("template_lora_name requires the official Flux template LoRA in host inventory.")
-        if profile.id == "qwen_image" and not template_lora_name:
-            raise ValueError("template_lora_name requires the official Qwen-Image template LoRA in host inventory.")
+    missing_template_lora_warning = ""
+    if (
+        primary_model_category == "diffusion_models"
+        and profile_entry.template_lora_visible
+        and profile_entry.official_template_lora_label
+        and not template_lora_name
+    ):
+        # DEBUG HOTSPOT: missing official template LoRA is a parity warning, not a generation blocker.
+        missing_template_lora_warning = (
+            f"Official {profile_entry.title} template LoRA "
+            f"'{profile_entry.official_template_lora_label}' is missing from host inventory; "
+            "generation will continue without template-owned LoRA parity. "
+            "To add a LoRA manually in RookieUI, use <lora:model_name:1> in the prompt."
+        )
     seed = validate_seed_range(_coerce_int(request.seed, "seed"))
     execution_seed = resolve_execution_seed(seed)
     seed_extra = _coerce_bool(request.seed_extra, "seed_extra")
@@ -494,6 +504,9 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
 
     prompt_warnings = list(prompt_preprocess.prompt_warnings)
     prompt_warning_codes = list(prompt_preprocess.warning_codes)
+    if missing_template_lora_warning:
+        prompt_warnings.append(missing_template_lora_warning)
+        prompt_warning_codes.append("TEMPLATE_LORA_MISSING")
     if primary_model_category == "diffusion_models" and lora_activations:
         model_only_warnings, model_only_warning_codes = collect_model_only_lora_drift_warnings(lora_activations)
         prompt_warnings.extend(model_only_warnings)

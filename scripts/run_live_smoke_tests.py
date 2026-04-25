@@ -338,6 +338,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="ComfyUI host base URL (default: %(default)s).",
     )
     parser.add_argument(
+        "--route-mode",
+        choices=("direct", "hosted-api"),
+        default=os.getenv("ROOKIEUI_LIVE_ROUTE_MODE", "direct").strip().lower() or "direct",
+        help=(
+            "Route prefix mode for live requests. Use 'direct' for /rookieui/* routes and "
+            "'hosted-api' for ComfyUI /api/rookieui/* routes (default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
         "--profiles",
         default=os.getenv("ROOKIEUI_LIVE_SMOKE_PROFILES", "").strip(),
         help="Comma-separated profile IDs to validate (mode-specific defaults apply when omitted).",
@@ -375,8 +384,12 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _normalize_base_url(base_url: str) -> str:
-    return base_url.rstrip("/")
+def _normalize_base_url(base_url: str, *, route_mode: str = "direct") -> str:
+    normalized = base_url.rstrip("/")
+    if route_mode == "hosted-api":
+        # CRITICAL: live smoke must declare whether it is testing direct backend routes or ComfyUI's /api proxy.
+        return normalized if normalized.endswith("/api") else f"{normalized}/api"
+    return normalized
 
 
 def _request_json(
@@ -4512,12 +4525,13 @@ def _run_adetailer_validation_lane(
 
 def main() -> int:
     args = _build_parser().parse_args()
-    base_url = _normalize_base_url(args.base_url)
+    base_url = _normalize_base_url(args.base_url, route_mode=args.route_mode)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
     if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "prompt-workbench", "xyz-plot", "full-pipeline"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
 
+    print(f"[live-smoke] route_mode={args.route_mode}")
     print(f"[live-smoke] base_url={base_url}")
     print(f"[live-smoke] profiles={','.join(profiles) if profiles else '<none>'}")
     print(f"[live-smoke] validation_mode={args.validation_mode}")
