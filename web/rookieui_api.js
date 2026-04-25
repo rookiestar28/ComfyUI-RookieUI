@@ -1309,6 +1309,8 @@ export async function fetchRookieUIModels(fetchImpl = globalThis.fetch) {
   return fetchRookieUIResource(
     "/rookieui/models",
     {
+      // IMPORTANT: __host_default__ is an inventory-discovery fallback, not a valid model choice;
+      // if it reaches the UI, debug /rookieui/models before changing preset defaults.
       source: "fallback",
       checkpoints: ["__host_default__"],
       clip: [],
@@ -1416,6 +1418,8 @@ export async function fetchRookieUICompatibility(fetchImpl = globalThis.fetch) {
         },
       ],
       dtype_profiles: [
+        // IMPORTANT: keep this fallback in parity with backend compatibility.py;
+        // otherwise transient compatibility-route failures make Diffusion in Low Bits look unsupported.
         {
           id: "automatic",
           title: "Automatic",
@@ -1423,6 +1427,46 @@ export async function fetchRookieUICompatibility(fetchImpl = globalThis.fetch) {
           default: true,
           experimental: false,
           aliases: [],
+        },
+        {
+          id: "automatic_fp16_lora",
+          title: "Automatic (fp16 LoRA)",
+          summary: "Keep the host default dtype while preferring fp16 LoRA execution.",
+          default: false,
+          experimental: false,
+          aliases: [],
+        },
+        {
+          id: "nf4",
+          title: "NF4",
+          summary: "Optional low-bit diffusion storage hint.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "fp4",
+          title: "FP4",
+          summary: "Optional fp4 diffusion storage hint.",
+          default: false,
+          experimental: true,
+          aliases: [],
+        },
+        {
+          id: "float8_e4m3fn",
+          title: "Float8 E4M3FN",
+          summary: "Optional float8-e4m3fn storage hint.",
+          default: false,
+          experimental: true,
+          aliases: ["float8-e4m3fn"],
+        },
+        {
+          id: "float8_e5m2",
+          title: "Float8 E5M2",
+          summary: "Optional float8-e5m2 storage hint.",
+          default: false,
+          experimental: true,
+          aliases: ["float8-e5m2"],
         },
       ],
       newer_family_profiles: DEFAULT_NEWER_FAMILY_PROFILES,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import types
 import unittest
 from unittest import mock
@@ -56,6 +57,40 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.ultralytics_segm, ["person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.unet, ["sdxl_unet.safetensors"])
         self.assertEqual(snapshot.upscale_models, ["4x_foolhardy.pth"])
+
+    def test_discover_model_inventory_falls_back_to_host_node_input_choices(self) -> None:
+        class CheckpointLoaderSimple:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"ckpt_name": (["sd15\\dreamshaper.safetensors"],)}}
+
+        class VAELoader:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"vae_name": (["vae-ft-mse.safetensors"],)}}
+
+        class UNETLoader:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"unet_name": (["flux\\flux1-dev.safetensors"],)}}
+
+        folder_paths_module = types.SimpleNamespace(get_filename_list=lambda _folder_name: [])
+        nodes_module = types.SimpleNamespace(
+            NODE_CLASS_MAPPINGS={
+                "CheckpointLoaderSimple": CheckpointLoaderSimple,
+                "VAELoader": VAELoader,
+                "UNETLoader": UNETLoader,
+            }
+        )
+
+        with mock.patch.dict(sys.modules, {"nodes": nodes_module}):
+            snapshot = discover_model_inventory(folder_paths_module=folder_paths_module)
+
+        self.assertEqual(snapshot.checkpoints, ["sd15\\dreamshaper.safetensors"])
+        self.assertEqual(snapshot.default_checkpoint, "sd15\\dreamshaper.safetensors")
+        self.assertEqual(snapshot.vae, ["vae-ft-mse.safetensors"])
+        self.assertEqual(snapshot.default_vae, "vae-ft-mse.safetensors")
+        self.assertEqual(snapshot.diffusion_models, ["flux\\flux1-dev.safetensors"])
 
     def test_ensure_native_ultralytics_model_paths_updates_extensions(self) -> None:
         module = types.SimpleNamespace(
@@ -295,6 +330,31 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(category_id, "diffusion_models")
         self.assertEqual(selectors, ["flux1-dev.safetensors"])
         self.assertEqual(default_value, "flux1-dev.safetensors")
+
+    def test_discover_model_inventory_maps_unet_alias_to_diffusion_models_when_needed(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": [],
+                "diffusion_models": [],
+                "unet": ["z\\z_image_turbo_bf16.safetensors"],
+                "vae": ["ae.safetensors"],
+                "text_encoders": ["qwen_3_4b.safetensors"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+        payload = snapshot.to_payload()
+
+        self.assertEqual(snapshot.checkpoints, ["__host_default__"])
+        self.assertEqual(snapshot.unet, ["z\\z_image_turbo_bf16.safetensors"])
+        self.assertEqual(snapshot.diffusion_models, ["z\\z_image_turbo_bf16.safetensors"])
+        self.assertEqual(
+            payload["catalog"]["categories"]["diffusion_models"]["items"],
+            ["z\\z_image_turbo_bf16.safetensors"],
+        )
+        category_id, selectors, default_value = resolve_primary_model_selector_context("z_image_turbo", snapshot)
+        self.assertEqual(category_id, "diffusion_models")
+        self.assertEqual(selectors, ["z\\z_image_turbo_bf16.safetensors"])
+        self.assertEqual(default_value, "z\\z_image_turbo_bf16.safetensors")
 
     def test_resolve_primary_model_selector_context_falls_back_to_checkpoints(self) -> None:
         module = types.SimpleNamespace(

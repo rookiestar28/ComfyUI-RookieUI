@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import ntpath
 import os
+import sys
 import threading
 import time
 from typing import Any
@@ -58,6 +59,16 @@ _NATIVE_ULTRALYTICS_MODEL_FOLDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ultralytics_bbox", ("ultralytics", "bbox")),
     ("ultralytics_segm", ("ultralytics", "segm")),
 )
+_HOST_NODE_INPUT_FALLBACKS: dict[str, tuple[tuple[str, str], ...]] = {
+    # IMPORTANT: these are the ComfyUI node input fields that users actually see in core loader nodes;
+    # keep them aligned with host node APIs so empty folder_paths lookups do not collapse UI selectors.
+    "checkpoints": (("CheckpointLoaderSimple", "ckpt_name"),),
+    "controlnet": (("ControlNetLoader", "control_net_name"),),
+    "diffusion_models": (("UNETLoader", "unet_name"),),
+    "loras": (("LoraLoader", "lora_name"),),
+    "upscale_models": (("UpscaleModelLoader", "model_name"),),
+    "vae": (("VAELoader", "vae_name"),),
+}
 
 
 def _join_models_dir_path(models_dir: str, *relative_parts: str) -> str:
@@ -110,6 +121,8 @@ def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[
 
     getter = getattr(folder_paths_module, "get_filename_list", None)
     if not callable(getter):
+        # IMPORTANT: standalone/test imports may not have a real ComfyUI folder_paths module;
+        # callers must continue into node INPUT_TYPES fallback before using sentinel defaults.
         return []
 
     try:
@@ -127,6 +140,53 @@ def _safe_get_filename_list(folder_paths_module: Any, folder_name: str) -> list[
     return values
 
 
+def _extract_node_input_choices(input_spec: Any, field_name: str) -> list[str]:
+    required_inputs = input_spec.get("required") if isinstance(input_spec, dict) else None
+    field_spec = required_inputs.get(field_name) if isinstance(required_inputs, dict) else None
+    if isinstance(field_spec, (list, tuple)) and field_spec:
+        choices = field_spec[0]
+    else:
+        choices = field_spec
+    if isinstance(choices, (list, tuple)):
+        return [str(choice) for choice in choices if isinstance(choice, str) and choice.strip()]
+    return []
+
+
+def _safe_get_node_input_choices(class_name: str, field_name: str) -> list[str]:
+    nodes_module = sys.modules.get("nodes")
+    mappings = getattr(nodes_module, "NODE_CLASS_MAPPINGS", None)
+    if not isinstance(mappings, dict):
+        return []
+    node_class = mappings.get(class_name)
+    input_types = getattr(node_class, "INPUT_TYPES", None)
+    if not callable(input_types):
+        return []
+    try:
+        input_spec = input_types()
+    except Exception:
+        _LOGGER.debug(
+            "RookieUI inventory fallback for node '%s.%s' due to host INPUT_TYPES exception.",
+            class_name,
+            field_name,
+            exc_info=True,
+        )
+        return []
+    return _extract_node_input_choices(input_spec, field_name)
+
+
+def _resolve_host_folder_selectors(module: Any | None, folder_name: str) -> list[str]:
+    values = _safe_get_filename_list(module, folder_name)
+    if values:
+        return values
+    for class_name, field_name in _HOST_NODE_INPUT_FALLBACKS.get(folder_name, ()):
+        values = _safe_get_node_input_choices(class_name, field_name)
+        if values:
+            # CRITICAL: ComfyUI can expose valid selector lists through loaded node INPUT_TYPES even when
+            # direct folder_paths lookup is unavailable or stale; relying on folder_paths only empties SD/VAE menus.
+            return values
+    return []
+
+
 def _partition_ultralytics_models(selectors: list[str]) -> tuple[list[str], list[str]]:
     bbox: list[str] = []
     segm: list[str] = []
@@ -142,7 +202,7 @@ def _partition_ultralytics_models(selectors: list[str]) -> tuple[list[str], list
 def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
     # CRITICAL: keep these folder names aligned with ComfyUI host folder_paths keys; renaming them breaks host inventory discovery for non-checkpoint families.
     inventory_map = {
-        folder_name: _safe_get_filename_list(module, folder_name)
+        folder_name: _resolve_host_folder_selectors(module, folder_name)
         for folder_name in _HOST_MODEL_FOLDERS
     }
 
@@ -157,14 +217,21 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
     ultralytics = inventory_map["ultralytics"]
     ultralytics_bbox, ultralytics_segm = _partition_ultralytics_models(ultralytics)
     unet = inventory_map["unet"]
+    if not diffusion_models and unet:
+        # CRITICAL: ComfyUI host builds may expose UNETLoader models under `unet`;
+        # non-SD presets read `diffusion_models`, so leaving this empty forces __host_default__ in the UI.
+        diffusion_models = list(unet)
     upscale_models = inventory_map["upscale_models"]
     vae = inventory_map["vae"]
 
     source = "host" if module is not None else "fallback"
     if not checkpoints:
+        # IMPORTANT: seeing this sentinel in the UI means both folder_paths and node INPUT_TYPES
+        # failed to expose CheckpointLoaderSimple choices; debug inventory discovery before blaming presets.
         checkpoints = ["__host_default__"]
         source = "fallback" if module is None else "host"
     if not vae:
+        # IMPORTANT: Automatic-only VAE menus are the VAE-side equivalent of the checkpoint sentinel above.
         vae = ["Automatic"]
     if not text_encoders:
         text_encoders = ["Automatic"]

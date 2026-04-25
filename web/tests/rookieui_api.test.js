@@ -271,6 +271,14 @@ describe("fetchRookieUICapabilities", () => {
     expect(models.data.catalog.categories.checkpoints.sidebar_visible).toBe(true);
     expect(compatibility.data.samplers[0].id).toBe("euler_ancestral");
     expect(compatibility.data.schedulers[0].id).toBe("normal");
+    expect(compatibility.data.dtype_profiles.map((profile) => profile.id)).toEqual([
+      "automatic",
+      "automatic_fp16_lora",
+      "nf4",
+      "fp4",
+      "float8_e4m3fn",
+      "float8_e5m2",
+    ]);
     expect(compatibility.data.newer_family_profiles.map((profile) => profile.id)).toEqual([
       "anima",
       "chroma",
