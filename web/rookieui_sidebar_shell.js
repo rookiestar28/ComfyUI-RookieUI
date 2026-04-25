@@ -655,12 +655,19 @@ function readTxt2ImgPayload(elements) {
     hires_steps: Number(elements.hiresSteps.value),
     hires_denoise: Number(elements.hiresDenoise.value),
     hires_upscale_method: elements.hiresUpscaleMethod.value,
+    template_lora_name: elements.templateLoraName?.value ?? "",
     lora_name: elements.loraName.value,
     lora_strength_model: Number(elements.loraStrengthModel.value),
     lora_strength_clip: Number(elements.loraStrengthClip.value),
     adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
+}
+
+function formatGenerationWarnings(resultData) {
+  const warnings = resultData?.normalized_request?.prompt_warnings ?? resultData?.warnings ?? [];
+  const firstWarning = Array.isArray(warnings) ? String(warnings.find(Boolean) ?? "").trim() : "";
+  return firstWarning ? `Warning: ${firstWarning}` : "";
 }
 
 async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, previewBox) {
@@ -680,20 +687,22 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
     return;
   }
 
+  const warningSuffix = formatGenerationWarnings(result.data);
   const submission = result.data.submission ?? {};
   if (submission.accepted) {
-    statusNode.textContent = `Queued prompt ${submission.prompt_id}`;
+    statusNode.textContent = `Queued prompt ${submission.prompt_id}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
     void trackGenerationRuntime(
       bootstrapState,
       String(submission.prompt_id ?? ""),
       statusNode,
       runtimeState,
       previewBox,
+      warningSuffix,
     );
     return;
   }
 
-  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}`;
+  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
 }
 
 function readImg2ImgPayload(elements) {
@@ -930,20 +939,22 @@ async function submitImg2Img(
     return;
   }
 
+  const warningSuffix = formatGenerationWarnings(result.data);
   const submission = result.data.submission ?? {};
   if (submission.accepted) {
-    statusNode.textContent = `Queued prompt ${submission.prompt_id}`;
+    statusNode.textContent = `Queued prompt ${submission.prompt_id}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
     void trackGenerationRuntime(
       bootstrapState,
       String(submission.prompt_id ?? ""),
       statusNode,
       runtimeState,
       previewBox,
+      warningSuffix,
     );
     return;
   }
 
-  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}`;
+  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
 }
 
 function activateShellTab(formRegistry, tabId, statusNode, message = "") {

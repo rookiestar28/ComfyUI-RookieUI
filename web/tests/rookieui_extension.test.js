@@ -196,6 +196,11 @@ describe("registerRookieUIBootstrapExtension", () => {
             return {
               mode: "queued",
               workflow_kind: requestPayload.hires_enabled ? "txt2img-sd15-hires" : "txt2img-sd15",
+              normalized_request: {
+                prompt_warnings: [
+                  "Official Qwen-Image 2512 template LoRA is missing from host inventory; generation will continue without template-owned LoRA parity. To add a LoRA manually, use <lora:model_name:1> in the prompt.",
+                ],
+              },
               submission: { accepted: true, prompt_id: "prompt-123" },
             };
           },
@@ -1621,6 +1626,12 @@ describe("registerRookieUIBootstrapExtension", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(document.getElementById("rookieui-txt2img-status").textContent).toMatch(/(Queued prompt|Completed:) prompt-123/);
+    expect(document.getElementById("rookieui-txt2img-status").textContent).toContain(
+      "Official Qwen-Image 2512 template LoRA is missing",
+    );
+    expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("<lora:model_name:1>");
+    const txt2imgRequest = fetchCalls.find(([url]) => url === "/rookieui/generate/txt2img");
+    expect(JSON.parse(txt2imgRequest[1].body).template_lora_name).toBe("detail_tweaker.safetensors");
     document.getElementById("rookieui-tab-img2img").click();
     expect(document.getElementById("rookieui-pane-txt2img").classList.contains("is-active")).toBe(false);
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);

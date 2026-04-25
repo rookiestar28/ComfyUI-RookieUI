@@ -411,6 +411,38 @@ class Img2ImgTranslationTests(unittest.TestCase):
             "Qwen-Image\\My-Custom-Qwen-Edit-LoRA.safetensors",
         )
 
+    def test_missing_official_template_lora_warns_and_allows_img2img_generation(self) -> None:
+        inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=[],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
+        with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=inventory):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the storefront signage",
+                    "negative_prompt": "blurry",
+                    "image_asset": "portrait-input",
+                    "profile": "qwen_image_edit",
+                    "mode": "edit",
+                }
+            )
+
+        self.assertEqual(normalized.template_lora_name, "")
+        self.assertIn("TEMPLATE_LORA_MISSING", normalized.prompt_warning_codes)
+        warning_text = "\n".join(normalized.prompt_warnings)
+        self.assertIn("<lora:model_name:1>", warning_text)
+        workflow = translate_img2img_request(normalized).to_payload()["workflow"]
+        lora_nodes = [node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly"]
+        self.assertEqual(lora_nodes, [])
+
     def test_normalize_img2img_request_rejects_inpaint_mode_for_image_edit_profile(self) -> None:
         with self.assertRaisesRegex(ValueError, "unsupported for official image-edit profiles"):
             normalize_img2img_request(
