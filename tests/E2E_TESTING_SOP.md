@@ -9,6 +9,12 @@ This SOP defines the verified Playwright workflow for this repository.
 - Not a live ComfyUI backend integration lane
 - Live backend checks are handled separately via `scripts/run_host_embedded_e2e.py`
 
+## Problem-First Test Design Rule
+
+E2E scripts and mocked harness flows must be designed to reproduce failures and catch bugs early. The goal is not to make the harness pass; the goal is to make the harness fail when a real user-facing contract breaks.
+
+When adding or reviewing E2E coverage, prefer assertions that prove final user-visible behavior, request routing, payload shape, state synchronization, and failure feedback. Avoid pass-only checks that only prove the page loaded or a mocked happy path returned.
+
 ## Requirements
 
 - Node.js 18+

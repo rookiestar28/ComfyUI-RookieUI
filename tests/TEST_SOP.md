@@ -20,6 +20,14 @@ Use it before push and before marking any implementation as accepted.
 
 A change is not accepted until required checks pass and evidence is recorded.
 
+### Problem-First Test Design Rule (Mandatory)
+
+All test scripts, test harnesses, and validation flows must be designed first to reproduce real failures and catch bugs early.
+
+The purpose of testing is to expose defects, regressions, drift, and broken assumptions before users hit them. Tests must not be designed merely to produce a green validation result, satisfy a checklist, or prove that a happy path still passes. Do not waste validation time on pass-only checks that cannot fail for the bug class under review.
+
+Every bugfix or high-risk change must start from the question: "Which test would have caught this before release?" If the existing gate missed the bug, update the targeted test or SOP flow so the same class of bug fails deterministically next time.
+
 Required minimum gate:
 
 1. `pre-commit run detect-secrets --all-files`
