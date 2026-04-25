@@ -11,7 +11,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.body.innerHTML = "";
   });
 
-  test("prefers ComfyUI runtime fetchApi so custom base paths do not break txt2img submission", async () => {
+  test("prefers ComfyUI runtime fetchApi so custom base paths do not break request bindings", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("root fetch should not be used");
     });
@@ -43,6 +43,35 @@ describe("registerRookieUIBootstrapExtension", () => {
               submission: { accepted: true, prompt_id: "prompt-prefixed" },
             });
           }
+          if (path === "/rookieui/generate/img2img") {
+            return apiResponse({
+              mode: "queued",
+              workflow_kind: "img2img-sd15",
+              submission: { accepted: true, prompt_id: "img2img-prefixed" },
+            });
+          }
+          if (path === "/rookieui/pnginfo/inspect") {
+            return apiResponse({ status: "ok", payload: {} });
+          }
+          if (path === "/rookieui/extras/run") {
+            return apiResponse({
+              mode: "queued",
+              workflow_kind: "extras",
+              submission: { accepted: true, prompt_id: "extras-prefixed" },
+            });
+          }
+          if (typeof path === "string" && path.startsWith("/rookieui/queue")) {
+            return apiResponse({ jobs: [] });
+          }
+          if (path === "/rookieui/controlnet/model_list") {
+            return apiResponse({ model_list: [] });
+          }
+          if (path === "/rookieui/prompt-tools/providers") {
+            return apiResponse({ surfaces: {} });
+          }
+          if (path === "/rookieui/xyz-plot/estimate") {
+            return apiResponse({ status: "ok", estimate: { total_jobs: 1 } });
+          }
           return apiResponse({});
         }),
       },
@@ -53,10 +82,29 @@ describe("registerRookieUIBootstrapExtension", () => {
 
     await registerRookieUIBootstrapExtension({ app, fetchImpl });
     const result = await window.__ROOKIEUI_BOOTSTRAP__.submitTxt2ImgRequest({ prompt: "cat" });
+    await window.__ROOKIEUI_BOOTSTRAP__.submitImg2ImgRequest({ prompt: "cat", image_asset: "asset.png" });
+    await window.__ROOKIEUI_BOOTSTRAP__.inspectPngInfoRequest({ image_data: "data:image/png;base64,ZmFrZQ==" });
+    await window.__ROOKIEUI_BOOTSTRAP__.submitExtrasRequest({ image_data: "data:image/png;base64,ZmFrZQ==" });
+    await window.__ROOKIEUI_BOOTSTRAP__.fetchQueueRequest("socket-client-prefixed");
+    await window.__ROOKIEUI_BOOTSTRAP__.fetchControlNetModelListRequest();
+    await window.__ROOKIEUI_BOOTSTRAP__.fetchPromptWorkbenchProvidersRequest();
+    await window.__ROOKIEUI_BOOTSTRAP__.estimateXYZPlotRequest({ mode: "txt2img", axes: [] });
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(app.api.fetchApi).toHaveBeenCalledWith("/rookieui/generate/txt2img", expect.objectContaining({ method: "POST" }));
-    expect(fetchApiCalls.map(([path]) => path)).toContain("/rookieui/capabilities");
+    expect(fetchApiCalls.map(([path]) => path)).toEqual(
+      expect.arrayContaining([
+        "/rookieui/capabilities",
+        "/rookieui/generate/txt2img",
+        "/rookieui/generate/img2img",
+        "/rookieui/pnginfo/inspect",
+        "/rookieui/extras/run",
+        "/rookieui/controlnet/model_list",
+        "/rookieui/prompt-tools/providers",
+        "/rookieui/xyz-plot/estimate",
+      ]),
+    );
+    expect(fetchApiCalls.some(([path]) => typeof path === "string" && path.startsWith("/rookieui/queue"))).toBe(true);
     expect(result.ok).toBe(true);
     expect(result.data.submission.prompt_id).toBe("prompt-prefixed");
   });
