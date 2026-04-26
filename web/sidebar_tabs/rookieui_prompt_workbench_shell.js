@@ -63,6 +63,18 @@ const WORKBENCH_I18N = Object.freeze({
   },
 });
 
+const INLINE_TOOLBAR_ICONS = Object.freeze({
+  append: "➕",
+  copy: "📋",
+  delete: "🗑️",
+  favorites: "🔖",
+  fold: "🔼",
+  history: "🕘",
+  open: "🧰",
+  settings: "⚙️",
+  translate: "🌐",
+});
+
 function normalizeTokenText(text) {
   return String(text ?? "").trim();
 }
@@ -457,11 +469,17 @@ export function createPromptWorkbenchShell({
     appendButton: null,
   };
 
-  const createInlineToolbarButton = (buttonId, label, uiName, handler) => {
-    const button = createActionButton(`${idPrefix}-${buttonId}`, label);
+  const applyIconButtonLabel = (button, icon, label) => {
+    button.textContent = icon;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+  };
+
+  const createInlineToolbarButton = (buttonId, icon, label, uiName, handler) => {
+    const button = createActionButton(`${idPrefix}-${buttonId}`, icon);
     button.classList.add("rookieui-shell__prompt-workbench-inline-tool");
     button.dataset.pwUi = uiName;
-    button.setAttribute("aria-label", label);
+    applyIconButtonLabel(button, icon, label);
     button.addEventListener("click", handler);
     headerActions.appendChild(button);
     return button;
@@ -489,7 +507,7 @@ export function createPromptWorkbenchShell({
     headerActions.appendChild(languageChip);
     inlineToolbarNodes.language = languageChip;
 
-    inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", "History", "inline-history-anchor", () => {
+    inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", INLINE_TOOLBAR_ICONS.history, "History", "inline-history-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "history" ? "" : "history";
       const state = getActiveState();
       state.workbench_open = true;
@@ -498,7 +516,7 @@ export function createPromptWorkbenchShell({
       void ensureResourcesLoaded({ statusMessage: "Prompt Workbench history loaded" });
       syncUi();
     });
-    inlineToolbarNodes.favoritesButton = createInlineToolbarButton("inline-favorites", "Favorites", "inline-favorites-anchor", () => {
+    inlineToolbarNodes.favoritesButton = createInlineToolbarButton("inline-favorites", INLINE_TOOLBAR_ICONS.favorites, "Favorites", "inline-favorites-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "favorites" ? "" : "favorites";
       const state = getActiveState();
       state.workbench_open = true;
@@ -507,7 +525,7 @@ export function createPromptWorkbenchShell({
       void ensureResourcesLoaded({ statusMessage: "Prompt Workbench favorites loaded" });
       syncUi();
     });
-    inlineToolbarNodes.settingsButton = createInlineToolbarButton("inline-settings", "Prefs", "inline-settings-anchor", () => {
+    inlineToolbarNodes.settingsButton = createInlineToolbarButton("inline-settings", INLINE_TOOLBAR_ICONS.settings, "Prefs", "inline-settings-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "settings" ? "" : "settings";
       const state = getActiveState();
       state.workbench_open = true;
@@ -519,23 +537,23 @@ export function createPromptWorkbenchShell({
       button?.setAttribute("aria-haspopup", "dialog");
       button?.setAttribute("aria-controls", `${idPrefix}-secondary-popover`);
     });
-    createInlineToolbarButton("inline-translate", "Translate", "inline-translate-action", () => {
+    createInlineToolbarButton("inline-translate", INLINE_TOOLBAR_ICONS.translate, "Translate", "inline-translate-action", () => {
       translateActivePrompt(String(configState.language ?? "en").trim() || "en");
     });
-    createInlineToolbarButton("inline-copy", "Copy", "inline-copy-action", () => {
+    createInlineToolbarButton("inline-copy", INLINE_TOOLBAR_ICONS.copy, "Copy", "inline-copy-action", () => {
       const promptText = String(getActiveState().draft_prompt || getActiveInput()?.value || "");
       if (navigator?.clipboard?.writeText) {
         void navigator.clipboard.writeText(promptText);
       }
       updateStatus("Copied active prompt text");
     });
-    createInlineToolbarButton("inline-delete", "Delete", "inline-delete-action", () => {
+    createInlineToolbarButton("inline-delete", INLINE_TOOLBAR_ICONS.delete, "Delete", "inline-delete-action", () => {
       applyPromptTextToInput("", {
         updateEditor: true,
         statusMessage: "Cleared active prompt text",
       });
     });
-    inlineToolbarNodes.appendButton = createInlineToolbarButton("inline-append", "Append", "inline-append-anchor", () => {
+    inlineToolbarNodes.appendButton = createInlineToolbarButton("inline-append", INLINE_TOOLBAR_ICONS.append, "Append", "inline-append-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "append" ? "" : "append";
       const state = getActiveState();
       state.workbench_open = true;
@@ -764,7 +782,11 @@ export function createPromptWorkbenchShell({
     shell.dataset.open = String(isOpen);
     shell.dataset.folded = String(!isOpen);
     body.hidden = !isOpen;
-    toggleButton.textContent = normalizedFixedScope ? (isOpen ? "Fold" : "Tools") : isOpen ? t("hideWorkbench") : t("openWorkbench");
+    if (normalizedFixedScope) {
+      applyIconButtonLabel(toggleButton, isOpen ? INLINE_TOOLBAR_ICONS.fold : INLINE_TOOLBAR_ICONS.open, isOpen ? "Fold tools" : "Open tools");
+    } else {
+      toggleButton.textContent = isOpen ? t("hideWorkbench") : t("openWorkbench");
+    }
     toggleButton.setAttribute("aria-expanded", String(isOpen));
   }
 

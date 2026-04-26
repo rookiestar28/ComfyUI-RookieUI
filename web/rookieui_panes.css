@@ -1741,6 +1741,13 @@
   justify-content: flex-start;
 }
 
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-toolbar {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-subtitle {
   display: none;
 }
@@ -1765,10 +1772,11 @@
 }
 
 .rookieui-shell__prompt-workbench-inline-tool {
+  min-width: 26px;
   min-height: 24px;
   border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 2px 6px;
+  font-size: 13px;
   line-height: 1.1;
   transition:
     border-color 120ms ease,

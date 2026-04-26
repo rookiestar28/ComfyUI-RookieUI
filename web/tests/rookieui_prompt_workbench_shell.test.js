@@ -449,6 +449,12 @@ describe("prompt workbench shell", () => {
     await negativeShell.openWorkbench();
     await flushPromises();
 
+    expect(document.getElementById("inline-negative-workbench-toggle")?.textContent).toBe("🔼");
+    expect(document.getElementById("inline-negative-workbench-toggle")?.getAttribute("title")).toBe("Fold tools");
+    expect(document.getElementById("inline-negative-workbench-inline-history")?.textContent).toBe("🕘");
+    expect(document.getElementById("inline-negative-workbench-inline-history")?.getAttribute("title")).toBe("History");
+    expect(document.getElementById("inline-negative-workbench-inline-translate")?.textContent).toBe("🌐");
+    expect(document.getElementById("inline-negative-workbench-inline-translate")?.getAttribute("aria-label")).toBe("Translate");
     expect(document.getElementById("inline-prompt-workbench-section")?.textContent).toContain("Prompt namespace: txt2img_prompt");
     expect(document.getElementById("inline-negative-workbench-section")?.textContent).toContain(
       "Negative Prompt namespace: txt2img_negative",

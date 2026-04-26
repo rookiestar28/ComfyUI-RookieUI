@@ -75,14 +75,14 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
           <div class="reference-header">
             <strong>Prompt Workbench</strong>
           <div class="reference-toolbar">
-              <button class="reference-button">Fold</button>
+              <button class="reference-button" title="Fold tools">🔼</button>
               <span class="reference-chip">5 tags</span>
               <span class="reference-chip">en / prompt</span>
-              <button class="reference-button">History</button>
-              <button class="reference-button">Favorites</button>
-              <button class="reference-button">Prefs</button>
-              <button class="reference-button">Translate</button>
-              <button class="reference-button">Append</button>
+              <button class="reference-button" title="History">🕘</button>
+              <button class="reference-button" title="Favorites">🔖</button>
+              <button class="reference-button" title="Prefs">⚙️</button>
+              <button class="reference-button" title="Translate">🌐</button>
+              <button class="reference-button" title="Append">➕</button>
             </div>
           </div>
           <div class="reference-secondary">
@@ -127,9 +127,13 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   );
   await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toHaveText("🕘");
+  await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toHaveAttribute("title", "History");
   await expect(workbench.locator("[data-pw-ui='inline-favorites-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-settings-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toHaveText("🌐");
+  await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toHaveAttribute("title", "Translate");
   await expect(workbench.locator("[data-pw-ui='inline-copy-action']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-delete-action']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-append-anchor']")).toBeVisible();
@@ -143,6 +147,10 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='secondary-entrypoints']")).toBeVisible();
   const selectionToolbar = workbench.locator("[data-pw-ui='selection-batch-toolbar']");
   await expect(selectionToolbar).toBeHidden();
+
+  const inlineToolbarShell = workbench.locator("[data-pw-ui='header-toolbar']");
+  await expect(inlineToolbarShell).toHaveCSS("border-top-style", "none");
+  await expect(inlineToolbarShell).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 
   const historyHoverTool = workbench.locator("[data-pw-ui='inline-history-anchor']");
   const toolbarStyleBeforeHover = await historyHoverTool.evaluate((node) => {
