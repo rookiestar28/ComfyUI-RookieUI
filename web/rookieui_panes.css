@@ -1770,6 +1770,20 @@
   padding: 2px 8px;
   font-size: 11px;
   line-height: 1.1;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.rookieui-shell__prompt-workbench-inline-tool:is(:hover, :focus-visible) {
+  border-color: color-mix(in srgb, var(--rookieui-accent) 72%, white 28%);
+  background: color-mix(in srgb, var(--rookieui-accent) 30%, var(--rookieui-bg-panel) 70%);
+  color: var(--rookieui-text-strong);
+  box-shadow: 0 6px 16px rgb(20 28 40 / 0.16);
+  transform: translateY(-1px);
 }
 
 .rookieui-shell__prompt-workbench-inline-tool[data-active="true"] {

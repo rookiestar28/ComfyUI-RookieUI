@@ -144,6 +144,29 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   const selectionToolbar = workbench.locator("[data-pw-ui='selection-batch-toolbar']");
   await expect(selectionToolbar).toBeHidden();
 
+  const historyHoverTool = workbench.locator("[data-pw-ui='inline-history-anchor']");
+  const toolbarStyleBeforeHover = await historyHoverTool.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+    };
+  });
+  await historyHoverTool.hover();
+  const toolbarStyleAfterHover = await historyHoverTool.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+    };
+  });
+  expect(toolbarStyleAfterHover).not.toEqual(toolbarStyleBeforeHover);
+  await page.mouse.move(0, 0);
+
   const firstToken = workbench.locator("[data-pw-token-ui='inline-token-tag']").first();
   const firstTokenActions = firstToken.locator("[data-pw-ui='token-quick-actions']");
   await expect(firstToken.locator("[data-pw-ui='token-local-language']")).toBeVisible();

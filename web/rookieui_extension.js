@@ -99,18 +99,18 @@ function enforceSidebarMinWidth(container) {
   }
 }
 
+const ROOKIEUI_STYLESHEETS = [["rookieui-styles", "./rookieui.css"], ["rookieui-styles-foundation", "./rookieui_shell_foundation.css"], ["rookieui-styles-panes", "./rookieui_panes.css"]];
 function ensureCssInjected(documentRef) {
-  if (!documentRef?.head || documentRef.getElementById("rookieui-styles")) {
-    return;
+  if (!documentRef?.head) return;
+  for (const [id, specifier] of ROOKIEUI_STYLESHEETS) {
+    if (documentRef.getElementById(id)) continue;
+    const link = Object.assign(documentRef.createElement("link"), {
+      id,
+      rel: "stylesheet",
+      href: applyRevisionToUrl(specifier, import.meta.url).href,
+    });
+    documentRef.head.appendChild(link);
   }
-
-  const link = documentRef.createElement("link");
-  link.id = "rookieui-styles";
-  link.rel = "stylesheet";
-  const stylesheetUrl = applyRevisionToUrl("./rookieui.css", import.meta.url);
-  // IMPORTANT: build the cache-busting query via URL APIs; inline template strings are treated as static literals by some test/tooling paths.
-  link.href = stylesheetUrl.href;
-  documentRef.head.appendChild(link);
 }
 
 function installLegacyLauncher(documentRef, bootstrapState) {

@@ -1,5 +1,5 @@
 // IMPORTANT: bump this token whenever shipped frontend module wiring changes; otherwise Comfy-host browser caches can mask live UI fixes.
-export const ROOKIEUI_ASSET_REVISION = "20260427-inline-a11y-sync-h37bdceaa7e"; // pragma: allowlist secret
+export const ROOKIEUI_ASSET_REVISION = "20260427-inline-hover-h89c0e9b115"; // pragma: allowlist secret
 
 export function buildRevisionedModuleUrl(specifier, metaUrl = import.meta.url) {
   const moduleUrl = new URL(specifier, metaUrl);
