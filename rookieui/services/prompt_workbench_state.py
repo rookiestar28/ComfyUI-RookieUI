@@ -28,6 +28,7 @@ _MAX_ENTRY_LABEL_LENGTH = 200
 _MAX_TAG_COUNT = 64
 _MAX_TAG_LENGTH = 120
 _COLLECTION_ACTIONS = {"push", "auto_capture", "clear", "replace", "remove", "move_up", "move_down"}
+_MASKED_SECRET_PLACEHOLDER = "********"
 
 
 def _prompt_workbench_root() -> Path:
@@ -351,6 +352,34 @@ def _mask_sensitive_fields(payload: object) -> object:
     return payload
 
 
+def _is_secret_field_key(key: object) -> bool:
+    lower_key = str(key).strip().lower()
+    return any(secret_key in lower_key for secret_key in PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS)
+
+
+def _replace_masked_secret_placeholders(payload: object, existing: object) -> object:
+    if isinstance(payload, dict):
+        cleaned: dict[str, Any] = {}
+        existing_payload = existing if isinstance(existing, dict) else {}
+        for key, value in payload.items():
+            key_text = str(key).strip()
+            if not key_text:
+                continue
+            if _is_secret_field_key(key_text) and value == _MASKED_SECRET_PLACEHOLDER:
+                existing_value = existing_payload.get(key_text)
+                cleaned[key_text] = existing_value if isinstance(existing_value, str) else ""
+                continue
+            cleaned[key_text] = _replace_masked_secret_placeholders(value, existing_payload.get(key_text))
+        return cleaned
+    if isinstance(payload, list):
+        existing_list = existing if isinstance(existing, list) else []
+        return [
+            _replace_masked_secret_placeholders(entry, existing_list[index] if index < len(existing_list) else {})
+            for index, entry in enumerate(payload)
+        ]
+    return payload
+
+
 def _coerce_store_shape(payload: object) -> dict[str, Any]:
     defaults = _default_prompt_workbench_store()
     if not isinstance(payload, dict):
@@ -420,6 +449,39 @@ def get_prompt_workbench_bootstrap_payload() -> dict[str, Any]:
         blacklist=store["blacklist"],
     )
     return snapshot.to_payload()
+
+
+def export_prompt_workbench_store(*, include_secrets: bool = False) -> dict[str, Any]:
+    store = load_prompt_workbench_store()
+    exported_store = deepcopy(store) if include_secrets else _mask_sensitive_fields(store)
+    return {
+        "schema_version": PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
+        "exported_at": int(time.time()),
+        "includes": ["config", "blacklist", "surfaces"],
+        "secret_policy": "include_secrets" if include_secrets else "masked_provider_fields",  # pragma: allowlist secret
+        "data": exported_store,
+    }
+
+
+def import_prompt_workbench_store(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Prompt Workbench import payload must be an object.")
+
+    raw_store = payload.get("data", payload)
+    if not isinstance(raw_store, dict):
+        raise ValueError("Prompt Workbench import data must be an object.")
+
+    with _STATE_LOCK:
+        existing = load_prompt_workbench_store()
+        cleaned = _replace_masked_secret_placeholders(raw_store, existing)
+        imported = save_prompt_workbench_store(cleaned)
+    return {
+        "schema_version": imported["schema_version"],
+        "config": _mask_sensitive_fields(imported["config"]),
+        "blacklist": imported["blacklist"],
+        "surface_count": len(imported["surfaces"]),
+        "imported": True,
+    }
 
 
 def update_prompt_workbench_config(payload: object) -> dict[str, Any]:

@@ -56,6 +56,8 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertIn("/rookieui/prompt-tools/favorites", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/blacklist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/providers", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/export", payload["routes"])
+        self.assertIn("/rookieui/prompt-tools/import", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/translate", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/assist", payload["routes"])
         self.assertIn("/rookieui/prompt-tools/catalog", payload["routes"])
@@ -174,6 +176,14 @@ class RoutePayloadTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_providers")
         self.assertIn("openai", payload["surfaces"]["translation"]["shipped_provider_ids"])
+
+    def test_prompt_tools_export_payload_masks_provider_secret_fields(self) -> None:
+        payload = routes.build_prompt_workbench_export_payload()
+
+        self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
+        self.assertEqual(payload["contract"]["surface"], "prompt_tools_export")
+        self.assertEqual(payload["export"]["secret_policy"], "masked_provider_fields")  # pragma: allowlist secret
+        self.assertIn("config", payload["export"]["includes"])
 
     def test_prompt_tools_catalog_snapshot_exposes_group_tags_and_prompt_library(self) -> None:
         payload = routes.build_prompt_workbench_catalog_snapshot(language="en")

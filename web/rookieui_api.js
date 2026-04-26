@@ -1894,6 +1894,7 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
       blacklist: {
         enabled: false,
         entries: [],
+        translation_entries: [],
       },
       host_actions: {
         danbooru_upsample: {
@@ -2066,6 +2067,50 @@ export async function fetchRookieUIPromptWorkbenchProviders(fetchImpl = globalTh
   );
 }
 
+export async function exportRookieUIPromptWorkbench(fetchImpl = globalThis.fetch) {
+  return fetchRookieUIResource(
+    "/rookieui/prompt-tools/export",
+    {
+      contract: {
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
+        surface: "prompt_tools_export",
+      },
+      export: {
+        schema_version: 1,
+        exported_at: 0,
+        includes: ["config", "blacklist", "surfaces"],
+        secret_policy: "masked_provider_fields", // pragma: allowlist secret
+        data: {
+          schema_version: 1,
+          config: {},
+          blacklist: { enabled: false, entries: [], translation_entries: [] },
+          surfaces: {},
+        },
+      },
+    },
+    fetchImpl,
+  );
+}
+
+export async function importRookieUIPromptWorkbench(payload, fetchImpl = globalThis.fetch) {
+  return postRookieUIJson(
+    "/rookieui/prompt-tools/import",
+    payload ?? {},
+    {
+      contract: {
+        version: PROMPT_WORKBENCH_CONTRACT_VERSION,
+        surface: "prompt_tools_import",
+      },
+      import_result: {
+        imported: false,
+        schema_version: 1,
+        surface_count: 0,
+      },
+    },
+    fetchImpl,
+  );
+}
+
 export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetchImpl = globalThis.fetch) {
   const params = new URLSearchParams();
   const normalizedLanguage = String(language ?? "").trim();
@@ -2183,6 +2228,7 @@ export async function fetchRookieUIPromptWorkbenchBlacklist(fetchImpl = globalTh
       blacklist: {
         enabled: false,
         entries: [],
+        translation_entries: [],
       },
     },
     fetchImpl,
@@ -2388,7 +2434,7 @@ export async function updateRookieUIPromptWorkbenchBlacklist(blacklist, fetchImp
         version: PROMPT_WORKBENCH_CONTRACT_VERSION,
         surface: "prompt_tools_blacklist",
       },
-      blacklist: blacklist ?? { enabled: false, entries: [] },
+      blacklist: blacklist ?? { enabled: false, entries: [], translation_entries: [] },
     },
     fetchImpl,
   );

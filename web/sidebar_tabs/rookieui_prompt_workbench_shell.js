@@ -1,5 +1,68 @@
 let tokenSequence = 0;
 
+const WORKBENCH_I18N = Object.freeze({
+  en: {
+    title: "Prompt Workbench",
+    subtitle: "Structured prompt editor with persisted history, favorites, formatting rules, and blacklist-aware cleanup.",
+    openWorkbench: "Open Workbench",
+    hideWorkbench: "Hide Workbench",
+    promptTab: "Prompt",
+    negativeTab: "Negative",
+    summaryState: "State",
+    summaryProviders: "Providers",
+    summaryCatalogs: "Catalogs",
+    summaryHistory: "History",
+    summaryFavorites: "Favorites",
+    summaryBlacklist: "Blacklist",
+    panelEditor: "Editor",
+    panelHistory: "History",
+    panelFavorites: "Favorites",
+    panelCatalog: "Catalog",
+    panelAssist: "Assist",
+    panelFormat: "Format",
+    captureCurrentText: "Capture Current Text",
+    restoreDraft: "Restore Draft",
+    ready: "Prompt Workbench ready",
+    formattingAndBlacklist: "Formatting and Blacklist",
+    importExport: "Import / Export",
+    exportJson: "Export JSON",
+    importJson: "Import JSON",
+    exportReady: "Prompt Workbench export JSON generated",
+    importReady: "Prompt Workbench import synchronized",
+    importInvalidJson: "Import JSON must be a valid object",
+  },
+  "zh-TW": {
+    title: "提示詞工作台",
+    subtitle: "結構化提示詞編輯器，支援歷史、收藏、格式化規則與黑名單清理。",
+    openWorkbench: "開啟工作台",
+    hideWorkbench: "收合工作台",
+    promptTab: "正向提示詞",
+    negativeTab: "反向提示詞",
+    summaryState: "狀態",
+    summaryProviders: "供應器",
+    summaryCatalogs: "目錄",
+    summaryHistory: "歷史",
+    summaryFavorites: "收藏",
+    summaryBlacklist: "黑名單",
+    panelEditor: "編輯",
+    panelHistory: "歷史",
+    panelFavorites: "收藏",
+    panelCatalog: "目錄",
+    panelAssist: "助理",
+    panelFormat: "格式",
+    captureCurrentText: "擷取目前文字",
+    restoreDraft: "還原草稿",
+    ready: "提示詞工作台已就緒",
+    formattingAndBlacklist: "格式化與黑名單",
+    importExport: "匯入 / 匯出",
+    exportJson: "匯出 JSON",
+    importJson: "匯入 JSON",
+    exportReady: "提示詞工作台匯出 JSON 已產生",
+    importReady: "提示詞工作台匯入已同步",
+    importInvalidJson: "匯入 JSON 必須是有效物件",
+  },
+});
+
 function normalizeTokenText(text) {
   return String(text ?? "").trim();
 }
@@ -338,6 +401,14 @@ export function createPromptWorkbenchShell({
   const upsampleState = {
     running: false,
   };
+  const importExportState = {
+    jsonText: "",
+    busy: false,
+  };
+  const t = (key) => {
+    const language = String(configState?.language ?? "en").trim();
+    return WORKBENCH_I18N[language]?.[key] ?? WORKBENCH_I18N.en[key] ?? key;
+  };
 
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
@@ -346,19 +417,19 @@ export function createPromptWorkbenchShell({
   const headerCopy = document.createElement("div");
   headerCopy.className = "rookieui-shell__prompt-workbench-copy";
   header.appendChild(headerCopy);
-  appendTextElement(headerCopy, "h5", "rookieui-shell__prompt-workbench-title", "Prompt Workbench");
+  appendTextElement(headerCopy, "h5", "rookieui-shell__prompt-workbench-title", t("title"));
   appendTextElement(
     headerCopy,
     "p",
     "rookieui-shell__prompt-workbench-subtitle",
-    "Structured prompt editor with persisted history, favorites, formatting rules, and blacklist-aware cleanup.",
+    t("subtitle"),
   );
 
   const headerActions = document.createElement("div");
   headerActions.className = "rookieui-shell__prompt-workbench-header-actions";
   header.appendChild(headerActions);
 
-  const toggleButton = createActionButton(`${idPrefix}-toggle`, "Open Workbench");
+  const toggleButton = createActionButton(`${idPrefix}-toggle`, t("openWorkbench"));
   toggleButton.classList.add("rookieui-shell__prompt-workbench-toggle");
   headerActions.appendChild(toggleButton);
 
@@ -385,8 +456,8 @@ export function createPromptWorkbenchShell({
     namespaceTabs.appendChild(button);
     tabButtons.set(scope, button);
   };
-  createScopeButton("prompt", "Prompt");
-  createScopeButton("negative", "Negative");
+  createScopeButton("prompt", t("promptTab"));
+  createScopeButton("negative", t("negativeTab"));
 
   const summaryGrid = document.createElement("div");
   summaryGrid.className = "rookieui-shell__prompt-workbench-summary-grid";
@@ -405,12 +476,12 @@ export function createPromptWorkbenchShell({
   };
 
   const summaryNodes = {
-    state: createSummaryCard("state", "State"),
-    providers: createSummaryCard("providers", "Providers"),
-    catalogs: createSummaryCard("catalogs", "Catalogs"),
-    history: createSummaryCard("history", "History"),
-    favorites: createSummaryCard("favorites", "Favorites"),
-    blacklist: createSummaryCard("blacklist", "Blacklist"),
+    state: createSummaryCard("state", t("summaryState")),
+    providers: createSummaryCard("providers", t("summaryProviders")),
+    catalogs: createSummaryCard("catalogs", t("summaryCatalogs")),
+    history: createSummaryCard("history", t("summaryHistory")),
+    favorites: createSummaryCard("favorites", t("summaryFavorites")),
+    blacklist: createSummaryCard("blacklist", t("summaryBlacklist")),
   };
 
   const panelRail = document.createElement("div");
@@ -423,7 +494,7 @@ export function createPromptWorkbenchShell({
     button.type = "button";
     button.id = `${idPrefix}-panel-${panelId}`;
     button.className = "rookieui-shell__prompt-workbench-panel-button";
-    button.textContent = panelId === "format" ? "Format" : panelId.charAt(0).toUpperCase() + panelId.slice(1);
+    button.textContent = t(`panel${panelId.charAt(0).toUpperCase()}${panelId.slice(1)}`);
     button.addEventListener("click", () => {
       const currentState = getActiveState();
       currentState.active_panel = panelId;
@@ -438,7 +509,7 @@ export function createPromptWorkbenchShell({
   actionsRow.className = "rookieui-shell__prompt-workbench-actions";
   body.appendChild(actionsRow);
 
-  const captureButton = createActionButton(`${idPrefix}-capture`, "Capture Current Text");
+  const captureButton = createActionButton(`${idPrefix}-capture`, t("captureCurrentText"));
   captureButton.addEventListener("click", () => {
     const input = getActiveInput();
     const nextText = String(input?.value ?? "");
@@ -451,7 +522,7 @@ export function createPromptWorkbenchShell({
   });
   actionsRow.appendChild(captureButton);
 
-  const restoreButton = createActionButton(`${idPrefix}-restore`, "Restore Draft");
+  const restoreButton = createActionButton(`${idPrefix}-restore`, t("restoreDraft"));
   restoreButton.addEventListener("click", () => {
     applyPromptTextToInput(getActiveState().draft_prompt, {
       updateEditor: true,
@@ -502,7 +573,7 @@ export function createPromptWorkbenchShell({
     scope: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
     draft: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
     panel: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
-    status: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-status", "Prompt Workbench ready"),
+    status: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-status", t("ready")),
   };
 
   function getActiveNamespace() {
@@ -542,7 +613,7 @@ export function createPromptWorkbenchShell({
   function setBodyOpen(isOpen) {
     shell.dataset.open = String(isOpen);
     body.hidden = !isOpen;
-    toggleButton.textContent = isOpen ? "Hide Workbench" : "Open Workbench";
+    toggleButton.textContent = isOpen ? t("hideWorkbench") : t("openWorkbench");
   }
 
   function readPreferredOpenState() {
@@ -1894,12 +1965,52 @@ export function createPromptWorkbenchShell({
     resultBlock.appendChild(resultInput);
   }
 
+  async function exportWorkbenchJson(outputNode) {
+    importExportState.busy = true;
+    syncUi();
+    const result = await bootstrapState?.exportPromptWorkbenchRequest?.();
+    const payload = result?.data?.export ?? result?.data ?? {};
+    importExportState.jsonText = JSON.stringify(payload, null, 2);
+    if (outputNode) {
+      outputNode.value = importExportState.jsonText;
+    }
+    importExportState.busy = false;
+    updateStatus(result?.ok === false ? "Prompt Workbench export used fallback data" : t("exportReady"));
+    syncUi();
+  }
+
+  async function importWorkbenchJson(inputNode) {
+    const rawText = String(inputNode?.value ?? importExportState.jsonText ?? "").trim();
+    let payload = null;
+    try {
+      payload = JSON.parse(rawText);
+    } catch (_error) {
+      updateStatus(t("importInvalidJson"));
+      return;
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      updateStatus(t("importInvalidJson"));
+      return;
+    }
+    importExportState.busy = true;
+    syncUi();
+    const result = await bootstrapState?.importPromptWorkbenchRequest?.(payload);
+    importExportState.busy = false;
+    updateStatus(result?.ok === false ? "Prompt Workbench import saved with fallback semantics" : t("importReady"));
+    resourcesReadyPromise = null;
+    resourcesLoaded = false;
+    await ensureResourcesLoaded({
+      statusMessage: result?.ok === false ? "Prompt Workbench import saved with fallback semantics" : t("importReady"),
+    });
+    syncUi();
+  }
+
   function renderFormatPane() {
     clearChildren(formatPane);
     const heading = document.createElement("div");
     heading.className = "rookieui-shell__prompt-workbench-pane-header";
     formatPane.appendChild(heading);
-    appendTextElement(heading, "h6", "rookieui-shell__prompt-workbench-pane-title", "Formatting and Blacklist");
+    appendTextElement(heading, "h6", "rookieui-shell__prompt-workbench-pane-title", t("formattingAndBlacklist"));
 
     const ruleGrid = document.createElement("div");
     ruleGrid.className = "rookieui-shell__prompt-workbench-format-grid";
@@ -2007,6 +2118,37 @@ export function createPromptWorkbenchShell({
       applyBlacklistFilter();
     });
     toolbar.appendChild(applyBlacklistButton);
+
+    const importExportBlock = document.createElement("section");
+    importExportBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
+    formatPane.appendChild(importExportBlock);
+    appendTextElement(importExportBlock, "h6", "rookieui-shell__prompt-workbench-pane-title", t("importExport"));
+    const importExportInput = document.createElement("textarea");
+    importExportInput.id = `${idPrefix}-import-export-json`;
+    importExportInput.className = "rookieui-shell__textarea";
+    importExportInput.rows = 6;
+    importExportInput.value = importExportState.jsonText;
+    importExportInput.addEventListener("input", () => {
+      importExportState.jsonText = importExportInput.value;
+    });
+    importExportBlock.appendChild(importExportInput);
+
+    const importExportToolbar = document.createElement("div");
+    importExportToolbar.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    importExportBlock.appendChild(importExportToolbar);
+    const exportButton = createActionButton(`${idPrefix}-export-json`, t("exportJson"));
+    exportButton.disabled = importExportState.busy;
+    exportButton.addEventListener("click", () => {
+      void exportWorkbenchJson(importExportInput);
+    });
+    importExportToolbar.appendChild(exportButton);
+
+    const importButton = createActionButton(`${idPrefix}-import-json`, t("importJson"));
+    importButton.disabled = importExportState.busy;
+    importButton.addEventListener("click", () => {
+      void importWorkbenchJson(importExportInput);
+    });
+    importExportToolbar.appendChild(importButton);
 
     const blacklistHeading = appendTextElement(
       formatPane,
@@ -2166,7 +2308,7 @@ export function createPromptWorkbenchShell({
     return stateReadyPromise;
   }
 
-  async function ensureResourcesLoaded() {
+  async function ensureResourcesLoaded({ statusMessage = "Prompt Workbench resources loaded" } = {}) {
     if (resourcesReadyPromise) {
       return resourcesReadyPromise;
     }
@@ -2211,7 +2353,7 @@ export function createPromptWorkbenchShell({
             Object.assign(blacklistState, blacklistResult.data.blacklist);
           }
           resourcesLoaded = true;
-          updateStatus("Prompt Workbench resources loaded");
+          updateStatus(statusMessage);
         },
       )
       .catch(() => {

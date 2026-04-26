@@ -24,6 +24,8 @@ from rookieui.services.prompt_workbench import (
     build_prompt_workbench_config_payload,
     build_prompt_workbench_favorites_payload,
     build_prompt_workbench_history_payload,
+    build_prompt_workbench_export_payload,
+    apply_prompt_workbench_import,
     build_prompt_workbench_provider_catalog_payload,
     build_prompt_workbench_surface_state_payload,
     execute_prompt_workbench_ai_assist,
@@ -80,6 +82,8 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/favorites",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/blacklist",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/providers",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/export",
+    f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/import",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/translate",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/assist",
     f"{INTERNAL_ROUTE_PREFIX}/prompt-tools/catalog",
@@ -587,6 +591,42 @@ async def prompt_tools_providers(request: Any) -> Any:
             "service": normalize_metadata_text("rookieui"),
             "status": normalize_metadata_text("ok"),
             **build_prompt_workbench_provider_catalog_payload(),
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_export(request: Any) -> Any:
+    include_secrets = coerce_bool(_read_request_query_value(request, "include_secrets"), "include_secrets", strict=False)
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **build_prompt_workbench_export_payload(include_secrets=include_secrets),
+        },
+        request=request,
+    )
+
+
+async def prompt_tools_import(request: Any) -> Any:
+    try:
+        payload = await _read_request_payload(request)
+        result = apply_prompt_workbench_import(payload.get("export", payload))
+    except ValueError as exc:
+        return _json_response(
+            {
+                "service": normalize_metadata_text("rookieui"),
+                "status": normalize_metadata_text("invalid-request"),
+                "detail": normalize_metadata_text(str(exc)),
+            },
+            status=400,
+            request=request,
+        )
+    return _json_response(
+        {
+            "service": normalize_metadata_text("rookieui"),
+            "status": normalize_metadata_text("ok"),
+            **result,
         },
         request=request,
     )
@@ -1169,6 +1209,8 @@ def register_routes(prompt_server: Any) -> None:
     _register_rookieui_get(registrar, "/prompt-tools/blacklist", prompt_tools_blacklist)
     _register_rookieui_post(registrar, "/prompt-tools/blacklist", prompt_tools_blacklist_update)
     _register_rookieui_get(registrar, "/prompt-tools/providers", prompt_tools_providers)
+    _register_rookieui_get(registrar, "/prompt-tools/export", prompt_tools_export)
+    _register_rookieui_post(registrar, "/prompt-tools/import", prompt_tools_import)
     _register_rookieui_post(registrar, "/prompt-tools/translate", prompt_tools_translate)
     _register_rookieui_post(registrar, "/prompt-tools/assist", prompt_tools_assist)
     _register_rookieui_get(registrar, "/prompt-tools/catalog", prompt_tools_catalog)

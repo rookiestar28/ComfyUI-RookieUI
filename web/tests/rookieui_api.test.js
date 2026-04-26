@@ -12,6 +12,7 @@ import {
   fetchRookieUIPromptWorkbenchBlacklist,
   fetchRookieUIPromptWorkbenchCatalog,
   fetchRookieUIPromptWorkbenchConfig,
+  exportRookieUIPromptWorkbench,
   fetchRookieUIPromptWorkbenchState,
   fetchRookieUIPresets,
   fetchRookieUIQueue,
@@ -20,6 +21,7 @@ import {
   fetchRookieUIXYZPlotSessions,
   fetchRookieUIXYZPlotSessionDetail,
   inspectRookieUIPngInfo,
+  importRookieUIPromptWorkbench,
   submitRookieUIExtras,
   submitRookieUIImg2Img,
   submitRookieUITxt2Img,
@@ -458,7 +460,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.data.config.ai_assist.instruction_preset).toContain("Stable Diffusion prompt");
     expect(result.data.language_options[0].code).toBe("en");
     expect(result.data.theme_style_options[0].id).toBe("rookieui_classic");
-    expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+    expect(result.data.blacklist).toEqual({ enabled: false, entries: [], translation_entries: [] });
     expect(result.data.host_actions.danbooru_upsample.route_path).toBe("/rookieui/prompt-tools/upsample");
   });
 
@@ -479,7 +481,7 @@ describe("fetchRookieUICapabilities", () => {
 
     expect(result.ok).toBe(false);
     expect(result.data.contract.surface).toBe("prompt_tools_blacklist");
-    expect(result.data.blacklist).toEqual({ enabled: false, entries: [] });
+    expect(result.data.blacklist).toEqual({ enabled: false, entries: [], translation_entries: [] });
   });
 
   test("loads xyz-plot axes fallback contract", async () => {
@@ -634,6 +636,53 @@ describe("fetchRookieUICapabilities", () => {
     expect(calls[0][0]).toBe("/rookieui/prompt-tools/blacklist");
     expect(JSON.parse(calls[0][1].body)).toEqual({
       blacklist: { enabled: true, entries: ["bad-hands"] },
+    });
+  });
+
+  test("exports and imports prompt-workbench JSON through the backend", async () => {
+    const calls = [];
+    const exportResult = await exportRookieUIPromptWorkbench(async (url) => {
+      calls.push([url]);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            contract: { surface: "prompt_tools_export" },
+            export: {
+              schema_version: 1,
+              secret_policy: "masked_provider_fields", // pragma: allowlist secret
+              data: { config: {}, blacklist: { enabled: false, entries: [], translation_entries: [] }, surfaces: {} },
+            },
+          };
+        },
+      };
+    });
+    const importResult = await importRookieUIPromptWorkbench(
+      { schema_version: 1, data: { config: {}, blacklist: { enabled: true, entries: ["bad hands"] } } },
+      async (url, options) => {
+        calls.push([url, options]);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              contract: { surface: "prompt_tools_import" },
+              import_result: { imported: true, surface_count: 4 },
+            };
+          },
+        };
+      },
+    );
+
+    expect(exportResult.ok).toBe(true);
+    expect(exportResult.data.export.secret_policy).toBe("masked_provider_fields"); // pragma: allowlist secret
+    expect(importResult.ok).toBe(true);
+    expect(calls[0][0]).toBe("/rookieui/prompt-tools/export");
+    expect(calls[1][0]).toBe("/rookieui/prompt-tools/import");
+    expect(JSON.parse(calls[1][1].body)).toEqual({
+      schema_version: 1,
+      data: { config: {}, blacklist: { enabled: true, entries: ["bad hands"] } },
     });
   });
 

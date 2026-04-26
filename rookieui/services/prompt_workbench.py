@@ -16,6 +16,8 @@ from rookieui.services.prompt_workbench_state import (
     get_prompt_workbench_favorites,
     get_prompt_workbench_history,
     get_prompt_workbench_surface_state,
+    export_prompt_workbench_store,
+    import_prompt_workbench_store,
     update_prompt_workbench_blacklist,
     update_prompt_workbench_config,
     update_prompt_workbench_surface_state,
@@ -94,6 +96,21 @@ def build_prompt_workbench_favorites_payload(namespace: object) -> dict[str, Any
 
 def build_prompt_workbench_provider_catalog_payload() -> dict[str, Any]:
     return build_prompt_workbench_provider_payload()
+
+
+def build_prompt_workbench_export_payload(*, include_secrets: bool = False) -> dict[str, Any]:
+    return {
+        "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_export"),
+        "export": export_prompt_workbench_store(include_secrets=include_secrets),
+    }
+
+
+def apply_prompt_workbench_import(payload: object) -> dict[str, Any]:
+    return {
+        "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_import"),
+        "import_result": import_prompt_workbench_store(payload),
+        "persistence": _build_prompt_workbench_persistence_meta(),
+    }
 
 
 def build_prompt_workbench_catalog_snapshot(*, language: object = "en") -> dict[str, Any]:

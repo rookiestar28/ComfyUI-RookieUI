@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -253,3 +254,60 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertIn("config", store)
         self.assertFalse(state_path.exists())
         self.assertEqual(len(list(state_path.parent.glob("state.corrupt-*.json"))), 1)
+
+    def test_export_prompt_workbench_store_masks_provider_secrets(self) -> None:
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "openai",
+                    "providers": {
+                        "openai": {
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
+                            "base_url": "https://example.test/v1",
+                            "model": "gpt-4.1-mini",
+                        }
+                    },
+                }
+            }
+        )
+
+        payload = prompt_workbench_state.export_prompt_workbench_store()
+
+        provider_config = payload["data"]["config"]["translation"]["providers"]["openai"]
+        self.assertEqual(payload["secret_policy"], "masked_provider_fields")  # pragma: allowlist secret
+        self.assertEqual(provider_config["api_key"], "********")
+        self.assertEqual(provider_config["base_url"], "https://example.test/v1")
+        self.assertNotIn("test-openai-key", json.dumps(payload))  # pragma: allowlist secret
+
+    def test_import_prompt_workbench_store_preserves_existing_secret_from_masked_export(self) -> None:
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "openai",
+                    "providers": {
+                        "openai": {
+                            "api_key": "test-openai-key",  # pragma: allowlist secret
+                            "base_url": "https://example.test/v1",
+                            "model": "gpt-4.1-mini",
+                        }
+                    },
+                }
+            }
+        )
+
+        exported = prompt_workbench_state.export_prompt_workbench_store()
+        exported["data"]["blacklist"] = {
+            "enabled": True,
+            "entries": ["bad hands"],
+            "translation_entries": ["private style"],
+        }
+        result = prompt_workbench_state.import_prompt_workbench_store(exported)
+        stored = prompt_workbench_state.load_prompt_workbench_store()
+
+        self.assertTrue(result["imported"])
+        self.assertEqual(stored["blacklist"]["entries"], ["bad hands"])
+        self.assertEqual(stored["blacklist"]["translation_entries"], ["private style"])
+        self.assertEqual(
+            stored["config"]["translation"]["providers"]["openai"]["api_key"],
+            "test-openai-key",  # pragma: allowlist secret
+        )

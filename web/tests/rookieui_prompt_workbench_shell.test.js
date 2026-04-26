@@ -260,6 +260,29 @@ function createBootstrapState(overrides = {}) {
       ok: true,
       data: { blacklist },
     })),
+    exportPromptWorkbenchRequest: vi.fn(async () => ({
+      ok: true,
+      data: {
+        export: {
+          schema_version: 1,
+          secret_policy: "masked_provider_fields", // pragma: allowlist secret
+          data: {
+            config: { language: "en" },
+            blacklist: { enabled: false, entries: [], translation_entries: [] },
+            surfaces: {},
+          },
+        },
+      },
+    })),
+    importPromptWorkbenchRequest: vi.fn(async () => ({
+      ok: true,
+      data: {
+        import_result: {
+          imported: true,
+          surface_count: 4,
+        },
+      },
+    })),
     ...overrides,
   };
 }
@@ -306,6 +329,74 @@ describe("prompt workbench shell", () => {
     expect(bootstrapState.fetchPromptWorkbenchBlacklistRequest).toHaveBeenCalledTimes(1);
     expect(document.getElementById("test-workbench-providers")?.textContent).toContain("1 translate / 1 assist / en");
     expect(document.getElementById("test-workbench-catalogs")?.textContent).toContain("1 groups");
+  });
+
+  test("localizes core labels and supports import export actions", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "zh-TW",
+          theme_style: "rookieui_classic",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: { default_provider: "", providers: {} },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+          ui_preferences: { default_open: false },
+        },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+        ],
+        theme_style_options: [{ id: "rookieui_classic", title: "RookieUI Classic" }],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "i18n-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    expect(document.querySelector(".rookieui-shell__prompt-workbench-title")?.textContent).toBe("提示詞工作台");
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+    document.getElementById("i18n-workbench-panel-format").click();
+    await flushPromises();
+
+    document.getElementById("i18n-workbench-export-json").click();
+    await flushPromises();
+    expect(bootstrapState.exportPromptWorkbenchRequest).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("i18n-workbench-import-export-json").value).toContain("masked_provider_fields");
+
+    const importInput = document.getElementById("i18n-workbench-import-export-json");
+    importInput.value = JSON.stringify({ schema_version: 1, data: { blacklist: { enabled: true, entries: ["bad hands"] } } });
+    importInput.dispatchEvent(new Event("input", { bubbles: true }));
+    document.getElementById("i18n-workbench-import-json").click();
+    await flushPromises();
+    expect(bootstrapState.importPromptWorkbenchRequest).toHaveBeenCalledWith({
+      schema_version: 1,
+      data: { blacklist: { enabled: true, entries: ["bad hands"] } },
+    });
+    expect(document.querySelector(".rookieui-shell__prompt-workbench-status")?.textContent).toBe("提示詞工作台匯入已同步");
   });
 
   test("preserves special token syntax and supports copy plus weight controls", async () => {
