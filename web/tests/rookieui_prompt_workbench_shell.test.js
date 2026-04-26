@@ -332,11 +332,29 @@ describe("prompt workbench shell", () => {
     expect(document.querySelector("#test-workbench-section .rookieui-shell__prompt-workbench-status-strip")?.dataset.pwUi).toBe(
       "status-strip",
     );
+    expect(document.getElementById("test-workbench-token-list")?.dataset.pwUi).toBe("token-chip-board");
+    expect(
+      document.getElementById("test-workbench-token-list")?.classList.contains("rookieui-shell__prompt-workbench-token-board"),
+    ).toBe(true);
 
     const tokenInputs = Array.from(
       document.querySelectorAll("#test-workbench-token-list .rookieui-shell__prompt-workbench-token-input"),
     );
     expect(tokenInputs.map((node) => node.value)).toEqual(["masterpiece", "city skyline"]);
+    const tokenChips = Array.from(document.querySelectorAll("#test-workbench-token-list .rookieui-shell__prompt-workbench-token-chip"));
+    expect(tokenChips).toHaveLength(2);
+    expect(tokenChips.map((node) => node.dataset.pwUi)).toEqual(["token-chip", "token-chip"]);
+    expect(tokenChips.map((node) => node.tabIndex)).toEqual([0, 0]);
+    expect(
+      Array.from(document.querySelectorAll("#test-workbench-token-list .rookieui-shell__prompt-workbench-token-quick-actions")).map(
+        (node) => node.dataset.pwUi,
+      ),
+    ).toEqual(["token-quick-actions", "token-quick-actions"]);
+    expect(
+      Array.from(document.querySelectorAll("#test-workbench-token-list .rookieui-shell__prompt-workbench-token-local-language")).map(
+        (node) => node.dataset.pwUi,
+      ),
+    ).toEqual(["token-local-language", "token-local-language"]);
     expect(bootstrapState.fetchPromptWorkbenchProvidersRequest).toHaveBeenCalledTimes(1);
     expect(bootstrapState.fetchPromptWorkbenchBlacklistRequest).toHaveBeenCalledTimes(1);
     expect(document.getElementById("test-workbench-providers")?.textContent).toContain("1 translate / 1 assist / en");
@@ -565,6 +583,9 @@ describe("prompt workbench shell", () => {
     await shellApi.openWorkbench();
     await flushPromises();
 
+    expect(document.querySelector("#batch-workbench-section .rookieui-shell__prompt-workbench-selection-toolbar")?.dataset.pwUi).toBe(
+      "selection-batch-toolbar",
+    );
     const providerSelect = document.getElementById("batch-workbench-translation-provider");
     providerSelect.value = "openai";
     providerSelect.dispatchEvent(new Event("change", { bubbles: true }));

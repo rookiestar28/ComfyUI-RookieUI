@@ -1336,7 +1336,8 @@ export function createPromptWorkbenchShell({
     const tokens = ensureEditorTokens(getActiveNamespace());
     const selectedCount = getSelectedTokens().length;
     const batchRow = document.createElement("div");
-    batchRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    batchRow.className = "rookieui-shell__prompt-workbench-editor-toolbar rookieui-shell__prompt-workbench-selection-toolbar";
+    batchRow.dataset.pwUi = "selection-batch-toolbar";
     editorPane.appendChild(batchRow);
 
     const selectedLabel = document.createElement("span");
@@ -1367,7 +1368,8 @@ export function createPromptWorkbenchShell({
 
     const list = document.createElement("div");
     list.id = `${idPrefix}-token-list`;
-    list.className = "rookieui-shell__prompt-workbench-token-list";
+    list.className = "rookieui-shell__prompt-workbench-token-list rookieui-shell__prompt-workbench-token-board";
+    list.dataset.pwUi = "token-chip-board";
     editorPane.appendChild(list);
 
     if (!tokens.length) {
@@ -1382,11 +1384,13 @@ export function createPromptWorkbenchShell({
 
     tokens.forEach((token, index) => {
       const row = document.createElement("div");
-      row.className = "rookieui-shell__prompt-workbench-token";
+      row.className = "rookieui-shell__prompt-workbench-token rookieui-shell__prompt-workbench-token-chip";
+      row.dataset.pwUi = "token-chip";
       row.dataset.disabled = String(token.disabled);
       row.dataset.keywordFamily = String(token.keyword_family ?? "plain");
       row.dataset.highlight = getTokenHighlight(token);
       row.draggable = true;
+      row.tabIndex = 0;
       row.id = `${idPrefix}-token-${token.id}`;
       row.addEventListener("dragstart", () => {
         dragTokenId = token.id;
@@ -1437,13 +1441,16 @@ export function createPromptWorkbenchShell({
       const translatedText = String(token.translated_text ?? "").trim();
       const translationDetail = document.createElement("span");
       translationDetail.id = `${idPrefix}-token-translation-${index}`;
-      translationDetail.className = "rookieui-shell__prompt-workbench-token-translation";
+      translationDetail.className =
+        "rookieui-shell__prompt-workbench-token-translation rookieui-shell__prompt-workbench-token-local-language";
+      translationDetail.dataset.pwUi = "token-local-language";
       translationDetail.dataset.hasTranslation = String(Boolean(translatedText));
       translationDetail.textContent = translatedText ? `Translation: ${translatedText}` : "Translation: not available";
       row.appendChild(translationDetail);
 
       const controls = document.createElement("div");
-      controls.className = "rookieui-shell__prompt-workbench-token-actions";
+      controls.className = "rookieui-shell__prompt-workbench-token-actions rookieui-shell__prompt-workbench-token-quick-actions";
+      controls.dataset.pwUi = "token-quick-actions";
       row.appendChild(controls);
 
       const toggleButton = createActionButton(`${idPrefix}-token-toggle-${index}`, token.disabled ? "Enable" : "Disable");

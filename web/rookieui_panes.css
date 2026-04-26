@@ -1902,6 +1902,17 @@
   gap: 8px;
 }
 
+.rookieui-shell__prompt-workbench-selection-toolbar {
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--rookieui-border) 72%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rookieui-bg-elevated) 78%, transparent);
+}
+
+.rookieui-shell__prompt-workbench-token-board {
+  align-items: start;
+}
+
 .rookieui-shell__prompt-workbench-catalog-block {
   display: grid;
   gap: 8px;
@@ -1976,8 +1987,18 @@
 }
 
 .rookieui-shell__prompt-workbench-token {
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(160px, 1fr) auto;
   align-items: center;
+}
+
+.rookieui-shell__prompt-workbench-token-chip {
+  border-radius: 18px;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.06);
+}
+
+.rookieui-shell__prompt-workbench-token-chip:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--rookieui-accent) 68%, white 32%);
+  outline-offset: 2px;
 }
 
 .rookieui-shell__prompt-workbench-token[data-disabled="true"] {
@@ -1994,6 +2015,27 @@
 
 .rookieui-shell__prompt-workbench-token-input {
   min-width: 0;
+  border-radius: 999px;
+}
+
+.rookieui-shell__prompt-workbench-token-local-language {
+  grid-column: 3 / -1;
+  color: var(--rookieui-text-muted);
+  font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench-token-quick-actions {
+  justify-content: flex-end;
+  opacity: 0.72;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.rookieui-shell__prompt-workbench-token-chip:is(:hover, :focus-within, :focus-visible)
+  .rookieui-shell__prompt-workbench-token-quick-actions {
+  opacity: 1;
+  transform: translateY(-1px);
 }
 
 .rookieui-shell__prompt-workbench-entry {
