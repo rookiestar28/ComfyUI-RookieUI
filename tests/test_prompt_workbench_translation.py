@@ -12,6 +12,7 @@ from rookieui.services.prompt_workbench_translation import (
     build_prompt_workbench_provider_payload,
     translate_prompt_workbench_payload,
 )
+from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS
 
 
 class _FakeHttpResponse:
@@ -78,6 +79,10 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
             for provider in payload["surfaces"]["translation"]["providers"]
         }
 
+        self.assertEqual(
+            payload["surfaces"]["translation"]["shipped_provider_ids"],
+            list(PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS),
+        )
         self.assertEqual(
             payload["surfaces"]["translation"]["provider_layer_order"],
             [

@@ -626,16 +626,16 @@ def build_prompt_workbench_provider_catalog_payload() -> dict[str, Any]:
             )
         surfaces[surface] = {
             "providers": entries,
-            "shipped_provider_ids": [
-                entry["provider_id"]
-                for entry in entries
-                if entry["execution_state"] == "shipped"
-            ],
-            "deferred_provider_ids": [
-                entry["provider_id"]
-                for entry in entries
-                if entry["execution_state"] == "deferred"
-            ],
+            "shipped_provider_ids": list(
+                PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS
+                if surface == "translation"
+                else PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS
+            ),
+            "deferred_provider_ids": list(
+                PROMPT_WORKBENCH_DEFERRED_TRANSLATION_PROVIDER_IDS
+                if surface == "translation"
+                else PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS
+            ),
             "reference_only_provider_ids": [
                 entry["provider_id"]
                 for entry in entries
