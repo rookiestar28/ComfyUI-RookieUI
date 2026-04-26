@@ -154,10 +154,10 @@ if (-not $env:ROOKIEUI_E2E_PORT) {
 Write-Host "[tests] Playwright harness python: $env:ROOKIEUI_E2E_PYTHON"
 Write-Host "[tests] Playwright harness port: $env:ROOKIEUI_E2E_PORT"
 
-Write-Host "[tests] 1/4 detect-secrets"
+Write-Host "[tests] 1/5 detect-secrets"
 Invoke-Checked "detect-secrets" { & $venvPython -m pre_commit run detect-secrets --all-files }
 
-Write-Host "[tests] 2/4 pre-commit all hooks"
+Write-Host "[tests] 2/5 pre-commit all hooks"
 $worktreeBefore = Get-GitDiffSnapshot
 $indexBefore = Get-GitDiffSnapshot -Cached
 & $venvPython -m pre_commit run --all-files --show-diff-on-failure
@@ -167,7 +167,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Assert-PreCommitDidNotMutateRepo -BeforeWorktree $worktreeBefore -BeforeIndex $indexBefore
 
-Write-Host "[tests] 3/4 backend unit tests"
+Write-Host "[tests] 3/5 backend unit tests"
 $env:MOLTBOT_STATE_DIR = "$root\moltbot_state\_local_unit"
 Invoke-Checked "unit tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_*.py" }
 

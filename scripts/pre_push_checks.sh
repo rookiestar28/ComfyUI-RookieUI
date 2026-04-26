@@ -261,10 +261,10 @@ fi
 echo "[pre-push] Playwright harness python: $ROOKIEUI_E2E_PYTHON"
 echo "[pre-push] Playwright harness port: $ROOKIEUI_E2E_PORT"
 
-echo "[pre-push] Step 1/4: detect-secrets"
+echo "[pre-push] Step 1/5: detect-secrets"
 "$VENV_PY" -m pre_commit run detect-secrets --all-files
 
-echo "[pre-push] Step 2/4: pre-commit all hooks"
+echo "[pre-push] Step 2/5: pre-commit all hooks"
 capture_precommit_snapshots
 if "$VENV_PY" -m pre_commit run --all-files --show-diff-on-failure; then
   :
@@ -277,7 +277,7 @@ if precommit_changed_repo_state; then
 fi
 cleanup_precommit_snapshots
 
-echo "[pre-push] Step 3/4: backend unit tests"
+echo "[pre-push] Step 3/5: backend unit tests"
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
   "$VENV_PY" scripts/run_unittests.py --start-dir tests --pattern "test_*.py"
 

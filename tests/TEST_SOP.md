@@ -65,6 +65,9 @@ Recommended venv paths:
 
 ## Quick Start (One-command full gate)
 
+These wrappers are the final sweep gate. For bugfixes or high-risk changes, run and record
+the targeted reproduce/pin checks first, then use the wrapper to prove whole-repo stability.
+
 ### Windows (PowerShell)
 
 ```powershell
