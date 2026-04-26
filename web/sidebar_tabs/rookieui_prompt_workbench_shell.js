@@ -82,7 +82,30 @@ function normalizePromptEntry(entry) {
     id: String(entry?.id ?? "").trim() || `pw-entry-${Date.now()}`,
     label: String(entry?.label ?? "").trim(),
     prompt_text: String(entry?.prompt_text ?? "").trim(),
+    tag_tokens: Array.isArray(entry?.tag_tokens) ? entry.tag_tokens.map((token) => normalizeTokenText(token)).filter(Boolean) : [],
+    token_payloads: Array.isArray(entry?.token_payloads) ? entry.token_payloads.map(normalizePersistedTokenPayload).filter(Boolean) : [],
     created_at: Number(entry?.created_at ?? 0) || 0,
+  };
+}
+
+function normalizePersistedTokenPayload(token) {
+  if (!token || typeof token !== "object") {
+    return null;
+  }
+  const rawText = normalizeTokenText(token.raw_text ?? token.text);
+  if (!rawText) {
+    return null;
+  }
+  return {
+    raw_text: rawText,
+    normalized_text: normalizeTokenText(token.normalized_text) || rawText.toLowerCase(),
+    scope: normalizeTokenText(token.scope),
+    order_index: Number.isInteger(token.order_index) ? token.order_index : 0,
+    disabled: Boolean(token.disabled),
+    selected: Boolean(token.selected),
+    translated_text: String(token.translated_text ?? ""),
+    keyword_family: normalizeTokenText(token.keyword_family) || classifyPromptToken(rawText),
+    weight: Number.isFinite(Number(token.weight)) ? Number(token.weight) : null,
   };
 }
 
@@ -295,6 +318,8 @@ export function createPromptWorkbenchShell({
   const historyCache = new Map();
   const favoritesCache = new Map();
   const dirtyTimers = new Map();
+  const autoHistoryTimers = new Map();
+  const lastAutoHistoryText = new Map();
   let providersPayload = null;
   let catalogPayload = null;
   let stateReadyPromise = null;
@@ -548,6 +573,66 @@ export function createPromptWorkbenchShell({
       syncUi();
     }, 180);
     dirtyTimers.set(namespace, nextTimer);
+  }
+
+  function serializeTokenPayload(token, index) {
+    const rawText = normalizeTokenText(token?.raw_text ?? token?.text);
+    if (!rawText) {
+      return null;
+    }
+    return {
+      raw_text: rawText,
+      normalized_text: normalizeTokenText(token.normalized_text) || rawText.toLowerCase(),
+      scope: normalizeTokenText(token.scope) || activeScope,
+      order_index: Number.isInteger(token.order_index) ? token.order_index : index,
+      disabled: Boolean(token.disabled),
+      selected: Boolean(token.selected),
+      translated_text: String(token.translated_text ?? ""),
+      keyword_family: normalizeTokenText(token.keyword_family) || classifyPromptToken(rawText),
+      weight: Number.isFinite(Number(token.weight)) ? Number(token.weight) : null,
+    };
+  }
+
+  function serializeTokenPayloads(tokens) {
+    return (Array.isArray(tokens) ? tokens : []).map(serializeTokenPayload).filter(Boolean);
+  }
+
+  function buildCollectionItem(scope, promptText, tokens) {
+    const tokenPayloads = serializeTokenPayloads(tokens);
+    return {
+      label: buildEntryLabel(scope, promptText),
+      prompt_text: String(promptText ?? "").trim(),
+      tag_tokens: tokenPayloads.filter((token) => !token.disabled).map((token) => token.raw_text),
+      token_payloads: tokenPayloads,
+    };
+  }
+
+  function queueAutoHistoryCapture(namespace, scope, promptText, tokens) {
+    const normalizedText = String(promptText ?? "").trim();
+    if (!namespace || !normalizedText || normalizedText === lastAutoHistoryText.get(namespace)) {
+      return;
+    }
+    const existingTimer = autoHistoryTimers.get(namespace);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    const tokenSnapshot = serializeTokenPayloads(tokens);
+    const nextTimer = setTimeout(() => {
+      autoHistoryTimers.delete(namespace);
+      if (normalizedText === lastAutoHistoryText.get(namespace)) {
+        return;
+      }
+      lastAutoHistoryText.set(namespace, normalizedText);
+      void bootstrapState?.updatePromptWorkbenchHistoryRequest?.(namespace, "auto_capture", {
+        item: buildCollectionItem(scope, normalizedText, tokenSnapshot),
+      }).then((result) => {
+        const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
+        historyCache.set(namespace, normalizedItems);
+        updateStatus("Auto-saved prompt history");
+        syncUi();
+      });
+    }, 600);
+    autoHistoryTimers.set(namespace, nextTimer);
   }
 
   function queueConfigPersist() {
@@ -814,11 +899,7 @@ export function createPromptWorkbenchShell({
       updateStatus(`No ${activeScope === "negative" ? "negative prompt" : "prompt"} text to save`);
       return;
     }
-    const item = {
-      label: buildEntryLabel(activeScope, promptText),
-      prompt_text: promptText,
-      tag_tokens: ensureEditorTokens(namespace).filter((token) => !token.disabled).map((token) => token.raw_text ?? token.text),
-    };
+    const item = buildCollectionItem(activeScope, promptText, ensureEditorTokens(namespace));
     void actionMethod?.(namespace, "push", { item }).then((result) => {
       const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
       if (collectionName === "favorites") {
@@ -861,7 +942,17 @@ export function createPromptWorkbenchShell({
     if (!normalized) {
       return;
     }
-    const nextEntries = Array.from(new Set([...(blacklistState.entries ?? []), normalized]));
+    addTokensToBlacklist([normalized]);
+  }
+
+  function addTokensToBlacklist(tokenTexts) {
+    const normalizedTokens = (Array.isArray(tokenTexts) ? tokenTexts : [])
+      .map((tokenText) => String(tokenText ?? "").trim())
+      .filter(Boolean);
+    if (!normalizedTokens.length) {
+      return;
+    }
+    const nextEntries = Array.from(new Set([...(blacklistState.entries ?? []), ...normalizedTokens]));
     blacklistState.enabled = true;
     blacklistState.entries = nextEntries;
     void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
@@ -891,6 +982,59 @@ export function createPromptWorkbenchShell({
       token.disabled = blacklistSet.has(normalizeTokenText(token.raw_text ?? token.text).toLowerCase());
     });
     rebuildPromptFromEditor("Applied Prompt Workbench blacklist filter");
+  }
+
+  function getSelectedTokens() {
+    return ensureEditorTokens(getActiveNamespace()).filter((token) => token.selected);
+  }
+
+  function mutateSelectedTokens(action) {
+    const namespace = getActiveNamespace();
+    const tokens = ensureEditorTokens(namespace);
+    const selectedTokens = tokens.filter((token) => token.selected);
+    if (!selectedTokens.length) {
+      updateStatus("Select one or more prompt tokens before running a batch action");
+      return;
+    }
+    if (action === "enable" || action === "disable") {
+      selectedTokens.forEach((token) => {
+        token.disabled = action === "disable";
+      });
+      rebuildPromptFromEditor(action === "disable" ? "Disabled selected prompt tokens" : "Enabled selected prompt tokens");
+      return;
+    }
+    if (action === "delete") {
+      editorCache.set(
+        namespace,
+        tokens.filter((token) => !token.selected),
+      );
+      rebuildPromptFromEditor("Deleted selected prompt tokens");
+      return;
+    }
+    if (action === "copy") {
+      const selectedText = selectedTokens.map((token) => normalizeTokenText(token.raw_text ?? token.text)).filter(Boolean).join(", ");
+      if (navigator?.clipboard?.writeText) {
+        void navigator.clipboard.writeText(selectedText);
+      }
+      updateStatus("Copied selected prompt tokens");
+      return;
+    }
+    if (action === "favorite") {
+      const selectedText = selectedTokens.map((token) => normalizeTokenText(token.raw_text ?? token.text)).filter(Boolean).join(", ");
+      const item = buildCollectionItem(activeScope, selectedText, selectedTokens);
+      void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(namespace, "push", { item }).then((result) => {
+        favoritesCache.set(
+          namespace,
+          Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [],
+        );
+        updateStatus("Saved selected prompt tokens to favorites");
+        syncUi();
+      });
+      return;
+    }
+    if (action === "blacklist") {
+      addTokensToBlacklist(selectedTokens.map((token) => token.raw_text ?? token.text));
+    }
   }
 
   function renderEditorPane() {
@@ -994,6 +1138,34 @@ export function createPromptWorkbenchShell({
     upsampleRow.appendChild(upsampleDetail);
 
     const tokens = ensureEditorTokens(getActiveNamespace());
+    const selectedCount = getSelectedTokens().length;
+    const batchRow = document.createElement("div");
+    batchRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    editorPane.appendChild(batchRow);
+
+    const selectedLabel = document.createElement("span");
+    selectedLabel.id = `${idPrefix}-token-selected-count`;
+    selectedLabel.className = "rookieui-shell__prompt-workbench-detail";
+    selectedLabel.textContent = `${selectedCount} selected`;
+    batchRow.appendChild(selectedLabel);
+
+    const batchActions = [
+      ["enable", "Enable Selected"],
+      ["disable", "Disable Selected"],
+      ["delete", "Delete Selected"],
+      ["copy", "Copy Selected"],
+      ["favorite", "Favorite Selected"],
+      ["blacklist", "Blacklist Selected"],
+    ];
+    batchActions.forEach(([action, label]) => {
+      const button = createActionButton(`${idPrefix}-token-batch-${action}`, label);
+      button.disabled = selectedCount === 0;
+      button.addEventListener("click", () => {
+        mutateSelectedTokens(action);
+      });
+      batchRow.appendChild(button);
+    });
+
     const list = document.createElement("div");
     list.id = `${idPrefix}-token-list`;
     list.className = "rookieui-shell__prompt-workbench-token-list";
@@ -1036,8 +1208,20 @@ export function createPromptWorkbenchShell({
 
       const dragHandle = document.createElement("span");
       dragHandle.className = "rookieui-shell__prompt-workbench-token-handle";
-      dragHandle.textContent = "⋮⋮";
+      dragHandle.textContent = "::";
       row.appendChild(dragHandle);
+
+      const selectedCheckbox = document.createElement("input");
+      selectedCheckbox.type = "checkbox";
+      selectedCheckbox.id = `${idPrefix}-token-select-${index}`;
+      selectedCheckbox.className = "rookieui-shell__prompt-workbench-token-select";
+      selectedCheckbox.checked = Boolean(token.selected);
+      selectedCheckbox.addEventListener("change", () => {
+        token.selected = selectedCheckbox.checked;
+        updateStatus(token.selected ? "Selected prompt token" : "Deselected prompt token");
+        syncUi();
+      });
+      row.appendChild(selectedCheckbox);
 
       const valueInput = document.createElement("input");
       valueInput.type = "text";
@@ -1117,6 +1301,7 @@ export function createPromptWorkbenchShell({
           label: token.raw_text ?? token.text,
           prompt_text: token.raw_text ?? token.text,
           tag_tokens: [token.raw_text ?? token.text],
+          token_payloads: [serializeTokenPayload(token, index)],
         };
         void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(getActiveNamespace(), "push", { item }).then((result) => {
           favoritesCache.set(
@@ -1777,7 +1962,9 @@ export function createPromptWorkbenchShell({
         stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: String(input.value ?? "") });
       cachedState.draft_prompt = String(input.value ?? "");
       stateCache.set(namespace, cachedState);
-      editorCache.set(namespace, parsePromptTokens(cachedState.draft_prompt, { scope: activeScope }));
+      const nextTokens = parsePromptTokens(cachedState.draft_prompt, { scope });
+      editorCache.set(namespace, nextTokens);
+      queueAutoHistoryCapture(namespace, scope, cachedState.draft_prompt, nextTokens);
       if (scope === activeScope) {
         queueStatePersist();
         syncUi();

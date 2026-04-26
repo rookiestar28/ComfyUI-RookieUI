@@ -192,7 +192,15 @@ function createBootstrapState(overrides = {}) {
         items:
           action === "clear"
             ? []
-            : [{ id: "history-2", label: payload?.item?.label ?? "Prompt", prompt_text: payload?.item?.prompt_text ?? "" }],
+            : [
+                {
+                  id: "history-2",
+                  label: payload?.item?.label ?? "Prompt",
+                  prompt_text: payload?.item?.prompt_text ?? "",
+                  tag_tokens: payload?.item?.tag_tokens ?? [],
+                  token_payloads: payload?.item?.token_payloads ?? [],
+                },
+              ],
       },
     })),
     updatePromptWorkbenchFavoritesRequest: vi.fn(async (_namespace, action, payload) => ({
@@ -201,7 +209,15 @@ function createBootstrapState(overrides = {}) {
         items:
           action === "move_up"
             ? [{ id: payload?.item_id ?? "favorite-1", label: "Moved", prompt_text: "masterpiece" }]
-            : [{ id: "favorite-2", label: payload?.item?.label ?? "Favorite", prompt_text: payload?.item?.prompt_text ?? "" }],
+            : [
+                {
+                  id: "favorite-2",
+                  label: payload?.item?.label ?? "Favorite",
+                  prompt_text: payload?.item?.prompt_text ?? "",
+                  tag_tokens: payload?.item?.tag_tokens ?? [],
+                  token_payloads: payload?.item?.token_payloads ?? [],
+                },
+              ],
       },
     })),
     updatePromptWorkbenchBlacklistRequest: vi.fn(async (blacklist) => ({
@@ -376,6 +392,111 @@ describe("prompt workbench shell", () => {
       expect.objectContaining({
         item: expect.objectContaining({
           prompt_text: "cinematic lighting, masterpiece",
+        }),
+      }),
+    );
+  });
+
+  test("supports selected token batch copy, favorites, blacklist, and delete", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const clipboard = { writeText: vi.fn(async () => undefined) };
+    Object.defineProperty(globalThis.navigator, "clipboard", {
+      value: clipboard,
+      configurable: true,
+    });
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "batch-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("batch-workbench-token-select-0").click();
+    document.getElementById("batch-workbench-token-select-1").click();
+    expect(document.getElementById("batch-workbench-token-selected-count").textContent).toBe("2 selected");
+
+    document.getElementById("batch-workbench-token-batch-copy").click();
+    expect(clipboard.writeText).toHaveBeenCalledWith("masterpiece, city skyline");
+
+    document.getElementById("batch-workbench-token-batch-favorite").click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchFavoritesRequest).toHaveBeenCalledWith(
+      "txt2img_prompt",
+      "push",
+      expect.objectContaining({
+        item: expect.objectContaining({
+          prompt_text: "masterpiece, city skyline",
+          tag_tokens: ["masterpiece", "city skyline"],
+          token_payloads: [
+            expect.objectContaining({ raw_text: "masterpiece", selected: true }),
+            expect.objectContaining({ raw_text: "city skyline", selected: true }),
+          ],
+        }),
+      }),
+    );
+
+    document.getElementById("batch-workbench-token-batch-blacklist").click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith({
+      enabled: true,
+      entries: ["masterpiece", "city skyline"],
+    });
+
+    document.getElementById("batch-workbench-token-batch-delete").click();
+    expect(prompt.value).toBe("");
+  });
+
+  test("auto-captures prompt history from input edits with token payloads", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "history-auto-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    prompt.value = "masterpiece, night skyline";
+    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(bootstrapState.updatePromptWorkbenchHistoryRequest).toHaveBeenCalledWith(
+      "txt2img_prompt",
+      "auto_capture",
+      expect.objectContaining({
+        item: expect.objectContaining({
+          prompt_text: "masterpiece, night skyline",
+          tag_tokens: ["masterpiece", "night skyline"],
+          token_payloads: [
+            expect.objectContaining({ raw_text: "masterpiece", scope: "prompt" }),
+            expect.objectContaining({ raw_text: "night skyline", scope: "prompt" }),
+          ],
         }),
       }),
     );

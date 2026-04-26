@@ -115,6 +115,87 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertEqual(len(removed), 0)
         self.assertEqual([entry["label"] for entry in moved], ["Two", "One"])
 
+    def test_collection_entries_preserve_normalized_token_payloads(self) -> None:
+        items = prompt_workbench_state.apply_prompt_workbench_favorite_action(
+            "txt2img_prompt",
+            action="push",
+            payload={
+                "item": {
+                    "prompt_text": "masterpiece, city skyline",
+                    "label": "Token payload",
+                    "tag_tokens": ["masterpiece", "city skyline"],
+                    "token_payloads": [
+                        {
+                            "raw_text": " masterpiece ",
+                            "normalized_text": "MASTERPIECE",
+                            "scope": "prompt",
+                            "order_index": 4,
+                            "disabled": "no",
+                            "selected": True,
+                            "translated_text": "傑作",
+                            "keyword_family": "plain",
+                            "weight": 1.2,
+                            "ignored": "drop",
+                        },
+                        {"raw_text": ""},
+                        "drop",
+                    ],
+                }
+            },
+        )
+
+        self.assertEqual(items[0]["tag_tokens"], ["masterpiece", "city skyline"])
+        self.assertEqual(
+            items[0]["token_payloads"],
+            [
+                {
+                    "raw_text": "masterpiece",
+                    "normalized_text": "MASTERPIECE",
+                    "scope": "prompt",
+                    "order_index": 4,
+                    "disabled": False,
+                    "selected": True,
+                    "translated_text": "傑作",
+                    "keyword_family": "plain",
+                    "weight": 1.2,
+                }
+            ],
+        )
+
+    def test_history_auto_capture_skips_empty_and_duplicate_latest_prompt(self) -> None:
+        first = prompt_workbench_state.apply_prompt_workbench_history_action(
+            "txt2img_prompt",
+            action="auto_capture",
+            payload={
+                "item": {
+                    "prompt_text": "masterpiece, city skyline",
+                    "label": "Prompt",
+                    "token_payloads": [{"raw_text": "masterpiece", "scope": "prompt"}],
+                }
+            },
+        )
+        duplicate = prompt_workbench_state.apply_prompt_workbench_history_action(
+            "txt2img_prompt",
+            action="auto_capture",
+            payload={"item": {"prompt_text": "masterpiece, city skyline", "label": "Duplicate"}},
+        )
+        empty = prompt_workbench_state.apply_prompt_workbench_history_action(
+            "txt2img_prompt",
+            action="auto_capture",
+            payload={"item": {"prompt_text": "", "label": "Empty"}},
+        )
+        second = prompt_workbench_state.apply_prompt_workbench_history_action(
+            "txt2img_prompt",
+            action="auto_capture",
+            payload={"item": {"prompt_text": "masterpiece, night skyline", "label": "Prompt"}},
+        )
+
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(duplicate), 1)
+        self.assertEqual(len(empty), 1)
+        self.assertEqual([entry["prompt_text"] for entry in second], ["masterpiece, city skyline", "masterpiece, night skyline"])
+        self.assertEqual(first[0]["token_payloads"][0]["raw_text"], "masterpiece")
+
     def test_blacklist_update_normalizes_entries(self) -> None:
         updated = prompt_workbench_state.update_prompt_workbench_blacklist(
             {

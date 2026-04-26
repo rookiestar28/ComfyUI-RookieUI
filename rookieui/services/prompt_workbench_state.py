@@ -98,6 +98,42 @@ def _normalize_tag_list(value: object) -> list[str]:
     return tags
 
 
+def _normalize_token_payload_list(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    tokens: list[dict[str, Any]] = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, dict):
+            continue
+        raw_text = _normalize_text(entry.get("raw_text", entry.get("text", "")), max_length=_MAX_TAG_LENGTH)
+        if not raw_text:
+            continue
+        normalized_text = _normalize_text(
+            entry.get("normalized_text", raw_text.lower()),
+            max_length=_MAX_TAG_LENGTH,
+        ) or raw_text.lower()
+        weight = entry.get("weight")
+        normalized_weight = float(weight) if isinstance(weight, (int, float)) and not isinstance(weight, bool) else None
+        tokens.append(
+            {
+                "raw_text": raw_text,
+                "normalized_text": normalized_text,
+                "scope": _normalize_text(entry.get("scope", ""), max_length=40),
+                "order_index": index
+                if isinstance(entry.get("order_index"), bool) or not isinstance(entry.get("order_index"), int)
+                else max(0, entry["order_index"]),
+                "disabled": _normalize_bool(entry.get("disabled"), False),
+                "selected": _normalize_bool(entry.get("selected"), False),
+                "translated_text": _normalize_text(entry.get("translated_text", ""), max_length=_MAX_TAG_LENGTH),
+                "keyword_family": _normalize_text(entry.get("keyword_family", "plain"), max_length=40) or "plain",
+                "weight": normalized_weight,
+            }
+        )
+        if len(tokens) >= _MAX_TAG_COUNT:
+            break
+    return tokens
+
+
 def _normalize_provider_field_value(field_spec: dict[str, Any], raw_value: object) -> Any:
     value_type = str(field_spec.get("value_type", "string")).strip() or "string"
     if value_type == "boolean":
@@ -277,6 +313,7 @@ def _normalize_prompt_entry_payload(payload: object) -> dict[str, Any]:
         "label": _normalize_text(payload.get("label", ""), max_length=_MAX_ENTRY_LABEL_LENGTH),
         "prompt_text": prompt_text,
         "tag_tokens": _normalize_tag_list(payload.get("tag_tokens")),
+        "token_payloads": _normalize_token_payload_list(payload.get("token_payloads")),
     }
 
 
@@ -447,6 +484,16 @@ def _apply_collection_action(
                 target_index = index + delta
                 if 0 <= target_index < len(collection):
                     collection[index], collection[target_index] = collection[target_index], collection[index]
+        elif normalized_action == "auto_capture" and collection_name == "history":
+            entry_payload = payload.get("item") if isinstance(payload, dict) else payload
+            try:
+                entry = _normalize_prompt_entry_payload(entry_payload)
+            except ValueError:
+                entry = None
+            if entry is not None:
+                latest_prompt_text = collection[-1]["prompt_text"] if collection else ""
+                if latest_prompt_text != entry["prompt_text"]:
+                    collection.append(entry)
         else:
             entry_payload = payload.get("item") if isinstance(payload, dict) else payload
             collection.append(_normalize_prompt_entry_payload(entry_payload))
