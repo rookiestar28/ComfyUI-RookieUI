@@ -1651,6 +1651,7 @@ export function createPromptWorkbenchShell({
     list.id = `${idPrefix}-token-list`;
     list.className = "rookieui-shell__prompt-workbench-token-list rookieui-shell__prompt-workbench-token-board";
     list.dataset.pwUi = "token-chip-board";
+    list.dataset.tokenLayout = normalizedFixedScope ? "inline-tags" : "board";
     editorPane.appendChild(list);
 
     if (!tokens.length) {
@@ -1667,7 +1668,11 @@ export function createPromptWorkbenchShell({
     tokens.forEach((token, index) => {
       const row = document.createElement("div");
       row.className = "rookieui-shell__prompt-workbench-token rookieui-shell__prompt-workbench-token-chip";
+      if (normalizedFixedScope) {
+        row.classList.add("rookieui-shell__prompt-workbench-token--inline-tag");
+      }
       row.dataset.pwUi = "token-chip";
+      row.dataset.pwTokenUi = normalizedFixedScope ? "inline-token-tag" : "token-chip";
       row.dataset.disabled = String(token.disabled);
       row.dataset.keywordFamily = String(token.keyword_family ?? "plain");
       row.dataset.highlight = getTokenHighlight(token);
@@ -1733,6 +1738,7 @@ export function createPromptWorkbenchShell({
       const controls = document.createElement("div");
       controls.className = "rookieui-shell__prompt-workbench-token-actions rookieui-shell__prompt-workbench-token-quick-actions";
       controls.dataset.pwUi = "token-quick-actions";
+      controls.setAttribute("aria-label", "Prompt token quick actions");
       row.appendChild(controls);
 
       const toggleButton = createActionButton(`${idPrefix}-token-toggle-${index}`, token.disabled ? "Enable" : "Disable");

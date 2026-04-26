@@ -446,6 +446,20 @@ describe("prompt workbench shell", () => {
       "Negative Prompt namespace: txt2img_negative",
     );
     expect(document.getElementById("inline-negative-workbench-inline-counter")?.textContent).toBe("2 tags");
+    expect(document.getElementById("inline-negative-workbench-token-list")?.dataset.tokenLayout).toBe("inline-tags");
+    expect(
+      document.querySelector("#inline-negative-workbench-token-list [data-pw-token-ui='inline-token-tag']"),
+    ).toBeTruthy();
+    expect(
+      document
+        .querySelector("#inline-negative-workbench-token-list [data-pw-ui='token-quick-actions']")
+        ?.getAttribute("aria-label"),
+    ).toBe("Prompt token quick actions");
+    expect(
+      Array.from(
+        document.querySelectorAll("#inline-negative-workbench-token-list [data-pw-ui='token-local-language']"),
+      ).length,
+    ).toBeGreaterThan(0);
 
     document.getElementById("inline-negative-workbench-inline-history").click();
     await flushPromises();

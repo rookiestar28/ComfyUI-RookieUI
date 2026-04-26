@@ -1786,6 +1786,67 @@
   margin-top: 8px;
 }
 
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token-board[data-token-layout="inline-tags"] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px dashed color-mix(in srgb, var(--rookieui-border-muted) 72%, transparent);
+  border-radius: 12px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 88%, var(--rookieui-accent) 12%);
+}
+
+.rookieui-shell__prompt-workbench-token--inline-tag {
+  grid-template-columns: auto auto minmax(120px, 1fr) minmax(100px, 0.7fr);
+  align-items: center;
+  border-radius: 12px;
+  padding: 6px 8px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag .rookieui-shell__prompt-workbench-token-input {
+  min-height: 28px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag .rookieui-shell__prompt-workbench-token-local-language {
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-muted) 78%, transparent);
+  font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag .rookieui-shell__prompt-workbench-token-quick-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+  opacity: 0;
+  visibility: hidden;
+  max-height: 0;
+  overflow: hidden;
+  transition:
+    opacity 120ms ease,
+    max-height 120ms ease,
+    visibility 120ms ease;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag:hover .rookieui-shell__prompt-workbench-token-quick-actions,
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag:focus-within .rookieui-shell__prompt-workbench-token-quick-actions {
+  opacity: 1;
+  visibility: visible;
+  max-height: 96px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-token--inline-tag .rookieui-shell__prompt-workbench-token-quick-actions button {
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
 .rookieui-shell__prompt-workbench[data-theme-style="rookieui_graphite"] {
   background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, black 8%);
   border-color: color-mix(in srgb, var(--rookieui-border-strong) 68%, black 32%);

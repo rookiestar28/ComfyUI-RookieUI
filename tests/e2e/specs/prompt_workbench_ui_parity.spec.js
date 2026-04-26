@@ -4,6 +4,8 @@ const path = require("path");
 
 const ARTIFACT_ROOT = process.env.ROOKIEUI_VISUAL_ARTIFACT_DIR || "test-results/prompt-workbench-ui-parity";
 
+test.setTimeout(60000);
+
 function ensureArtifactDir() {
   const dir = path.resolve(process.cwd(), ARTIFACT_ROOT);
   fs.mkdirSync(dir, { recursive: true });
@@ -130,7 +132,25 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='inline-suggestions']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='token-chip-board']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='token-chip']")).toHaveCount(3);
+  await expect(workbench.locator("[data-pw-ui='token-chip-board']")).toHaveAttribute("data-token-layout", "inline-tags");
+  await expect(workbench.locator("[data-pw-token-ui='inline-token-tag']")).toHaveCount(3);
   await expect(workbench.locator("[data-pw-ui='secondary-entrypoints']")).toBeVisible();
+
+  const firstToken = workbench.locator("[data-pw-token-ui='inline-token-tag']").first();
+  const firstTokenActions = firstToken.locator("[data-pw-ui='token-quick-actions']");
+  await expect(firstToken.locator("[data-pw-ui='token-local-language']")).toBeVisible();
+  await expect(firstTokenActions).toBeHidden();
+  await firstToken.hover();
+  await expect(firstTokenActions).toBeVisible();
+  await expect(firstTokenActions.getByRole("button", { name: "Disable" })).toBeVisible();
+  await expect(firstTokenActions.getByRole("button", { name: "Weight +" })).toBeVisible();
+  await expect(firstTokenActions.getByRole("button", { name: "Copy" })).toBeVisible();
+  await expect(firstTokenActions.getByRole("button", { name: "Favorite" })).toBeVisible();
+  await expect(firstTokenActions.getByRole("button", { name: "Blacklist" })).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(firstTokenActions).toBeHidden();
+  await firstToken.locator(".rookieui-shell__prompt-workbench-token-input").focus();
+  await expect(firstTokenActions).toBeVisible();
 
   await workbench.screenshot({ path: currentCardPath });
 
@@ -144,6 +164,11 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toHaveAttribute("data-active-surface", "history");
   await expect(page.locator("#rookieui-txt2img-workbench-panel-history")).toHaveAttribute("data-active", "true");
   await workbench.screenshot({ path: currentPopoverPath });
+
+  await page.locator("#rookieui-txt2img-workbench-panel-editor").click();
+  await page.locator("[data-pw-token-ui='inline-token-tag']").first().hover();
+  await page.locator("#rookieui-txt2img-workbench-token-delete-0").click();
+  await expect(page.locator("#rookieui-prompt")).not.toHaveValue(/masterpiece/);
 
   await page.locator("#rookieui-txt2img-workbench-inline-append").click();
   await expect(page.locator("#rookieui-txt2img-workbench-panel-catalog")).toHaveAttribute("data-active", "true");
