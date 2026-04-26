@@ -12,6 +12,7 @@ from typing import Any
 from rookieui.services.state_persistence import atomic_write_json, quarantine_corrupt_json
 from rookieui.contracts.prompt_workbench import (
     PROMPT_WORKBENCH_NAMESPACES,
+    PROMPT_WORKBENCH_PANELS,
     PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS,
     PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
     PromptWorkbenchBootstrapSnapshot,
@@ -82,6 +83,11 @@ def _normalize_positive_int(value: object, default: int) -> int:
     if isinstance(value, int):
         return max(1, value)
     return default
+
+
+def _normalize_panel_id(value: object, default: str = "editor") -> str:
+    normalized = _normalize_text(value, max_length=80)
+    return normalized if normalized in PROMPT_WORKBENCH_PANELS else default
 
 
 def _normalize_tag_list(value: object) -> list[str]:
@@ -222,8 +228,7 @@ def _normalize_ui_preferences(value: object) -> dict[str, Any]:
         return defaults
     return {
         "default_open": _normalize_bool(value.get("default_open"), defaults["default_open"]),
-        "preferred_panel": _normalize_text(value.get("preferred_panel", defaults["preferred_panel"]), max_length=80)
-        or defaults["preferred_panel"],
+        "preferred_panel": _normalize_panel_id(value.get("preferred_panel", defaults["preferred_panel"]), defaults["preferred_panel"]),
         "show_history": _normalize_bool(value.get("show_history"), defaults["show_history"]),
         "show_favorites": _normalize_bool(value.get("show_favorites"), defaults["show_favorites"]),
     }
@@ -288,7 +293,7 @@ def _normalize_surface_state_payload(namespace: str, existing: dict[str, Any], p
     if "workbench_open" in payload:
         merged["workbench_open"] = _normalize_bool(payload.get("workbench_open"), defaults["workbench_open"])
     if "active_panel" in payload:
-        merged["active_panel"] = _normalize_text(payload.get("active_panel", ""), max_length=80) or defaults["active_panel"]
+        merged["active_panel"] = _normalize_panel_id(payload.get("active_panel", ""), defaults["active_panel"])
     if "draft_prompt" in payload:
         merged["draft_prompt"] = _normalize_text(payload.get("draft_prompt", ""), max_length=_MAX_PROMPT_TEXT_LENGTH)
     if "selected_entry_id" in payload:

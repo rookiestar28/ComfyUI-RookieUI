@@ -584,6 +584,88 @@ describe("prompt workbench shell", () => {
     );
   });
 
+  test("persists UI preferences and hides disabled collection panels", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "en",
+          theme_style: "rookieui_classic",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: { default_provider: "", providers: {} },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+          ui_preferences: {
+            default_open: false,
+            preferred_panel: "history",
+            show_history: false,
+            show_favorites: true,
+          },
+        },
+        blacklist: { enabled: false, entries: [] },
+        host_actions: {},
+        language_options: [{ code: "en", title: "English" }],
+        theme_style_options: [{ id: "rookieui_classic", title: "RookieUI Classic" }],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "settings-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    expect(document.getElementById("settings-workbench-panel-history").hidden).toBe(true);
+    expect(document.getElementById("settings-workbench-panel-favorites").hidden).toBe(false);
+    expect(document.getElementById("settings-workbench-panel-editor").dataset.active).toBe("true");
+
+    document.getElementById("settings-workbench-panel-format").click();
+    await flushPromises();
+
+    const showHistoryToggle = document.getElementById("settings-workbench-pref-show-history");
+    showHistoryToggle.click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ui_preferences: expect.objectContaining({
+          show_history: true,
+        }),
+      }),
+    );
+    expect(document.getElementById("settings-workbench-panel-history").hidden).toBe(false);
+
+    const preferredPanelSelect = document.getElementById("settings-workbench-pref-preferred-panel");
+    preferredPanelSelect.value = "catalog";
+    preferredPanelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        ui_preferences: expect.objectContaining({
+          preferred_panel: "catalog",
+        }),
+      }),
+    );
+  });
+
   test("applies formatting and blacklist actions through the active editor", async () => {
     const { prompt, negative, parent } = createBaseDom();
     prompt.value = " masterpiece , masterpiece , bad hands ";

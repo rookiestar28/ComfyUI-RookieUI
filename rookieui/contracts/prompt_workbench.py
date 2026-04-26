@@ -18,6 +18,7 @@ PROMPT_WORKBENCH_NAMESPACES = (
     "img2img_prompt",
     "img2img_negative",
 )
+PROMPT_WORKBENCH_PANELS = ("editor", "history", "favorites", "catalog", "assist", "format")
 PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS = (
     "access_token",
     "api_key",

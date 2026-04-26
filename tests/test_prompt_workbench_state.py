@@ -84,6 +84,25 @@ class PromptWorkbenchStateTests(unittest.TestCase):
             "masterpiece, city skyline",
         )
 
+    def test_panel_preferences_normalize_to_supported_panel_ids(self) -> None:
+        config = prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "ui_preferences": {
+                    "default_open": True,
+                    "preferred_panel": "unknown-panel",
+                    "show_history": False,
+                    "show_favorites": True,
+                }
+            }
+        )
+        state = prompt_workbench_state.update_prompt_workbench_surface_state(
+            "txt2img_prompt",
+            {"active_panel": "unknown-panel"},
+        )
+
+        self.assertEqual(config["ui_preferences"]["preferred_panel"], "editor")
+        self.assertEqual(state["active_panel"], "editor")
+
     def test_history_and_favorites_support_push_remove_and_reorder(self) -> None:
         history_items = prompt_workbench_state.apply_prompt_workbench_history_action(
             "txt2img_prompt",

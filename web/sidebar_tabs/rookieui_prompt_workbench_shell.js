@@ -551,6 +551,27 @@ export function createPromptWorkbenchShell({
     return Boolean(configState?.ui_preferences?.default_open);
   }
 
+  function isPanelVisible(panelId) {
+    if (panelId === "history") {
+      return configState?.ui_preferences?.show_history !== false;
+    }
+    if (panelId === "favorites") {
+      return configState?.ui_preferences?.show_favorites !== false;
+    }
+    return true;
+  }
+
+  function resolveVisiblePanel(panelId) {
+    if (panelId && isPanelVisible(panelId)) {
+      return panelId;
+    }
+    const preferredPanel = normalizeTokenText(configState?.ui_preferences?.preferred_panel) || "editor";
+    if (isPanelVisible(preferredPanel)) {
+      return preferredPanel;
+    }
+    return "editor";
+  }
+
   function updateStatus(message) {
     setText(detailNodes.status, message);
   }
@@ -1802,6 +1823,67 @@ export function createPromptWorkbenchShell({
     createRuleToggle("normalize_spacing", "Normalize spacing and comma separators");
     createRuleToggle("trim_outer_whitespace", "Trim outer whitespace");
 
+    appendTextElement(formatPane, "h6", "rookieui-shell__prompt-workbench-pane-title", "Workbench Preferences");
+
+    const settingsGrid = document.createElement("div");
+    settingsGrid.className = "rookieui-shell__prompt-workbench-format-grid";
+    formatPane.appendChild(settingsGrid);
+
+    const createPreferenceToggle = (key, label) => {
+      const row = document.createElement("label");
+      row.className = "rookieui-shell__prompt-workbench-rule";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = `${idPrefix}-pref-${key.replace(/_/g, "-")}`;
+      input.checked = configState?.ui_preferences?.[key] !== false;
+      if (key === "default_open") {
+        input.checked = Boolean(configState?.ui_preferences?.default_open);
+      }
+      input.addEventListener("change", () => {
+        configState.ui_preferences = {
+          ...(configState.ui_preferences ?? {}),
+          [key]: input.checked,
+        };
+        const state = getActiveState();
+        state.active_panel = resolveVisiblePanel(state.active_panel);
+        queueConfigPersist();
+        syncUi();
+      });
+      row.appendChild(input);
+      appendTextElement(row, "span", "rookieui-shell__prompt-workbench-rule-label", label);
+      settingsGrid.appendChild(row);
+    };
+
+    createPreferenceToggle("default_open", "Open Prompt Workbench by default");
+    createPreferenceToggle("show_history", "Show history panel");
+    createPreferenceToggle("show_favorites", "Show favorites panel");
+
+    const preferredPanelRow = document.createElement("label");
+    preferredPanelRow.className = "rookieui-shell__prompt-workbench-rule rookieui-shell__prompt-workbench-rule--stacked";
+    appendTextElement(preferredPanelRow, "span", "rookieui-shell__prompt-workbench-rule-label", "Preferred panel when opening");
+    const preferredPanelSelect = document.createElement("select");
+    preferredPanelSelect.id = `${idPrefix}-pref-preferred-panel`;
+    preferredPanelSelect.className = "rookieui-shell__input";
+    preferredPanelSelect.setAttribute("aria-label", "Prompt Workbench preferred panel");
+    ["editor", "history", "favorites", "catalog", "assist", "format"].forEach((panelId) => {
+      const option = document.createElement("option");
+      option.value = panelId;
+      option.textContent = panelId.charAt(0).toUpperCase() + panelId.slice(1);
+      option.disabled = !isPanelVisible(panelId);
+      preferredPanelSelect.appendChild(option);
+    });
+    preferredPanelSelect.value = resolveVisiblePanel(configState?.ui_preferences?.preferred_panel ?? "editor");
+    preferredPanelSelect.addEventListener("change", () => {
+      configState.ui_preferences = {
+        ...(configState.ui_preferences ?? {}),
+        preferred_panel: preferredPanelSelect.value,
+      };
+      queueConfigPersist();
+      syncUi();
+    });
+    preferredPanelRow.appendChild(preferredPanelSelect);
+    settingsGrid.appendChild(preferredPanelRow);
+
     const toolbar = document.createElement("div");
     toolbar.className = "rookieui-shell__prompt-workbench-editor-toolbar";
     formatPane.appendChild(toolbar);
@@ -1857,6 +1939,7 @@ export function createPromptWorkbenchShell({
 
   function syncUi() {
     const state = getActiveState();
+    state.active_panel = resolveVisiblePanel(state.active_panel);
     const historyItems = historyCache.get(getActiveNamespace()) ?? [];
     const favoriteItems = favoritesCache.get(getActiveNamespace()) ?? [];
     const language = String(configState?.language ?? "en").trim() || "en";
@@ -1878,6 +1961,7 @@ export function createPromptWorkbenchShell({
       button.setAttribute("aria-pressed", String(scope === activeScope));
     });
     panelButtons.forEach((button, panelId) => {
+      button.hidden = !isPanelVisible(panelId);
       button.dataset.active = String(panelId === state.active_panel);
       button.setAttribute("aria-pressed", String(panelId === state.active_panel));
     });
@@ -2012,6 +2096,12 @@ export function createPromptWorkbenchShell({
       syncUi();
       if (state.workbench_open) {
         await ensureResourcesLoaded();
+        const preferredPanel = resolveVisiblePanel(configState?.ui_preferences?.preferred_panel ?? state.active_panel);
+        if (preferredPanel !== state.active_panel) {
+          state.active_panel = preferredPanel;
+          queueStatePersist();
+          syncUi();
+        }
         onStatusMessage?.("Opened Prompt Workbench");
       } else {
         onStatusMessage?.("Collapsed Prompt Workbench");
