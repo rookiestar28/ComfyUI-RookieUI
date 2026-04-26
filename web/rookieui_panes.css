@@ -1711,6 +1711,11 @@
   background: color-mix(in srgb, var(--rookieui-bg-panel) 86%, white 14%);
 }
 
+.rookieui-shell__prompt-workbench-card-root {
+  position: relative;
+  overflow: clip;
+}
+
 .rookieui-shell__prompt-workbench[data-theme-style="rookieui_graphite"] {
   background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, black 8%);
   border-color: color-mix(in srgb, var(--rookieui-border-strong) 68%, black 32%);
@@ -1762,9 +1767,21 @@
   gap: 8px;
 }
 
+.rookieui-shell__prompt-workbench-toolbar {
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--rookieui-border) 72%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rookieui-bg-elevated) 82%, transparent);
+}
+
 .rookieui-shell__prompt-workbench-body {
   display: grid;
   gap: 10px;
+}
+
+.rookieui-shell__prompt-workbench-card-body {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--rookieui-border) 70%, transparent);
 }
 
 .rookieui-shell__prompt-workbench-tabs {
@@ -1801,6 +1818,10 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.rookieui-shell__prompt-workbench-status-strip {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .rookieui-shell__prompt-workbench-card {
@@ -2190,6 +2211,10 @@
 @media (max-width: 1180px) {
   .rookieui-shell__prompt-workbench-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rookieui-shell__prompt-workbench-status-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .rookieui-shell__controlnet-toggle-grid {

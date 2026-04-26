@@ -321,6 +321,18 @@ describe("prompt workbench shell", () => {
     await shellApi.openWorkbench();
     await flushPromises();
 
+    const promptCard = document.getElementById("test-workbench-section");
+    expect(promptCard.classList.contains("rookieui-shell__prompt-workbench-card-root")).toBe(true);
+    expect(promptCard.dataset.layout).toBe("prompt_all_in_one");
+    expect(document.getElementById("test-workbench-toggle")?.dataset.pwUi).toBe("fold-toggle");
+    expect(document.querySelector("#test-workbench-section .rookieui-shell__prompt-workbench-toolbar")?.dataset.pwUi).toBe(
+      "header-toolbar",
+    );
+    expect(document.getElementById("test-workbench-body")?.dataset.pwUi).toBe("prompt-card-body");
+    expect(document.querySelector("#test-workbench-section .rookieui-shell__prompt-workbench-status-strip")?.dataset.pwUi).toBe(
+      "status-strip",
+    );
+
     const tokenInputs = Array.from(
       document.querySelectorAll("#test-workbench-token-list .rookieui-shell__prompt-workbench-token-input"),
     );

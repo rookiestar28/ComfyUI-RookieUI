@@ -350,7 +350,8 @@ export function createPromptWorkbenchShell({
 } = {}) {
   const shell = document.createElement("section");
   shell.id = `${idPrefix}-section`;
-  shell.className = "rookieui-shell__prompt-workbench";
+  shell.className = "rookieui-shell__prompt-workbench rookieui-shell__prompt-workbench-card-root";
+  shell.dataset.layout = "prompt_all_in_one";
   shell.tabIndex = -1;
   parent.appendChild(shell);
 
@@ -412,6 +413,7 @@ export function createPromptWorkbenchShell({
 
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
+  header.dataset.pwUi = "prompt-card-header";
   shell.appendChild(header);
 
   const headerCopy = document.createElement("div");
@@ -426,20 +428,24 @@ export function createPromptWorkbenchShell({
   );
 
   const headerActions = document.createElement("div");
-  headerActions.className = "rookieui-shell__prompt-workbench-header-actions";
+  headerActions.className = "rookieui-shell__prompt-workbench-header-actions rookieui-shell__prompt-workbench-toolbar";
+  headerActions.dataset.pwUi = "header-toolbar";
   header.appendChild(headerActions);
 
   const toggleButton = createActionButton(`${idPrefix}-toggle`, t("openWorkbench"));
   toggleButton.classList.add("rookieui-shell__prompt-workbench-toggle");
+  toggleButton.dataset.pwUi = "fold-toggle";
   headerActions.appendChild(toggleButton);
 
   const body = document.createElement("div");
   body.id = `${idPrefix}-body`;
-  body.className = "rookieui-shell__prompt-workbench-body";
+  body.className = "rookieui-shell__prompt-workbench-body rookieui-shell__prompt-workbench-card-body";
+  body.dataset.pwUi = "prompt-card-body";
   shell.appendChild(body);
 
   const namespaceTabs = document.createElement("div");
   namespaceTabs.className = "rookieui-shell__prompt-workbench-tabs";
+  namespaceTabs.dataset.pwUi = "scope-tabs";
   body.appendChild(namespaceTabs);
 
   const tabButtons = new Map();
@@ -460,7 +466,8 @@ export function createPromptWorkbenchShell({
   createScopeButton("negative", t("negativeTab"));
 
   const summaryGrid = document.createElement("div");
-  summaryGrid.className = "rookieui-shell__prompt-workbench-summary-grid";
+  summaryGrid.className = "rookieui-shell__prompt-workbench-summary-grid rookieui-shell__prompt-workbench-status-strip";
+  summaryGrid.dataset.pwUi = "status-strip";
   body.appendChild(summaryGrid);
 
   const createSummaryCard = (key, label) => {
