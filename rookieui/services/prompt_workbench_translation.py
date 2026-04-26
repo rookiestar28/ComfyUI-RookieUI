@@ -41,7 +41,9 @@ class PromptWorkbenchTranslationExecutionResult:
     provider_layer: str = ""
     dictionary_hits: list[str] | None = None
     dictionary_misses: list[str] | None = None
+    blacklisted_terms: list[str] | None = None
     fallback_provider_id: str = ""
+    dictionary_only: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -78,6 +80,9 @@ def _normalize_translate_payload(payload: object) -> dict[str, Any]:
         "text": single_text,
         "texts": batch_texts,
         "dictionary_first": bool(payload.get("dictionary_first")),
+        "dictionary_only": bool(payload.get("dictionary_only"))
+        or bool(payload.get("auto_translate"))
+        or _normalize_text(payload.get("translation_mode"), max_length=40) == "auto",
         "fallback_provider": _normalize_text(payload.get("fallback_provider"), max_length=80),
     }
 
@@ -252,14 +257,38 @@ def _load_translation_dictionary(to_lang: str) -> dict[str, str]:
     return entries
 
 
-def _translate_via_dictionary(text: str, *, to_lang: str) -> tuple[str, list[str], list[str]]:
+def _translation_blacklist_terms() -> set[str]:
+    store = load_prompt_workbench_store()
+    blacklist_state = store.get("blacklist", {})
+    entries = blacklist_state.get("translation_entries", []) if isinstance(blacklist_state, dict) else []
+    if not isinstance(entries, list):
+        return set()
+    return {
+        _normalize_text(entry, max_length=512).lower()
+        for entry in entries
+        if _normalize_text(entry, max_length=512)
+    }
+
+
+def _translate_via_dictionary(
+    text: str,
+    *,
+    to_lang: str,
+    translation_blacklist: set[str] | None = None,
+) -> tuple[str, list[str], list[str], list[str]]:
     dictionary = _load_translation_dictionary(to_lang)
     tokens = parse_prompt_workbench_tokens(text)
     translated_tokens: list[str] = []
     hits: list[str] = []
     misses: list[str] = []
+    blacklisted_terms: list[str] = []
+    blacklist = translation_blacklist or set()
     for token in tokens:
         lookup_key = token.raw_text.lower()
+        if lookup_key in blacklist:
+            translated_tokens.append(token.raw_text)
+            blacklisted_terms.append(token.raw_text)
+            continue
         translated = dictionary.get(lookup_key)
         if translated:
             translated_tokens.append(translated)
@@ -267,7 +296,7 @@ def _translate_via_dictionary(text: str, *, to_lang: str) -> tuple[str, list[str
         else:
             translated_tokens.append(token.raw_text)
             misses.append(token.raw_text)
-    return ", ".join(translated_tokens), hits, misses
+    return ", ".join(translated_tokens), hits, misses, blacklisted_terms
 
 
 def _translate_text_with_entry(
@@ -297,7 +326,8 @@ def _translate_text_with_entry(
 
 def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTranslationExecutionResult:
     normalized = _normalize_translate_payload(payload)
-    entry, provider_config = _effective_translation_provider(normalized["provider"])
+    provider_override = "csv_tag_dictionary" if normalized["dictionary_only"] else normalized["provider"]
+    entry, provider_config = _effective_translation_provider(provider_override)
     availability = _provider_availability(entry, provider_config, surface="translation")
     if availability["status"] != "ready":
         raise ValueError(str(availability["detail"]))
@@ -306,21 +336,33 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
     translated_texts: list[str] = []
     dictionary_hits: list[str] = []
     dictionary_misses: list[str] = []
+    blacklisted_terms: list[str] = []
     fallback_provider_id = ""
+    translation_blacklist = _translation_blacklist_terms()
     for text in texts:
         if not text:
             translated_texts.append("")
             continue
         try:
             if entry.provider_id == "csv_tag_dictionary":
-                translated, hits, misses = _translate_via_dictionary(text, to_lang=normalized["to_lang"])
+                translated, hits, misses, skipped = _translate_via_dictionary(
+                    text,
+                    to_lang=normalized["to_lang"],
+                    translation_blacklist=translation_blacklist,
+                )
                 translated_texts.append(translated)
                 dictionary_hits.extend(hits)
                 dictionary_misses.extend(misses)
+                blacklisted_terms.extend(skipped)
             elif normalized["dictionary_first"]:
-                translated, hits, misses = _translate_via_dictionary(text, to_lang=normalized["to_lang"])
+                translated, hits, misses, skipped = _translate_via_dictionary(
+                    text,
+                    to_lang=normalized["to_lang"],
+                    translation_blacklist=translation_blacklist,
+                )
                 dictionary_hits.extend(hits)
                 dictionary_misses.extend(misses)
+                blacklisted_terms.extend(skipped)
                 if not misses:
                     translated_texts.append(translated)
                     continue
@@ -328,6 +370,10 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
                 dictionary = _load_translation_dictionary(normalized["to_lang"])
                 translated_parts: list[str] = []
                 for token in parse_prompt_workbench_tokens(text):
+                    lookup_key = token.raw_text.lower()
+                    if lookup_key in translation_blacklist:
+                        translated_parts.append(token.raw_text)
+                        continue
                     dictionary_hit = dictionary.get(token.raw_text.lower())
                     if dictionary_hit:
                         translated_parts.append(dictionary_hit)
@@ -343,15 +389,39 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
                         )
                 translated_texts.append(", ".join(translated_parts))
             else:
-                translated_texts.append(
-                    _translate_text_with_entry(
-                        entry,
-                        text,
-                        from_lang=normalized["from_lang"],
-                        to_lang=normalized["to_lang"],
-                        provider_config=provider_config,
+                tokens = parse_prompt_workbench_tokens(text)
+                skipped = [
+                    token.raw_text
+                    for token in tokens
+                    if token.raw_text.lower() in translation_blacklist
+                ]
+                if skipped:
+                    blacklisted_terms.extend(skipped)
+                    translated_parts = []
+                    for token in tokens:
+                        if token.raw_text.lower() in translation_blacklist:
+                            translated_parts.append(token.raw_text)
+                        else:
+                            translated_parts.append(
+                                _translate_text_with_entry(
+                                    entry,
+                                    token.raw_text,
+                                    from_lang=normalized["from_lang"],
+                                    to_lang=normalized["to_lang"],
+                                    provider_config=provider_config,
+                                )
+                            )
+                    translated_texts.append(", ".join(translated_parts))
+                else:
+                    translated_texts.append(
+                        _translate_text_with_entry(
+                            entry,
+                            text,
+                            from_lang=normalized["from_lang"],
+                            to_lang=normalized["to_lang"],
+                            provider_config=provider_config,
+                        )
                     )
-                )
         except PromptWorkbenchTranslateProviderError:
             raise
         except Exception as exc:  # pragma: no cover - error normalization path
@@ -368,7 +438,9 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
             provider_layer=_provider_layer(entry.provider_id),
             dictionary_hits=dictionary_hits,
             dictionary_misses=dictionary_misses,
+            blacklisted_terms=blacklisted_terms,
             fallback_provider_id=fallback_provider_id,
+            dictionary_only=normalized["dictionary_only"],
         )
     return PromptWorkbenchTranslationExecutionResult(
         provider_id=entry.provider_id,
@@ -380,5 +452,7 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
         provider_layer=_provider_layer(entry.provider_id),
         dictionary_hits=dictionary_hits,
         dictionary_misses=dictionary_misses,
+        blacklisted_terms=blacklisted_terms,
         fallback_provider_id=fallback_provider_id,
+        dictionary_only=normalized["dictionary_only"],
     )

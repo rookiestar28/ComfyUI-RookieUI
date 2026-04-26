@@ -274,13 +274,17 @@ def _normalize_config_payload(existing: dict[str, Any], payload: object) -> dict
 
 
 def _normalize_blacklist_payload(existing: dict[str, Any], payload: object) -> dict[str, Any]:
-    merged = deepcopy(existing) if isinstance(existing, dict) else {"enabled": False, "entries": []}
+    merged = deepcopy(existing) if isinstance(existing, dict) else {"enabled": False, "entries": [], "translation_entries": []}
+    merged.setdefault("translation_entries", [])
     if not isinstance(payload, dict):
         return merged
     if "enabled" in payload:
         merged["enabled"] = _normalize_bool(payload.get("enabled"), merged.get("enabled", False))
     if "entries" in payload and isinstance(payload.get("entries"), list):
         merged["entries"] = _normalize_tag_list(payload.get("entries"))
+    translation_entries = payload.get("translation_entries", payload.get("translate"))
+    if isinstance(translation_entries, list):
+        merged["translation_entries"] = _normalize_tag_list(translation_entries)
     return merged
 
 

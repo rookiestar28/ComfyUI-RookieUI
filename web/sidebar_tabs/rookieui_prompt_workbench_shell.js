@@ -297,7 +297,8 @@ export function createPromptWorkbenchShell({
     providers: {},
     instruction_preset: "",
   };
-  const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [] });
+  const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [], translation_entries: [] });
+  blacklistState.translation_entries = Array.isArray(blacklistState.translation_entries) ? blacklistState.translation_entries : [];
   const hostActions = structuredClone(bootstrapState?.promptWorkbench?.host_actions ?? {});
   const languageOptions = Array.isArray(bootstrapState?.promptWorkbench?.language_options)
     ? bootstrapState.promptWorkbench.language_options
@@ -999,13 +1000,45 @@ export function createPromptWorkbenchShell({
     });
   }
 
+  function addTokensToTranslationBlacklist(tokenTexts) {
+    const normalizedTokens = (Array.isArray(tokenTexts) ? tokenTexts : [])
+      .map((tokenText) => String(tokenText ?? "").trim())
+      .filter(Boolean);
+    if (!normalizedTokens.length) {
+      return;
+    }
+    const nextEntries = Array.from(new Set([...(blacklistState.translation_entries ?? []), ...normalizedTokens]));
+    blacklistState.translation_entries = nextEntries;
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+      if (result?.data?.blacklist) {
+        Object.assign(blacklistState, result.data.blacklist);
+      }
+      blacklistState.translation_entries = Array.isArray(blacklistState.translation_entries) ? blacklistState.translation_entries : [];
+      updateStatus("Prompt Workbench translation blacklist updated");
+      syncUi();
+    });
+  }
+
   function removeBlacklistEntry(entryText) {
     blacklistState.entries = (blacklistState.entries ?? []).filter((entry) => entry !== entryText);
     void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
       if (result?.data?.blacklist) {
         Object.assign(blacklistState, result.data.blacklist);
       }
+      blacklistState.translation_entries = Array.isArray(blacklistState.translation_entries) ? blacklistState.translation_entries : [];
       updateStatus("Removed blacklist entry");
+      syncUi();
+    });
+  }
+
+  function removeTranslationBlacklistEntry(entryText) {
+    blacklistState.translation_entries = (blacklistState.translation_entries ?? []).filter((entry) => entry !== entryText);
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+      if (result?.data?.blacklist) {
+        Object.assign(blacklistState, result.data.blacklist);
+      }
+      blacklistState.translation_entries = Array.isArray(blacklistState.translation_entries) ? blacklistState.translation_entries : [];
+      updateStatus("Removed translation blacklist entry");
       syncUi();
     });
   }
@@ -1069,6 +1102,9 @@ export function createPromptWorkbenchShell({
     }
     if (action === "blacklist") {
       addTokensToBlacklist(selectedTokens.map((token) => token.raw_text ?? token.text));
+    }
+    if (action === "translation-blacklist") {
+      addTokensToTranslationBlacklist(selectedTokens.map((token) => token.raw_text ?? token.text));
     }
   }
 
@@ -1192,6 +1228,7 @@ export function createPromptWorkbenchShell({
       ["copy", "Copy Selected"],
       ["favorite", "Favorite Selected"],
       ["blacklist", "Blacklist Selected"],
+      ["translation-blacklist", "Skip Translation"],
     ];
     batchActions.forEach(([action, label]) => {
       const button = createActionButton(`${idPrefix}-token-batch-${action}`, label);
@@ -1358,6 +1395,12 @@ export function createPromptWorkbenchShell({
         addTokenToBlacklist(token.raw_text ?? token.text);
       });
       controls.appendChild(blacklistButton);
+
+      const translationBlacklistButton = createActionButton(`${idPrefix}-token-translation-blacklist-${index}`, "Skip Translate");
+      translationBlacklistButton.addEventListener("click", () => {
+        addTokensToTranslationBlacklist([token.raw_text ?? token.text]);
+      });
+      controls.appendChild(translationBlacklistButton);
 
       list.appendChild(row);
     });
@@ -1918,20 +1961,51 @@ export function createPromptWorkbenchShell({
 
     if (!(blacklistState.entries ?? []).length) {
       appendTextElement(list, "p", "rookieui-shell__prompt-workbench-empty", "No blacklist entries configured.");
+    } else {
+      (blacklistState.entries ?? []).forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.className = "rookieui-shell__prompt-workbench-entry";
+        list.appendChild(row);
+        appendTextElement(row, "strong", "rookieui-shell__prompt-workbench-entry-label", entry);
+        const controls = document.createElement("div");
+        controls.className = "rookieui-shell__prompt-workbench-entry-actions";
+        row.appendChild(controls);
+        const removeButton = createActionButton(`${idPrefix}-blacklist-remove-${index}`, "Remove");
+        removeButton.addEventListener("click", () => {
+          removeBlacklistEntry(entry);
+        });
+        controls.appendChild(removeButton);
+      });
+    }
+
+    const translationBlacklistHeading = appendTextElement(
+      formatPane,
+      "p",
+      "rookieui-shell__prompt-workbench-detail",
+      "Translation blacklist entries",
+    );
+    translationBlacklistHeading.id = `${idPrefix}-translation-blacklist-heading`;
+
+    const translationList = document.createElement("div");
+    translationList.className = "rookieui-shell__prompt-workbench-entry-list";
+    formatPane.appendChild(translationList);
+
+    if (!(blacklistState.translation_entries ?? []).length) {
+      appendTextElement(translationList, "p", "rookieui-shell__prompt-workbench-empty", "No translation blacklist entries configured.");
       return;
     }
 
-    (blacklistState.entries ?? []).forEach((entry, index) => {
+    (blacklistState.translation_entries ?? []).forEach((entry, index) => {
       const row = document.createElement("div");
       row.className = "rookieui-shell__prompt-workbench-entry";
-      list.appendChild(row);
+      translationList.appendChild(row);
       appendTextElement(row, "strong", "rookieui-shell__prompt-workbench-entry-label", entry);
       const controls = document.createElement("div");
       controls.className = "rookieui-shell__prompt-workbench-entry-actions";
       row.appendChild(controls);
-      const removeButton = createActionButton(`${idPrefix}-blacklist-remove-${index}`, "Remove");
+      const removeButton = createActionButton(`${idPrefix}-translation-blacklist-remove-${index}`, "Remove");
       removeButton.addEventListener("click", () => {
-        removeBlacklistEntry(entry);
+        removeTranslationBlacklistEntry(entry);
       });
       controls.appendChild(removeButton);
     });

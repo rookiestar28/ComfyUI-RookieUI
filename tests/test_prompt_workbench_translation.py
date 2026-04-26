@@ -93,6 +93,9 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(providers["openai"]["provider_layer"], "optional_openai_compatible")
         self.assertEqual(providers["local_host_model"]["provider_layer"], "optional_local_host_model")
         self.assertEqual(providers["local_host_model"]["availability"]["status"], "deferred")
+        self.assertEqual(providers["itranslate_free"]["availability"]["status"], "reference_only")
+        self.assertEqual(providers["baidu_free"]["execution_state"], "reference_only")
+        self.assertEqual(providers["mymemory"]["execution_state"], "reference_only")
         self.assertNotIn("gemma", repr(payload).lower())
 
     def test_csv_dictionary_provider_translates_exact_runtime_dictionary_hits(self) -> None:
@@ -209,6 +212,87 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["translated_text"], "傑作, 城市天際線")
         self.assertEqual(payload["dictionary_hits"], ["masterpiece"])
         self.assertEqual(payload["dictionary_misses"], ["city skyline"])
+        self.assertEqual(mocked_urlopen.call_count, 1)
+
+    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    def test_dictionary_only_auto_translation_does_not_call_network_for_misses(self, mocked_urlopen: mock.Mock) -> None:
+        catalog_root = Path(self.runtime_dir.name) / "catalogs"
+        catalog_root.mkdir(parents=True)
+        (catalog_root / "translation_dictionary.zh-TW.csv").write_text(
+            "source,target\nmasterpiece,傑作\n",
+            encoding="utf-8",
+        )
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "mymemory_free",
+                    "providers": {
+                        "mymemory_free": {
+                            "email": "tester@example.com",
+                        }
+                    },
+                }
+            }
+        )
+
+        payload = translate_prompt_workbench_payload(
+            {
+                "text": "masterpiece, city skyline",
+                "from_lang": "en",
+                "to_lang": "zh-TW",
+                "auto_translate": True,
+            }
+        ).to_payload()
+
+        self.assertEqual(payload["provider_id"], "csv_tag_dictionary")
+        self.assertTrue(payload["dictionary_only"])
+        self.assertEqual(payload["translated_text"], "傑作, city skyline")
+        self.assertEqual(payload["dictionary_hits"], ["masterpiece"])
+        self.assertEqual(payload["dictionary_misses"], ["city skyline"])
+        mocked_urlopen.assert_not_called()
+
+    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    def test_translation_blacklist_skips_dictionary_and_provider_translation(self, mocked_urlopen: mock.Mock) -> None:
+        catalog_root = Path(self.runtime_dir.name) / "catalogs"
+        catalog_root.mkdir(parents=True)
+        (catalog_root / "translation_dictionary.zh-TW.csv").write_text(
+            "source,target\nmasterpiece,傑作\nprivate style,私密風格\n",
+            encoding="utf-8",
+        )
+        prompt_workbench_state.update_prompt_workbench_blacklist(
+            {
+                "enabled": True,
+                "entries": ["bad hands"],
+                "translation_entries": ["private style"],
+            }
+        )
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "mymemory_free",
+                    "providers": {
+                        "mymemory_free": {
+                            "email": "tester@example.com",
+                        }
+                    },
+                }
+            }
+        )
+        mocked_urlopen.return_value = _FakeHttpResponse({"responseData": {"translatedText": "城市天際線"}})
+
+        payload = translate_prompt_workbench_payload(
+            {
+                "text": "masterpiece, private style, city skyline",
+                "from_lang": "en",
+                "to_lang": "zh-TW",
+                "dictionary_first": True,
+            }
+        ).to_payload()
+
+        self.assertEqual(payload["translated_text"], "傑作, private style, 城市天際線")
+        self.assertEqual(payload["dictionary_hits"], ["masterpiece"])
+        self.assertEqual(payload["dictionary_misses"], ["city skyline"])
+        self.assertEqual(payload["blacklisted_terms"], ["private style"])
         self.assertEqual(mocked_urlopen.call_count, 1)
 
     def test_translate_payload_rejects_missing_provider_configuration(self) -> None:

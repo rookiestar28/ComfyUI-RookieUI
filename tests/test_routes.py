@@ -164,7 +164,7 @@ class RoutePayloadTests(unittest.TestCase):
 
         self.assertEqual(payload["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_config")
-        self.assertEqual(payload["blacklist"], {"enabled": False, "entries": []})
+        self.assertEqual(payload["blacklist"], {"enabled": False, "entries": [], "translation_entries": []})
         self.assertIn("danbooru_upsample", payload["host_actions"])
         self.assertEqual(payload["host_actions"]["danbooru_upsample"]["route_path"], "/rookieui/prompt-tools/upsample")
 

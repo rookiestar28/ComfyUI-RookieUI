@@ -235,11 +235,13 @@ class PromptWorkbenchStateTests(unittest.TestCase):
             {
                 "enabled": True,
                 "entries": ["bad-hands", "  blurry  ", "", 123],
+                "translation_entries": ["private style", "  secret token  ", "", 456],
             }
         )
 
         self.assertTrue(updated["enabled"])
         self.assertEqual(updated["entries"], ["bad-hands", "blurry"])
+        self.assertEqual(updated["translation_entries"], ["private style", "secret token"])
 
     def test_load_prompt_workbench_store_quarantines_corrupt_json(self) -> None:
         state_path = prompt_workbench_state._prompt_workbench_state_path()

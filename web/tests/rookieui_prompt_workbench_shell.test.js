@@ -484,10 +484,21 @@ describe("prompt workbench shell", () => {
 
     document.getElementById("batch-workbench-token-batch-blacklist").click();
     await flushPromises();
-    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith({
-      enabled: true,
-      entries: ["masterpiece", "city skyline"],
-    });
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabled: true,
+        entries: ["masterpiece", "city skyline"],
+      }),
+    );
+
+    document.getElementById("batch-workbench-token-batch-translation-blacklist").click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entries: ["masterpiece", "city skyline"],
+        translation_entries: ["masterpiece", "city skyline"],
+      }),
+    );
 
     document.getElementById("batch-workbench-token-batch-delete").click();
     expect(prompt.value).toBe("");
@@ -717,22 +728,45 @@ describe("prompt workbench shell", () => {
     await flushPromises();
     document.getElementById("format-workbench-token-blacklist-1").click();
     await flushPromises();
-    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith({
-      enabled: true,
-      entries: ["bad hands"],
-    });
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabled: true,
+        entries: ["bad hands"],
+      }),
+    );
+
+    document.getElementById("format-workbench-token-translation-blacklist-0").click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entries: ["bad hands"],
+        translation_entries: ["masterpiece"],
+      }),
+    );
 
     document.getElementById("format-workbench-panel-format").click();
     await flushPromises();
     document.getElementById("format-workbench-apply-blacklist").click();
     expect(prompt.value).toBe("masterpiece");
 
+    document.getElementById("format-workbench-translation-blacklist-remove-0").click();
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        entries: ["bad hands"],
+        translation_entries: [],
+      }),
+    );
+
     document.getElementById("format-workbench-blacklist-remove-0").click();
     await flushPromises();
-    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenLastCalledWith({
-      enabled: true,
-      entries: [],
-    });
+    expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        enabled: true,
+        entries: [],
+        translation_entries: [],
+      }),
+    );
   });
 
   test("supports translation actions and catalog quick insert flows", async () => {
