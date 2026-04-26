@@ -434,6 +434,8 @@ describe("prompt workbench shell", () => {
     expect(negativeShell.element.dataset.fixedScope).toBe("negative");
     expect(document.getElementById("inline-prompt-workbench-body")?.querySelector("[data-pw-ui='scope-tabs']")?.hidden).toBe(true);
     expect(document.getElementById("inline-negative-workbench-body")?.querySelector("[data-pw-ui='scope-tabs']")?.hidden).toBe(true);
+    expect(document.getElementById("inline-prompt-workbench-inline-counter")?.textContent).toBe("0 tags");
+    expect(document.getElementById("inline-negative-workbench-inline-language")?.textContent).toBe("en / negative");
 
     await promptShell.openWorkbench();
     await negativeShell.openWorkbench();
@@ -443,12 +445,37 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("inline-negative-workbench-section")?.textContent).toContain(
       "Negative Prompt namespace: txt2img_negative",
     );
+    expect(document.getElementById("inline-negative-workbench-inline-counter")?.textContent).toBe("2 tags");
+
+    document.getElementById("inline-negative-workbench-inline-history").click();
+    await flushPromises();
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.dataset.activeSurface).toBe("history");
+    expect(document.getElementById("inline-negative-workbench-panel-history")?.dataset.active).toBe("true");
+
+    document.getElementById("inline-negative-workbench-inline-settings").click();
+    await flushPromises();
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.dataset.activeSurface).toBe("settings");
+    expect(document.getElementById("inline-negative-workbench-panel-format")?.dataset.active).toBe("true");
+
+    document.getElementById("inline-negative-workbench-inline-append").click();
+    await flushPromises();
+    expect(document.getElementById("inline-negative-workbench-panel-catalog")?.dataset.active).toBe("true");
 
     document.getElementById("inline-negative-workbench-token-add").value = "low quality";
     document.getElementById("inline-negative-workbench-token-add-button").click();
     await flushPromises();
 
     expect(negative.value).toContain("bad anatomy, low quality");
+    expect(prompt.value).toBe("");
+
+    document.getElementById("inline-negative-workbench-toggle").click();
+    await flushPromises();
+    expect(negativeShell.element.dataset.folded).toBe("true");
+    expect(document.getElementById("inline-negative-workbench-toggle")?.getAttribute("aria-expanded")).toBe("false");
+
+    document.getElementById("inline-negative-workbench-inline-delete").click();
+    await flushPromises();
+    expect(negative.value).toBe("");
     expect(prompt.value).toBe("");
   });
 

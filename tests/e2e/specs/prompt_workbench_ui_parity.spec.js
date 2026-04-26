@@ -72,11 +72,15 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
         <section data-reference="prompt-all-in-one-card">
           <div class="reference-header">
             <strong>Prompt Workbench</strong>
-            <div class="reference-toolbar">
+          <div class="reference-toolbar">
               <button class="reference-button">Fold</button>
+              <span class="reference-chip">5 tags</span>
+              <span class="reference-chip">en / prompt</span>
               <button class="reference-button">History</button>
               <button class="reference-button">Favorites</button>
               <button class="reference-button">Prefs</button>
+              <button class="reference-button">Translate</button>
+              <button class="reference-button">Append</button>
             </div>
           </div>
           <div class="reference-secondary">
@@ -111,6 +115,16 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   const workbench = page.locator("#rookieui-txt2img-workbench-section");
   await expect(workbench).toHaveAttribute("data-layout", "prompt_all_in_one_inline");
   await expect(workbench).toHaveAttribute("data-fixed-scope", "prompt");
+  await expect(workbench.locator("[data-pw-ui='fold-toggle']")).toHaveAttribute("aria-expanded", "true");
+  await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("5 tags");
+  await expect(workbench.locator("[data-pw-ui='inline-language']")).toContainText("prompt");
+  await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-favorites-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-settings-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-copy-action']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-delete-action']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-append-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='status-strip']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-add']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-suggestions']")).toBeVisible();
@@ -120,10 +134,23 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
 
   await workbench.screenshot({ path: currentCardPath });
 
-  await page.locator("#rookieui-txt2img-workbench-quick-history").click();
+  await page.locator("#rookieui-txt2img-workbench-toggle").click();
+  await expect(workbench).toHaveAttribute("data-folded", "true");
+  await expect(workbench.locator("[data-pw-ui='fold-toggle']")).toHaveAttribute("aria-expanded", "false");
+  await page.locator("#rookieui-txt2img-workbench-toggle").click();
+  await expect(workbench).toHaveAttribute("data-folded", "false");
+
+  await page.locator("#rookieui-txt2img-workbench-inline-history").click();
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toHaveAttribute("data-active-surface", "history");
   await expect(page.locator("#rookieui-txt2img-workbench-panel-history")).toHaveAttribute("data-active", "true");
   await workbench.screenshot({ path: currentPopoverPath });
+
+  await page.locator("#rookieui-txt2img-workbench-inline-append").click();
+  await expect(page.locator("#rookieui-txt2img-workbench-panel-catalog")).toHaveAttribute("data-active", "true");
+
+  await page.locator("#rookieui-txt2img-workbench-inline-delete").click();
+  await expect(page.locator("#rookieui-prompt")).toHaveValue("");
+  await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("0 tags");
 
   [referencePath, currentCardPath, currentPopoverPath].forEach((artifactPath) => {
     expect(fs.statSync(artifactPath).size).toBeGreaterThan(1000);

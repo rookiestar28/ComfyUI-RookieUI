@@ -445,7 +445,96 @@ export function createPromptWorkbenchShell({
   const toggleButton = createActionButton(`${idPrefix}-toggle`, t("openWorkbench"));
   toggleButton.classList.add("rookieui-shell__prompt-workbench-toggle");
   toggleButton.dataset.pwUi = "fold-toggle";
+  toggleButton.setAttribute("aria-controls", `${idPrefix}-body`);
   headerActions.appendChild(toggleButton);
+
+  const inlineToolbarNodes = {
+    counter: null,
+    language: null,
+    historyButton: null,
+    favoritesButton: null,
+    settingsButton: null,
+  };
+
+  const createInlineToolbarButton = (buttonId, label, uiName, handler) => {
+    const button = createActionButton(`${idPrefix}-${buttonId}`, label);
+    button.classList.add("rookieui-shell__prompt-workbench-inline-tool");
+    button.dataset.pwUi = uiName;
+    button.setAttribute("aria-label", label);
+    button.addEventListener("click", handler);
+    headerActions.appendChild(button);
+    return button;
+  };
+
+  if (normalizedFixedScope) {
+    const counterChip = document.createElement("span");
+    counterChip.id = `${idPrefix}-inline-counter`;
+    counterChip.className = "rookieui-shell__prompt-workbench-inline-chip";
+    counterChip.dataset.pwUi = "inline-counter";
+    counterChip.textContent = "0 tags";
+    headerActions.appendChild(counterChip);
+    inlineToolbarNodes.counter = counterChip;
+
+    const languageChip = document.createElement("span");
+    languageChip.id = `${idPrefix}-inline-language`;
+    languageChip.className = "rookieui-shell__prompt-workbench-inline-chip";
+    languageChip.dataset.pwUi = "inline-language";
+    languageChip.textContent = "en";
+    headerActions.appendChild(languageChip);
+    inlineToolbarNodes.language = languageChip;
+
+    inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", "History", "inline-history-anchor", () => {
+      activeSecondaryPopover = activeSecondaryPopover === "history" ? "" : "history";
+      const state = getActiveState();
+      state.workbench_open = true;
+      state.active_panel = "history";
+      queueStatePersist();
+      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench history loaded" });
+      syncUi();
+    });
+    inlineToolbarNodes.favoritesButton = createInlineToolbarButton("inline-favorites", "Favorites", "inline-favorites-anchor", () => {
+      activeSecondaryPopover = activeSecondaryPopover === "favorites" ? "" : "favorites";
+      const state = getActiveState();
+      state.workbench_open = true;
+      state.active_panel = "favorites";
+      queueStatePersist();
+      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench favorites loaded" });
+      syncUi();
+    });
+    inlineToolbarNodes.settingsButton = createInlineToolbarButton("inline-settings", "Prefs", "inline-settings-anchor", () => {
+      activeSecondaryPopover = activeSecondaryPopover === "settings" ? "" : "settings";
+      const state = getActiveState();
+      state.workbench_open = true;
+      state.active_panel = "format";
+      queueStatePersist();
+      syncUi();
+    });
+    createInlineToolbarButton("inline-translate", "Translate", "inline-translate-action", () => {
+      translateActivePrompt(String(configState.language ?? "en").trim() || "en");
+    });
+    createInlineToolbarButton("inline-copy", "Copy", "inline-copy-action", () => {
+      const promptText = String(getActiveState().draft_prompt || getActiveInput()?.value || "");
+      if (navigator?.clipboard?.writeText) {
+        void navigator.clipboard.writeText(promptText);
+      }
+      updateStatus("Copied active prompt text");
+    });
+    createInlineToolbarButton("inline-delete", "Delete", "inline-delete-action", () => {
+      applyPromptTextToInput("", {
+        updateEditor: true,
+        statusMessage: "Cleared active prompt text",
+      });
+    });
+    createInlineToolbarButton("inline-append", "Append", "inline-append-anchor", () => {
+      activeSecondaryPopover = "";
+      const state = getActiveState();
+      state.workbench_open = true;
+      state.active_panel = "catalog";
+      queueStatePersist();
+      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench append catalog loaded" });
+      syncUi();
+    });
+  }
 
   const body = document.createElement("div");
   body.id = `${idPrefix}-body`;
@@ -661,8 +750,10 @@ export function createPromptWorkbenchShell({
 
   function setBodyOpen(isOpen) {
     shell.dataset.open = String(isOpen);
+    shell.dataset.folded = String(!isOpen);
     body.hidden = !isOpen;
-    toggleButton.textContent = isOpen ? t("hideWorkbench") : t("openWorkbench");
+    toggleButton.textContent = normalizedFixedScope ? (isOpen ? "Fold" : "Tools") : isOpen ? t("hideWorkbench") : t("openWorkbench");
+    toggleButton.setAttribute("aria-expanded", String(isOpen));
   }
 
   function readPreferredOpenState() {
@@ -2441,6 +2532,8 @@ export function createPromptWorkbenchShell({
     const extraNetworkCount =
       (Array.isArray(catalogPayload?.extra_networks?.embeddings) ? catalogPayload.extra_networks.embeddings.length : 0) +
       (Array.isArray(catalogPayload?.extra_networks?.loras) ? catalogPayload.extra_networks.loras.length : 0);
+    const activeText = String(state.draft_prompt || getActiveInput()?.value || "");
+    const activeUnitCount = countPromptUnits(activeText);
 
     setBodyOpen(readPreferredOpenState());
     tabButtons.forEach((button, scope) => {
@@ -2465,6 +2558,26 @@ export function createPromptWorkbenchShell({
     const quickSettingsButton = document.getElementById(`${idPrefix}-quick-settings`);
     if (quickSettingsButton) {
       quickSettingsButton.dataset.active = String(activeSecondaryPopover === "settings");
+    }
+    if (inlineToolbarNodes.counter) {
+      inlineToolbarNodes.counter.textContent = `${activeUnitCount} ${activeUnitCount === 1 ? "tag" : "tags"}`;
+    }
+    if (inlineToolbarNodes.language) {
+      inlineToolbarNodes.language.textContent = `${language} / ${activeScope === "negative" ? "negative" : "prompt"}`;
+    }
+    if (inlineToolbarNodes.historyButton) {
+      inlineToolbarNodes.historyButton.hidden = !isPanelVisible("history");
+      inlineToolbarNodes.historyButton.dataset.active = String(activeSecondaryPopover === "history");
+      inlineToolbarNodes.historyButton.setAttribute("aria-expanded", String(activeSecondaryPopover === "history"));
+    }
+    if (inlineToolbarNodes.favoritesButton) {
+      inlineToolbarNodes.favoritesButton.hidden = !isPanelVisible("favorites");
+      inlineToolbarNodes.favoritesButton.dataset.active = String(activeSecondaryPopover === "favorites");
+      inlineToolbarNodes.favoritesButton.setAttribute("aria-expanded", String(activeSecondaryPopover === "favorites"));
+    }
+    if (inlineToolbarNodes.settingsButton) {
+      inlineToolbarNodes.settingsButton.dataset.active = String(activeSecondaryPopover === "settings");
+      inlineToolbarNodes.settingsButton.setAttribute("aria-expanded", String(activeSecondaryPopover === "settings"));
     }
 
     editorPane.hidden = state.active_panel !== "editor";
