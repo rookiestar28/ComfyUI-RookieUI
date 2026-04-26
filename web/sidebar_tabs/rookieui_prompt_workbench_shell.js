@@ -555,9 +555,12 @@ export function createPromptWorkbenchShell({
     setText(detailNodes.status, message);
   }
 
-  function queueStatePersist() {
-    const namespace = getActiveNamespace();
-    const state = getActiveState();
+  function queueStatePersist(namespaceOverride = "") {
+    const namespace = normalizeTokenText(namespaceOverride) || getActiveNamespace();
+    const state =
+      stateCache.get(namespace) ??
+      normalizeStatePayload(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
+    stateCache.set(namespace, state);
     const existingTimer = dirtyTimers.get(namespace);
     if (existingTimer) {
       clearTimeout(existingTimer);
@@ -1091,6 +1094,7 @@ export function createPromptWorkbenchShell({
     const providerSelect = document.createElement("select");
     providerSelect.id = `${idPrefix}-translation-provider`;
     providerSelect.className = "rookieui-shell__input rookieui-shell__prompt-workbench-provider-select";
+    providerSelect.setAttribute("aria-label", "Prompt Workbench translation provider");
     const providerPlaceholder = document.createElement("option");
     providerPlaceholder.value = "";
     providerPlaceholder.textContent = "Translation provider";
@@ -1171,6 +1175,7 @@ export function createPromptWorkbenchShell({
     batchActions.forEach(([action, label]) => {
       const button = createActionButton(`${idPrefix}-token-batch-${action}`, label);
       button.disabled = selectedCount === 0;
+      button.setAttribute("aria-label", `${label} prompt tokens`);
       button.addEventListener("click", () => {
         mutateSelectedTokens(action);
       });
@@ -1227,6 +1232,7 @@ export function createPromptWorkbenchShell({
       selectedCheckbox.type = "checkbox";
       selectedCheckbox.id = `${idPrefix}-token-select-${index}`;
       selectedCheckbox.className = "rookieui-shell__prompt-workbench-token-select";
+      selectedCheckbox.setAttribute("aria-label", `Select prompt token ${index + 1}`);
       selectedCheckbox.checked = Boolean(token.selected);
       selectedCheckbox.addEventListener("change", () => {
         token.selected = selectedCheckbox.checked;
@@ -1480,6 +1486,7 @@ export function createPromptWorkbenchShell({
     searchInput.type = "search";
     searchInput.className = "rookieui-shell__input";
     searchInput.placeholder = "Search tags, aliases, or categories";
+    searchInput.setAttribute("aria-label", "Search Prompt Workbench tagcomplete catalog");
     searchInput.value = catalogSearchState.query;
     searchInput.addEventListener("input", () => {
       catalogSearchState.query = String(searchInput.value ?? "");
@@ -1608,6 +1615,7 @@ export function createPromptWorkbenchShell({
     const themeSelect = document.createElement("select");
     themeSelect.id = `${idPrefix}-assist-theme`;
     themeSelect.className = "rookieui-shell__input";
+    themeSelect.setAttribute("aria-label", "Prompt Workbench theme style");
     (themeStyleOptions.length
       ? themeStyleOptions
       : [{ id: "rookieui_classic", title: "RookieUI Classic", summary: "" }]).forEach((entry) => {
@@ -1626,6 +1634,7 @@ export function createPromptWorkbenchShell({
     const providerSelect = document.createElement("select");
     providerSelect.id = `${idPrefix}-assist-provider`;
     providerSelect.className = "rookieui-shell__input rookieui-shell__prompt-workbench-provider-select";
+    providerSelect.setAttribute("aria-label", "Prompt Workbench AI assist provider");
     const providerPlaceholder = document.createElement("option");
     providerPlaceholder.value = "";
     providerPlaceholder.textContent = "Select AI assist provider";
@@ -2023,8 +2032,8 @@ export function createPromptWorkbenchShell({
       const nextTokens = parsePromptTokens(cachedState.draft_prompt, { scope });
       editorCache.set(namespace, nextTokens);
       queueAutoHistoryCapture(namespace, scope, cachedState.draft_prompt, nextTokens);
+      queueStatePersist(namespace);
       if (scope === activeScope) {
-        queueStatePersist();
         syncUi();
       }
     });

@@ -67,6 +67,8 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["contract"]["version"], PROMPT_WORKBENCH_CONTRACT_VERSION)
         self.assertEqual(response["payload"]["config"]["translation"]["providers"]["openai"]["api_key"], "********")
+        self.assertEqual(response["payload"]["persistence"]["schema_version"], 1)
+        self.assertNotIn("/", response["payload"]["persistence"]["storage"])
 
     def test_prompt_tools_state_route_rejects_invalid_namespace(self) -> None:
         response = asyncio.run(routes.prompt_tools_state(_FakeJsonRequest(query={"namespace": "invalid"})))
@@ -108,6 +110,36 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(favorites_response["payload"]["status"], "ok")
         self.assertEqual(history_get["payload"]["items"][0]["label"], "Base")
         self.assertEqual(favorites_get["payload"]["items"][0]["label"], "Lighting")
+        self.assertEqual(history_get["payload"]["persistence"]["storage"], "rookieui_prompt_workbench_state")
+
+    def test_prompt_tools_collection_routes_reject_unknown_actions(self) -> None:
+        history_response = asyncio.run(
+            routes.prompt_tools_history_update(
+                _FakeJsonRequest(
+                    {
+                        "namespace": "txt2img_prompt",
+                        "action": "typo_push",
+                        "item": {"prompt_text": "masterpiece", "label": "Base"},
+                    }
+                )
+            )
+        )
+        favorites_response = asyncio.run(
+            routes.prompt_tools_favorites_update(
+                _FakeJsonRequest(
+                    {
+                        "namespace": "txt2img_prompt",
+                        "action": "auto_capture",
+                        "item": {"prompt_text": "masterpiece", "label": "Base"},
+                    }
+                )
+            )
+        )
+
+        self.assertEqual(history_response["status"], 400)
+        self.assertEqual(history_response["payload"]["status"], "invalid-request")
+        self.assertEqual(favorites_response["status"], 400)
+        self.assertEqual(favorites_response["payload"]["status"], "invalid-request")
 
     def test_prompt_tools_blacklist_route_round_trips_state(self) -> None:
         update_response = asyncio.run(

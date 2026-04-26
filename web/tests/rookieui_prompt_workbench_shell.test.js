@@ -536,6 +536,54 @@ describe("prompt workbench shell", () => {
     );
   });
 
+  test("persists inactive namespace edits and labels workbench controls", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "host-sync-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    expect(document.getElementById("host-sync-workbench-translation-provider").getAttribute("aria-label")).toBe(
+      "Prompt Workbench translation provider",
+    );
+    expect(document.getElementById("host-sync-workbench-token-select-0").getAttribute("aria-label")).toBe(
+      "Select prompt token 1",
+    );
+    expect(document.getElementById("host-sync-workbench-token-batch-copy").getAttribute("aria-label")).toBe(
+      "Copy Selected prompt tokens",
+    );
+    expect(document.getElementById("host-sync-workbench-tagcomplete-search").getAttribute("aria-label")).toBe(
+      "Search Prompt Workbench tagcomplete catalog",
+    );
+
+    negative.value = "low quality, blurry";
+    negative.dispatchEvent(new Event("input", { bubbles: true }));
+    vi.advanceTimersByTime(180);
+    await flushPromises();
+
+    expect(bootstrapState.updatePromptWorkbenchStateRequest).toHaveBeenCalledWith(
+      "txt2img_negative",
+      expect.objectContaining({
+        draft_prompt: "low quality, blurry",
+      }),
+    );
+  });
+
   test("applies formatting and blacklist actions through the active editor", async () => {
     const { prompt, negative, parent } = createBaseDom();
     prompt.value = " masterpiece , masterpiece , bad hands ";

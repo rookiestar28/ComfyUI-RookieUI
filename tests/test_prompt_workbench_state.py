@@ -196,6 +196,21 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertEqual([entry["prompt_text"] for entry in second], ["masterpiece, city skyline", "masterpiece, night skyline"])
         self.assertEqual(first[0]["token_payloads"][0]["raw_text"], "masterpiece")
 
+    def test_collection_action_rejects_unknown_mutation_names(self) -> None:
+        with self.assertRaises(ValueError):
+            prompt_workbench_state.apply_prompt_workbench_history_action(
+                "txt2img_prompt",
+                action="typo_push",
+                payload={"item": {"prompt_text": "masterpiece"}},
+            )
+
+        with self.assertRaises(ValueError):
+            prompt_workbench_state.apply_prompt_workbench_favorite_action(
+                "txt2img_prompt",
+                action="auto_capture",
+                payload={"item": {"prompt_text": "masterpiece"}},
+            )
+
     def test_blacklist_update_normalizes_entries(self) -> None:
         updated = prompt_workbench_state.update_prompt_workbench_blacklist(
             {

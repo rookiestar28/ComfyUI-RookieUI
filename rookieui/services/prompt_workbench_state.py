@@ -26,6 +26,7 @@ _MAX_PROMPT_TEXT_LENGTH = 16000
 _MAX_ENTRY_LABEL_LENGTH = 200
 _MAX_TAG_COUNT = 64
 _MAX_TAG_LENGTH = 120
+_COLLECTION_ACTIONS = {"push", "auto_capture", "clear", "replace", "remove", "move_up", "move_down"}
 
 
 def _prompt_workbench_root() -> Path:
@@ -461,6 +462,11 @@ def _apply_collection_action(
     payload: object,
 ) -> list[dict[str, Any]]:
     normalized_action = _normalize_text(action, max_length=40) or "push"
+    if normalized_action not in _COLLECTION_ACTIONS:
+        raise ValueError(f"Unsupported prompt workbench collection action: {normalized_action}.")
+    if normalized_action == "auto_capture" and collection_name != "history":
+        raise ValueError("auto_capture is only supported for prompt workbench history.")
+
     with _STATE_LOCK:
         store = load_prompt_workbench_store()
         collection = list(store["surfaces"][namespace][collection_name])

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from rookieui.contracts.prompt_workbench import build_prompt_workbench_contract_meta
+from rookieui.contracts.prompt_workbench import (
+    PROMPT_WORKBENCH_NAMESPACES,
+    PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
+    build_default_prompt_workbench_config,
+    build_prompt_workbench_contract_meta,
+)
 from rookieui.services.prompt_workbench_state import (
     apply_prompt_workbench_favorite_action,
     apply_prompt_workbench_history_action,
@@ -29,6 +34,19 @@ from rookieui.services.prompt_workbench_translation import (
 from rookieui.contracts.prompt_workbench import PROMPT_WORKBENCH_DANBOORU_ACTION_ID
 
 
+def _build_prompt_workbench_persistence_meta() -> dict[str, Any]:
+    config = get_prompt_workbench_bootstrap_payload().get("config", build_default_prompt_workbench_config())
+    if not isinstance(config, dict):
+        config = build_default_prompt_workbench_config()
+    return {
+        "schema_version": PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
+        "namespaces": list(PROMPT_WORKBENCH_NAMESPACES),
+        "history_limit": int(config.get("history_limit", build_default_prompt_workbench_config()["history_limit"])),
+        "favorites_limit": int(config.get("favorites_limit", build_default_prompt_workbench_config()["favorites_limit"])),
+        "storage": "rookieui_prompt_workbench_state",
+    }
+
+
 def build_prompt_workbench_config_payload() -> dict[str, Any]:
     payload = get_prompt_workbench_bootstrap_payload()
     payload["host_actions"] = {
@@ -36,6 +54,7 @@ def build_prompt_workbench_config_payload() -> dict[str, Any]:
         PROMPT_WORKBENCH_DANBOORU_ACTION_ID: build_prompt_workbench_danbooru_host_action_payload(),
     }
     payload["contract"] = build_prompt_workbench_contract_meta(surface="prompt_tools_config")
+    payload["persistence"] = _build_prompt_workbench_persistence_meta()
     return payload
 
 
@@ -51,6 +70,7 @@ def build_prompt_workbench_surface_state_payload(namespace: object) -> dict[str,
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_state"),
         "namespace": str(namespace),
         "state": get_prompt_workbench_surface_state(namespace),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
@@ -59,6 +79,7 @@ def build_prompt_workbench_history_payload(namespace: object) -> dict[str, Any]:
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_history"),
         "namespace": str(namespace),
         "items": get_prompt_workbench_history(namespace),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
@@ -67,6 +88,7 @@ def build_prompt_workbench_favorites_payload(namespace: object) -> dict[str, Any
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_favorites"),
         "namespace": str(namespace),
         "items": get_prompt_workbench_favorites(namespace),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
@@ -83,6 +105,7 @@ def apply_prompt_workbench_config_update(payload: object) -> dict[str, Any]:
     return {
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_config"),
         "config": get_prompt_workbench_bootstrap_payload()["config"],
+        "persistence": _build_prompt_workbench_persistence_meta(),
         "saved": True,
     }
 
@@ -99,6 +122,7 @@ def apply_prompt_workbench_surface_state_update(namespace: object, payload: obje
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_state"),
         "namespace": str(namespace),
         "state": update_prompt_workbench_surface_state(namespace, payload),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
@@ -107,6 +131,7 @@ def apply_prompt_workbench_history_update(namespace: object, *, action: object, 
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_history"),
         "namespace": str(namespace),
         "items": apply_prompt_workbench_history_action(namespace, action=action, payload=payload),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
@@ -115,6 +140,7 @@ def apply_prompt_workbench_favorites_update(namespace: object, *, action: object
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_favorites"),
         "namespace": str(namespace),
         "items": apply_prompt_workbench_favorite_action(namespace, action=action, payload=payload),
+        "persistence": _build_prompt_workbench_persistence_meta(),
     }
 
 
