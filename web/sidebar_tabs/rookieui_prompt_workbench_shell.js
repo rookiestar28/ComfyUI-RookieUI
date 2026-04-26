@@ -1,11 +1,69 @@
 let tokenSequence = 0;
 
-function createToken(text, { disabled = false } = {}) {
+function normalizeTokenText(text) {
+  return String(text ?? "").trim();
+}
+
+function classifyPromptToken(text) {
+  const normalized = normalizeTokenText(text);
+  const lower = normalized.toLowerCase();
+  if (lower === "break") {
+    return "break";
+  }
+  if (lower === "and" || lower.startsWith("and ")) {
+    return "and";
+  }
+  if (lower.startsWith("<lora:")) {
+    return "lora";
+  }
+  if (lower.startsWith("<lyco:") || lower.startsWith("<lycoris:")) {
+    return "lycoris";
+  }
+  if (lower.startsWith("embedding:")) {
+    return "embedding";
+  }
+  if (lower.startsWith("[") && lower.endsWith("]") && lower.includes(":")) {
+    return "schedule";
+  }
+  if (extractTokenWeight(normalized) !== null || (normalized.startsWith("(") && normalized.endsWith(")"))) {
+    return "weighted";
+  }
+  return "plain";
+}
+
+function extractTokenWeight(text) {
+  const match = normalizeTokenText(text).match(/^\((.+):([+-]?(?:\d+(?:\.\d+)?|\.\d+))\)$/);
+  if (!match) {
+    return null;
+  }
+  const value = Number.parseFloat(match[2]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function createToken(
+  text,
+  {
+    disabled = false,
+    selected = false,
+    translatedText = "",
+    scope = "prompt",
+    orderIndex = 0,
+  } = {},
+) {
   tokenSequence += 1;
+  const rawText = normalizeTokenText(text);
   return {
     id: `pw-token-${tokenSequence}`,
-    text: String(text ?? "").trim(),
+    text: rawText,
+    raw_text: rawText,
+    normalized_text: rawText.toLowerCase(),
+    scope: String(scope ?? "prompt").trim() || "prompt",
+    order_index: Number.isInteger(orderIndex) ? orderIndex : 0,
     disabled: Boolean(disabled),
+    selected: Boolean(selected),
+    translated_text: String(translatedText ?? ""),
+    keyword_family: classifyPromptToken(rawText),
+    weight: extractTokenWeight(rawText),
   };
 }
 
@@ -42,19 +100,109 @@ function countPromptUnits(value) {
   return trimmed.split(/[\s,]+/).filter(Boolean).length;
 }
 
-function parsePromptTokens(text) {
-  return String(text ?? "")
-    .split(/[\n,]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => createToken(entry));
+function splitPromptTokenText(text) {
+  const source = String(text ?? "");
+  const tokens = [];
+  let current = "";
+  let escaped = false;
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let angleDepth = 0;
+
+  for (const char of source) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      current += char;
+      escaped = true;
+      continue;
+    }
+    if (char === "<") {
+      angleDepth += 1;
+      current += char;
+      continue;
+    }
+    if (char === ">" && angleDepth > 0) {
+      angleDepth -= 1;
+      current += char;
+      continue;
+    }
+    if (char === "(" && angleDepth === 0) {
+      parenDepth += 1;
+      current += char;
+      continue;
+    }
+    if (char === ")" && parenDepth > 0 && angleDepth === 0) {
+      parenDepth -= 1;
+      current += char;
+      continue;
+    }
+    if (char === "[" && angleDepth === 0) {
+      bracketDepth += 1;
+      current += char;
+      continue;
+    }
+    if (char === "]" && bracketDepth > 0 && angleDepth === 0) {
+      bracketDepth -= 1;
+      current += char;
+      continue;
+    }
+    if ((char === "," || char === "\n") && parenDepth === 0 && bracketDepth === 0 && angleDepth === 0) {
+      const normalized = normalizeTokenText(current);
+      if (normalized) {
+        tokens.push(normalized);
+      }
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  const normalized = normalizeTokenText(current);
+  if (normalized) {
+    tokens.push(normalized);
+  }
+  return tokens;
+}
+
+function parsePromptTokens(text, { scope = "prompt" } = {}) {
+  return splitPromptTokenText(text).map((entry, index) => createToken(entry, { scope, orderIndex: index }));
 }
 
 function buildPromptTextFromTokens(tokens) {
   return (Array.isArray(tokens) ? tokens : [])
-    .filter((token) => token && !token.disabled && String(token.text ?? "").trim())
-    .map((token) => String(token.text).trim())
+    .filter((token) => token && !token.disabled && normalizeTokenText(token.raw_text ?? token.text))
+    .map((token) => normalizeTokenText(token.raw_text ?? token.text))
     .join(", ");
+}
+
+function formatTokenWeight(value) {
+  const rounded = Math.max(0, Math.round(Number(value) * 100) / 100);
+  return String(rounded).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+}
+
+function adjustPromptTokenWeight(text, delta) {
+  const normalized = normalizeTokenText(text);
+  if (!normalized) {
+    return "";
+  }
+  const match = normalized.match(/^\((.+):([+-]?(?:\d+(?:\.\d+)?|\.\d+))\)$/);
+  if (match) {
+    return `(${match[1]}:${formatTokenWeight(Number.parseFloat(match[2]) + delta)})`;
+  }
+  return `(${normalized}:${delta >= 0 ? "1.1" : "0.9"})`;
+}
+
+function updateTokenText(token, nextText) {
+  const rawText = normalizeTokenText(nextText);
+  token.text = rawText;
+  token.raw_text = rawText;
+  token.normalized_text = rawText.toLowerCase();
+  token.keyword_family = classifyPromptToken(rawText);
+  token.weight = extractTokenWeight(rawText);
 }
 
 function formatPromptText(text, formattingRules) {
@@ -268,7 +416,7 @@ export function createPromptWorkbenchShell({
     const nextText = String(input?.value ?? "");
     const state = getActiveState();
     state.draft_prompt = nextText;
-    editorCache.set(getActiveNamespace(), parsePromptTokens(nextText));
+    editorCache.set(getActiveNamespace(), parsePromptTokens(nextText, { scope: activeScope }));
     queueStatePersist();
     syncUi();
     onStatusMessage?.("Captured current prompt text into Prompt Workbench state");
@@ -358,7 +506,7 @@ export function createPromptWorkbenchShell({
   function ensureEditorTokens(namespace) {
     if (!editorCache.has(namespace)) {
       const state = stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
-      editorCache.set(namespace, parsePromptTokens(state.draft_prompt || getNamespaceInput(namespace)?.value));
+      editorCache.set(namespace, parsePromptTokens(state.draft_prompt || getNamespaceInput(namespace)?.value, { scope: activeScope }));
     }
     return editorCache.get(namespace);
   }
@@ -581,7 +729,7 @@ export function createPromptWorkbenchShell({
     const normalizedText = String(nextText ?? "");
     state.draft_prompt = normalizedText;
     if (updateEditor) {
-      editorCache.set(namespace, parsePromptTokens(normalizedText));
+      editorCache.set(namespace, parsePromptTokens(normalizedText, { scope: activeScope }));
     }
     if (input) {
       input.value = normalizedText;
@@ -669,7 +817,7 @@ export function createPromptWorkbenchShell({
     const item = {
       label: buildEntryLabel(activeScope, promptText),
       prompt_text: promptText,
-      tag_tokens: ensureEditorTokens(namespace).filter((token) => !token.disabled).map((token) => token.text),
+      tag_tokens: ensureEditorTokens(namespace).filter((token) => !token.disabled).map((token) => token.raw_text ?? token.text),
     };
     void actionMethod?.(namespace, "push", { item }).then((result) => {
       const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
@@ -740,7 +888,7 @@ export function createPromptWorkbenchShell({
     const tokens = ensureEditorTokens(getActiveNamespace());
     const blacklistSet = new Set((blacklistState.entries ?? []).map((entry) => String(entry).trim().toLowerCase()));
     tokens.forEach((token) => {
-      token.disabled = blacklistSet.has(String(token.text ?? "").trim().toLowerCase());
+      token.disabled = blacklistSet.has(normalizeTokenText(token.raw_text ?? token.text).toLowerCase());
     });
     rebuildPromptFromEditor("Applied Prompt Workbench blacklist filter");
   }
@@ -774,7 +922,8 @@ export function createPromptWorkbenchShell({
       if (!normalizedText) {
         return;
       }
-      ensureEditorTokens(getActiveNamespace()).push(createToken(normalizedText));
+      const tokens = ensureEditorTokens(getActiveNamespace());
+      tokens.push(createToken(normalizedText, { scope: activeScope, orderIndex: tokens.length }));
       addInput.value = "";
       rebuildPromptFromEditor("Added prompt token");
     });
@@ -864,6 +1013,7 @@ export function createPromptWorkbenchShell({
       const row = document.createElement("div");
       row.className = "rookieui-shell__prompt-workbench-token";
       row.dataset.disabled = String(token.disabled);
+      row.dataset.keywordFamily = String(token.keyword_family ?? "plain");
       row.draggable = true;
       row.id = `${idPrefix}-token-${token.id}`;
       row.addEventListener("dragstart", () => {
@@ -892,9 +1042,9 @@ export function createPromptWorkbenchShell({
       const valueInput = document.createElement("input");
       valueInput.type = "text";
       valueInput.className = "rookieui-shell__input rookieui-shell__prompt-workbench-token-input";
-      valueInput.value = token.text;
+      valueInput.value = token.raw_text ?? token.text;
       valueInput.addEventListener("change", () => {
-        token.text = String(valueInput.value ?? "").trim();
+        updateTokenText(token, valueInput.value);
         rebuildPromptFromEditor("Edited prompt token");
       });
       row.appendChild(valueInput);
@@ -930,6 +1080,30 @@ export function createPromptWorkbenchShell({
       });
       controls.appendChild(downButton);
 
+      const weightUpButton = createActionButton(`${idPrefix}-token-weight-up-${index}`, "Weight +");
+      weightUpButton.addEventListener("click", () => {
+        updateTokenText(token, adjustPromptTokenWeight(token.raw_text ?? token.text, 0.1));
+        rebuildPromptFromEditor("Increased prompt token weight");
+      });
+      controls.appendChild(weightUpButton);
+
+      const weightDownButton = createActionButton(`${idPrefix}-token-weight-down-${index}`, "Weight -");
+      weightDownButton.addEventListener("click", () => {
+        updateTokenText(token, adjustPromptTokenWeight(token.raw_text ?? token.text, -0.1));
+        rebuildPromptFromEditor("Decreased prompt token weight");
+      });
+      controls.appendChild(weightDownButton);
+
+      const copyButton = createActionButton(`${idPrefix}-token-copy-${index}`, "Copy");
+      copyButton.addEventListener("click", () => {
+        const tokenText = normalizeTokenText(token.raw_text ?? token.text);
+        if (navigator?.clipboard?.writeText) {
+          void navigator.clipboard.writeText(tokenText);
+        }
+        updateStatus("Copied prompt token");
+      });
+      controls.appendChild(copyButton);
+
       const deleteButton = createActionButton(`${idPrefix}-token-delete-${index}`, "Delete");
       deleteButton.addEventListener("click", () => {
         tokens.splice(index, 1);
@@ -940,9 +1114,9 @@ export function createPromptWorkbenchShell({
       const favoriteButton = createActionButton(`${idPrefix}-token-favorite-${index}`, "Favorite");
       favoriteButton.addEventListener("click", () => {
         const item = {
-          label: token.text,
-          prompt_text: token.text,
-          tag_tokens: [token.text],
+          label: token.raw_text ?? token.text,
+          prompt_text: token.raw_text ?? token.text,
+          tag_tokens: [token.raw_text ?? token.text],
         };
         void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(getActiveNamespace(), "push", { item }).then((result) => {
           favoritesCache.set(
@@ -957,7 +1131,7 @@ export function createPromptWorkbenchShell({
 
       const blacklistButton = createActionButton(`${idPrefix}-token-blacklist-${index}`, "Blacklist");
       blacklistButton.addEventListener("click", () => {
-        addTokenToBlacklist(token.text);
+        addTokenToBlacklist(token.raw_text ?? token.text);
       });
       controls.appendChild(blacklistButton);
 
@@ -1505,7 +1679,7 @@ export function createPromptWorkbenchShell({
           nextState.draft_prompt = String(getNamespaceInput(namespace)?.value ?? "");
         }
         stateCache.set(namespace, nextState);
-        editorCache.set(namespace, parsePromptTokens(nextState.draft_prompt));
+        editorCache.set(namespace, parsePromptTokens(nextState.draft_prompt, { scope: activeScope }));
       }),
     )
       .then(() => {
@@ -1603,7 +1777,7 @@ export function createPromptWorkbenchShell({
         stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: String(input.value ?? "") });
       cachedState.draft_prompt = String(input.value ?? "");
       stateCache.set(namespace, cachedState);
-      editorCache.set(namespace, parsePromptTokens(cachedState.draft_prompt));
+      editorCache.set(namespace, parsePromptTokens(cachedState.draft_prompt, { scope: activeScope }));
       if (scope === activeScope) {
         queueStatePersist();
         syncUi();

@@ -256,6 +256,69 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("test-workbench-catalogs")?.textContent).toContain("1 groups");
   });
 
+  test("preserves special token syntax and supports copy plus weight controls", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const clipboard = { writeText: vi.fn(async () => undefined) };
+    Object.defineProperty(globalThis.navigator, "clipboard", {
+      value: clipboard,
+      configurable: true,
+    });
+    const bootstrapState = createBootstrapState({
+      fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
+        ok: true,
+        data: {
+          state: {
+            namespace,
+            workbench_open: false,
+            active_panel: "editor",
+            draft_prompt: namespace.includes("negative")
+              ? ""
+              : String.raw`city\, skyline, <lora:detail_tweaker:0.8>, (soft light:1.2)`,
+            selected_entry_id: "",
+          },
+        },
+      })),
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "syntax-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+    });
+
+    await flushPromises();
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const tokenInputs = Array.from(
+      document.querySelectorAll("#syntax-workbench-token-list .rookieui-shell__prompt-workbench-token-input"),
+    );
+    expect(tokenInputs.map((node) => node.value)).toEqual([
+      String.raw`city\, skyline`,
+      "<lora:detail_tweaker:0.8>",
+      "(soft light:1.2)",
+    ]);
+    const tokenRows = Array.from(document.querySelectorAll("#syntax-workbench-token-list .rookieui-shell__prompt-workbench-token"));
+    expect(tokenRows[1]?.dataset.keywordFamily).toBe("lora");
+
+    document.getElementById("syntax-workbench-token-copy-1").click();
+    expect(clipboard.writeText).toHaveBeenCalledWith("<lora:detail_tweaker:0.8>");
+
+    document.getElementById("syntax-workbench-token-weight-up-2").click();
+    expect(prompt.value).toBe(String.raw`city\, skyline, <lora:detail_tweaker:0.8>, (soft light:1.3)`);
+
+    document.getElementById("syntax-workbench-token-weight-down-0").click();
+    expect(prompt.value).toBe(String.raw`(city\, skyline:0.9), <lora:detail_tweaker:0.8>, (soft light:1.3)`);
+  });
+
   test("supports editor token actions and collection saves", async () => {
     const { prompt, negative, parent } = createBaseDom();
     prompt.value = "masterpiece, city skyline";

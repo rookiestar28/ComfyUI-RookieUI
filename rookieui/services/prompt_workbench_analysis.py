@@ -6,6 +6,7 @@ from rookieui.contracts.prompt_dsl import PromptSemanticPlan
 from rookieui.contracts.prompt_workbench import build_prompt_workbench_contract_meta
 from rookieui.services.model_inventory import discover_model_inventory
 from rookieui.services.prompt_dsl import preprocess_prompt_bundle
+from rookieui.services.prompt_workbench_tokens import parse_prompt_workbench_tokens
 
 _MAX_ANALYZE_TEXT_LENGTH = 16000
 
@@ -85,12 +86,17 @@ def analyze_prompt_workbench_payload(payload: object) -> dict[str, Any]:
         "prompt": {
             "raw": prompt,
             "cleaned": preprocess_result.cleaned_prompt,
+            "tokens": [token.to_payload() for token in parse_prompt_workbench_tokens(preprocess_result.cleaned_prompt, scope="prompt")],
             "semantics": result_payload["prompt_semantics"],
             "metrics": prompt_metrics,
         },
         "negative_prompt": {
             "raw": negative_prompt,
             "cleaned": preprocess_result.cleaned_negative_prompt,
+            "tokens": [
+                token.to_payload()
+                for token in parse_prompt_workbench_tokens(preprocess_result.cleaned_negative_prompt, scope="negative")
+            ],
             "semantics": result_payload["negative_prompt_semantics"],
             "metrics": negative_metrics,
         },
