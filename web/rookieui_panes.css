@@ -1720,6 +1720,7 @@
   margin-top: -6px;
   padding: 8px 10px;
   border-radius: 8px;
+  overflow: visible;
 }
 
 .rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-header {

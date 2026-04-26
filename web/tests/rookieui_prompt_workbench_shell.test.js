@@ -455,6 +455,8 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("inline-negative-workbench-inline-history")?.getAttribute("title")).toBe("History");
     expect(document.getElementById("inline-negative-workbench-inline-translate")?.textContent).toBe("🌐");
     expect(document.getElementById("inline-negative-workbench-inline-translate")?.getAttribute("aria-label")).toBe("Translate");
+    expect(document.getElementById("inline-negative-workbench-inline-settings")?.getAttribute("aria-label")).toBe("Prefs");
+    expect(document.getElementById("inline-negative-workbench-inline-settings")?.hasAttribute("title")).toBe(false);
     expect(document.getElementById("inline-negative-workbench-inline-settings-hoverbox")?.dataset.pwUi).toBe(
       "inline-settings-hoverbox",
     );
@@ -463,7 +465,7 @@ describe("prompt workbench shell", () => {
     );
     expect(document.getElementById("inline-negative-workbench-inline-settings-auto-input")?.value).toBe("disabled");
     const inlineKeywordInput = document.getElementById("inline-negative-workbench-inline-keyword-input");
-    expect(inlineKeywordInput?.getAttribute("placeholder")).toBe("请输入新关键词");
+    expect(inlineKeywordInput?.getAttribute("placeholder")).toBe("Enter new keyword");
     expect(document.getElementById("inline-prompt-workbench-section")?.textContent).toContain("Prompt namespace: txt2img_prompt");
     expect(document.getElementById("inline-negative-workbench-section")?.textContent).toContain(
       "Negative Prompt namespace: txt2img_negative",

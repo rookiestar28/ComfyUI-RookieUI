@@ -605,7 +605,7 @@ export function createPromptWorkbenchShell({
     input.className = "rookieui-shell__prompt-workbench-inline-keyword-input";
     input.dataset.pwUi = "inline-keyword-input";
     input.rows = 1;
-    input.placeholder = "请输入新关键词";
+    input.placeholder = "Enter new keyword";
     input.setAttribute("aria-label", "Prompt Workbench keyword input");
     input.setAttribute("title", "Enter to add keyword");
     input.addEventListener("keydown", (event) => {
@@ -674,6 +674,7 @@ export function createPromptWorkbenchShell({
     inlineToolbarNodes.settingsButton.classList.add("rookieui-shell__prompt-workbench-inline-tool");
     inlineToolbarNodes.settingsButton.dataset.pwUi = "inline-settings-anchor";
     applyIconButtonLabel(inlineToolbarNodes.settingsButton, INLINE_TOOLBAR_ICONS.settings, "Prefs");
+    inlineToolbarNodes.settingsButton.removeAttribute("title");
     inlineToolbarNodes.settingsButton.addEventListener("click", () => {
       activeSecondaryPopover = activeSecondaryPopover === "settings" ? "" : "settings";
       const state = getActiveState();
