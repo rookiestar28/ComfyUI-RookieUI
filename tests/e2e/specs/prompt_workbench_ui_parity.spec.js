@@ -68,6 +68,28 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
             border-radius: 14px;
             background: #f1f5fb;
           }
+          .reference-settings-cluster {
+            position: relative;
+            display: inline-flex;
+          }
+          .reference-settings-box {
+            position: absolute;
+            top: 26px;
+            left: 0;
+            display: inline-flex;
+            min-width: 260px;
+            gap: 6px;
+            padding: 6px;
+            border-radius: 8px;
+            background: #e6f4ff;
+            box-shadow: 0 8px 22px rgb(20 32 46 / 0.22);
+          }
+          .reference-keyword-input {
+            min-width: 220px;
+            min-height: 24px;
+            border-radius: 5px;
+            background: #fff;
+          }
         </style>
       </head>
       <body>
@@ -80,9 +102,13 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
               <span class="reference-chip">en / prompt</span>
               <button class="reference-button" title="History">🕘</button>
               <button class="reference-button" title="Favorites">🔖</button>
-              <button class="reference-button" title="Prefs">⚙️</button>
+              <span class="reference-settings-cluster">
+                <button class="reference-button" title="Prefs">⚙️</button>
+                <span class="reference-settings-box">API A↔B ▦ ⌘ 🎨 ⓘ ✅ Ⓣ ⌨️</span>
+              </span>
               <button class="reference-button" title="Translate">🌐</button>
               <button class="reference-button" title="Append">➕</button>
+              <textarea class="reference-keyword-input" placeholder="请输入新关键词"></textarea>
             </div>
           </div>
           <div class="reference-secondary">
@@ -131,12 +157,15 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toHaveAttribute("title", "History");
   await expect(workbench.locator("[data-pw-ui='inline-favorites-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-settings-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-settings-hoverbox']")).toBeHidden();
   await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toHaveText("🌐");
   await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toHaveAttribute("title", "Translate");
   await expect(workbench.locator("[data-pw-ui='inline-copy-action']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-delete-action']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-append-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-keyword-input']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-keyword-input']")).toHaveAttribute("placeholder", "请输入新关键词");
   await expect(workbench.locator("[data-pw-ui='status-strip']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-add']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-suggestions']")).toBeVisible();
@@ -175,6 +204,15 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   expect(toolbarStyleAfterHover).not.toEqual(toolbarStyleBeforeHover);
   await page.mouse.move(0, 0);
 
+  await workbench.locator("[data-pw-ui='inline-settings-anchor']").hover();
+  const settingsHoverBox = workbench.locator("[data-pw-ui='inline-settings-hoverbox']");
+  await expect(settingsHoverBox).toBeVisible();
+  await expect(settingsHoverBox.locator("[data-pw-ui='inline-settings-api']")).toBeVisible();
+  await expect(settingsHoverBox.locator("[data-pw-ui='inline-settings-format']")).toHaveAttribute("title", "Prompt format settings");
+  await expect(settingsHoverBox.locator("#rookieui-txt2img-workbench-inline-settings-auto-translate")).toBeVisible();
+  await expect(settingsHoverBox.locator("#rookieui-txt2img-workbench-inline-settings-auto-input")).toBeVisible();
+  await page.mouse.move(0, 0);
+
   const firstToken = workbench.locator("[data-pw-token-ui='inline-token-tag']").first();
   const firstTokenActions = firstToken.locator("[data-pw-ui='token-quick-actions']");
   await expect(firstToken.locator("[data-pw-ui='token-local-language']")).toBeVisible();
@@ -196,6 +234,10 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(selectionToolbar.locator("#rookieui-txt2img-workbench-token-selected-count")).toHaveText("1 selected");
 
   await workbench.screenshot({ path: currentCardPath });
+
+  await workbench.locator("[data-pw-ui='inline-keyword-input']").fill("soft rim light");
+  await workbench.locator("[data-pw-ui='inline-keyword-input']").press("Enter");
+  await expect(page.locator("#rookieui-prompt")).toHaveValue(/soft rim light/);
 
   await page.locator("#rookieui-txt2img-workbench-toggle").click();
   await expect(workbench).toHaveAttribute("data-folded", "true");

@@ -65,13 +65,22 @@ const WORKBENCH_I18N = Object.freeze({
 
 const INLINE_TOOLBAR_ICONS = Object.freeze({
   append: "➕",
+  api: "API",
+  autoInput: "⌨️",
+  autoTranslate: "✅",
+  blacklist: "▦",
   copy: "📋",
   delete: "🗑️",
   favorites: "🔖",
   fold: "🔼",
+  format: "A↔B",
   history: "🕘",
+  hotkey: "⌘",
+  info: "ⓘ",
   open: "🧰",
   settings: "⚙️",
+  theme: "🎨",
+  tooltip: "Ⓣ",
   translate: "🌐",
 });
 
@@ -466,7 +475,9 @@ export function createPromptWorkbenchShell({
     historyButton: null,
     favoritesButton: null,
     settingsButton: null,
+    settingsHoverBox: null,
     appendButton: null,
+    keywordInput: null,
   };
 
   const applyIconButtonLabel = (button, icon, label) => {
@@ -483,6 +494,136 @@ export function createPromptWorkbenchShell({
     button.addEventListener("click", handler);
     headerActions.appendChild(button);
     return button;
+  };
+
+  const openInlinePanel = (panelId, surface = "") => {
+    activeSecondaryPopover = surface;
+    const state = getActiveState();
+    state.workbench_open = true;
+    state.active_panel = panelId;
+    queueStatePersist();
+    syncUi();
+  };
+
+  const createInlineSettingsHoverBox = () => {
+    const box = document.createElement("div");
+    box.id = `${idPrefix}-inline-settings-hoverbox`;
+    box.className = "rookieui-shell__prompt-workbench-inline-settings-box";
+    box.dataset.pwUi = "inline-settings-hoverbox";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-label", "Prompt Workbench quick settings");
+
+    const actionRow = document.createElement("div");
+    actionRow.className = "rookieui-shell__prompt-workbench-inline-settings-row";
+    box.appendChild(actionRow);
+
+    const addDetailButton = (buttonId, icon, label, panelId, statusMessage = "") => {
+      const button = createActionButton(`${idPrefix}-inline-settings-${buttonId}`, icon);
+      button.classList.add("rookieui-shell__prompt-workbench-inline-setting-detail");
+      button.dataset.pwUi = `inline-settings-${buttonId}`;
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+      button.addEventListener("click", () => {
+        openInlinePanel(panelId, panelId === "format" ? "settings" : "");
+        if (statusMessage) {
+          updateStatus(statusMessage);
+        }
+      });
+      actionRow.appendChild(button);
+      return button;
+    };
+
+    addDetailButton("api", INLINE_TOOLBAR_ICONS.api, "Translation API settings", "assist");
+    addDetailButton("format", INLINE_TOOLBAR_ICONS.format, "Prompt format settings", "format");
+    addDetailButton("blacklist", INLINE_TOOLBAR_ICONS.blacklist, "Keywords blacklist", "format");
+    addDetailButton("hotkey", INLINE_TOOLBAR_ICONS.hotkey, "Hotkey settings", "format", "Prompt Workbench hotkeys are scoped to the active editor");
+    addDetailButton("theme", INLINE_TOOLBAR_ICONS.theme, "Theme settings", "assist");
+    addDetailButton("about", INLINE_TOOLBAR_ICONS.info, "Prompt Workbench details", "assist", "Prompt Workbench inline prompt-all-in-one parity controls");
+
+    const optionRow = document.createElement("div");
+    optionRow.className = "rookieui-shell__prompt-workbench-inline-settings-row";
+    box.appendChild(optionRow);
+
+    const addOptionToggle = (key, icon, label, defaultChecked = false) => {
+      const labelNode = document.createElement("label");
+      labelNode.className = "rookieui-shell__prompt-workbench-inline-setting-toggle";
+      labelNode.setAttribute("title", label);
+      labelNode.setAttribute("aria-label", label);
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = `${idPrefix}-inline-settings-${key.replace(/_/g, "-")}`;
+      input.checked = Boolean(configState?.ui_preferences?.[key] ?? defaultChecked);
+      input.addEventListener("change", () => {
+        configState.ui_preferences = {
+          ...(configState.ui_preferences ?? {}),
+          [key]: input.checked,
+        };
+        queueConfigPersist();
+      });
+      labelNode.appendChild(input);
+      appendTextElement(labelNode, "span", "rookieui-shell__prompt-workbench-inline-setting-icon", icon);
+      optionRow.appendChild(labelNode);
+      return input;
+    };
+
+    addOptionToggle("auto_translate", INLINE_TOOLBAR_ICONS.autoTranslate, "Auto translate new keywords");
+    addOptionToggle("enable_tooltip", INLINE_TOOLBAR_ICONS.tooltip, "Enable keyword tooltips", true);
+
+    const autoInputLabel = document.createElement("label");
+    autoInputLabel.className = "rookieui-shell__prompt-workbench-inline-setting-select";
+    autoInputLabel.setAttribute("title", "Auto input prompt after page load");
+    appendTextElement(autoInputLabel, "span", "rookieui-shell__prompt-workbench-inline-setting-icon", INLINE_TOOLBAR_ICONS.autoInput);
+    const autoInputSelect = document.createElement("select");
+    autoInputSelect.id = `${idPrefix}-inline-settings-auto-input`;
+    autoInputSelect.setAttribute("aria-label", "Auto input prompt after page load");
+    [
+      ["disabled", "Auto input: disabled"],
+      ["last", "Last input prompt"],
+    ].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      autoInputSelect.appendChild(option);
+    });
+    autoInputSelect.value = String(configState?.ui_preferences?.auto_input_prompt ?? "disabled");
+    autoInputSelect.addEventListener("change", () => {
+      configState.ui_preferences = {
+        ...(configState.ui_preferences ?? {}),
+        auto_input_prompt: autoInputSelect.value,
+      };
+      queueConfigPersist();
+    });
+    autoInputLabel.appendChild(autoInputSelect);
+    box.appendChild(autoInputLabel);
+
+    return box;
+  };
+
+  const createInlineKeywordInput = () => {
+    const input = document.createElement("textarea");
+    input.id = `${idPrefix}-inline-keyword-input`;
+    input.className = "rookieui-shell__prompt-workbench-inline-keyword-input";
+    input.dataset.pwUi = "inline-keyword-input";
+    input.rows = 1;
+    input.placeholder = "请输入新关键词";
+    input.setAttribute("aria-label", "Prompt Workbench keyword input");
+    input.setAttribute("title", "Enter to add keyword");
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const value = normalizeTokenText(input.value);
+      if (!value) {
+        return;
+      }
+      appendPromptFragment(value, {
+        statusMessage: `Appended ${value}`,
+      });
+      input.value = "";
+    });
+    return input;
   };
 
   if (normalizedFixedScope) {
@@ -525,7 +666,15 @@ export function createPromptWorkbenchShell({
       void ensureResourcesLoaded({ statusMessage: "Prompt Workbench favorites loaded" });
       syncUi();
     });
-    inlineToolbarNodes.settingsButton = createInlineToolbarButton("inline-settings", INLINE_TOOLBAR_ICONS.settings, "Prefs", "inline-settings-anchor", () => {
+    const settingsCluster = document.createElement("span");
+    settingsCluster.className = "rookieui-shell__prompt-workbench-inline-settings-cluster";
+    settingsCluster.dataset.pwUi = "inline-settings-cluster";
+    headerActions.appendChild(settingsCluster);
+    inlineToolbarNodes.settingsButton = createActionButton(`${idPrefix}-inline-settings`, INLINE_TOOLBAR_ICONS.settings);
+    inlineToolbarNodes.settingsButton.classList.add("rookieui-shell__prompt-workbench-inline-tool");
+    inlineToolbarNodes.settingsButton.dataset.pwUi = "inline-settings-anchor";
+    applyIconButtonLabel(inlineToolbarNodes.settingsButton, INLINE_TOOLBAR_ICONS.settings, "Prefs");
+    inlineToolbarNodes.settingsButton.addEventListener("click", () => {
       activeSecondaryPopover = activeSecondaryPopover === "settings" ? "" : "settings";
       const state = getActiveState();
       state.workbench_open = true;
@@ -533,6 +682,9 @@ export function createPromptWorkbenchShell({
       queueStatePersist();
       syncUi();
     });
+    settingsCluster.appendChild(inlineToolbarNodes.settingsButton);
+    inlineToolbarNodes.settingsHoverBox = createInlineSettingsHoverBox();
+    settingsCluster.appendChild(inlineToolbarNodes.settingsHoverBox);
     [inlineToolbarNodes.historyButton, inlineToolbarNodes.favoritesButton, inlineToolbarNodes.settingsButton].forEach((button) => {
       button?.setAttribute("aria-haspopup", "dialog");
       button?.setAttribute("aria-controls", `${idPrefix}-secondary-popover`);
@@ -564,6 +716,8 @@ export function createPromptWorkbenchShell({
     });
     inlineToolbarNodes.appendButton.setAttribute("aria-haspopup", "dialog");
     inlineToolbarNodes.appendButton.setAttribute("aria-controls", `${idPrefix}-secondary-popover`);
+    inlineToolbarNodes.keywordInput = createInlineKeywordInput();
+    headerActions.appendChild(inlineToolbarNodes.keywordInput);
   }
 
   const body = document.createElement("div");

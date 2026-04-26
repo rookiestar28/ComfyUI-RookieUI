@@ -1733,6 +1733,7 @@
 }
 
 .rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-header-actions {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-wrap: wrap;
@@ -1798,6 +1799,101 @@
   border-color: color-mix(in srgb, var(--rookieui-accent) 78%, white 22%);
   background: color-mix(in srgb, var(--rookieui-accent) 26%, var(--rookieui-bg-panel) 74%);
   color: var(--rookieui-text-strong);
+}
+
+.rookieui-shell__prompt-workbench-inline-settings-cluster {
+  position: relative;
+  display: inline-flex;
+}
+
+.rookieui-shell__prompt-workbench-inline-settings-box {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  left: 0;
+  display: none;
+  min-width: 360px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--rookieui-accent) 40%, var(--rookieui-border) 60%);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-elevated) 92%, var(--rookieui-accent) 8%);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.32);
+}
+
+.rookieui-shell__prompt-workbench-inline-settings-cluster:is(:hover, :focus-within)
+  .rookieui-shell__prompt-workbench-inline-settings-box {
+  display: flex;
+}
+
+.rookieui-shell__prompt-workbench-inline-settings-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-detail,
+.rookieui-shell__prompt-workbench-inline-setting-toggle,
+.rookieui-shell__prompt-workbench-inline-setting-select {
+  min-height: 22px;
+  border: 1px solid color-mix(in srgb, var(--rookieui-border-muted) 72%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 86%, black 14%);
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-detail {
+  min-width: 28px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-toggle,
+.rookieui-shell__prompt-workbench-inline-setting-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-toggle input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-icon {
+  line-height: 1;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-select select {
+  max-width: 160px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench-inline-keyword-input {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 520px;
+  min-height: 24px;
+  resize: none;
+  border: 1px solid color-mix(in srgb, var(--rookieui-border-muted) 76%, transparent);
+  border-radius: 5px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 88%, black 12%);
+  color: var(--rookieui-text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.rookieui-shell__prompt-workbench-inline-keyword-input:focus {
+  outline: 1px solid color-mix(in srgb, var(--rookieui-accent) 68%, white 32%);
+  border-color: color-mix(in srgb, var(--rookieui-accent) 60%, var(--rookieui-border) 40%);
 }
 
 .rookieui-shell__prompt-workbench--inline[data-folded="true"] {

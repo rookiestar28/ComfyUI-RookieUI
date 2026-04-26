@@ -455,6 +455,15 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("inline-negative-workbench-inline-history")?.getAttribute("title")).toBe("History");
     expect(document.getElementById("inline-negative-workbench-inline-translate")?.textContent).toBe("🌐");
     expect(document.getElementById("inline-negative-workbench-inline-translate")?.getAttribute("aria-label")).toBe("Translate");
+    expect(document.getElementById("inline-negative-workbench-inline-settings-hoverbox")?.dataset.pwUi).toBe(
+      "inline-settings-hoverbox",
+    );
+    expect(document.getElementById("inline-negative-workbench-inline-settings-format")?.getAttribute("title")).toBe(
+      "Prompt format settings",
+    );
+    expect(document.getElementById("inline-negative-workbench-inline-settings-auto-input")?.value).toBe("disabled");
+    const inlineKeywordInput = document.getElementById("inline-negative-workbench-inline-keyword-input");
+    expect(inlineKeywordInput?.getAttribute("placeholder")).toBe("请输入新关键词");
     expect(document.getElementById("inline-prompt-workbench-section")?.textContent).toContain("Prompt namespace: txt2img_prompt");
     expect(document.getElementById("inline-negative-workbench-section")?.textContent).toContain(
       "Negative Prompt namespace: txt2img_negative",
@@ -527,6 +536,11 @@ describe("prompt workbench shell", () => {
     await flushPromises();
 
     expect(negative.value).toContain("bad anatomy, masterpiece, low quality");
+    inlineKeywordInput.value = "film grain";
+    inlineKeywordInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(negative.value).toContain("film grain");
+    expect(inlineKeywordInput.value).toBe("");
     expect(prompt.value).toBe("");
 
     document.getElementById("inline-negative-workbench-toggle").click();
