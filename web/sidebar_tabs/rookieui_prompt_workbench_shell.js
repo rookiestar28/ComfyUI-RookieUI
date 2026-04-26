@@ -392,6 +392,7 @@ export function createPromptWorkbenchShell({
   let stateReadyPromise = null;
   let resourcesReadyPromise = null;
   let activeScope = "prompt";
+  let activeSecondaryPopover = "";
   let resourcesLoaded = false;
   let dragTokenId = "";
   const assistState = {
@@ -511,6 +512,37 @@ export function createPromptWorkbenchShell({
     panelRail.appendChild(button);
     panelButtons.set(panelId, button);
   });
+
+  const secondaryRow = document.createElement("div");
+  secondaryRow.className = "rookieui-shell__prompt-workbench-secondary-entrypoints";
+  secondaryRow.dataset.pwUi = "secondary-entrypoints";
+  body.appendChild(secondaryRow);
+
+  const createSecondaryButton = (surface, label, panelId = surface) => {
+    const button = createActionButton(`${idPrefix}-quick-${surface}`, label);
+    button.classList.add("rookieui-shell__prompt-workbench-secondary-button");
+    button.dataset.pwUi = surface === "settings" ? "settings-menu-entrypoint" : `${surface}-popover-entrypoint`;
+    button.addEventListener("click", () => {
+      activeSecondaryPopover = activeSecondaryPopover === surface ? "" : surface;
+      const currentState = getActiveState();
+      currentState.active_panel = panelId;
+      queueStatePersist();
+      syncUi();
+    });
+    secondaryRow.appendChild(button);
+    return button;
+  };
+
+  createSecondaryButton("history", "History");
+  createSecondaryButton("favorites", "Favorites");
+  createSecondaryButton("settings", "Prefs", "format");
+
+  const secondaryPopover = document.createElement("div");
+  secondaryPopover.id = `${idPrefix}-secondary-popover`;
+  secondaryPopover.className = "rookieui-shell__prompt-workbench-secondary-popover";
+  secondaryPopover.dataset.pwUi = "history-favorites-popovers";
+  secondaryPopover.hidden = true;
+  body.appendChild(secondaryPopover);
 
   const actionsRow = document.createElement("div");
   actionsRow.className = "rookieui-shell__prompt-workbench-actions";
@@ -1232,6 +1264,151 @@ export function createPromptWorkbenchShell({
     }
   }
 
+  function getInlineSuggestions() {
+    const seen = new Set();
+    const suggestions = [];
+    const pushSuggestion = (source, label, fragment) => {
+      const normalizedFragment = normalizeTokenText(fragment);
+      if (!normalizedFragment || seen.has(normalizedFragment)) {
+        return;
+      }
+      seen.add(normalizedFragment);
+      suggestions.push({
+        source,
+        label: String(label ?? normalizedFragment),
+        fragment: normalizedFragment,
+      });
+    };
+
+    (favoritesCache.get(getActiveNamespace()) ?? []).slice(0, 3).forEach((entry) => {
+      pushSuggestion("favorites", entry.label || "Favorite", entry.prompt_text);
+    });
+    (historyCache.get(getActiveNamespace()) ?? []).slice(0, 3).forEach((entry) => {
+      pushSuggestion("history", entry.label || "History", entry.prompt_text);
+    });
+    (Array.isArray(catalogPayload?.tagcomplete?.entries) ? catalogPayload.tagcomplete.entries : []).slice(0, 6).forEach((entry) => {
+      pushSuggestion("tagcomplete", entry?.label ?? entry?.tag, entry?.insert_token ?? entry?.tag ?? entry?.label);
+    });
+
+    return suggestions.slice(0, 8);
+  }
+
+  function renderInlineSuggestions(parent) {
+    const suggestions = getInlineSuggestions();
+    const suggestionRow = document.createElement("div");
+    suggestionRow.className = "rookieui-shell__prompt-workbench-inline-suggestions";
+    suggestionRow.dataset.pwUi = "inline-suggestions";
+    parent.appendChild(suggestionRow);
+
+    if (!suggestions.length) {
+      appendTextElement(suggestionRow, "span", "rookieui-shell__prompt-workbench-detail", "No inline suggestions loaded yet.");
+      return;
+    }
+
+    suggestions.forEach((suggestion, index) => {
+      const button = createActionButton(`${idPrefix}-inline-suggestion-${index}`, suggestion.label);
+      button.classList.add("rookieui-shell__prompt-workbench-chip");
+      button.dataset.source = suggestion.source;
+      button.addEventListener("click", () => {
+        appendPromptFragment(suggestion.fragment, {
+          statusMessage: `Inserted ${suggestion.label}`,
+        });
+      });
+      suggestionRow.appendChild(button);
+    });
+  }
+
+  function renderGroupTagsBoard(parent, surfaceId = "editor") {
+    const groups = Array.isArray(catalogPayload?.group_tags?.groups) ? catalogPayload.group_tags.groups : [];
+    const board = document.createElement("section");
+    board.className = "rookieui-shell__prompt-workbench-group-tags-board";
+    board.dataset.pwUi = "group-tags-tab-board";
+    parent.appendChild(board);
+    appendTextElement(board, "h6", "rookieui-shell__prompt-workbench-pane-title", "Group Tags");
+
+    const chipGrid = document.createElement("div");
+    chipGrid.className = "rookieui-shell__prompt-workbench-chip-grid";
+    board.appendChild(chipGrid);
+
+    if (!groups.length) {
+      appendTextElement(chipGrid, "p", "rookieui-shell__prompt-workbench-empty", "No group tags are loaded yet.");
+      return;
+    }
+
+    groups.slice(0, 4).forEach((group, groupIndex) => {
+      const entries = Array.isArray(group?.tag_entries)
+        ? group.tag_entries
+        : Array.isArray(group?.tags)
+          ? group.tags.map((tag) => ({ id: tag, label: tag }))
+          : [];
+      entries.slice(0, 8).forEach((entry, entryIndex) => {
+        const insertToken = String(entry?.insert_token ?? entry?.tag ?? entry?.label ?? "").trim();
+        if (!insertToken) {
+          return;
+        }
+        const button = createActionButton(`${idPrefix}-${surfaceId}-group-tag-${groupIndex}-${entryIndex}`, String(entry?.label ?? insertToken));
+        button.classList.add("rookieui-shell__prompt-workbench-chip");
+        button.dataset.highlight = getCatalogHighlight(entry);
+        button.title = String(group?.title ?? `Group ${groupIndex + 1}`);
+        button.addEventListener("click", () => {
+          appendPromptFragment(insertToken, {
+            statusMessage: `Inserted ${String(entry?.label ?? insertToken)}`,
+          });
+        });
+        chipGrid.appendChild(button);
+      });
+    });
+  }
+
+  function renderSecondaryPopover() {
+    clearChildren(secondaryPopover);
+    const surface = activeSecondaryPopover;
+    secondaryPopover.hidden = !surface;
+    secondaryPopover.dataset.activeSurface = surface;
+    if (!surface) {
+      return;
+    }
+
+    const title = surface === "settings" ? "Preferences" : surface === "favorites" ? "Favorites" : "History";
+    appendTextElement(secondaryPopover, "h6", "rookieui-shell__prompt-workbench-pane-title", title);
+
+    if (surface === "settings") {
+      [
+        ["format", "Formatting and blacklist"],
+        ["assist", "AI assist"],
+      ].forEach(([panelId, label], index) => {
+        const button = createActionButton(`${idPrefix}-settings-popover-${index}`, label);
+        button.addEventListener("click", () => {
+          activeSecondaryPopover = "";
+          const currentState = getActiveState();
+          currentState.active_panel = panelId;
+          queueStatePersist();
+          syncUi();
+        });
+        secondaryPopover.appendChild(button);
+      });
+      return;
+    }
+
+    const entries = surface === "favorites"
+      ? favoritesCache.get(getActiveNamespace()) ?? []
+      : historyCache.get(getActiveNamespace()) ?? [];
+    if (!entries.length) {
+      appendTextElement(secondaryPopover, "p", "rookieui-shell__prompt-workbench-empty", `No ${surface} entries available.`);
+      return;
+    }
+
+    entries.slice(0, 4).forEach((entry, index) => {
+      const button = createActionButton(`${idPrefix}-${surface}-popover-${index}`, String(entry.label || entry.prompt_text || title));
+      button.classList.add("rookieui-shell__prompt-workbench-popover-entry");
+      button.addEventListener("click", () => {
+        activeSecondaryPopover = "";
+        applyCollectionEntry(entry);
+      });
+      secondaryPopover.appendChild(button);
+    });
+  }
+
   function renderEditorPane() {
     clearChildren(editorPane);
     const heading = document.createElement("div");
@@ -1246,6 +1423,7 @@ export function createPromptWorkbenchShell({
 
     const addRow = document.createElement("div");
     addRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
+    addRow.dataset.pwUi = "inline-add";
     editorPane.appendChild(addRow);
 
     const addInput = document.createElement("input");
@@ -1267,6 +1445,8 @@ export function createPromptWorkbenchShell({
       rebuildPromptFromEditor("Added prompt token");
     });
     addRow.appendChild(addButton);
+
+    renderInlineSuggestions(editorPane);
 
     const translateRow = document.createElement("div");
     translateRow.className = "rookieui-shell__prompt-workbench-editor-toolbar";
@@ -1379,6 +1559,7 @@ export function createPromptWorkbenchShell({
         "rookieui-shell__prompt-workbench-empty",
         "No tokens yet. Capture or add prompt text to begin editing.",
       );
+      renderGroupTagsBoard(editorPane, "editor");
       return;
     }
 
@@ -1550,6 +1731,8 @@ export function createPromptWorkbenchShell({
 
       list.appendChild(row);
     });
+
+    renderGroupTagsBoard(editorPane, "editor");
   }
 
   function renderCollectionPane(targetPane, collectionName) {
@@ -2231,6 +2414,9 @@ export function createPromptWorkbenchShell({
   function syncUi() {
     const state = getActiveState();
     state.active_panel = resolveVisiblePanel(state.active_panel);
+    if ((activeSecondaryPopover === "history" && !isPanelVisible("history")) || (activeSecondaryPopover === "favorites" && !isPanelVisible("favorites"))) {
+      activeSecondaryPopover = "";
+    }
     const historyItems = historyCache.get(getActiveNamespace()) ?? [];
     const favoriteItems = favoritesCache.get(getActiveNamespace()) ?? [];
     const language = String(configState?.language ?? "en").trim() || "en";
@@ -2256,6 +2442,20 @@ export function createPromptWorkbenchShell({
       button.dataset.active = String(panelId === state.active_panel);
       button.setAttribute("aria-pressed", String(panelId === state.active_panel));
     });
+    const quickHistoryButton = document.getElementById(`${idPrefix}-quick-history`);
+    if (quickHistoryButton) {
+      quickHistoryButton.hidden = !isPanelVisible("history");
+      quickHistoryButton.dataset.active = String(activeSecondaryPopover === "history");
+    }
+    const quickFavoritesButton = document.getElementById(`${idPrefix}-quick-favorites`);
+    if (quickFavoritesButton) {
+      quickFavoritesButton.hidden = !isPanelVisible("favorites");
+      quickFavoritesButton.dataset.active = String(activeSecondaryPopover === "favorites");
+    }
+    const quickSettingsButton = document.getElementById(`${idPrefix}-quick-settings`);
+    if (quickSettingsButton) {
+      quickSettingsButton.dataset.active = String(activeSecondaryPopover === "settings");
+    }
 
     editorPane.hidden = state.active_panel !== "editor";
     historyPane.hidden = state.active_panel !== "history";
@@ -2288,6 +2488,7 @@ export function createPromptWorkbenchShell({
     renderCatalogPane();
     renderAssistPane();
     renderFormatPane();
+    renderSecondaryPopover();
   }
 
   async function ensureStateLoaded() {

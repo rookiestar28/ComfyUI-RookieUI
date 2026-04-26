@@ -332,6 +332,12 @@ describe("prompt workbench shell", () => {
     expect(document.querySelector("#test-workbench-section .rookieui-shell__prompt-workbench-status-strip")?.dataset.pwUi).toBe(
       "status-strip",
     );
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='inline-add']")).toBeTruthy();
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='inline-suggestions']")).toBeTruthy();
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='history-popover-entrypoint']")).toBeTruthy();
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='favorites-popover-entrypoint']")).toBeTruthy();
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='settings-menu-entrypoint']")).toBeTruthy();
+    expect(document.getElementById("test-workbench-secondary-popover")?.dataset.pwUi).toBe("history-favorites-popovers");
     expect(document.getElementById("test-workbench-token-list")?.dataset.pwUi).toBe("token-chip-board");
     expect(
       document.getElementById("test-workbench-token-list")?.classList.contains("rookieui-shell__prompt-workbench-token-board"),
@@ -359,6 +365,25 @@ describe("prompt workbench shell", () => {
     expect(bootstrapState.fetchPromptWorkbenchBlacklistRequest).toHaveBeenCalledTimes(1);
     expect(document.getElementById("test-workbench-providers")?.textContent).toContain("1 translate / 1 assist / en");
     expect(document.getElementById("test-workbench-catalogs")?.textContent).toContain("1 groups");
+
+    document.getElementById("test-workbench-inline-suggestion-0").click();
+    await flushPromises();
+    expect(prompt.value).toContain("masterpiece, city skyline, masterpiece");
+
+    expect(document.querySelector("#test-workbench-section [data-pw-ui='group-tags-tab-board']")).toBeTruthy();
+    document.getElementById("test-workbench-editor-group-tag-0-0").click();
+    await flushPromises();
+    expect(prompt.value).toContain("masterpiece, city skyline, masterpiece, masterpiece");
+
+    document.getElementById("test-workbench-quick-history").click();
+    await flushPromises();
+    expect(document.getElementById("test-workbench-secondary-popover")?.dataset.activeSurface).toBe("history");
+    expect(document.getElementById("test-workbench-secondary-popover")?.textContent).toContain("Prompt: masterpiece");
+
+    document.getElementById("test-workbench-quick-settings").click();
+    await flushPromises();
+    expect(document.getElementById("test-workbench-secondary-popover")?.dataset.activeSurface).toBe("settings");
+    expect(document.getElementById("test-workbench-panel-format")?.dataset.active).toBe("true");
   });
 
   test("localizes core labels and supports import export actions", async () => {
