@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from typing import Any
+
+
+PROMPT_WORKBENCH_UI_PARITY_CONTRACT_VERSION = "prompt-all-in-one-ui-parity-20260426"
+
+PROMPT_WORKBENCH_UI_PARITY_CLASSES = (
+    "implemented",
+    "adapted_comfyui_native",
+    "planned",
+    "reference_only",
+    "out_of_scope",
+)
+
+PROMPT_WORKBENCH_UI_EVIDENCE_TYPES = (
+    "contract",
+    "unit_dom",
+    "e2e_interaction",
+    "visual_reference_fixture",
+    "visual_current_capture",
+    "live_host_target_capture",
+)
+
+
+@dataclass(frozen=True)
+class PromptWorkbenchUiParityPrimitive:
+    primitive_id: str
+    title: str
+    reference_file: str
+    reference_surface: str
+    reference_concept: str
+    rookieui_target: str
+    target_selector: str
+    parity_class: str
+    implementation_item: str
+    evidence_required: tuple[str, ...]
+
+    def to_payload(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _primitive_entries() -> tuple[PromptWorkbenchUiParityPrimitive, ...]:
+    return (
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="prompt_card_root",
+            title="Prompt Card Root",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".physton-prompt / .prompt-main",
+            reference_concept="Each prompt field receives a self-contained prompt editing card.",
+            rookieui_target="Render a prompt-all-in-one-style prompt card inside each RookieUI prompt band.",
+            target_selector=".rookieui-shell__prompt-workbench-card-root",
+            parity_class="planned",
+            implementation_item="F192",
+            evidence_required=("contract", "unit_dom", "visual_current_capture"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="fold_unfold",
+            title="Fold / Unfold Affordance",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".prompt-unfold",
+            reference_concept="Prompt card collapse state is controlled from the card header.",
+            rookieui_target="Keep the Prompt Workbench open/close control in the prompt-card header.",
+            target_selector="[data-pw-ui='fold-toggle']",
+            parity_class="adapted_comfyui_native",
+            implementation_item="F192",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="header_toolbar_groups",
+            title="Header Toolbar Groups",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".prompt-header .prompt-header-extend",
+            reference_concept="Language, settings, history, favorite, translation, copy/delete, load, and assist actions live in dense header groups.",
+            rookieui_target="Move Prompt Workbench actions into compact grouped header toolbar controls.",
+            target_selector=".rookieui-shell__prompt-workbench-toolbar",
+            parity_class="planned",
+            implementation_item="F192",
+            evidence_required=("contract", "unit_dom", "visual_current_capture"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="inline_append_input",
+            title="Inline Append Input",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".input-tag-append / .prompt-append-list",
+            reference_concept="Adding tags happens inline from the prompt header with nearby suggestions.",
+            rookieui_target="Provide an inline add/autocomplete row sourced from current catalog/history/favorites data.",
+            target_selector="[data-pw-ui='inline-add']",
+            parity_class="planned",
+            implementation_item="F194",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="token_chip_board",
+            title="Token Chip Board",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".prompt-tags .prompt-tags-list",
+            reference_concept="Prompt tokens rest as compact draggable chips rather than permanent text rows.",
+            rookieui_target="Render Prompt Workbench tokens as chip-forward elements with drag/reorder support.",
+            target_selector=".rookieui-shell__prompt-workbench-token-board",
+            parity_class="planned",
+            implementation_item="F193",
+            evidence_required=("contract", "unit_dom", "visual_current_capture", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="token_hover_quick_actions",
+            title="Token Hover / Focus Quick Actions",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".btn-tag-extend",
+            reference_concept="Per-token operations appear as compact controls on hover/focus.",
+            rookieui_target="Expose quick actions for edit, weight, translate, copy, favorite, blacklist, enable/disable, move, and delete.",
+            target_selector=".rookieui-shell__prompt-workbench-token-quick-actions",
+            parity_class="planned",
+            implementation_item="F193",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="bilingual_token_row",
+            title="Bilingual Token Row",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".prompt-local-language",
+            reference_concept="Translated/local-language text is visually tied to each token.",
+            rookieui_target="Show translated/local token text below the corresponding chip.",
+            target_selector=".rookieui-shell__prompt-workbench-token-local",
+            parity_class="planned",
+            implementation_item="F193",
+            evidence_required=("contract", "unit_dom", "visual_current_capture"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="selection_batch_toolbar",
+            title="Selection Batch Toolbar",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".drop-select-btns",
+            reference_concept="Batch actions are spatially tied to selected tags.",
+            rookieui_target="Show selected-token batch actions near the token board instead of only as a permanent panel toolbar.",
+            target_selector=".rookieui-shell__prompt-workbench-selection-toolbar",
+            parity_class="planned",
+            implementation_item="F193",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="group_tags_tab_board",
+            title="Group Tags Tab Board",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".group-tabs .group-header / .sub-group-header / .group-tags",
+            reference_concept="Group tags render as a tab/subtab board beneath the prompt token area.",
+            rookieui_target="Render group tags in an in-workbench tab/subtab board with quick insert behavior.",
+            target_selector=".rookieui-shell__prompt-workbench-group-tags",
+            parity_class="planned",
+            implementation_item="F194",
+            evidence_required=("contract", "unit_dom", "visual_current_capture", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="history_favorites_popovers",
+            title="History / Favorites Dense Reuse",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/history.vue and favorite.vue",
+            reference_surface=".physton-prompt-history / .physton-prompt-favorite",
+            reference_concept="History and favorites are dense reuse surfaces opened from header buttons.",
+            rookieui_target="Expose history/favorites popover-style surfaces near the prompt-card toolbar while preserving persisted state.",
+            target_selector=".rookieui-shell__prompt-workbench-popover",
+            parity_class="planned",
+            implementation_item="F194",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="settings_menu_entrypoints",
+            title="Settings / Format / Blacklist Entrypoints",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/components/phystonPrompt.vue",
+            reference_surface=".setting-box",
+            reference_concept="Secondary configuration surfaces are grouped under a compact settings affordance.",
+            rookieui_target="Expose settings, format, blacklist, provider, theme, and import/export controls from a compact workbench menu.",
+            target_selector=".rookieui-shell__prompt-workbench-settings-menu",
+            parity_class="planned",
+            implementation_item="F194",
+            evidence_required=("contract", "unit_dom", "e2e_interaction"),
+        ),
+        PromptWorkbenchUiParityPrimitive(
+            primitive_id="a1111_textarea_hijack",
+            title="A1111 Textarea Hijack",
+            reference_file="reference/sd-webui-prompt-all-in-one/src/src/App.vue",
+            reference_surface="A1111 prompt textarea attachment",
+            reference_concept="Reference extension attaches directly to A1111 DOM textareas.",
+            rookieui_target="Out of scope; RookieUI binds to ComfyUI-native prompt inputs instead.",
+            target_selector="",
+            parity_class="out_of_scope",
+            implementation_item="R181",
+            evidence_required=("contract",),
+        ),
+    )
+
+
+def get_prompt_workbench_ui_parity_primitives() -> tuple[PromptWorkbenchUiParityPrimitive, ...]:
+    return _primitive_entries()
+
+
+def build_prompt_workbench_ui_parity_payload() -> dict[str, Any]:
+    primitives = [entry.to_payload() for entry in get_prompt_workbench_ui_parity_primitives()]
+    return {
+        "contract": {
+            "version": PROMPT_WORKBENCH_UI_PARITY_CONTRACT_VERSION,
+            "reference_project": "reference/sd-webui-prompt-all-in-one",
+            "execution_policy": "read_only_reference_code_no_execution",
+            "visual_claim_policy": "code_derived_until_reference_host_or_fixture_capture_exists",
+        },
+        "parity_classes": list(PROMPT_WORKBENCH_UI_PARITY_CLASSES),
+        "evidence_types": list(PROMPT_WORKBENCH_UI_EVIDENCE_TYPES),
+        "primitives": primitives,
+    }
