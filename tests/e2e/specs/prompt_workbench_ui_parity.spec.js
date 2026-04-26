@@ -119,8 +119,14 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench).toHaveAttribute("data-fixed-scope", "prompt");
   await expect(workbench.locator("[data-pw-ui='fold-toggle']")).toHaveAttribute("aria-expanded", "true");
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("5 tags");
+  await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveAttribute("role", "status");
   await expect(workbench.locator("[data-pw-ui='inline-language']")).toContainText("prompt");
+  await expect(workbench.locator("[data-pw-ui='inline-language']")).toHaveAttribute(
+    "aria-label",
+    "Prompt workbench language and scope",
+  );
   await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toBeVisible();
+  await expect(workbench.locator("[data-pw-ui='inline-history-anchor']")).toHaveAttribute("aria-haspopup", "dialog");
   await expect(workbench.locator("[data-pw-ui='inline-favorites-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-settings-anchor']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-translate-action']")).toBeVisible();
@@ -184,6 +190,8 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   );
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='inline-suggestions']")).toBeVisible();
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='group-tags-tab-board']")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toBeHidden();
 
   await page.locator("#rookieui-txt2img-workbench-inline-delete").click();
   await expect(page.locator("#rookieui-prompt")).toHaveValue("");

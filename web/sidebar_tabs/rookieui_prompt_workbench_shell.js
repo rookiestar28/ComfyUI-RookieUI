@@ -472,6 +472,9 @@ export function createPromptWorkbenchShell({
     counterChip.id = `${idPrefix}-inline-counter`;
     counterChip.className = "rookieui-shell__prompt-workbench-inline-chip";
     counterChip.dataset.pwUi = "inline-counter";
+    counterChip.setAttribute("role", "status");
+    counterChip.setAttribute("aria-live", "polite");
+    counterChip.setAttribute("aria-label", "Prompt token count");
     counterChip.textContent = "0 tags";
     headerActions.appendChild(counterChip);
     inlineToolbarNodes.counter = counterChip;
@@ -480,6 +483,8 @@ export function createPromptWorkbenchShell({
     languageChip.id = `${idPrefix}-inline-language`;
     languageChip.className = "rookieui-shell__prompt-workbench-inline-chip";
     languageChip.dataset.pwUi = "inline-language";
+    languageChip.setAttribute("role", "status");
+    languageChip.setAttribute("aria-label", "Prompt workbench language and scope");
     languageChip.textContent = "en";
     headerActions.appendChild(languageChip);
     inlineToolbarNodes.language = languageChip;
@@ -510,6 +515,10 @@ export function createPromptWorkbenchShell({
       queueStatePersist();
       syncUi();
     });
+    [inlineToolbarNodes.historyButton, inlineToolbarNodes.favoritesButton, inlineToolbarNodes.settingsButton].forEach((button) => {
+      button?.setAttribute("aria-haspopup", "dialog");
+      button?.setAttribute("aria-controls", `${idPrefix}-secondary-popover`);
+    });
     createInlineToolbarButton("inline-translate", "Translate", "inline-translate-action", () => {
       translateActivePrompt(String(configState.language ?? "en").trim() || "en");
     });
@@ -535,6 +544,8 @@ export function createPromptWorkbenchShell({
       void ensureResourcesLoaded({ statusMessage: "Prompt Workbench append dropdown loaded" });
       syncUi();
     });
+    inlineToolbarNodes.appendButton.setAttribute("aria-haspopup", "dialog");
+    inlineToolbarNodes.appendButton.setAttribute("aria-controls", `${idPrefix}-secondary-popover`);
   }
 
   const body = document.createElement("div");
@@ -2772,6 +2783,13 @@ export function createPromptWorkbenchShell({
   }
 
   shell.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && activeSecondaryPopover && shell.contains(event.target)) {
+      event.preventDefault();
+      activeSecondaryPopover = "";
+      syncUi();
+      updateStatus("Closed Prompt Workbench popover");
+      return;
+    }
     if (shouldIgnoreWorkbenchHotkey(event)) {
       return;
     }

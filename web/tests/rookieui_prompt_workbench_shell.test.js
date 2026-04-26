@@ -436,6 +436,14 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("inline-negative-workbench-body")?.querySelector("[data-pw-ui='scope-tabs']")?.hidden).toBe(true);
     expect(document.getElementById("inline-prompt-workbench-inline-counter")?.textContent).toBe("0 tags");
     expect(document.getElementById("inline-negative-workbench-inline-language")?.textContent).toBe("en / negative");
+    expect(document.getElementById("inline-negative-workbench-inline-counter")?.getAttribute("role")).toBe("status");
+    expect(document.getElementById("inline-negative-workbench-inline-language")?.getAttribute("aria-label")).toBe(
+      "Prompt workbench language and scope",
+    );
+    expect(document.getElementById("inline-negative-workbench-inline-history")?.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(document.getElementById("inline-negative-workbench-inline-append")?.getAttribute("aria-controls")).toBe(
+      "inline-negative-workbench-secondary-popover",
+    );
 
     await promptShell.openWorkbench();
     await negativeShell.openWorkbench();
@@ -472,6 +480,15 @@ describe("prompt workbench shell", () => {
     expect(
       document.querySelector("#inline-negative-workbench-section [data-pw-ui='selection-batch-toolbar']")?.dataset.batchLayout,
     ).toBe("inline-overlay");
+    const tokenCountBeforeInputDelete = document.querySelectorAll(
+      "#inline-negative-workbench-token-list [data-pw-token-ui='inline-token-tag']",
+    ).length;
+    document
+      .querySelector("#inline-negative-workbench-token-list .rookieui-shell__prompt-workbench-token-input")
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    expect(
+      document.querySelectorAll("#inline-negative-workbench-token-list [data-pw-token-ui='inline-token-tag']").length,
+    ).toBe(tokenCountBeforeInputDelete);
 
     document.getElementById("inline-negative-workbench-inline-history").click();
     await flushPromises();
@@ -490,6 +507,11 @@ describe("prompt workbench shell", () => {
       "append-dropdown-popover",
     );
     expect(document.getElementById("inline-negative-workbench-secondary-popover")?.textContent).toContain("Group Tags");
+    negativeShell.element.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.hidden).toBe(true);
+    document.getElementById("inline-negative-workbench-inline-append").click();
+    await flushPromises();
     document.getElementById("inline-negative-workbench-append-popover-group-tag-0-0").click();
     await flushPromises();
     expect(negative.value).toContain("bad anatomy, masterpiece");
