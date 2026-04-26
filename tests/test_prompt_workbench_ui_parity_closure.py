@@ -15,30 +15,57 @@ VISUAL_SPEC = ROOT / "tests" / "e2e" / "specs" / "prompt_workbench_ui_parity.spe
 
 
 EXPECTED_RUNTIME_SELECTORS = {
-    "prompt_card_root": ".rookieui-shell__prompt-workbench-card-root",
+    "inline_surface_root": "[data-layout='prompt_all_in_one_inline']",
     "fold_unfold": "[data-pw-ui='fold-toggle']",
-    "header_toolbar_groups": ".rookieui-shell__prompt-workbench-toolbar",
-    "inline_append_input": "[data-pw-ui='inline-add']",
-    "token_chip_board": ".rookieui-shell__prompt-workbench-token-board",
+    "inline_toolbar_row": ".rookieui-shell__prompt-workbench-inline-tool",
+    "counter_language_status": "[data-pw-ui='inline-counter']",
+    "popover_anchor_buttons": "[data-pw-ui='inline-history-anchor']",
+    "inline_append_dropdown": "[data-pw-ui='append-dropdown-popover']",
+    "inline_suggestions": "[data-pw-ui='inline-suggestions']",
+    "inline_token_tags": "[data-pw-token-ui='inline-token-tag']",
     "token_hover_quick_actions": ".rookieui-shell__prompt-workbench-token-quick-actions",
     "bilingual_token_row": ".rookieui-shell__prompt-workbench-token-local-language",
-    "selection_batch_toolbar": ".rookieui-shell__prompt-workbench-selection-toolbar",
+    "selection_batch_toolbar": "[data-pw-ui='selection-batch-toolbar']",
     "group_tags_tab_board": "[data-pw-ui='group-tags-tab-board']",
-    "history_favorites_popovers": "[data-pw-ui='history-favorites-popovers']",
-    "settings_menu_entrypoints": "[data-pw-ui='settings-menu-entrypoint']",
+    "namespace_accessibility": "[aria-haspopup='dialog']",
 }
 
 
 def _selector_markers(selector: str) -> tuple[str, ...]:
     if selector.startswith("."):
         return (selector.removeprefix("."),)
-    match = re.fullmatch(r"\[data-pw-ui='([^']+)'\]", selector)
+    match = re.fullmatch(r"\[([^=]+)='([^']+)'\]", selector)
     if match:
-        value = match.group(1)
+        attribute, value = match.groups()
+        if attribute == "data-pw-ui":
+            return (
+                f'dataset.pwUi = "{value}"',
+                f'"{value}"',
+                f"data-pw-ui='{value}'",
+                f'data-pw-ui="{value}"',
+            )
+        if attribute == "data-pw-token-ui":
+            return (
+                f'dataset.pwTokenUi = "{value}"',
+                f'"{value}"',
+                f"data-pw-token-ui='{value}'",
+                f'data-pw-token-ui="{value}"',
+            )
+        if attribute == "data-layout":
+            return (
+                f'dataset.layout = normalizedFixedScope ? "{value}"',
+                f'data-layout="{value}"',
+                f"data-layout='{value}'",
+            )
+        if attribute == "aria-haspopup":
+            return (
+                f'setAttribute("aria-haspopup", "{value}")',
+                f"aria-haspopup='{value}'",
+                f'aria-haspopup="{value}"',
+            )
         return (
-            f'dataset.pwUi = "{value}"',
-            f"data-pw-ui='{value}'",
-            f'data-pw-ui="{value}"',
+            value,
+            selector,
         )
     return (selector,)
 
@@ -79,9 +106,12 @@ class PromptWorkbenchUiParityClosureTests(unittest.TestCase):
             "current-rookieui-prompt-workbench-card.png",
             "current-rookieui-prompt-workbench-popover.png",
             "[data-reference='prompt-all-in-one-card']",
-            "[data-pw-ui='token-chip-board']",
-            "[data-pw-ui='secondary-entrypoints']",
+            'toHaveAttribute("data-layout", "prompt_all_in_one_inline")',
+            "[data-pw-token-ui='inline-token-tag']",
+            'toHaveAttribute("data-batch-layout", "inline-overlay")',
             'toHaveAttribute("data-active-surface", "history")',
+            'toHaveAttribute("data-active-surface", "append")',
+            'page.keyboard.press("Escape")',
         ):
             with self.subTest(required=required):
                 self.assertIn(required, spec_text)

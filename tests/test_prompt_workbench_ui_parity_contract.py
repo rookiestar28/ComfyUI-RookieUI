@@ -16,25 +16,27 @@ class PromptWorkbenchUiParityContractTests(unittest.TestCase):
 
         self.assertEqual(
             {
-                "prompt_card_root",
+                "inline_surface_root",
                 "fold_unfold",
-                "header_toolbar_groups",
-                "inline_append_input",
-                "token_chip_board",
+                "inline_toolbar_row",
+                "counter_language_status",
+                "popover_anchor_buttons",
+                "inline_append_dropdown",
+                "inline_suggestions",
+                "inline_token_tags",
                 "token_hover_quick_actions",
                 "bilingual_token_row",
                 "selection_batch_toolbar",
                 "group_tags_tab_board",
-                "history_favorites_popovers",
-                "settings_menu_entrypoints",
+                "namespace_accessibility",
                 "a1111_textarea_hijack",
             },
             set(primitives),
         )
         self.assertEqual(primitives["a1111_textarea_hijack"]["parity_class"], "out_of_scope")
-        self.assertEqual(primitives["prompt_card_root"]["implementation_item"], "F192")
-        self.assertEqual(primitives["token_chip_board"]["implementation_item"], "F193")
-        self.assertEqual(primitives["group_tags_tab_board"]["implementation_item"], "F194")
+        self.assertEqual(primitives["inline_surface_root"]["implementation_item"], "inline_surface_mount")
+        self.assertEqual(primitives["inline_token_tags"]["implementation_item"], "inline_token_tags")
+        self.assertEqual(primitives["namespace_accessibility"]["implementation_item"], "namespace_accessibility")
 
     def test_required_runtime_primitives_have_selectors_and_evidence(self) -> None:
         payload = build_prompt_workbench_ui_parity_payload()
@@ -61,7 +63,7 @@ class PromptWorkbenchUiParityContractTests(unittest.TestCase):
             "read_only_reference_code_no_execution",
         )
         self.assertIn(
-            "code_derived",
+            "current_capture",
             payload["contract"]["visual_claim_policy"],
         )
 
