@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from pathlib import Path
 import unittest
 from unittest import mock
 
@@ -70,6 +71,56 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         )
         self.assertEqual(ai_openai_entry["availability"]["status"], "configuration_required")
 
+    def test_provider_payload_exposes_translation_provider_layers(self) -> None:
+        payload = build_prompt_workbench_provider_payload()
+        providers = {
+            provider["provider_id"]: provider
+            for provider in payload["surfaces"]["translation"]["providers"]
+        }
+
+        self.assertEqual(
+            payload["surfaces"]["translation"]["provider_layer_order"],
+            [
+                "csv_tag_dictionary",
+                "shipped_lightweight",
+                "optional_openai_compatible",
+                "optional_local_host_model",
+                "reference_only",
+            ],
+        )
+        self.assertEqual(providers["csv_tag_dictionary"]["provider_layer"], "csv_tag_dictionary")
+        self.assertEqual(providers["mymemory_free"]["provider_layer"], "shipped_lightweight")
+        self.assertEqual(providers["openai"]["provider_layer"], "optional_openai_compatible")
+        self.assertEqual(providers["local_host_model"]["provider_layer"], "optional_local_host_model")
+        self.assertEqual(providers["local_host_model"]["availability"]["status"], "deferred")
+        self.assertNotIn("gemma", repr(payload).lower())
+
+    def test_csv_dictionary_provider_translates_exact_runtime_dictionary_hits(self) -> None:
+        catalog_root = Path(self.runtime_dir.name) / "catalogs"
+        catalog_root.mkdir(parents=True)
+        (catalog_root / "translation_dictionary.zh-TW.csv").write_text(
+            "source,target\nmasterpiece,傑作\ncity skyline,城市天際線\n",
+            encoding="utf-8",
+        )
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "csv_tag_dictionary",
+                    "providers": {},
+                }
+            }
+        )
+
+        payload = translate_prompt_workbench_payload(
+            {"text": "masterpiece, city skyline, unknown tag", "to_lang": "zh-TW"}
+        ).to_payload()
+
+        self.assertEqual(payload["provider_id"], "csv_tag_dictionary")
+        self.assertEqual(payload["provider_layer"], "csv_tag_dictionary")
+        self.assertEqual(payload["translated_text"], "傑作, 城市天際線, unknown tag")
+        self.assertEqual(payload["dictionary_hits"], ["masterpiece", "city skyline"])
+        self.assertEqual(payload["dictionary_misses"], ["unknown tag"])
+
     @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
     def test_translate_payload_uses_openai_provider(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
@@ -121,6 +172,44 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["mode"], "batch")
         self.assertEqual(payload["translated_texts"], ["uno", "dos"])
         self.assertEqual(mocked_urlopen.call_count, 2)
+
+    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    def test_dictionary_first_manual_translation_falls_back_for_misses(self, mocked_urlopen: mock.Mock) -> None:
+        catalog_root = Path(self.runtime_dir.name) / "catalogs"
+        catalog_root.mkdir(parents=True)
+        (catalog_root / "translation_dictionary.zh-TW.csv").write_text(
+            "source,target\nmasterpiece,傑作\n",
+            encoding="utf-8",
+        )
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "mymemory_free",
+                    "providers": {
+                        "mymemory_free": {
+                            "email": "tester@example.com",
+                        }
+                    },
+                }
+            }
+        )
+        mocked_urlopen.return_value = _FakeHttpResponse({"responseData": {"translatedText": "城市天際線"}})
+
+        payload = translate_prompt_workbench_payload(
+            {
+                "text": "masterpiece, city skyline",
+                "from_lang": "en",
+                "to_lang": "zh-TW",
+                "dictionary_first": True,
+            }
+        ).to_payload()
+
+        self.assertEqual(payload["provider_id"], "mymemory_free")
+        self.assertEqual(payload["fallback_provider_id"], "mymemory_free")
+        self.assertEqual(payload["translated_text"], "傑作, 城市天際線")
+        self.assertEqual(payload["dictionary_hits"], ["masterpiece"])
+        self.assertEqual(payload["dictionary_misses"], ["city skyline"])
+        self.assertEqual(mocked_urlopen.call_count, 1)
 
     def test_translate_payload_rejects_missing_provider_configuration(self) -> None:
         prompt_workbench_state.update_prompt_workbench_config(

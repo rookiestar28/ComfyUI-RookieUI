@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
 from urllib import parse
 
@@ -16,7 +18,8 @@ from rookieui.services.prompt_workbench_openai import (
     openai_chat_completion,
     urlopen_json,
 )
-from rookieui.services.prompt_workbench_state import load_prompt_workbench_store
+from rookieui.services.prompt_workbench_state import _prompt_workbench_root, load_prompt_workbench_store
+from rookieui.services.prompt_workbench_tokens import parse_prompt_workbench_tokens
 
 _MAX_TRANSLATE_ITEMS = 32
 _MAX_TRANSLATE_TEXT_LENGTH = 16000
@@ -35,6 +38,10 @@ class PromptWorkbenchTranslationExecutionResult:
     to_lang: str
     translated_text: str | None = None
     translated_texts: list[str] | None = None
+    provider_layer: str = ""
+    dictionary_hits: list[str] | None = None
+    dictionary_misses: list[str] | None = None
+    fallback_provider_id: str = ""
 
     def to_payload(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -70,7 +77,21 @@ def _normalize_translate_payload(payload: object) -> dict[str, Any]:
         "to_lang": _normalize_text(payload.get("to_lang"), max_length=32) or "en",
         "text": single_text,
         "texts": batch_texts,
+        "dictionary_first": bool(payload.get("dictionary_first")),
+        "fallback_provider": _normalize_text(payload.get("fallback_provider"), max_length=80),
     }
+
+
+def _provider_layer(provider_id: str) -> str:
+    if provider_id == "csv_tag_dictionary":
+        return "csv_tag_dictionary"
+    if provider_id == "mymemory_free":
+        return "shipped_lightweight"
+    if provider_id == "openai":
+        return "optional_openai_compatible"
+    if provider_id == "local_host_model":
+        return "optional_local_host_model"
+    return "reference_only"
 
 
 def _effective_translation_provider(provider_override: str) -> tuple[PromptWorkbenchProviderCatalogEntry, dict[str, Any]]:
@@ -149,7 +170,16 @@ def build_prompt_workbench_provider_payload() -> dict[str, Any]:
             provider_entry["availability"] = availability
             provider_entry["configured"] = isinstance(provider_config, dict) and bool(provider_config)
             provider_entry["default_selected"] = provider_id == configured_default_provider
+            provider_entry["provider_layer"] = _provider_layer(provider_id)
         surface_payload["default_provider"] = configured_default_provider
+        if surface_name == "translation":
+            surface_payload["provider_layer_order"] = [
+                "csv_tag_dictionary",
+                "shipped_lightweight",
+                "optional_openai_compatible",
+                "optional_local_host_model",
+                "reference_only",
+            ]
     return payload
 
 
@@ -193,6 +223,78 @@ def _translate_via_mymemory(text: str, *, from_lang: str, to_lang: str, provider
     return translated_text
 
 
+def _translation_dictionary_paths(to_lang: str) -> tuple[Path, ...]:
+    catalog_root = _prompt_workbench_root() / "catalogs"
+    normalized_lang = str(to_lang or "").strip()
+    candidates = []
+    if normalized_lang:
+        candidates.append(catalog_root / f"translation_dictionary.{normalized_lang}.csv")
+    candidates.append(catalog_root / "translation_dictionary.csv")
+    return tuple(candidates)
+
+
+def _load_translation_dictionary(to_lang: str) -> dict[str, str]:
+    entries: dict[str, str] = {}
+    for path in _translation_dictionary_paths(to_lang):
+        if not path.exists() or not path.is_file():
+            continue
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            for row_index, row in enumerate(reader):
+                if len(row) < 2:
+                    continue
+                source = _normalize_text(row[0], max_length=512)
+                target = _normalize_text(row[1], max_length=512)
+                if row_index == 0 and source.lower() in {"source", "tag", "en"}:
+                    continue
+                if source and target:
+                    entries[source.lower()] = target
+    return entries
+
+
+def _translate_via_dictionary(text: str, *, to_lang: str) -> tuple[str, list[str], list[str]]:
+    dictionary = _load_translation_dictionary(to_lang)
+    tokens = parse_prompt_workbench_tokens(text)
+    translated_tokens: list[str] = []
+    hits: list[str] = []
+    misses: list[str] = []
+    for token in tokens:
+        lookup_key = token.raw_text.lower()
+        translated = dictionary.get(lookup_key)
+        if translated:
+            translated_tokens.append(translated)
+            hits.append(token.raw_text)
+        else:
+            translated_tokens.append(token.raw_text)
+            misses.append(token.raw_text)
+    return ", ".join(translated_tokens), hits, misses
+
+
+def _translate_text_with_entry(
+    entry: PromptWorkbenchProviderCatalogEntry,
+    text: str,
+    *,
+    from_lang: str,
+    to_lang: str,
+    provider_config: dict[str, Any],
+) -> str:
+    if entry.provider_id == "openai":
+        return _translate_via_openai(
+            text,
+            from_lang=from_lang,
+            to_lang=to_lang,
+            provider_config=provider_config,
+        )
+    if entry.provider_id == "mymemory_free":
+        return _translate_via_mymemory(
+            text,
+            from_lang=from_lang,
+            to_lang=to_lang,
+            provider_config=provider_config,
+        )
+    raise PromptWorkbenchTranslateProviderError("Prompt-workbench translation provider is not implemented.")
+
+
 def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTranslationExecutionResult:
     normalized = _normalize_translate_payload(payload)
     entry, provider_config = _effective_translation_provider(normalized["provider"])
@@ -202,31 +304,54 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
 
     texts = normalized["texts"] or ([normalized["text"]] if normalized["text"] else [])
     translated_texts: list[str] = []
+    dictionary_hits: list[str] = []
+    dictionary_misses: list[str] = []
+    fallback_provider_id = ""
     for text in texts:
         if not text:
             translated_texts.append("")
             continue
         try:
-            if entry.provider_id == "openai":
-                translated_texts.append(
-                    _translate_via_openai(
-                        text,
-                        from_lang=normalized["from_lang"],
-                        to_lang=normalized["to_lang"],
-                        provider_config=provider_config,
-                    )
-                )
-            elif entry.provider_id == "mymemory_free":
-                translated_texts.append(
-                    _translate_via_mymemory(
-                        text,
-                        from_lang=normalized["from_lang"],
-                        to_lang=normalized["to_lang"],
-                        provider_config=provider_config,
-                    )
-                )
+            if entry.provider_id == "csv_tag_dictionary":
+                translated, hits, misses = _translate_via_dictionary(text, to_lang=normalized["to_lang"])
+                translated_texts.append(translated)
+                dictionary_hits.extend(hits)
+                dictionary_misses.extend(misses)
+            elif normalized["dictionary_first"]:
+                translated, hits, misses = _translate_via_dictionary(text, to_lang=normalized["to_lang"])
+                dictionary_hits.extend(hits)
+                dictionary_misses.extend(misses)
+                if not misses:
+                    translated_texts.append(translated)
+                    continue
+                fallback_provider_id = entry.provider_id
+                dictionary = _load_translation_dictionary(normalized["to_lang"])
+                translated_parts: list[str] = []
+                for token in parse_prompt_workbench_tokens(text):
+                    dictionary_hit = dictionary.get(token.raw_text.lower())
+                    if dictionary_hit:
+                        translated_parts.append(dictionary_hit)
+                    else:
+                        translated_parts.append(
+                            _translate_text_with_entry(
+                                entry,
+                                token.raw_text,
+                                from_lang=normalized["from_lang"],
+                                to_lang=normalized["to_lang"],
+                                provider_config=provider_config,
+                            )
+                        )
+                translated_texts.append(", ".join(translated_parts))
             else:
-                raise PromptWorkbenchTranslateProviderError("Prompt-workbench translation provider is not implemented.")
+                translated_texts.append(
+                    _translate_text_with_entry(
+                        entry,
+                        text,
+                        from_lang=normalized["from_lang"],
+                        to_lang=normalized["to_lang"],
+                        provider_config=provider_config,
+                    )
+                )
         except PromptWorkbenchTranslateProviderError:
             raise
         except Exception as exc:  # pragma: no cover - error normalization path
@@ -240,6 +365,10 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
             from_lang=normalized["from_lang"],
             to_lang=normalized["to_lang"],
             translated_texts=translated_texts,
+            provider_layer=_provider_layer(entry.provider_id),
+            dictionary_hits=dictionary_hits,
+            dictionary_misses=dictionary_misses,
+            fallback_provider_id=fallback_provider_id,
         )
     return PromptWorkbenchTranslationExecutionResult(
         provider_id=entry.provider_id,
@@ -248,4 +377,8 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
         from_lang=normalized["from_lang"],
         to_lang=normalized["to_lang"],
         translated_text=translated_texts[0] if translated_texts else "",
+        provider_layer=_provider_layer(entry.provider_id),
+        dictionary_hits=dictionary_hits,
+        dictionary_misses=dictionary_misses,
+        fallback_provider_id=fallback_provider_id,
     )

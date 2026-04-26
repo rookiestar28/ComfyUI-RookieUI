@@ -27,8 +27,9 @@ PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS = (
     "token",
 )
 PROMPT_WORKBENCH_PROVIDER_SURFACES = ("translation", "ai_assist")
-PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS = ("openai", "mymemory_free")
+PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS = ("csv_tag_dictionary", "mymemory_free", "openai")
 PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS = ("openai",)
+PROMPT_WORKBENCH_DEFERRED_TRANSLATION_PROVIDER_IDS = ("local_host_model",)
 PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS = ()
 DEFAULT_PROMPT_WORKBENCH_AI_ASSIST_PRESET = (
     "Write a concise Stable Diffusion prompt from the user's image description. "
@@ -173,6 +174,19 @@ def _mymemory_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
 
 def _provider_catalog_entries() -> tuple[PromptWorkbenchProviderCatalogEntry, ...]:
     return (
+        PromptWorkbenchProviderCatalogEntry(
+            provider_id="csv_tag_dictionary",
+            title="CSV / Tag Dictionary Translation",
+            surface_scopes=("translation",),
+            execution_state="shipped",
+            supports_batch=True,
+            reference_origin="sd-webui-prompt-all-in-one: group_tags / keyword dictionary enhancement",
+            summary="Local exact-match tag dictionary lookup used before network-backed providers.",
+            notes=(
+                "Runtime dictionaries are loaded from Prompt Workbench catalog storage.",
+                "No network or model dependency is required.",
+            ),
+        ),
         PromptWorkbenchProviderCatalogEntry(
             provider_id="openai",
             title="OpenAI-Compatible Chat Translation",
@@ -353,6 +367,19 @@ def _provider_catalog_entries() -> tuple[PromptWorkbenchProviderCatalogEntry, ..
             reference_origin="sd-webui-prompt-all-in-one: iflytekV2",
             summary="Reference-provider entry preserved for migration truthfulness only.",
         ),
+        PromptWorkbenchProviderCatalogEntry(
+            provider_id="local_host_model",
+            title="Local / Host Model Provider (Optional)",
+            surface_scopes=("translation",),
+            execution_state="deferred",
+            supports_batch=True,
+            reference_origin="sd-webui-prompt-all-in-one: offline/local model provider class",
+            summary="Optional local or host-installed model integration point; no baseline dependency is required.",
+            notes=(
+                "Classification-only entry for truthful provider planning.",
+                "No local model runtime is executed by baseline RookieUI.",
+            ),
+        ),
     )
 
 
@@ -381,6 +408,8 @@ def get_prompt_workbench_provider_execution_state(provider_id: object, *, surfac
         return "reference_only"
     if surface == "translation" and normalized_provider_id in PROMPT_WORKBENCH_SHIPPED_TRANSLATION_PROVIDER_IDS:
         return "shipped"
+    if surface == "translation" and normalized_provider_id in PROMPT_WORKBENCH_DEFERRED_TRANSLATION_PROVIDER_IDS:
+        return "deferred"
     if surface == "ai_assist" and normalized_provider_id in PROMPT_WORKBENCH_SHIPPED_AI_PROVIDER_IDS:
         return "shipped"
     if surface == "ai_assist" and normalized_provider_id in PROMPT_WORKBENCH_DEFERRED_AI_PROVIDER_IDS:
