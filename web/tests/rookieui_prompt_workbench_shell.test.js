@@ -53,7 +53,7 @@ function createBootstrapState(overrides = {}) {
         },
         ui_preferences: { default_open: false },
       },
-      blacklist: { enabled: false, entries: [] },
+      blacklist: { enabled: false, entries: [], translation_entries: [] },
       host_actions: {
         danbooru_upsample: {
           action_id: "danbooru_upsample",
@@ -173,7 +173,7 @@ function createBootstrapState(overrides = {}) {
     fetchPromptWorkbenchBlacklistRequest: vi.fn(async () => ({
       ok: true,
       data: {
-        blacklist: { enabled: false, entries: [] },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
       },
     })),
     translatePromptWorkbenchRequest: vi.fn(async (payload) => ({
@@ -181,9 +181,12 @@ function createBootstrapState(overrides = {}) {
       data: {
         provider_id: payload?.provider ?? "mymemory_free",
         provider_title: "MyMemory Free Translation",
-        mode: "single",
+        mode: Array.isArray(payload?.texts) ? "batch" : "single",
         from_lang: payload?.from_lang ?? "auto",
         to_lang: payload?.to_lang ?? "en",
+        translated_texts: Array.isArray(payload?.texts)
+          ? payload.texts.map((text) => `translated ${text}`)
+          : undefined,
         translated_text: payload?.to_lang === "en" ? "city skyline at dusk" : "城市天際線黃昏",
       },
     })),
@@ -433,6 +436,7 @@ describe("prompt workbench shell", () => {
 
   test("supports selected token batch copy, favorites, blacklist, and delete", async () => {
     const { prompt, negative, parent } = createBaseDom();
+    prompt.value = "masterpiece, city skyline";
     const clipboard = { writeText: vi.fn(async () => undefined) };
     Object.defineProperty(globalThis.navigator, "clipboard", {
       value: clipboard,
@@ -456,6 +460,11 @@ describe("prompt workbench shell", () => {
 
     await flushPromises();
     await shellApi.openWorkbench();
+    await flushPromises();
+
+    const providerSelect = document.getElementById("batch-workbench-translation-provider");
+    providerSelect.value = "openai";
+    providerSelect.dispatchEvent(new Event("change", { bubbles: true }));
     await flushPromises();
 
     document.getElementById("batch-workbench-token-select-0").click();
@@ -482,6 +491,18 @@ describe("prompt workbench shell", () => {
       }),
     );
 
+    document.getElementById("batch-workbench-token-batch-translate").click();
+    await flushPromises();
+    expect(bootstrapState.translatePromptWorkbenchRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "openai",
+        texts: ["masterpiece", "city skyline"],
+        dictionary_first: true,
+      }),
+    );
+    expect(document.getElementById("batch-workbench-token-translation-0").textContent).toContain("translated masterpiece");
+    expect(prompt.value).toBe("masterpiece, city skyline");
+
     document.getElementById("batch-workbench-token-batch-blacklist").click();
     await flushPromises();
     expect(bootstrapState.updatePromptWorkbenchBlacklistRequest).toHaveBeenCalledWith(
@@ -500,7 +521,19 @@ describe("prompt workbench shell", () => {
       }),
     );
 
-    document.getElementById("batch-workbench-token-batch-delete").click();
+    const tokenInput = document.querySelector("#batch-workbench-token-list input[type='text']");
+    tokenInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
+    expect(prompt.value).toBe("masterpiece, city skyline");
+
+    document.getElementById("batch-workbench-section").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "t", ctrlKey: true, bubbles: true }),
+    );
+    await flushPromises();
+    expect(bootstrapState.translatePromptWorkbenchRequest).toHaveBeenCalledTimes(2);
+
+    document.getElementById("batch-workbench-section").dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+    );
     expect(prompt.value).toBe("");
   });
 
@@ -620,7 +653,7 @@ describe("prompt workbench shell", () => {
             show_favorites: true,
           },
         },
-        blacklist: { enabled: false, entries: [] },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
         host_actions: {},
         language_options: [{ code: "en", title: "English" }],
         theme_style_options: [{ id: "rookieui_classic", title: "RookieUI Classic" }],
@@ -793,7 +826,7 @@ describe("prompt workbench shell", () => {
           },
           ui_preferences: { default_open: false },
         },
-        blacklist: { enabled: false, entries: [] },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
         language_options: [
           { code: "en", title: "English" },
           { code: "zh-TW", title: "Traditional Chinese" },
@@ -978,7 +1011,7 @@ describe("prompt workbench shell", () => {
           },
           ui_preferences: { default_open: false },
         },
-        blacklist: { enabled: false, entries: [] },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
         host_actions: {
           danbooru_upsample: {
             action_id: "danbooru_upsample",
@@ -1050,7 +1083,7 @@ describe("prompt workbench shell", () => {
           },
           ui_preferences: { default_open: false },
         },
-        blacklist: { enabled: false, entries: [] },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
         language_options: [
           { code: "en", title: "English" },
           { code: "zh-TW", title: "Traditional Chinese" },

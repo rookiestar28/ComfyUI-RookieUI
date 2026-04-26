@@ -288,6 +288,7 @@ export function createPromptWorkbenchShell({
   const shell = document.createElement("section");
   shell.id = `${idPrefix}-section`;
   shell.className = "rookieui-shell__prompt-workbench";
+  shell.tabIndex = -1;
   parent.appendChild(shell);
 
   const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
@@ -782,6 +783,47 @@ export function createPromptWorkbenchShell({
       });
   }
 
+  function translateTokenBatch(tokens, targetLanguage) {
+    const providerId = String(configState.translation?.default_provider ?? "").trim();
+    const selectedTokens = (Array.isArray(tokens) ? tokens : []).filter(Boolean);
+    if (!selectedTokens.length) {
+      updateStatus("Select one or more prompt tokens before translating");
+      return;
+    }
+    if (!providerId) {
+      updateStatus("Select a shipped translation provider before translating");
+      return;
+    }
+    const texts = selectedTokens.map((token) => normalizeTokenText(token.raw_text ?? token.text)).filter(Boolean);
+    if (!texts.length) {
+      updateStatus("No prompt tokens are available for translation");
+      return;
+    }
+    updateStatus("Translating selected prompt tokens...");
+    void bootstrapState
+      ?.translatePromptWorkbenchRequest?.({
+        provider: providerId,
+        from_lang: "auto",
+        to_lang: targetLanguage,
+        texts,
+        dictionary_first: true,
+      })
+      .then((result) => {
+        const translatedTexts = Array.isArray(result?.data?.translated_texts) ? result.data.translated_texts : [];
+        selectedTokens.forEach((token, index) => {
+          const translatedText = String(translatedTexts[index] ?? "").trim();
+          if (translatedText) {
+            token.translated_text = translatedText;
+          }
+        });
+        updateStatus("Translated selected prompt tokens");
+        syncUi();
+      })
+      .catch(() => {
+        updateStatus("Prompt token translation failed");
+      });
+  }
+
   function requestDanbooruUpsample() {
     const action = getDanbooruUpsampleAction();
     const availability = action?.availability ?? {};
@@ -1100,6 +1142,10 @@ export function createPromptWorkbenchShell({
       });
       return;
     }
+    if (action === "translate") {
+      translateTokenBatch(selectedTokens, String(configState.language ?? "en").trim() || "en");
+      return;
+    }
     if (action === "blacklist") {
       addTokensToBlacklist(selectedTokens.map((token) => token.raw_text ?? token.text));
     }
@@ -1227,6 +1273,7 @@ export function createPromptWorkbenchShell({
       ["delete", "Delete Selected"],
       ["copy", "Copy Selected"],
       ["favorite", "Favorite Selected"],
+      ["translate", "Translate Selected"],
       ["blacklist", "Blacklist Selected"],
       ["translation-blacklist", "Skip Translation"],
     ];
@@ -1309,6 +1356,14 @@ export function createPromptWorkbenchShell({
       });
       row.appendChild(valueInput);
 
+      const translatedText = String(token.translated_text ?? "").trim();
+      const translationDetail = document.createElement("span");
+      translationDetail.id = `${idPrefix}-token-translation-${index}`;
+      translationDetail.className = "rookieui-shell__prompt-workbench-token-translation";
+      translationDetail.dataset.hasTranslation = String(Boolean(translatedText));
+      translationDetail.textContent = translatedText ? `Translation: ${translatedText}` : "Translation: not available";
+      row.appendChild(translationDetail);
+
       const controls = document.createElement("div");
       controls.className = "rookieui-shell__prompt-workbench-token-actions";
       row.appendChild(controls);
@@ -1389,6 +1444,12 @@ export function createPromptWorkbenchShell({
         });
       });
       controls.appendChild(favoriteButton);
+
+      const translateButton = createActionButton(`${idPrefix}-token-translate-${index}`, "Translate");
+      translateButton.addEventListener("click", () => {
+        translateTokenBatch([token], String(configState.language ?? "en").trim() || "en");
+      });
+      controls.appendChild(translateButton);
 
       const blacklistButton = createActionButton(`${idPrefix}-token-blacklist-${index}`, "Blacklist");
       blacklistButton.addEventListener("click", () => {
@@ -2181,6 +2242,39 @@ export function createPromptWorkbenchShell({
         onStatusMessage?.("Collapsed Prompt Workbench");
       }
     });
+  });
+
+  function shouldIgnoreWorkbenchHotkey(event) {
+    const target = event?.target;
+    if (!target || !shell.contains(target)) {
+      return true;
+    }
+    const tagName = String(target.tagName ?? "").toLowerCase();
+    if (["input", "select", "textarea"].includes(tagName)) {
+      return true;
+    }
+    return Boolean(target.isContentEditable);
+  }
+
+  shell.addEventListener("keydown", (event) => {
+    if (shouldIgnoreWorkbenchHotkey(event)) {
+      return;
+    }
+    const isModifier = Boolean(event.ctrlKey || event.metaKey);
+    if (event.key === "Delete") {
+      event.preventDefault();
+      mutateSelectedTokens("delete");
+      return;
+    }
+    if (isModifier && String(event.key).toLowerCase() === "c") {
+      event.preventDefault();
+      mutateSelectedTokens("copy");
+      return;
+    }
+    if (isModifier && String(event.key).toLowerCase() === "t") {
+      event.preventDefault();
+      mutateSelectedTokens("translate");
+    }
   });
 
   Object.entries(namespaceMap).forEach(([scope, namespace]) => {
