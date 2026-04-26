@@ -1922,6 +1922,7 @@ export async function fetchRookieUIPromptWorkbenchConfig(fetchImpl = globalThis.
         { id: "rookieui_classic", title: "RookieUI Classic", summary: "Default RookieUI framing with neutral panel contrast." },
         { id: "rookieui_graphite", title: "Graphite Studio", summary: "Higher-contrast shell chrome for denser prompt editing sessions." },
         { id: "rookieui_paper", title: "Paper Notes", summary: "Lighter note-card treatment for catalog and prompt drafting work." },
+        { id: "rookieui_tagboard", title: "Tag Board", summary: "Color-forward catalog and tag-highlighting treatment for dense prompt authoring." },
       ],
     },
     fetchImpl,
@@ -2081,7 +2082,9 @@ export async function fetchRookieUIPromptWorkbenchCatalog(language = "en", fetch
       },
       group_tags: { language: normalizedLanguage || "en", source: "fallback", groups: [] },
       prompt_library: { source: "fallback", sections: [] },
+      tagcomplete: { language: normalizedLanguage || "en", source: "fallback", entries: [] },
       extra_networks: { embeddings: [], loras: [] },
+      catalog_highlights: { token_families: {}, catalog_categories: {} },
     },
     fetchImpl,
   );

@@ -59,6 +59,11 @@ PROMPT_WORKBENCH_THEME_STYLE_OPTIONS = (
         "title": "Paper Notes",
         "summary": "Lighter note-card treatment for catalog and prompt drafting work.",
     },
+    {
+        "id": "rookieui_tagboard",
+        "title": "Tag Board",
+        "summary": "Color-forward catalog and tag-highlighting treatment for dense prompt authoring.",
+    },
 )
 PROMPT_WORKBENCH_REFERENCE_ONLY_PROVIDER_IDS = (
     "alibaba",

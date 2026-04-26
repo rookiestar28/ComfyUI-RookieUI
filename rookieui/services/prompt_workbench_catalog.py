@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,52 @@ from rookieui.services.prompt_workbench_state import _prompt_workbench_root
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
 _DATA_ROOT = _WORKSPACE_ROOT / "rookieui" / "data" / "prompt_workbench"
+_MAX_CATALOG_ENTRIES = 500
+_MAX_CATALOG_TEXT_LENGTH = 160
+_HIGHLIGHT_BY_CATEGORY = {
+    "quality": "quality",
+    "style": "style",
+    "lighting": "lighting",
+    "composition": "composition",
+    "negative": "negative",
+    "embedding": "embedding",
+    "lora": "lora",
+    "plain": "plain",
+}
+
+
+def _normalize_catalog_text(value: object, *, max_length: int = _MAX_CATALOG_TEXT_LENGTH) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:max_length]
+
+
+def _normalize_highlight(value: object, fallback: str = "plain") -> str:
+    normalized = _normalize_catalog_text(value, max_length=40).lower().replace(" ", "_")
+    if normalized in _HIGHLIGHT_BY_CATEGORY.values():
+        return normalized
+    return _HIGHLIGHT_BY_CATEGORY.get(normalized, fallback)
+
+
+def _build_tag_entry(tag: str, *, category: str = "", aliases: object = None, count: object = None, highlight: str = "") -> dict[str, Any]:
+    normalized_tag = _normalize_catalog_text(tag)
+    normalized_category = _normalize_catalog_text(category, max_length=80) or "plain"
+    if isinstance(aliases, str):
+        alias_list = [entry.strip() for entry in aliases.replace("|", ",").split(",") if entry.strip()]
+    elif isinstance(aliases, list):
+        alias_list = [_normalize_catalog_text(entry) for entry in aliases if _normalize_catalog_text(entry)]
+    else:
+        alias_list = []
+    normalized_count = int(count) if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else 0
+    return {
+        "tag": normalized_tag,
+        "label": normalized_tag,
+        "insert_token": normalized_tag,
+        "category": normalized_category,
+        "aliases": alias_list[:8],
+        "count": normalized_count,
+        "highlight": _normalize_highlight(highlight or normalized_category),
+    }
 
 
 def _load_json_file(path: Path) -> dict[str, Any]:
@@ -59,10 +106,33 @@ def _normalize_group_tags_payload(payload: object, *, language: str, source: str
             raw_tags = group.get("tags", [])
             if not group_id or not title or not isinstance(raw_tags, list):
                 continue
-            tags = [str(tag).strip() for tag in raw_tags if isinstance(tag, str) and str(tag).strip()]
+            tag_entries = []
+            tags = []
+            for tag in raw_tags:
+                if isinstance(tag, str) and str(tag).strip():
+                    tag_entry = _build_tag_entry(tag, category=group_id)
+                elif isinstance(tag, dict):
+                    tag_text = _normalize_catalog_text(tag.get("tag", tag.get("label", tag.get("insert_token", ""))))
+                    if not tag_text:
+                        continue
+                    tag_entry = _build_tag_entry(
+                        tag_text,
+                        category=_normalize_catalog_text(tag.get("category", group_id), max_length=80) or group_id,
+                        aliases=tag.get("aliases"),
+                        count=tag.get("count"),
+                        highlight=_normalize_catalog_text(tag.get("highlight", ""), max_length=40),
+                    )
+                    if _normalize_catalog_text(tag.get("insert_token", "")):
+                        tag_entry["insert_token"] = _normalize_catalog_text(tag.get("insert_token", ""))
+                    if _normalize_catalog_text(tag.get("label", "")):
+                        tag_entry["label"] = _normalize_catalog_text(tag.get("label", ""))
+                else:
+                    continue
+                tag_entries.append(tag_entry)
+                tags.append(tag_entry["tag"])
             if not tags:
                 continue
-            normalized_groups.append({"id": group_id, "title": title, "tags": tags})
+            normalized_groups.append({"id": group_id, "title": title, "tags": tags, "tag_entries": tag_entries})
     return {"language": language, "source": source, "groups": normalized_groups}
 
 
@@ -102,6 +172,8 @@ def _build_extra_network_payload() -> dict[str, Any]:
             "title": name,
             "family": "embedding",
             "insert_token": f"embedding:{name}",
+            "highlight": "embedding",
+            "highlight_class": "rookieui-shell__prompt-workbench-chip--embedding",
         }
         for name in inventory.embeddings
     ]
@@ -113,12 +185,119 @@ def _build_extra_network_payload() -> dict[str, Any]:
             "insert_token": f"<lora:{name}:0.8>",
             "default_strength_model": 0.8,
             "default_strength_clip": 0.8,
+            "highlight": "lora",
+            "highlight_class": "rookieui-shell__prompt-workbench-chip--lora",
         }
         for name in inventory.loras
     ]
     return {
         "embeddings": embeddings,
         "loras": loras,
+    }
+
+
+def _resolve_tagcomplete_path(language: str) -> tuple[Path | None, str]:
+    runtime_root = _runtime_catalog_root()
+    candidate_names = [
+        f"tagcomplete.{language}.csv",
+        "tagcomplete.csv",
+    ]
+    for candidate_name in candidate_names:
+        runtime_candidate = runtime_root / candidate_name
+        if runtime_candidate.exists():
+            return runtime_candidate, "runtime"
+    return None, "builtin"
+
+
+def _build_fallback_tagcomplete_entries(
+    group_tags_payload: dict[str, Any],
+    prompt_library_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in group_tags_payload.get("groups", []):
+        if not isinstance(group, dict):
+            continue
+        for tag_entry in group.get("tag_entries", []):
+            if not isinstance(tag_entry, dict):
+                continue
+            tag = _normalize_catalog_text(tag_entry.get("tag", ""))
+            if not tag or tag.lower() in seen:
+                continue
+            seen.add(tag.lower())
+            entries.append(tag_entry)
+    for section in prompt_library_payload.get("sections", []):
+        if not isinstance(section, dict):
+            continue
+        for entry in section.get("entries", []):
+            if not isinstance(entry, dict):
+                continue
+            prompt_text = _normalize_catalog_text(entry.get("prompt_text", ""))
+            label = _normalize_catalog_text(entry.get("label", prompt_text))
+            if not prompt_text or prompt_text.lower() in seen:
+                continue
+            seen.add(prompt_text.lower())
+            tag_entry = _build_tag_entry(prompt_text, category="library", highlight="style")
+            tag_entry["label"] = label or prompt_text
+            entries.append(tag_entry)
+    return entries[:_MAX_CATALOG_ENTRIES]
+
+
+def _load_tagcomplete_payload(
+    *,
+    language: str,
+    group_tags_payload: dict[str, Any],
+    prompt_library_payload: dict[str, Any],
+) -> dict[str, Any]:
+    tagcomplete_path, source = _resolve_tagcomplete_path(language)
+    if tagcomplete_path is None:
+        return {
+            "language": language,
+            "source": source,
+            "entries": _build_fallback_tagcomplete_entries(group_tags_payload, prompt_library_payload),
+        }
+
+    entries: list[dict[str, Any]] = []
+    with tagcomplete_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if not isinstance(row, dict):
+                continue
+            tag = _normalize_catalog_text(row.get("tag") or row.get("name") or row.get("keyword"))
+            if not tag:
+                continue
+            entry = _build_tag_entry(
+                tag,
+                category=_normalize_catalog_text(row.get("category", ""), max_length=80),
+                aliases=row.get("aliases", ""),
+                count=int(row["count"]) if str(row.get("count", "")).isdigit() else 0,
+                highlight=_normalize_catalog_text(row.get("highlight", ""), max_length=40),
+            )
+            insert_token = _normalize_catalog_text(row.get("insert_token", ""))
+            if insert_token:
+                entry["insert_token"] = insert_token
+            label = _normalize_catalog_text(row.get("label", ""))
+            if label:
+                entry["label"] = label
+            entries.append(entry)
+            if len(entries) >= _MAX_CATALOG_ENTRIES:
+                break
+    return {"language": language, "source": source, "entries": entries}
+
+
+def _build_catalog_highlights() -> dict[str, Any]:
+    return {
+        "token_families": {
+            "plain": {"highlight": "plain", "title": "Plain tag"},
+            "weighted": {"highlight": "quality", "title": "Weighted tag"},
+            "schedule": {"highlight": "composition", "title": "Prompt schedule"},
+            "embedding": {"highlight": "embedding", "title": "Embedding"},
+            "lora": {"highlight": "lora", "title": "LoRA"},
+            "lycoris": {"highlight": "lora", "title": "LyCORIS"},
+            "break": {"highlight": "composition", "title": "BREAK separator"},
+            "and": {"highlight": "composition", "title": "AND composition separator"},
+        },
+        "catalog_categories": _HIGHLIGHT_BY_CATEGORY,
     }
 
 
@@ -139,5 +318,11 @@ def build_prompt_workbench_catalog_payload(*, language: object = "en") -> dict[s
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_catalog"),
         "group_tags": group_tags_payload,
         "prompt_library": prompt_library_payload,
+        "tagcomplete": _load_tagcomplete_payload(
+            language=normalized_language,
+            group_tags_payload=group_tags_payload,
+            prompt_library_payload=prompt_library_payload,
+        ),
         "extra_networks": _build_extra_network_payload(),
+        "catalog_highlights": _build_catalog_highlights(),
     }

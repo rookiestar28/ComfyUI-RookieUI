@@ -74,6 +74,7 @@ function createBootstrapState(overrides = {}) {
       theme_style_options: [
         { id: "rookieui_classic", title: "RookieUI Classic" },
         { id: "rookieui_graphite", title: "Graphite Studio" },
+        { id: "rookieui_tagboard", title: "Tag Board" },
       ],
     },
     fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
@@ -120,9 +121,41 @@ function createBootstrapState(overrides = {}) {
     fetchPromptWorkbenchCatalogRequest: vi.fn(async () => ({
       ok: true,
       data: {
-        group_tags: { groups: [{ id: "quality", title: "Quality", tags: ["masterpiece"] }] },
+        group_tags: {
+          groups: [
+            {
+              id: "quality",
+              title: "Quality",
+              tags: ["masterpiece"],
+              tag_entries: [{ tag: "masterpiece", label: "masterpiece", insert_token: "masterpiece", highlight: "quality" }],
+            },
+          ],
+        },
+        tagcomplete: {
+          entries: [
+            {
+              tag: "city skyline",
+              label: "city skyline",
+              insert_token: "city skyline",
+              category: "composition",
+              aliases: ["skyline city"],
+              highlight: "composition",
+            },
+          ],
+        },
         prompt_library: { sections: [{ id: "portrait", title: "Portrait", entries: [] }] },
-        extra_networks: { embeddings: [{ id: "badhandv4" }], loras: [{ id: "detail_tweaker" }] },
+        extra_networks: {
+          embeddings: [{ id: "badhandv4", highlight: "embedding" }],
+          loras: [{ id: "detail_tweaker", highlight: "lora" }],
+        },
+        catalog_highlights: {
+          token_families: {
+            plain: { highlight: "plain" },
+            lora: { highlight: "lora" },
+            weighted: { highlight: "quality" },
+          },
+          catalog_categories: {},
+        },
       },
     })),
     fetchPromptWorkbenchHistoryRequest: vi.fn(async () => ({
@@ -324,6 +357,7 @@ describe("prompt workbench shell", () => {
     ]);
     const tokenRows = Array.from(document.querySelectorAll("#syntax-workbench-token-list .rookieui-shell__prompt-workbench-token"));
     expect(tokenRows[1]?.dataset.keywordFamily).toBe("lora");
+    expect(tokenRows[1]?.dataset.highlight).toBe("lora");
 
     document.getElementById("syntax-workbench-token-copy-1").click();
     expect(clipboard.writeText).toHaveBeenCalledWith("<lora:detail_tweaker:0.8>");
@@ -600,11 +634,12 @@ describe("prompt workbench shell", () => {
           { code: "en", title: "English" },
           { code: "zh-TW", title: "Traditional Chinese" },
         ],
-        theme_style_options: [
-          { id: "rookieui_classic", title: "RookieUI Classic" },
-          { id: "rookieui_graphite", title: "Graphite Studio" },
-        ],
-      },
+          theme_style_options: [
+            { id: "rookieui_classic", title: "RookieUI Classic" },
+            { id: "rookieui_graphite", title: "Graphite Studio" },
+            { id: "rookieui_tagboard", title: "Tag Board" },
+          ],
+        },
       fetchPromptWorkbenchStateRequest: vi.fn(async (namespace) => ({
         ok: true,
         data: {
@@ -620,7 +655,36 @@ describe("prompt workbench shell", () => {
       fetchPromptWorkbenchCatalogRequest: vi.fn(async () => ({
         ok: true,
         data: {
-          group_tags: { groups: [{ id: "quality", title: "Quality", tags: ["masterpiece"] }] },
+          group_tags: {
+            groups: [
+              {
+                id: "quality",
+                title: "Quality",
+                tags: ["masterpiece"],
+                tag_entries: [{ tag: "masterpiece", label: "masterpiece", insert_token: "masterpiece", highlight: "quality" }],
+              },
+            ],
+          },
+          tagcomplete: {
+            entries: [
+              {
+                tag: "city skyline",
+                label: "city skyline",
+                insert_token: "city skyline",
+                category: "composition",
+                aliases: ["skyline city"],
+                highlight: "composition",
+              },
+              {
+                tag: "soft light",
+                label: "soft light",
+                insert_token: "soft light",
+                category: "lighting",
+                aliases: ["gentle lighting"],
+                highlight: "lighting",
+              },
+            ],
+          },
           prompt_library: {
             sections: [
               {
@@ -631,8 +695,12 @@ describe("prompt workbench shell", () => {
             ],
           },
           extra_networks: {
-            embeddings: [{ id: "badhandv4.pt", insert_token: "embedding:badhandv4.pt" }],
-            loras: [{ id: "detail_tweaker.safetensors", insert_token: "<lora:detail_tweaker.safetensors:0.8>" }],
+            embeddings: [{ id: "badhandv4.pt", insert_token: "embedding:badhandv4.pt", highlight: "embedding" }],
+            loras: [{ id: "detail_tweaker.safetensors", insert_token: "<lora:detail_tweaker.safetensors:0.8>", highlight: "lora" }],
+          },
+          catalog_highlights: {
+            token_families: { plain: { highlight: "plain" }, lora: { highlight: "lora" } },
+            catalog_categories: {},
           },
         },
       })),
@@ -668,16 +736,26 @@ describe("prompt workbench shell", () => {
 
     document.getElementById("catalog-workbench-panel-catalog").click();
     await flushPromises();
+    const tagcompleteSearch = document.getElementById("catalog-workbench-tagcomplete-search");
+    tagcompleteSearch.value = "skyline";
+    tagcompleteSearch.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(document.getElementById("catalog-workbench-tagcomplete-matches-0")?.dataset.highlight).toBe("composition");
+    document.getElementById("catalog-workbench-tagcomplete-matches-0").click();
+    expect(prompt.value).toContain("city skyline");
+
+    expect(document.getElementById("catalog-workbench-quality-0")?.dataset.highlight).toBe("quality");
     document.getElementById("catalog-workbench-quality-0").click();
-    expect(prompt.value).toBe("city skyline at dusk, masterpiece");
+    expect(prompt.value).toBe("city skyline at dusk, city skyline, masterpiece");
 
     document.getElementById("catalog-workbench-library-append-0-0").click();
     expect(prompt.value).toContain("masterpiece, best quality, high detail");
 
     document.getElementById("catalog-workbench-embeddings-0").click();
+    expect(document.getElementById("catalog-workbench-embeddings-0")?.dataset.highlight).toBe("embedding");
     expect(prompt.value).toContain("embedding:badhandv4.pt");
 
     document.getElementById("catalog-workbench-loras-0").click();
+    expect(document.getElementById("catalog-workbench-loras-0")?.dataset.highlight).toBe("lora");
     expect(prompt.value).toContain("<lora:detail_tweaker.safetensors:0.8>");
   });
 

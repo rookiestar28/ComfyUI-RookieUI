@@ -320,6 +320,7 @@ export function createPromptWorkbenchShell({
   const dirtyTimers = new Map();
   const autoHistoryTimers = new Map();
   const lastAutoHistoryText = new Map();
+  const catalogSearchState = { query: "" };
   let providersPayload = null;
   let catalogPayload = null;
   let stateReadyPromise = null;
@@ -673,6 +674,16 @@ export function createPromptWorkbenchShell({
         detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
       },
     };
+  }
+
+  function getCatalogHighlight(entry, fallback = "plain") {
+    return normalizeTokenText(entry?.highlight ?? entry?.category) || fallback;
+  }
+
+  function getTokenHighlight(token) {
+    const tokenFamily = normalizeTokenText(token?.keyword_family) || "plain";
+    const tokenFamilyHighlights = catalogPayload?.catalog_highlights?.token_families ?? {};
+    return normalizeTokenText(tokenFamilyHighlights[tokenFamily]?.highlight) || tokenFamily;
   }
 
   function appendPromptFragment(fragment, { replace = false, statusMessage = "" } = {}) {
@@ -1186,6 +1197,7 @@ export function createPromptWorkbenchShell({
       row.className = "rookieui-shell__prompt-workbench-token";
       row.dataset.disabled = String(token.disabled);
       row.dataset.keywordFamily = String(token.keyword_family ?? "plain");
+      row.dataset.highlight = getTokenHighlight(token);
       row.draggable = true;
       row.id = `${idPrefix}-token-${token.id}`;
       row.addEventListener("dragstart", () => {
@@ -1418,6 +1430,7 @@ export function createPromptWorkbenchShell({
 
     const groups = Array.isArray(catalogPayload?.group_tags?.groups) ? catalogPayload.group_tags.groups : [];
     const sections = Array.isArray(catalogPayload?.prompt_library?.sections) ? catalogPayload.prompt_library.sections : [];
+    const tagcompleteEntries = Array.isArray(catalogPayload?.tagcomplete?.entries) ? catalogPayload.tagcomplete.entries : [];
     const embeddings = Array.isArray(catalogPayload?.extra_networks?.embeddings) ? catalogPayload.extra_networks.embeddings : [];
     const loras = Array.isArray(catalogPayload?.extra_networks?.loras) ? catalogPayload.extra_networks.loras : [];
 
@@ -1441,6 +1454,13 @@ export function createPromptWorkbenchShell({
       entries.forEach((entry, index) => {
         const button = createActionButton(`${idPrefix}-${title.toLowerCase().replace(/\s+/g, "-")}-${index}`, actionLabel);
         button.classList.add("rookieui-shell__prompt-workbench-chip");
+        if (entry?.highlight_class) {
+          button.classList.add(String(entry.highlight_class));
+        }
+        button.dataset.highlight = getCatalogHighlight(entry);
+        if (Array.isArray(entry?.aliases) && entry.aliases.length) {
+          button.title = `Aliases: ${entry.aliases.join(", ")}`;
+        }
         button.textContent = String(entry?.label ?? entry?.title ?? entry?.id ?? fragmentBuilder(entry));
         button.addEventListener("click", () => {
           appendPromptFragment(fragmentBuilder(entry), {
@@ -1451,11 +1471,49 @@ export function createPromptWorkbenchShell({
       });
     };
 
+    const tagcompleteBlock = document.createElement("section");
+    tagcompleteBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
+    catalogPane.appendChild(tagcompleteBlock);
+    appendTextElement(tagcompleteBlock, "h6", "rookieui-shell__prompt-workbench-pane-title", "Tagcomplete Lookup");
+    const searchInput = document.createElement("input");
+    searchInput.id = `${idPrefix}-tagcomplete-search`;
+    searchInput.type = "search";
+    searchInput.className = "rookieui-shell__input";
+    searchInput.placeholder = "Search tags, aliases, or categories";
+    searchInput.value = catalogSearchState.query;
+    searchInput.addEventListener("input", () => {
+      catalogSearchState.query = String(searchInput.value ?? "");
+      syncUi();
+    });
+    tagcompleteBlock.appendChild(searchInput);
+    const query = normalizeTokenText(catalogSearchState.query).toLowerCase();
+    const filteredTagcomplete = tagcompleteEntries
+      .filter((entry) => {
+        if (!query) {
+          return true;
+        }
+        const haystack = [
+          entry?.tag,
+          entry?.label,
+          entry?.category,
+          ...(Array.isArray(entry?.aliases) ? entry.aliases : []),
+        ]
+          .map((value) => String(value ?? "").toLowerCase())
+          .join(" ");
+        return haystack.includes(query);
+      })
+      .slice(0, 24);
+    renderChipRow("Tagcomplete Matches", filteredTagcomplete, (entry) => String(entry?.insert_token ?? entry?.tag ?? entry?.label ?? ""));
+
     groups.forEach((group, groupIndex) => {
       renderChipRow(
         String(group?.title ?? `Group ${groupIndex + 1}`),
-        Array.isArray(group?.tags) ? group.tags.map((tag) => ({ id: tag, label: tag })) : [],
-        (entry) => String(entry?.label ?? ""),
+        Array.isArray(group?.tag_entries)
+          ? group.tag_entries
+          : Array.isArray(group?.tags)
+            ? group.tags.map((tag) => ({ id: tag, label: tag }))
+            : [],
+        (entry) => String(entry?.insert_token ?? entry?.tag ?? entry?.label ?? ""),
       );
     });
 

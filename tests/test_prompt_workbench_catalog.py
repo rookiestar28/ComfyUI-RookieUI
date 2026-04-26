@@ -29,7 +29,11 @@ class PromptWorkbenchCatalogTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["surface"], "prompt_tools_catalog")
         self.assertEqual(payload["group_tags"]["source"], "builtin")
         self.assertTrue(payload["group_tags"]["groups"])
+        self.assertTrue(payload["group_tags"]["groups"][0]["tag_entries"])
         self.assertTrue(payload["prompt_library"]["sections"])
+        self.assertEqual(payload["tagcomplete"]["source"], "builtin")
+        self.assertTrue(payload["tagcomplete"]["entries"])
+        self.assertIn("catalog_highlights", payload)
         self.assertIn("embeddings", payload["extra_networks"])
         self.assertIn("loras", payload["extra_networks"])
 
@@ -52,6 +56,26 @@ class PromptWorkbenchCatalogTests(unittest.TestCase):
 
         self.assertEqual(payload["group_tags"]["source"], "runtime")
         self.assertEqual(payload["group_tags"]["groups"][0]["id"], "custom")
+        self.assertEqual(payload["group_tags"]["groups"][0]["tag_entries"][0]["highlight"], "plain")
+
+    def test_runtime_tagcomplete_csv_is_preferred_and_normalized(self) -> None:
+        runtime_root = Path(self.runtime_dir.name) / "catalogs"
+        runtime_root.mkdir(parents=True, exist_ok=True)
+        (runtime_root / "tagcomplete.zh-TW.csv").write_text(
+            "tag,category,aliases,count,insert_token,highlight\n"
+            "city skyline,composition,城市天際線|skyline city,42,city skyline,composition\n"
+            "detail tweaker,lora,,7,<lora:detail_tweaker:0.8>,lora\n",
+            encoding="utf-8",
+        )
+
+        payload = build_prompt_workbench_catalog_payload(language="zh-TW")
+
+        self.assertEqual(payload["tagcomplete"]["source"], "runtime")
+        self.assertEqual(payload["tagcomplete"]["entries"][0]["tag"], "city skyline")
+        self.assertEqual(payload["tagcomplete"]["entries"][0]["aliases"], ["城市天際線", "skyline city"])
+        self.assertEqual(payload["tagcomplete"]["entries"][0]["count"], 42)
+        self.assertEqual(payload["tagcomplete"]["entries"][1]["insert_token"], "<lora:detail_tweaker:0.8>")
+        self.assertEqual(payload["tagcomplete"]["entries"][1]["highlight"], "lora")
 
     def test_analyze_payload_reuses_prompt_semantics_and_inventory_metrics(self) -> None:
         payload = analyze_prompt_workbench_payload(
