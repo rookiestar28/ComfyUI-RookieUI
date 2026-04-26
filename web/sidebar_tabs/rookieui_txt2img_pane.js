@@ -452,7 +452,6 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   promptStack.className = "rookieui-shell__prompt-stack";
   promptBand.appendChild(promptStack);
   createPromptField(promptStack, "Prompt", elements.prompt, "rookieui-prompt-counter");
-  createPromptField(promptStack, "Negative Prompt", elements.negativePrompt, "rookieui-negative-prompt-counter");
   createPromptWorkbenchShell({
     idPrefix: "rookieui-txt2img-workbench",
     parent: promptStack,
@@ -465,6 +464,25 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     },
     appendTextElement,
     createActionButton,
+    fixedScope: "prompt",
+    onStatusMessage: (message) => {
+      statusNode.textContent = message;
+    },
+  });
+  createPromptField(promptStack, "Negative Prompt", elements.negativePrompt, "rookieui-negative-prompt-counter");
+  createPromptWorkbenchShell({
+    idPrefix: "rookieui-txt2img-negative-workbench",
+    parent: promptStack,
+    bootstrapState,
+    promptInput: elements.prompt,
+    negativePromptInput: elements.negativePrompt,
+    namespaces: {
+      prompt: "txt2img_prompt",
+      negative: "txt2img_negative",
+    },
+    appendTextElement,
+    createActionButton,
+    fixedScope: "negative",
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },

@@ -386,6 +386,72 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("test-workbench-panel-format")?.dataset.active).toBe("true");
   });
 
+  test("supports fixed-scope inline prompt and negative workbench surfaces", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const promptField = document.createElement("label");
+    promptField.className = "rookieui-shell__prompt-field";
+    promptField.appendChild(prompt);
+    const negativeField = document.createElement("label");
+    negativeField.className = "rookieui-shell__prompt-field";
+    negativeField.appendChild(negative);
+    parent.replaceChildren(promptField);
+    const bootstrapState = createBootstrapState();
+
+    const promptShell = createPromptWorkbenchShell({
+      idPrefix: "inline-prompt-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+    parent.appendChild(negativeField);
+    const negativeShell = createPromptWorkbenchShell({
+      idPrefix: "inline-negative-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "negative",
+    });
+
+    expect(promptField.nextElementSibling).toBe(promptShell.element);
+    expect(negativeField.nextElementSibling).toBe(negativeShell.element);
+    expect(promptShell.element.dataset.layout).toBe("prompt_all_in_one_inline");
+    expect(promptShell.element.dataset.fixedScope).toBe("prompt");
+    expect(negativeShell.element.dataset.fixedScope).toBe("negative");
+    expect(document.getElementById("inline-prompt-workbench-body")?.querySelector("[data-pw-ui='scope-tabs']")?.hidden).toBe(true);
+    expect(document.getElementById("inline-negative-workbench-body")?.querySelector("[data-pw-ui='scope-tabs']")?.hidden).toBe(true);
+
+    await promptShell.openWorkbench();
+    await negativeShell.openWorkbench();
+    await flushPromises();
+
+    expect(document.getElementById("inline-prompt-workbench-section")?.textContent).toContain("Prompt namespace: txt2img_prompt");
+    expect(document.getElementById("inline-negative-workbench-section")?.textContent).toContain(
+      "Negative Prompt namespace: txt2img_negative",
+    );
+
+    document.getElementById("inline-negative-workbench-token-add").value = "low quality";
+    document.getElementById("inline-negative-workbench-token-add-button").click();
+    await flushPromises();
+
+    expect(negative.value).toContain("bad anatomy, low quality");
+    expect(prompt.value).toBe("");
+  });
+
   test("localizes core labels and supports import export actions", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const bootstrapState = createBootstrapState({

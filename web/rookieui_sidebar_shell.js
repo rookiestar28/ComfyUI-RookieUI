@@ -153,6 +153,7 @@ function createPromptField(parent, labelText, textarea, counterId) {
   syncCounter();
 
   parent.appendChild(field);
+  return field;
 }
 
 function createList(id) {

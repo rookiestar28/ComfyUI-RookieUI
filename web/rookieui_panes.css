@@ -1716,6 +1716,20 @@
   overflow: clip;
 }
 
+.rookieui-shell__prompt-workbench--inline {
+  margin-top: -6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-subtitle {
+  display: none;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-tabs[hidden] {
+  display: none;
+}
+
 .rookieui-shell__prompt-workbench[data-theme-style="rookieui_graphite"] {
   background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, black 8%);
   border-color: color-mix(in srgb, var(--rookieui-border-strong) 68%, black 32%);

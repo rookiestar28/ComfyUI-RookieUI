@@ -109,7 +109,8 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await page.locator("#rookieui-txt2img-workbench-capture").click();
 
   const workbench = page.locator("#rookieui-txt2img-workbench-section");
-  await expect(workbench).toHaveAttribute("data-layout", "prompt_all_in_one");
+  await expect(workbench).toHaveAttribute("data-layout", "prompt_all_in_one_inline");
+  await expect(workbench).toHaveAttribute("data-fixed-scope", "prompt");
   await expect(workbench.locator("[data-pw-ui='status-strip']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-add']")).toBeVisible();
   await expect(workbench.locator("[data-pw-ui='inline-suggestions']")).toBeVisible();

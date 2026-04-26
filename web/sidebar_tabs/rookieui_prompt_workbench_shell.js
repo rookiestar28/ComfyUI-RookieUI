@@ -347,11 +347,20 @@ export function createPromptWorkbenchShell({
   appendTextElement,
   createActionButton,
   onStatusMessage,
+  fixedScope = "",
 } = {}) {
+  const normalizedFixedScope = fixedScope === "prompt" || fixedScope === "negative" ? fixedScope : "";
   const shell = document.createElement("section");
   shell.id = `${idPrefix}-section`;
   shell.className = "rookieui-shell__prompt-workbench rookieui-shell__prompt-workbench-card-root";
-  shell.dataset.layout = "prompt_all_in_one";
+  if (normalizedFixedScope) {
+    shell.classList.add("rookieui-shell__prompt-workbench--inline");
+  }
+  shell.dataset.layout = normalizedFixedScope ? "prompt_all_in_one_inline" : "prompt_all_in_one";
+  shell.dataset.scopeMode = normalizedFixedScope ? "fixed" : "paired";
+  if (normalizedFixedScope) {
+    shell.dataset.fixedScope = normalizedFixedScope;
+  }
   shell.tabIndex = -1;
   parent.appendChild(shell);
 
@@ -391,7 +400,7 @@ export function createPromptWorkbenchShell({
   let catalogPayload = null;
   let stateReadyPromise = null;
   let resourcesReadyPromise = null;
-  let activeScope = "prompt";
+  let activeScope = normalizedFixedScope || "prompt";
   let activeSecondaryPopover = "";
   let resourcesLoaded = false;
   let dragTokenId = "";
@@ -447,6 +456,7 @@ export function createPromptWorkbenchShell({
   const namespaceTabs = document.createElement("div");
   namespaceTabs.className = "rookieui-shell__prompt-workbench-tabs";
   namespaceTabs.dataset.pwUi = "scope-tabs";
+  namespaceTabs.hidden = Boolean(normalizedFixedScope);
   body.appendChild(namespaceTabs);
 
   const tabButtons = new Map();
@@ -2511,6 +2521,10 @@ export function createPromptWorkbenchShell({
       }),
     )
       .then(() => {
+        if (normalizedFixedScope) {
+          activeScope = normalizedFixedScope;
+          return;
+        }
         const promptState = stateCache.get(namespaceMap.prompt);
         const negativeState = stateCache.get(namespaceMap.negative);
         if (!promptState?.workbench_open && negativeState?.workbench_open) {
@@ -2635,6 +2649,9 @@ export function createPromptWorkbenchShell({
   });
 
   Object.entries(namespaceMap).forEach(([scope, namespace]) => {
+    if (normalizedFixedScope && scope !== normalizedFixedScope) {
+      return;
+    }
     const input = inputMap[scope];
     if (!input || !namespace) {
       return;
