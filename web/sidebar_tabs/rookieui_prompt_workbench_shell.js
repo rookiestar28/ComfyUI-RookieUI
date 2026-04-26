@@ -454,6 +454,7 @@ export function createPromptWorkbenchShell({
     historyButton: null,
     favoritesButton: null,
     settingsButton: null,
+    appendButton: null,
   };
 
   const createInlineToolbarButton = (buttonId, label, uiName, handler) => {
@@ -525,13 +526,13 @@ export function createPromptWorkbenchShell({
         statusMessage: "Cleared active prompt text",
       });
     });
-    createInlineToolbarButton("inline-append", "Append", "inline-append-anchor", () => {
-      activeSecondaryPopover = "";
+    inlineToolbarNodes.appendButton = createInlineToolbarButton("inline-append", "Append", "inline-append-anchor", () => {
+      activeSecondaryPopover = activeSecondaryPopover === "append" ? "" : "append";
       const state = getActiveState();
       state.workbench_open = true;
-      state.active_panel = "catalog";
+      state.active_panel = "editor";
       queueStatePersist();
-      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench append catalog loaded" });
+      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench append dropdown loaded" });
       syncUi();
     });
   }
@@ -1394,7 +1395,7 @@ export function createPromptWorkbenchShell({
     return suggestions.slice(0, 8);
   }
 
-  function renderInlineSuggestions(parent) {
+  function renderInlineSuggestions(parent, surfaceId = "inline") {
     const suggestions = getInlineSuggestions();
     const suggestionRow = document.createElement("div");
     suggestionRow.className = "rookieui-shell__prompt-workbench-inline-suggestions";
@@ -1407,7 +1408,7 @@ export function createPromptWorkbenchShell({
     }
 
     suggestions.forEach((suggestion, index) => {
-      const button = createActionButton(`${idPrefix}-inline-suggestion-${index}`, suggestion.label);
+      const button = createActionButton(`${idPrefix}-${surfaceId}-suggestion-${index}`, suggestion.label);
       button.classList.add("rookieui-shell__prompt-workbench-chip");
       button.dataset.source = suggestion.source;
       button.addEventListener("click", () => {
@@ -1470,7 +1471,14 @@ export function createPromptWorkbenchShell({
       return;
     }
 
-    const title = surface === "settings" ? "Preferences" : surface === "favorites" ? "Favorites" : "History";
+    const title =
+      surface === "settings"
+        ? "Preferences"
+        : surface === "favorites"
+          ? "Favorites"
+          : surface === "append"
+            ? "Append"
+            : "History";
     appendTextElement(secondaryPopover, "h6", "rookieui-shell__prompt-workbench-pane-title", title);
 
     if (surface === "settings") {
@@ -1490,6 +1498,15 @@ export function createPromptWorkbenchShell({
       });
       return;
     }
+
+    if (surface === "append") {
+      secondaryPopover.dataset.pwUi = "append-dropdown-popover";
+      renderInlineSuggestions(secondaryPopover, "append-popover");
+      renderGroupTagsBoard(secondaryPopover, "append-popover");
+      return;
+    }
+
+    secondaryPopover.dataset.pwUi = "history-favorites-popovers";
 
     const entries = surface === "favorites"
       ? favoritesCache.get(getActiveNamespace()) ?? []
@@ -1619,6 +1636,10 @@ export function createPromptWorkbenchShell({
     const batchRow = document.createElement("div");
     batchRow.className = "rookieui-shell__prompt-workbench-editor-toolbar rookieui-shell__prompt-workbench-selection-toolbar";
     batchRow.dataset.pwUi = "selection-batch-toolbar";
+    batchRow.dataset.batchLayout = normalizedFixedScope ? "inline-overlay" : "panel";
+    if (normalizedFixedScope && selectedCount === 0) {
+      batchRow.hidden = true;
+    }
     editorPane.appendChild(batchRow);
 
     const selectedLabel = document.createElement("span");
@@ -2584,6 +2605,10 @@ export function createPromptWorkbenchShell({
     if (inlineToolbarNodes.settingsButton) {
       inlineToolbarNodes.settingsButton.dataset.active = String(activeSecondaryPopover === "settings");
       inlineToolbarNodes.settingsButton.setAttribute("aria-expanded", String(activeSecondaryPopover === "settings"));
+    }
+    if (inlineToolbarNodes.appendButton) {
+      inlineToolbarNodes.appendButton.dataset.active = String(activeSecondaryPopover === "append");
+      inlineToolbarNodes.appendButton.setAttribute("aria-expanded", String(activeSecondaryPopover === "append"));
     }
 
     editorPane.hidden = state.active_panel !== "editor";

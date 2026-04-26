@@ -460,6 +460,18 @@ describe("prompt workbench shell", () => {
         document.querySelectorAll("#inline-negative-workbench-token-list [data-pw-ui='token-local-language']"),
       ).length,
     ).toBeGreaterThan(0);
+    expect(document.querySelector("#inline-negative-workbench-section [data-pw-ui='selection-batch-toolbar']")?.hidden).toBe(
+      true,
+    );
+
+    document.getElementById("inline-negative-workbench-token-select-0").click();
+    await flushPromises();
+    expect(document.querySelector("#inline-negative-workbench-section [data-pw-ui='selection-batch-toolbar']")?.hidden).toBe(
+      false,
+    );
+    expect(
+      document.querySelector("#inline-negative-workbench-section [data-pw-ui='selection-batch-toolbar']")?.dataset.batchLayout,
+    ).toBe("inline-overlay");
 
     document.getElementById("inline-negative-workbench-inline-history").click();
     await flushPromises();
@@ -473,13 +485,20 @@ describe("prompt workbench shell", () => {
 
     document.getElementById("inline-negative-workbench-inline-append").click();
     await flushPromises();
-    expect(document.getElementById("inline-negative-workbench-panel-catalog")?.dataset.active).toBe("true");
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.dataset.activeSurface).toBe("append");
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.dataset.pwUi).toBe(
+      "append-dropdown-popover",
+    );
+    expect(document.getElementById("inline-negative-workbench-secondary-popover")?.textContent).toContain("Group Tags");
+    document.getElementById("inline-negative-workbench-append-popover-group-tag-0-0").click();
+    await flushPromises();
+    expect(negative.value).toContain("bad anatomy, masterpiece");
 
     document.getElementById("inline-negative-workbench-token-add").value = "low quality";
     document.getElementById("inline-negative-workbench-token-add-button").click();
     await flushPromises();
 
-    expect(negative.value).toContain("bad anatomy, low quality");
+    expect(negative.value).toContain("bad anatomy, masterpiece, low quality");
     expect(prompt.value).toBe("");
 
     document.getElementById("inline-negative-workbench-toggle").click();

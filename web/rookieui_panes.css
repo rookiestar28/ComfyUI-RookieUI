@@ -1847,6 +1847,31 @@
   font-size: 11px;
 }
 
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-secondary-popover[data-pw-ui="append-dropdown-popover"] {
+  max-height: 320px;
+  overflow: auto;
+  border-style: solid;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-secondary-popover[data-pw-ui="append-dropdown-popover"] .rookieui-shell__prompt-workbench-inline-suggestions {
+  margin-top: 8px;
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-selection-toolbar[data-batch-layout="inline-overlay"] {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border: 1px solid color-mix(in srgb, var(--rookieui-accent) 42%, var(--rookieui-border-muted) 58%);
+  border-radius: 12px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 82%, var(--rookieui-accent) 18%);
+  box-shadow: 0 10px 24px rgb(20 28 40 / 0.12);
+}
+
+.rookieui-shell__prompt-workbench--inline .rookieui-shell__prompt-workbench-selection-toolbar[hidden] {
+  display: none;
+}
+
 .rookieui-shell__prompt-workbench[data-theme-style="rookieui_graphite"] {
   background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, black 8%);
   border-color: color-mix(in srgb, var(--rookieui-border-strong) 68%, black 32%);

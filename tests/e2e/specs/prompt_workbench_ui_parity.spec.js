@@ -135,6 +135,8 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='token-chip-board']")).toHaveAttribute("data-token-layout", "inline-tags");
   await expect(workbench.locator("[data-pw-token-ui='inline-token-tag']")).toHaveCount(3);
   await expect(workbench.locator("[data-pw-ui='secondary-entrypoints']")).toBeVisible();
+  const selectionToolbar = workbench.locator("[data-pw-ui='selection-batch-toolbar']");
+  await expect(selectionToolbar).toBeHidden();
 
   const firstToken = workbench.locator("[data-pw-token-ui='inline-token-tag']").first();
   const firstTokenActions = firstToken.locator("[data-pw-ui='token-quick-actions']");
@@ -151,6 +153,10 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(firstTokenActions).toBeHidden();
   await firstToken.locator(".rookieui-shell__prompt-workbench-token-input").focus();
   await expect(firstTokenActions).toBeVisible();
+  await firstToken.locator(".rookieui-shell__prompt-workbench-token-select").check();
+  await expect(selectionToolbar).toBeVisible();
+  await expect(selectionToolbar).toHaveAttribute("data-batch-layout", "inline-overlay");
+  await expect(selectionToolbar.locator("#rookieui-txt2img-workbench-token-selected-count")).toHaveText("1 selected");
 
   await workbench.screenshot({ path: currentCardPath });
 
@@ -171,7 +177,13 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(page.locator("#rookieui-prompt")).not.toHaveValue(/masterpiece/);
 
   await page.locator("#rookieui-txt2img-workbench-inline-append").click();
-  await expect(page.locator("#rookieui-txt2img-workbench-panel-catalog")).toHaveAttribute("data-active", "true");
+  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toHaveAttribute("data-active-surface", "append");
+  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toHaveAttribute(
+    "data-pw-ui",
+    "append-dropdown-popover",
+  );
+  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='inline-suggestions']")).toBeVisible();
+  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='group-tags-tab-board']")).toBeVisible();
 
   await page.locator("#rookieui-txt2img-workbench-inline-delete").click();
   await expect(page.locator("#rookieui-prompt")).toHaveValue("");
