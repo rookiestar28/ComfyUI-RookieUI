@@ -1266,12 +1266,18 @@ describe("prompt workbench shell", () => {
     document.getElementById("catalog-workbench-library-append-0-0").click();
     expect(prompt.value).toContain("masterpiece, best quality, high detail");
 
-    document.getElementById("catalog-workbench-embeddings-0").click();
-    expect(document.getElementById("catalog-workbench-embeddings-0")?.dataset.highlight).toBe("embedding");
+    expect(document.getElementById("catalog-workbench-embeddings-0")).toBeNull();
+    expect(document.getElementById("catalog-workbench-embeddings-select")?.dataset.pwUi).toBe("catalog-network-select");
+    document.getElementById("catalog-workbench-embeddings-select").value = "embedding:badhandv4.pt";
+    document.getElementById("catalog-workbench-embeddings-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("catalog-workbench-embeddings-insert").click();
     expect(prompt.value).toContain("embedding:badhandv4.pt");
 
-    document.getElementById("catalog-workbench-loras-0").click();
-    expect(document.getElementById("catalog-workbench-loras-0")?.dataset.highlight).toBe("lora");
+    expect(document.getElementById("catalog-workbench-loras-0")).toBeNull();
+    expect(document.getElementById("catalog-workbench-loras-select")?.dataset.pwUi).toBe("catalog-network-select");
+    document.getElementById("catalog-workbench-loras-select").value = "<lora:detail_tweaker.safetensors:0.8>";
+    document.getElementById("catalog-workbench-loras-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("catalog-workbench-loras-insert").click();
     expect(prompt.value).toContain("<lora:detail_tweaker.safetensors:0.8>");
   });
 

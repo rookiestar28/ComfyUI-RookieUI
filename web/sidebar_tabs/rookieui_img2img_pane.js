@@ -2278,7 +2278,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
         loraSection.appendChild(clearButton);
 
-        buildLoraLibrary(
+        const loraLibraryControls = buildLoraLibrary(
           pane,
           "Available LoRAs",
           inventory.loras ?? [],
@@ -2286,6 +2286,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           "rookieui-img2img-lora-item",
           loraStatus,
         );
+        clearButton.addEventListener("click", () => {
+          if (loraLibraryControls?.select) {
+            loraLibraryControls.select.value = "";
+            if (loraLibraryControls.actionButton) {
+              loraLibraryControls.actionButton.disabled = true;
+            }
+          }
+        });
         elements.templateLoraName.addEventListener("input", syncTemplateLoraControls);
         elements.templateLoraName.addEventListener("change", syncTemplateLoraControls);
         syncTemplateLoraControls();

@@ -2186,6 +2186,75 @@ export function createPromptWorkbenchShell({
       });
     };
 
+    const renderNetworkSelect = (title, entries, fragmentBuilder, actionLabel = "Insert") => {
+      const block = document.createElement("section");
+      block.className = "rookieui-shell__prompt-workbench-catalog-block";
+      catalogPane.appendChild(block);
+      appendTextElement(block, "h6", "rookieui-shell__prompt-workbench-pane-title", title);
+      if (!entries.length) {
+        appendTextElement(
+          block,
+          "p",
+          "rookieui-shell__prompt-workbench-empty",
+          `No ${title.toLowerCase()} entries are available for this workbench profile.`,
+        );
+        return;
+      }
+
+      const slug = title.toLowerCase().replace(/\s+/g, "-");
+      appendTextElement(
+        block,
+        "p",
+        "rookieui-shell__prompt-workbench-empty",
+        `${entries.length} ${entries.length === 1 ? "entry" : "entries"} available. Use the dropdown to keep large host inventories compact.`,
+      );
+      const controls = document.createElement("div");
+      controls.className = "rookieui-shell__prompt-workbench-catalog-select-row";
+      block.appendChild(controls);
+
+      const select = document.createElement("select");
+      select.id = `${idPrefix}-${slug}-select`;
+      select.className = "rookieui-shell__select rookieui-shell__prompt-workbench-catalog-select";
+      select.dataset.pwUi = "catalog-network-select";
+      select.setAttribute("aria-label", `${title} catalog selector`);
+      controls.appendChild(select);
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = `Select ${title}`;
+      select.appendChild(placeholder);
+
+      entries.forEach((entry, index) => {
+        const option = document.createElement("option");
+        option.id = `${idPrefix}-${slug}-option-${index}`;
+        option.value = fragmentBuilder(entry);
+        option.textContent = String(entry?.label ?? entry?.title ?? entry?.id ?? option.value);
+        option.dataset.highlight = getCatalogHighlight(entry);
+        if (Array.isArray(entry?.aliases) && entry.aliases.length) {
+          option.title = `Aliases: ${entry.aliases.join(", ")}`;
+        }
+        select.appendChild(option);
+      });
+
+      const insertButton = createActionButton(`${idPrefix}-${slug}-${actionLabel.toLowerCase()}`, actionLabel);
+      insertButton.classList.add("rookieui-shell__prompt-workbench-catalog-insert");
+      insertButton.dataset.pwUi = "catalog-network-insert";
+      insertButton.disabled = !select.value;
+      controls.appendChild(insertButton);
+
+      select.addEventListener("change", () => {
+        insertButton.disabled = !select.value;
+      });
+      insertButton.addEventListener("click", () => {
+        if (!select.value) {
+          return;
+        }
+        appendPromptFragment(select.value, {
+          statusMessage: `Inserted ${select.options[select.selectedIndex]?.textContent || "catalog entry"}`,
+        });
+      });
+    };
+
     const tagcompleteBlock = document.createElement("section");
     tagcompleteBlock.className = "rookieui-shell__prompt-workbench-catalog-block";
     catalogPane.appendChild(tagcompleteBlock);
@@ -2281,8 +2350,8 @@ export function createPromptWorkbenchShell({
       });
     });
 
-    renderChipRow("Embeddings", embeddings, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
-    renderChipRow("LoRAs", loras, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
+    renderNetworkSelect("Embeddings", embeddings, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
+    renderNetworkSelect("LoRAs", loras, (entry) => String(entry?.insert_token ?? entry?.id ?? ""), "Insert");
   }
 
   function renderAssistPane() {

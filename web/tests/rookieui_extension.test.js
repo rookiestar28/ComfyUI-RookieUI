@@ -1574,8 +1574,19 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-batch-count").value = "2";
     document.getElementById("rookieui-batch-count").dispatchEvent(new Event("input", { bubbles: true }));
     expect(document.getElementById("rookieui-batch-count-slider").value).toBe("2");
+    document.getElementById("rookieui-txt2img-workspace-tab-checkpoints").click();
+    expect(document.getElementById("rookieui-txt2img-checkpoint-item-0")).toBeNull();
+    expect(document.getElementById("rookieui-txt2img-checkpoint-item-select")).toBeTruthy();
+    document.getElementById("rookieui-txt2img-checkpoint-item-select").value = "dreamshaper.safetensors";
+    document.getElementById("rookieui-txt2img-checkpoint-item-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-txt2img-checkpoint-item-apply").click();
+    expect(document.getElementById("rookieui-checkpoint").value).toBe("dreamshaper.safetensors");
     document.getElementById("rookieui-txt2img-workspace-tab-textual-inversion").click();
-    document.getElementById("rookieui-txt2img-embedding-item-0").click();
+    expect(document.getElementById("rookieui-txt2img-embedding-item-0")).toBeNull();
+    expect(document.getElementById("rookieui-txt2img-embedding-item-select")).toBeTruthy();
+    document.getElementById("rookieui-txt2img-embedding-item-select").value = "badhandv4.pt";
+    document.getElementById("rookieui-txt2img-embedding-item-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-txt2img-embedding-item-apply").click();
     expect(document.getElementById("rookieui-prompt").value).toContain("embedding:badhandv4.pt");
     expect(document.getElementById("rookieui-prompt-counter").textContent).not.toBe("0/75");
     document.getElementById("rookieui-txt2img-workspace-tab-lora").click();
@@ -1597,7 +1608,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-template-lora-status").textContent).toContain(
       "exact official template parity no longer applies",
     );
-    document.getElementById("rookieui-txt2img-lora-item-0").click();
+    expect(document.getElementById("rookieui-txt2img-lora-item-0")).toBeNull();
+    expect(document.getElementById("rookieui-txt2img-lora-item-select")).toBeTruthy();
+    document.getElementById("rookieui-txt2img-lora-item-select").value = "detail_tweaker.safetensors";
+    document.getElementById("rookieui-txt2img-lora-item-select").dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("rookieui-txt2img-lora-item-apply").click();
     document.getElementById("rookieui-lora-strength-model").value = "0.9";
     document.getElementById("rookieui-lora-strength-clip").value = "0.7";
     document.getElementById("rookieui-txt2img-workspace-tab-generation").click();

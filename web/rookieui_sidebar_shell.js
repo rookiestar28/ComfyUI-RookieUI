@@ -1084,33 +1084,48 @@ function buildSelectionLibrary(parent, title, values, activeValue, onSelect, idP
   section.className = "rookieui-shell__section rookieui-shell__section--soft";
   parent.appendChild(section);
   appendTextElement(section, "h4", "rookieui-shell__section-title", title);
-  const list = document.createElement("div");
-  list.className = "rookieui-shell__library";
-  section.appendChild(list);
   const getLabel = options.getLabel ?? ((value) => value);
-  const emptyMessage = options.emptyMessage ?? "No host items available yet.";
-
   if (!values.length) {
-    appendTextElement(section, "p", "rookieui-shell__status", emptyMessage);
-    return;
+    appendTextElement(section, "p", "rookieui-shell__status", options.emptyMessage ?? "No host items available yet.");
+    return { section, select: null, actionButton: null };
   }
 
+  const countLabel = values.length === 1 ? "1 item available." : `${values.length} items available.`;
+  appendTextElement(section, "p", "rookieui-shell__status", `${countLabel} Use the dropdown to keep large host inventories compact.`);
+  const controls = document.createElement("div");
+  controls.className = "rookieui-shell__library-select-row";
+  section.appendChild(controls);
+
+  const select = document.createElement("select");
+  Object.assign(select, { id: `${idPrefix}-select`, className: "rookieui-shell__select rookieui-shell__library-select" });
+  select.setAttribute("aria-label", title);
+  controls.appendChild(select);
+
+  const placeholder = document.createElement("option");
+  Object.assign(placeholder, { value: "", textContent: options.placeholderLabel ?? `Select ${title}` });
+  select.appendChild(placeholder);
   values.forEach((value, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.id = `${idPrefix}-${index}`;
-    button.className = "rookieui-shell__library-item";
-    button.textContent = getLabel(value);
-    button.dataset.value = value;
-    button.dataset.active = String(value === activeValue());
-    button.addEventListener("click", () => {
-      onSelect(value);
-      Array.from(list.children).forEach((node) => {
-        node.dataset.active = String(node.dataset.value === value);
-      });
-    });
-    list.appendChild(button);
+    const option = document.createElement("option");
+    Object.assign(option, { id: `${idPrefix}-option-${index}`, value, textContent: getLabel(value) });
+    select.appendChild(option);
   });
+
+  const currentValue = activeValue();
+  select.value = values.includes(currentValue) ? currentValue : "";
+  const actionButton = document.createElement("button");
+  Object.assign(actionButton, {
+    type: "button",
+    id: `${idPrefix}-apply`,
+    className: "rookieui-shell__button rookieui-shell__library-apply",
+    textContent: options.actionLabel ?? "Apply",
+  });
+  actionButton.disabled = !select.value;
+  controls.appendChild(actionButton);
+  select.addEventListener("change", () => { actionButton.disabled = !select.value; });
+  actionButton.addEventListener("click", () => {
+    if (select.value) onSelect(select.value);
+  });
+  return { section, select, actionButton };
 }
 
 function formatModelAssetLabel(value) {
@@ -1137,19 +1152,14 @@ function appendPromptToken(textarea, token) {
 }
 
 function buildEmbeddingLibrary(parent, title, values, promptInput, idPrefix) {
-  buildSelectionLibrary(
-    parent,
-    title,
-    values,
+  return buildSelectionLibrary(
+    parent, title, values,
     () => "",
     (value) => {
       appendPromptToken(promptInput, `embedding:${value}`);
     },
     idPrefix,
-    {
-      getLabel: formatModelAssetLabel,
-      emptyMessage: "No host textual inversion embeddings available yet.",
-    },
+    { getLabel: formatModelAssetLabel, emptyMessage: "No host textual inversion embeddings available yet.", placeholderLabel: "Select an embedding", actionLabel: "Insert" },
   );
 }
 
@@ -1161,25 +1171,20 @@ function buildLoraLibrary(parent, title, values, elements, idPrefix, statusNode)
       : "No LoRA selected. Generation will use the base checkpoint only.";
   };
 
-  buildSelectionLibrary(
-    parent,
-    title,
-    values,
+  const controls = buildSelectionLibrary(
+    parent, title, values,
     () => elements.loraName.value,
     (value) => {
       elements.loraName.value = value;
       updateStatus();
     },
     idPrefix,
-    {
-      getLabel: formatModelAssetLabel,
-      emptyMessage: "No host LoRA files available yet.",
-    },
+    { getLabel: formatModelAssetLabel, emptyMessage: "No host LoRA files available yet.", placeholderLabel: "Select a LoRA", actionLabel: "Apply" },
   );
 
-  elements.loraStrengthModel.addEventListener("change", updateStatus);
-  elements.loraStrengthClip.addEventListener("change", updateStatus);
+  [elements.loraStrengthModel, elements.loraStrengthClip].forEach((element) => element.addEventListener("change", updateStatus));
   updateStatus();
+  return controls;
 }
 
 function parseJsonObjectArrayField(rawValue) {

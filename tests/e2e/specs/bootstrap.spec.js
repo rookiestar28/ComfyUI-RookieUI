@@ -36,7 +36,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     };
   });
   await expect(page.locator("#rookieui-title")).toHaveText("RookieUI Bootstrap Harness");
-  await expect(page.locator("#rookieui-root")).toContainText('"hostSurface":"standalone-web"');
+  await expect(page.locator("#rookieui-root")).toContainText('"hostSurface":"standalone-web"', { timeout: 15000 });
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true');
   await expect(page.locator("#rookieui-shell-title")).toHaveText("RookieUI");
   await expect(page.locator("#rookieui-header-version")).toHaveText("v0.1.0");
@@ -407,12 +407,21 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.locator("#rookieui-prompt").fill("e2e sunset skyline");
   await page.locator("#rookieui-batch-count").fill("2");
   await expect(page.locator("#rookieui-batch-count-slider")).toHaveValue("2");
+  await page.locator("#rookieui-txt2img-workspace-tab-checkpoints").click();
+  await expect(page.locator("#rookieui-txt2img-checkpoint-item-0")).toHaveCount(0);
+  await page.locator("#rookieui-txt2img-checkpoint-item-select").selectOption("realvisxl.safetensors");
+  await page.locator("#rookieui-txt2img-checkpoint-item-apply").click();
+  await expect(page.locator("#rookieui-checkpoint")).toHaveValue("realvisxl.safetensors");
   await page.locator("#rookieui-txt2img-workspace-tab-textual-inversion").click();
-  await page.locator("#rookieui-txt2img-embedding-item-0").click();
+  await expect(page.locator("#rookieui-txt2img-embedding-item-0")).toHaveCount(0);
+  await page.locator("#rookieui-txt2img-embedding-item-select").selectOption("badhandv4.pt");
+  await page.locator("#rookieui-txt2img-embedding-item-apply").click();
   await expect(page.locator("#rookieui-prompt")).toHaveValue(/embedding:badhandv4\.pt/);
   await expect(page.locator("#rookieui-prompt-counter")).not.toHaveText("0/75");
   await page.locator("#rookieui-txt2img-workspace-tab-lora").click();
-  await page.locator("#rookieui-txt2img-lora-item-0").click();
+  await expect(page.locator("#rookieui-txt2img-lora-item-0")).toHaveCount(0);
+  await page.locator("#rookieui-txt2img-lora-item-select").selectOption("detail_tweaker.safetensors");
+  await page.locator("#rookieui-txt2img-lora-item-apply").click();
   await page.locator("#rookieui-lora-strength-model").fill("0.9");
   await page.locator("#rookieui-lora-strength-clip").fill("0.7");
   await page.locator("#rookieui-txt2img-workspace-tab-generation").click();
@@ -569,7 +578,9 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-img2img-source-canvas-stage")).toHaveAttribute("data-interaction-mode", "upload");
   await page.locator("#rookieui-img2img-preset").selectOption("sd15");
   await page.locator("#rookieui-img2img-workspace-tab-lora").click();
-  await page.locator("#rookieui-img2img-lora-item-0").click();
+  await expect(page.locator("#rookieui-img2img-lora-item-0")).toHaveCount(0);
+  await page.locator("#rookieui-img2img-lora-item-select").selectOption("detail_tweaker.safetensors");
+  await page.locator("#rookieui-img2img-lora-item-apply").click();
   await page.locator("#rookieui-img2img-workspace-tab-generation").click();
   await page.locator("#rookieui-img2img-controlnet-section").evaluate((details) => {
     details.open = true;

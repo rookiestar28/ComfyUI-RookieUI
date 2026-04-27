@@ -1666,6 +1666,25 @@
   gap: 8px;
 }
 
+.rookieui-shell__library-select-row,
+.rookieui-shell__prompt-workbench-catalog-select-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.rookieui-shell__library-select,
+.rookieui-shell__prompt-workbench-catalog-select {
+  min-width: 0;
+  width: 100%;
+}
+
+.rookieui-shell__library-apply,
+.rookieui-shell__prompt-workbench-catalog-insert {
+  white-space: nowrap;
+}
+
 .rookieui-shell__library-item {
   display: inline-flex;
   align-items: center;
