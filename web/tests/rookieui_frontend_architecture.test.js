@@ -75,6 +75,28 @@ describe("frontend architecture guardrails", () => {
     expect(countLines("web/rookieui_sidebar_shell.js")).toBeLessThanOrEqual(1700);
   });
 
+  test("keeps Prompt Workbench shell behind extracted module ownership boundaries", () => {
+    // IMPORTANT: this budget prevents prompt-all-in-one parity work from sliding back into a single closure-heavy frontend file.
+    const shellPath = "web/sidebar_tabs/rookieui_prompt_workbench_shell.js";
+    const shellSource = readFile(shellPath);
+    const extractedModules = [
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_i18n.js",
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_tokens.js",
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_catalog.js",
+    ];
+
+    expect(countLines(shellPath)).toBeLessThanOrEqual(3100);
+    extractedModules.forEach((relativePath) => {
+      expect(fs.existsSync(path.join(repoRoot, relativePath))).toBe(true);
+    });
+    expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_i18n.js");
+    expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_tokens.js");
+    expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_catalog.js");
+    expect(shellSource).not.toMatch(/const\s+WORKBENCH_I18N\s*=/);
+    expect(shellSource).not.toMatch(/function\s+splitPromptTokenText\s*\(/);
+    expect(shellSource).not.toMatch(/function\s+normalizeGroupTagEntry\s*\(/);
+  });
+
   test("keeps the bootstrap entrypoint and feature registry within phase-59 size budgets", () => {
     // IMPORTANT: these budgets protect the phase-59 bootstrap split; if either file grows past budget,
     // extract another registry/helper seam instead of rebuilding a bootstrap monolith.
