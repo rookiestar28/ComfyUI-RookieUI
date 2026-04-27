@@ -287,7 +287,7 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(languageSelector.locator("[data-language-code='zh-TW']")).toBeVisible();
   await languageSelector.screenshot({ path: currentLanguageSelectorPath });
   await languageSelector.locator("[data-language-code='zh-TW']").click();
-  await expect(languageButton).toHaveText("zh-TW / prompt");
+  await expect(languageButton).toHaveText("zh-TW / 正向");
   await expect(page.locator("#rookieui-txt2img-workbench-assist-language")).toHaveValue("zh-TW");
   await expect(workbench.locator(".rookieui-shell__prompt-workbench-title")).toHaveText("提示詞工作台");
   await expect(workbench.locator("[data-pw-ui='inline-keyword-input']")).toHaveAttribute("placeholder", "請輸入新關鍵詞");

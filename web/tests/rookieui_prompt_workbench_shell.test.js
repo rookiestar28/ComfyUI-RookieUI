@@ -608,7 +608,7 @@ describe("prompt workbench shell", () => {
     document.getElementById("inline-language-workbench-language-option-zh-TW").click();
     await flushPromises();
 
-    expect(document.getElementById("inline-language-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(document.getElementById("inline-language-workbench-inline-language")?.textContent).toBe("zh-TW / 正向");
     expect(document.getElementById("inline-language-workbench-assist-language")?.value).toBe("zh-TW");
     expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenCalledWith(
       expect.objectContaining({ language: "zh-TW" }),
@@ -671,8 +671,8 @@ describe("prompt workbench shell", () => {
     document.getElementById("global-language-prompt-workbench-language-option-zh-TW").click();
     await flushPromises();
 
-    expect(document.getElementById("global-language-prompt-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
-    expect(document.getElementById("global-language-negative-workbench-inline-language")?.textContent).toBe("zh-TW / negative");
+    expect(document.getElementById("global-language-prompt-workbench-inline-language")?.textContent).toBe("zh-TW / 正向");
+    expect(document.getElementById("global-language-negative-workbench-inline-language")?.textContent).toBe("zh-TW / 反向");
     expect(document.getElementById("global-language-prompt-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
       "請輸入新關鍵詞",
     );
@@ -692,6 +692,86 @@ describe("prompt workbench shell", () => {
     );
     expect(document.getElementById("global-language-negative-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
       "Enter new keyword",
+    );
+  });
+
+  test("localizes non-English prompt workbench languages and honors fallback codes", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        config: {
+          language: "en",
+          theme_style: "rookieui_classic",
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          translation: { default_provider: "", providers: {} },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+          ui_preferences: { default_open: false },
+        },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
+        language_options: [
+          { code: "en", title: "English", native_title: "English", fallback_code: "en" },
+          { code: "zh-TW", title: "Traditional Chinese", native_title: "繁體中文", fallback_code: "en" },
+          { code: "zh-CN", title: "Simplified Chinese", native_title: "简体中文", fallback_code: "en" },
+          { code: "zh-HK", title: "Traditional Chinese (Hong Kong)", native_title: "繁體中文 (香港)", fallback_code: "zh-TW" },
+          { code: "ja", title: "Japanese", native_title: "日本語", fallback_code: "en" },
+        ],
+        theme_style_options: [
+          { id: "rookieui_classic", title: "RookieUI Classic" },
+          { id: "rookieui_graphite", title: "Graphite Studio" },
+        ],
+      },
+    });
+
+    createPromptWorkbenchShell({
+      idPrefix: "language-pack-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await flushPromises();
+
+    document.getElementById("language-pack-workbench-inline-language").click();
+    document.getElementById("language-pack-workbench-language-option-ja").click();
+    await flushPromises();
+    expect(document.getElementById("language-pack-workbench-inline-language")?.textContent).toBe("ja / プロンプト");
+    expect(parent.querySelector(".rookieui-shell__prompt-workbench-title")?.textContent).toBe("プロンプトワークベンチ");
+    expect(document.getElementById("language-pack-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "新しいキーワードを入力",
+    );
+
+    document.getElementById("language-pack-workbench-inline-language").click();
+    document.getElementById("language-pack-workbench-language-option-zh-CN").click();
+    await flushPromises();
+    expect(document.getElementById("language-pack-workbench-inline-language")?.textContent).toBe("zh-CN / 正向");
+    expect(parent.querySelector(".rookieui-shell__prompt-workbench-title")?.textContent).toBe("提示词工作台");
+    expect(document.getElementById("language-pack-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "请输入新关键词",
+    );
+
+    document.getElementById("language-pack-workbench-inline-language").click();
+    document.getElementById("language-pack-workbench-language-option-zh-HK").click();
+    await flushPromises();
+    expect(document.getElementById("language-pack-workbench-inline-language")?.textContent).toBe("zh-HK / 正向");
+    expect(parent.querySelector(".rookieui-shell__prompt-workbench-title")?.textContent).toBe("提示詞工作台");
+    expect(document.getElementById("language-pack-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "請輸入新關鍵詞",
     );
   });
 
@@ -853,7 +933,7 @@ describe("prompt workbench shell", () => {
     await shellApi.openWorkbench();
     await flushPromises();
 
-    expect(document.getElementById("inline-language-alias-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(document.getElementById("inline-language-alias-workbench-inline-language")?.textContent).toBe("zh-TW / 正向");
     document.getElementById("inline-language-alias-workbench-inline-language").click();
     await flushPromises();
     expect(
@@ -1093,7 +1173,7 @@ describe("prompt workbench shell", () => {
 
     selector.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flushPromises();
-    expect(document.getElementById("inline-language-keyboard-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(document.getElementById("inline-language-keyboard-workbench-inline-language")?.textContent).toBe("zh-TW / 正向");
     expect(selector?.hidden).toBe(true);
     expect(document.activeElement).toBe(languageButton);
   });
