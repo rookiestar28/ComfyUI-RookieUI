@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Prompt Workbench localized group tags and language sync closure (new functionality/stability)</strong></summary>
+
+- Added an inline Group Tags board with group/subgroup tabs, localized tag labels, show/hide behavior, and add/remove interaction on the prompt authoring surface.
+- Expanded Prompt Workbench scoped UI localization beyond English and Traditional Chinese, with deterministic fallback handling for configured locale fallbacks such as Hong Kong Traditional Chinese falling back through `zh-TW`.
+- Prompt and negative prompt workbench language controls now stay synchronized globally, including the inline chips, keyword placeholders, workbench titles, Assist language selector, local translation targets, and language-sensitive catalog resources.
+- Tightened frontend asset cache busting and regression coverage for Prompt Workbench language switching so recent UI fixes are less likely to be masked by stale browser assets.
+
+</details>
+
+<details>
+
 <summary><strong>Prompt Workbench language selector and host-safe overlay parity (new functionality/stability)</strong></summary>
 
 - Added an inline language control in the `Prompt Workbench` header, so local-language selection is available directly from the prompt authoring surface instead of only from the assist panel.
@@ -398,8 +409,9 @@ If your host or Manager install path does not automatically install custom-node 
 
 - integrated prompt-band workbench in `txt2img` and `img2img`
 - persisted `prompt` / `negative` namespace state, history, and favorites
-- inline language selector with host-aware locale alias normalization and synchronized local translation/catalog state
+- inline language selector shared across prompt/negative scopes, with host-aware locale alias normalization, configured fallback-code handling, localized UI copy, and synchronized local translation/catalog state
 - quick-insert catalogs for group tags, prompt-library entries, embeddings, and LoRA references
+- localized Group Tags board with group/subgroup tabs, local/en labels, show/hide controls, and add/remove behavior
 - translation, prompt analysis, AI assist delivery, and blacklist-aware formatting tools
 - truthful Danbooru host-action support for `Upsample Tags` when the host-side upsampler node is installed and available
 - provider truthfulness for shipped, reference-only, unavailable, and misconfigured Prompt Workbench provider states
@@ -474,7 +486,7 @@ If your host or Manager install path does not automatically install custom-node 
 ### Official Non-SD Inline LoRA Support
 
 <div align="left">
-  <img src="assets/loras.png" width="100%" />
+  <img src="assets/loras.png" width="75%" />
 </div>
 
 <br>
@@ -523,22 +535,24 @@ Prompt semantics note:
 Simple usage:
 
 1. Open `txt2img` or `img2img`, then click `Open Workbench` in the prompt band.
-2. Use the inline language control in the workbench header to choose the local language for translation, assist, and catalog labeling; the Assist panel language selector stays synchronized with the same setting.
+2. Use the inline language control in either prompt scope to choose the local language for the Prompt Workbench UI, translation, assist, and catalog labeling; the prompt and negative workbench controls plus the Assist panel language selector stay synchronized with the same setting.
 3. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit, then use `Capture Current Text` if you want to pull the current field value into the workbench explicitly.
 4. Use the `Editor`, `History`, `Favorites`, `Catalog`, `Assist`, and `Format` panels as needed; token insertion, formatting cleanup, blacklist application, translation, and AI assist all operate on the active scope.
 5. Choose a configured shipped translation or AI-assist provider before running translation/assist actions, then apply the returned text back into the active RookieUI prompt field.
-6. Use `Upsample Tags` when you want the active prompt expanded through the host-installed Danbooru upsampler node; the returned text writes back into the current Prompt Workbench draft and prompt field.
-7. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
+6. Use the inline Group Tags board to browse localized group/subgroup tabs and add or remove tags from the active prompt text.
+7. Use `Upsample Tags` when you want the active prompt expanded through the host-installed Danbooru upsampler node; the returned text writes back into the current Prompt Workbench draft and prompt field.
+8. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
 
 Behavior and compatibility:
 
 - `Prompt Workbench` is built directly into RookieUI's prompt band instead of relying on an A1111 textarea hijack or a separate external extension surface.
 - State is persisted separately for the shipped `txt2img` / `img2img` prompt and negative namespaces.
 - Inline language selection is shared by the prompt and negative workbench scopes and persists through the Prompt Workbench config.
-- The language catalog accepts common A1111/ComfyUI locale aliases such as `en_US`, `zh_TW`, and `zh_CN`, then normalizes them to RookieUI display codes.
-- Changing language refreshes language-sensitive catalog/group-tag resources and updates local translation controls and token local-language rows.
+- The language catalog accepts common A1111/ComfyUI locale aliases such as `en_US`, `zh_TW`, and `zh_CN`, then normalizes them to RookieUI display codes and applies configured fallback behavior where a selected language uses another local UI pack.
+- Changing language refreshes Prompt Workbench UI copy, inline chips, keyword placeholders, Assist language state, language-sensitive catalog/group-tag resources, local translation controls, and token local-language rows.
 - The language selector uses viewport-safe overlay placement with Escape/outside-click dismissal and focus return for ComfyUI-hosted layouts.
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
+- Group Tags can be shown or hidden inline and support group/subgroup browsing plus add/remove behavior against the active prompt text.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, reference-only, or otherwise unavailable on the current host/setup.
 - Shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist uses the OpenAI-compatible provider contract.
 
