@@ -1,4 +1,7 @@
 let tokenSequence = 0;
+let promptWorkbenchInstanceSequence = 0;
+
+const PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT = "rookieui:prompt-workbench-language-sync";
 
 const WORKBENCH_I18N = Object.freeze({
   en: {
@@ -513,6 +516,7 @@ export function createPromptWorkbenchShell({
     prompt: promptInput,
     negative: negativePromptInput,
   };
+  const languageSyncSourceId = `${idPrefix}-${++promptWorkbenchInstanceSequence}`;
   const stateCache = new Map();
   const editorCache = new Map();
   const historyCache = new Map();
@@ -1197,7 +1201,7 @@ export function createPromptWorkbenchShell({
     }
   }
 
-  function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false } = {}) {
+  function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false, broadcast = true } = {}) {
     const normalizedLanguage = normalizeLanguageCode(nextLanguage);
     const didChange = String(configState.language ?? "en").trim() !== normalizedLanguage;
     if (String(configState.language ?? "en").trim() !== normalizedLanguage) {
@@ -1209,10 +1213,42 @@ export function createPromptWorkbenchShell({
     if (didChange && resourcesLoaded) {
       void refreshCatalogForLanguage(normalizedLanguage);
     }
+    if (broadcast) {
+      // IMPORTANT: prompt and negative inline shells own separate state; broadcast language changes so their chips cannot drift apart.
+      document.dispatchEvent(
+        new CustomEvent(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, {
+          detail: {
+            language: normalizedLanguage,
+            sourceId: languageSyncSourceId,
+          },
+        }),
+      );
+    }
     if (focusTrigger) {
       inlineToolbarNodes.language?.focus();
     }
   }
+
+  function handlePromptWorkbenchLanguageSync(event) {
+    const detail = event?.detail ?? {};
+    if (detail.sourceId === languageSyncSourceId) {
+      return;
+    }
+    if (!shell.isConnected) {
+      document.removeEventListener(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, handlePromptWorkbenchLanguageSync);
+      return;
+    }
+    const normalizedLanguage = normalizeLanguageCode(detail.language);
+    const didChange = String(configState.language ?? "en").trim() !== normalizedLanguage;
+    configState.language = normalizedLanguage;
+    languageSelectorOpen = false;
+    syncUi();
+    if (didChange && resourcesLoaded) {
+      void refreshCatalogForLanguage(normalizedLanguage);
+    }
+  }
+
+  document.addEventListener(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, handlePromptWorkbenchLanguageSync);
 
   async function refreshCatalogForLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);

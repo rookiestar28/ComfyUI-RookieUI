@@ -617,6 +617,84 @@ describe("prompt workbench shell", () => {
     expect(document.activeElement).toBe(document.getElementById("inline-language-workbench-inline-language"));
   });
 
+  test("synchronizes language across prompt and negative inline workbenches", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        config: {
+          ...createBootstrapState().promptWorkbench.config,
+          language: "en",
+        },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese", native_title: "繁體中文" },
+        ],
+      },
+    });
+
+    const promptShell = createPromptWorkbenchShell({
+      idPrefix: "global-language-prompt-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+    const negativeShell = createPromptWorkbenchShell({
+      idPrefix: "global-language-negative-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "negative",
+    });
+
+    await promptShell.openWorkbench();
+    await negativeShell.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("global-language-prompt-workbench-inline-language").click();
+    await flushPromises();
+    document.getElementById("global-language-prompt-workbench-language-option-zh-TW").click();
+    await flushPromises();
+
+    expect(document.getElementById("global-language-prompt-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(document.getElementById("global-language-negative-workbench-inline-language")?.textContent).toBe("zh-TW / negative");
+    expect(document.getElementById("global-language-prompt-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "請輸入新關鍵詞",
+    );
+    expect(document.getElementById("global-language-negative-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "請輸入新關鍵詞",
+    );
+
+    document.getElementById("global-language-negative-workbench-inline-language").click();
+    await flushPromises();
+    document.getElementById("global-language-negative-workbench-language-option-en").click();
+    await flushPromises();
+
+    expect(document.getElementById("global-language-prompt-workbench-inline-language")?.textContent).toBe("en / prompt");
+    expect(document.getElementById("global-language-negative-workbench-inline-language")?.textContent).toBe("en / negative");
+    expect(document.getElementById("global-language-prompt-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "Enter new keyword",
+    );
+    expect(document.getElementById("global-language-negative-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "Enter new keyword",
+    );
+  });
+
   test("localizes inline workbench controls and toggles grouped tags by active language", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const fetchCatalog = vi.fn(async (language = "en") => ({
