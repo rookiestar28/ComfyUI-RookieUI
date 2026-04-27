@@ -58,6 +58,50 @@ class PromptWorkbenchCatalogTests(unittest.TestCase):
         self.assertEqual(payload["group_tags"]["groups"][0]["id"], "custom")
         self.assertEqual(payload["group_tags"]["groups"][0]["tag_entries"][0]["highlight"], "plain")
 
+    def test_group_tag_payload_preserves_nested_subgroups_and_local_labels(self) -> None:
+        runtime_root = Path(self.runtime_dir.name) / "catalogs"
+        runtime_root.mkdir(parents=True, exist_ok=True)
+        (runtime_root / "group_tags.zh-TW.json").write_text(
+            json.dumps(
+                {
+                    "groups": [
+                        {
+                            "id": "facial_expression",
+                            "title": "表情動作",
+                            "subgroups": [
+                                {
+                                    "id": "eyes",
+                                    "title": "眼睛",
+                                    "tags": [
+                                        {
+                                            "tag": "looking at viewer",
+                                            "label": "看向鏡頭",
+                                            "local_label": "看向鏡頭",
+                                            "english_label": "looking at viewer",
+                                            "insert_token": "looking at viewer",
+                                            "highlight": "composition",
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        payload = build_prompt_workbench_catalog_payload(language="zh-TW")
+
+        group = payload["group_tags"]["groups"][0]
+        self.assertEqual(group["id"], "facial_expression")
+        self.assertEqual(group["tag_entries"][0]["label"], "看向鏡頭")
+        self.assertEqual(group["tag_entries"][0]["local_label"], "看向鏡頭")
+        self.assertEqual(group["tag_entries"][0]["english_label"], "looking at viewer")
+        self.assertEqual(group["subgroups"][0]["id"], "eyes")
+        self.assertEqual(group["subgroups"][0]["tag_entries"][0]["insert_token"], "looking at viewer")
+
     def test_runtime_tagcomplete_csv_is_preferred_and_normalized(self) -> None:
         runtime_root = Path(self.runtime_dir.name) / "catalogs"
         runtime_root.mkdir(parents=True, exist_ok=True)

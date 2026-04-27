@@ -289,6 +289,8 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await languageSelector.locator("[data-language-code='zh-TW']").click();
   await expect(languageButton).toHaveText("zh-TW / prompt");
   await expect(page.locator("#rookieui-txt2img-workbench-assist-language")).toHaveValue("zh-TW");
+  await expect(workbench.locator(".rookieui-shell__prompt-workbench-title")).toHaveText("提示詞工作台");
+  await expect(workbench.locator("[data-pw-ui='inline-keyword-input']")).toHaveAttribute("placeholder", "請輸入新關鍵詞");
   await expect(languageSelector).toBeHidden();
   await languageButton.click();
   await expect(languageSelector).toBeVisible();
@@ -323,13 +325,23 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
     "append-dropdown-popover",
   );
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='inline-suggestions']")).toBeVisible();
-  await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='group-tags-tab-board']")).toBeVisible();
+  const groupTagsBoard = page.locator("#rookieui-txt2img-workbench-secondary-popover [data-pw-ui='group-tags-tab-board']");
+  await expect(groupTagsBoard).toBeVisible();
+  await expect(groupTagsBoard.locator("[data-pw-ui='group-tags-group-tab']").first()).toBeVisible();
+  await expect(groupTagsBoard.locator("[data-pw-ui='group-tags-subgroup-tab']").first()).toBeVisible();
+  const firstGroupTag = groupTagsBoard.locator("[data-pw-ui='group-tags-entry']").first();
+  await expect(firstGroupTag).toBeVisible();
+  const promptBeforeGroupTag = await page.locator("#rookieui-prompt").inputValue();
+  await firstGroupTag.click();
+  await expect(page.locator("#rookieui-prompt")).not.toHaveValue(promptBeforeGroupTag);
+  await expect(groupTagsBoard.locator("[data-pw-ui='group-tags-entry'][data-selected='true']").first()).toBeVisible();
+  await workbench.locator("[data-pw-ui='inline-append-anchor']").focus();
   await page.keyboard.press("Escape");
   await expect(page.locator("#rookieui-txt2img-workbench-secondary-popover")).toBeHidden();
 
   await page.locator("#rookieui-txt2img-workbench-inline-delete").click();
   await expect(page.locator("#rookieui-prompt")).toHaveValue("");
-  await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("0 tags");
+  await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("0 標籤");
 
   [referencePath, referenceLanguageSelectorPath, currentCardPath, currentPopoverPath, currentLanguageSelectorPath].forEach((artifactPath) => {
     expect(fs.statSync(artifactPath).size).toBeGreaterThan(1000);

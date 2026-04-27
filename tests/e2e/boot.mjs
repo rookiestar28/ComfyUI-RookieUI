@@ -1020,6 +1020,86 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
+  if (route.startsWith("/rookieui/prompt-tools/catalog")) {
+    const routeUrl = new URL(route, "http://rookieui.test");
+    const language = routeUrl.searchParams.get("language") === "zh-TW" ? "zh-TW" : "en";
+    return new Response(
+      JSON.stringify({
+        contract: { surface: "prompt_tools_catalog" },
+        group_tags: {
+          language,
+          source: "e2e",
+          groups: [
+            {
+              id: "facial_expression",
+              title: language === "zh-TW" ? "表情動作" : "Facial expression",
+              tags: ["looking at viewer", "smile"],
+              tag_entries: [
+                {
+                  tag: "looking at viewer",
+                  label: language === "zh-TW" ? "看向鏡頭" : "looking at viewer",
+                  local_label: language === "zh-TW" ? "看向鏡頭" : "",
+                  english_label: "looking at viewer",
+                  insert_token: "looking at viewer",
+                  highlight: "composition",
+                },
+                {
+                  tag: "smile",
+                  label: language === "zh-TW" ? "微笑" : "smile",
+                  local_label: language === "zh-TW" ? "微笑" : "",
+                  english_label: "smile",
+                  insert_token: "smile",
+                  highlight: "style",
+                },
+              ],
+              subgroups: [
+                {
+                  id: "eyes",
+                  title: language === "zh-TW" ? "眼睛" : "Eyes",
+                  tag_entries: [
+                    {
+                      tag: "looking at viewer",
+                      label: language === "zh-TW" ? "看向鏡頭" : "looking at viewer",
+                      local_label: language === "zh-TW" ? "看向鏡頭" : "",
+                      english_label: "looking at viewer",
+                      insert_token: "looking at viewer",
+                      highlight: "composition",
+                    },
+                  ],
+                },
+                {
+                  id: "mouth",
+                  title: language === "zh-TW" ? "嘴部" : "Mouth",
+                  tag_entries: [
+                    {
+                      tag: "smile",
+                      label: language === "zh-TW" ? "微笑" : "smile",
+                      local_label: language === "zh-TW" ? "微笑" : "",
+                      english_label: "smile",
+                      insert_token: "smile",
+                      highlight: "style",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        tagcomplete: { language, source: "e2e", entries: [] },
+        prompt_library: { source: "e2e", sections: [] },
+        extra_networks: { embeddings: [], loras: [] },
+        catalog_highlights: {
+          token_families: { plain: { highlight: "plain" } },
+          catalog_categories: {},
+        },
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   return new Response(
     JSON.stringify({
       service: "rookieui",

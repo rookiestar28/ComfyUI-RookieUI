@@ -30,6 +30,52 @@ const WORKBENCH_I18N = Object.freeze({
     exportReady: "Prompt Workbench export JSON generated",
     importReady: "Prompt Workbench import synchronized",
     importInvalidJson: "Import JSON must be a valid object",
+    foldTools: "Fold tools",
+    openTools: "Open tools",
+    promptTokenCount: "Prompt token count",
+    languageAndScope: "Prompt workbench language and scope",
+    languageSelector: "Prompt Workbench language selector",
+    promptScope: "prompt",
+    negativeScope: "negative",
+    tagSingular: "tag",
+    tagPlural: "tags",
+    enterNewKeyword: "Enter new keyword",
+    keywordInput: "Prompt Workbench keyword input",
+    enterToAddKeyword: "Enter to add keyword",
+    preferencesShort: "Prefs",
+    preferences: "Preferences",
+    append: "Append",
+    noInlineSuggestions: "No inline suggestions loaded yet.",
+    groupTags: "Group Tags",
+    showGroupTags: "Show Group Tags",
+    hideGroupTags: "Hide Group Tags",
+    groupTagsHidden: "Group Tags are hidden.",
+    noGroupTags: "No group tags are loaded yet.",
+    groupTagInserted: "Inserted {label}",
+    groupTagRemoved: "Removed {label}",
+    historyLoaded: "Prompt Workbench history loaded",
+    favoritesLoaded: "Prompt Workbench favorites loaded",
+    appendLoaded: "Prompt Workbench append dropdown loaded",
+    copiedActivePrompt: "Copied active prompt text",
+    clearedActivePrompt: "Cleared active prompt text",
+    editorPrompt: "Prompt Editor",
+    editorNegative: "Negative Prompt Editor",
+    savedDraft: "Saved draft: {count} prompt units",
+    activePanel: "Active panel: {panel}",
+    scopeDetail: "{scope} namespace: {namespace}",
+    promptNamespace: "Prompt",
+    negativeNamespace: "Negative Prompt",
+    persistedOpen: "Persisted open",
+    collapsed: "Collapsed",
+    lazy: "Lazy",
+    entries: "entries",
+    disabled: "Disabled",
+    blocked: "blocked",
+    groupsCount: "groups",
+    sectionsCount: "sections",
+    networksCount: "networks",
+    translateProviders: "translate",
+    assistProviders: "assist",
   },
   "zh-TW": {
     title: "提示詞工作台",
@@ -60,6 +106,52 @@ const WORKBENCH_I18N = Object.freeze({
     exportReady: "提示詞工作台匯出 JSON 已產生",
     importReady: "提示詞工作台匯入已同步",
     importInvalidJson: "匯入 JSON 必須是有效物件",
+    foldTools: "收合工具",
+    openTools: "開啟工具",
+    promptTokenCount: "提示詞標籤數",
+    languageAndScope: "提示詞工作台語系與範圍",
+    languageSelector: "提示詞工作台語系選單",
+    promptScope: "正向",
+    negativeScope: "反向",
+    tagSingular: "標籤",
+    tagPlural: "標籤",
+    enterNewKeyword: "請輸入新關鍵詞",
+    keywordInput: "提示詞工作台關鍵詞輸入",
+    enterToAddKeyword: "按 Enter 加入關鍵詞",
+    preferencesShort: "偏好",
+    preferences: "偏好設定",
+    append: "加入",
+    noInlineSuggestions: "尚未載入即時建議。",
+    groupTags: "分組標籤",
+    showGroupTags: "顯示分組標籤",
+    hideGroupTags: "隱藏分組標籤",
+    groupTagsHidden: "分組標籤已隱藏。",
+    noGroupTags: "尚未載入分組標籤。",
+    groupTagInserted: "已加入 {label}",
+    groupTagRemoved: "已移除 {label}",
+    historyLoaded: "提示詞工作台歷史已載入",
+    favoritesLoaded: "提示詞工作台收藏已載入",
+    appendLoaded: "提示詞工作台加入選單已載入",
+    copiedActivePrompt: "已複製目前提示詞",
+    clearedActivePrompt: "已清除目前提示詞",
+    editorPrompt: "正向提示詞編輯器",
+    editorNegative: "反向提示詞編輯器",
+    savedDraft: "已儲存草稿：{count} 個提示詞單位",
+    activePanel: "目前面板：{panel}",
+    scopeDetail: "{scope} 命名空間：{namespace}",
+    promptNamespace: "正向提示詞",
+    negativeNamespace: "反向提示詞",
+    persistedOpen: "已記住開啟",
+    collapsed: "已收合",
+    lazy: "延遲載入",
+    entries: "筆",
+    disabled: "停用",
+    blocked: "封鎖",
+    groupsCount: "組",
+    sectionsCount: "段",
+    networksCount: "網路",
+    translateProviders: "翻譯",
+    assistProviders: "助理",
   },
 });
 
@@ -397,6 +489,7 @@ export function createPromptWorkbenchShell({
   parent.appendChild(shell);
 
   const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
+  configState.ui_preferences = configState.ui_preferences ?? {};
   configState.translation = configState.translation ?? { default_provider: "", providers: {} };
   configState.ai_assist = configState.ai_assist ?? {
     default_provider: "",
@@ -453,6 +546,11 @@ export function createPromptWorkbenchShell({
     const language = normalizeLanguageCode(configState?.language ?? "en");
     return WORKBENCH_I18N[language]?.[key] ?? WORKBENCH_I18N.en[key] ?? key;
   };
+  const text = (key, replacements = {}) =>
+    Object.entries(replacements).reduce(
+      (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement ?? "")),
+      t(key),
+    );
 
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
@@ -462,8 +560,8 @@ export function createPromptWorkbenchShell({
   const headerCopy = document.createElement("div");
   headerCopy.className = "rookieui-shell__prompt-workbench-copy";
   header.appendChild(headerCopy);
-  appendTextElement(headerCopy, "h5", "rookieui-shell__prompt-workbench-title", t("title"));
-  appendTextElement(
+  const titleNode = appendTextElement(headerCopy, "h5", "rookieui-shell__prompt-workbench-title", t("title"));
+  const subtitleNode = appendTextElement(
     headerCopy,
     "p",
     "rookieui-shell__prompt-workbench-subtitle",
@@ -524,7 +622,7 @@ export function createPromptWorkbenchShell({
     box.className = "rookieui-shell__prompt-workbench-inline-settings-box";
     box.dataset.pwUi = "inline-settings-hoverbox";
     box.setAttribute("role", "dialog");
-    box.setAttribute("aria-label", "Prompt Workbench quick settings");
+    box.setAttribute("aria-label", t("preferences"));
 
     const actionRow = document.createElement("div");
     actionRow.className = "rookieui-shell__prompt-workbench-inline-settings-row";
@@ -618,9 +716,9 @@ export function createPromptWorkbenchShell({
     input.className = "rookieui-shell__prompt-workbench-inline-keyword-input";
     input.dataset.pwUi = "inline-keyword-input";
     input.rows = 1;
-    input.placeholder = "Enter new keyword";
-    input.setAttribute("aria-label", "Prompt Workbench keyword input");
-    input.setAttribute("title", "Enter to add keyword");
+    input.placeholder = t("enterNewKeyword");
+    input.setAttribute("aria-label", t("keywordInput"));
+    input.setAttribute("title", t("enterToAddKeyword"));
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.shiftKey) {
         return;
@@ -632,7 +730,7 @@ export function createPromptWorkbenchShell({
         return;
       }
       appendPromptFragment(value, {
-        statusMessage: `Appended ${value}`,
+        statusMessage: text("groupTagInserted", { label: value }),
       });
       input.value = "";
     });
@@ -646,15 +744,15 @@ export function createPromptWorkbenchShell({
     counterChip.dataset.pwUi = "inline-counter";
     counterChip.setAttribute("role", "status");
     counterChip.setAttribute("aria-live", "polite");
-    counterChip.setAttribute("aria-label", "Prompt token count");
-    counterChip.textContent = "0 tags";
+    counterChip.setAttribute("aria-label", t("promptTokenCount"));
+    counterChip.textContent = `0 ${t("tagPlural")}`;
     headerActions.appendChild(counterChip);
     inlineToolbarNodes.counter = counterChip;
 
     const languageButton = createActionButton(`${idPrefix}-inline-language`, "en");
     languageButton.classList.add("rookieui-shell__prompt-workbench-inline-chip", "rookieui-shell__prompt-workbench-language-button");
     languageButton.dataset.pwUi = "inline-language";
-    languageButton.setAttribute("aria-label", "Prompt workbench language and scope");
+    languageButton.setAttribute("aria-label", t("languageAndScope"));
     languageButton.setAttribute("aria-haspopup", "listbox");
     languageButton.setAttribute("aria-controls", `${idPrefix}-language-selector`);
     languageButton.setAttribute("aria-expanded", "false");
@@ -676,28 +774,28 @@ export function createPromptWorkbenchShell({
     languageSelector.className = "rookieui-shell__prompt-workbench-language-selector";
     languageSelector.dataset.pwUi = "language-selector-popover";
     languageSelector.setAttribute("role", "listbox");
-    languageSelector.setAttribute("aria-label", "Prompt Workbench language selector");
+    languageSelector.setAttribute("aria-label", t("languageSelector"));
     languageSelector.hidden = true;
     languageSelector.addEventListener("keydown", handleLanguageSelectorKeydown);
     headerActions.appendChild(languageSelector);
     inlineToolbarNodes.languageSelector = languageSelector;
 
-    inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", INLINE_TOOLBAR_ICONS.history, "History", "inline-history-anchor", () => {
+    inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", INLINE_TOOLBAR_ICONS.history, t("panelHistory"), "inline-history-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "history" ? "" : "history";
       const state = getActiveState();
       state.workbench_open = true;
       state.active_panel = "history";
       queueStatePersist();
-      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench history loaded" });
+      void ensureResourcesLoaded({ statusMessage: t("historyLoaded") });
       syncUi();
     });
-    inlineToolbarNodes.favoritesButton = createInlineToolbarButton("inline-favorites", INLINE_TOOLBAR_ICONS.favorites, "Favorites", "inline-favorites-anchor", () => {
+    inlineToolbarNodes.favoritesButton = createInlineToolbarButton("inline-favorites", INLINE_TOOLBAR_ICONS.favorites, t("panelFavorites"), "inline-favorites-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "favorites" ? "" : "favorites";
       const state = getActiveState();
       state.workbench_open = true;
       state.active_panel = "favorites";
       queueStatePersist();
-      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench favorites loaded" });
+      void ensureResourcesLoaded({ statusMessage: t("favoritesLoaded") });
       syncUi();
     });
     const settingsCluster = document.createElement("span");
@@ -707,7 +805,7 @@ export function createPromptWorkbenchShell({
     inlineToolbarNodes.settingsButton = createActionButton(`${idPrefix}-inline-settings`, INLINE_TOOLBAR_ICONS.settings);
     inlineToolbarNodes.settingsButton.classList.add("rookieui-shell__prompt-workbench-inline-tool");
     inlineToolbarNodes.settingsButton.dataset.pwUi = "inline-settings-anchor";
-    applyIconButtonLabel(inlineToolbarNodes.settingsButton, INLINE_TOOLBAR_ICONS.settings, "Prefs");
+    applyIconButtonLabel(inlineToolbarNodes.settingsButton, INLINE_TOOLBAR_ICONS.settings, t("preferencesShort"));
     inlineToolbarNodes.settingsButton.removeAttribute("title");
     inlineToolbarNodes.settingsButton.addEventListener("click", () => {
       activeSecondaryPopover = activeSecondaryPopover === "settings" ? "" : "settings";
@@ -732,21 +830,21 @@ export function createPromptWorkbenchShell({
       if (navigator?.clipboard?.writeText) {
         void navigator.clipboard.writeText(promptText);
       }
-      updateStatus("Copied active prompt text");
+      updateStatus(t("copiedActivePrompt"));
     });
     createInlineToolbarButton("inline-delete", INLINE_TOOLBAR_ICONS.delete, "Delete", "inline-delete-action", () => {
       applyPromptTextToInput("", {
         updateEditor: true,
-        statusMessage: "Cleared active prompt text",
+        statusMessage: t("clearedActivePrompt"),
       });
     });
-    inlineToolbarNodes.appendButton = createInlineToolbarButton("inline-append", INLINE_TOOLBAR_ICONS.append, "Append", "inline-append-anchor", () => {
+    inlineToolbarNodes.appendButton = createInlineToolbarButton("inline-append", INLINE_TOOLBAR_ICONS.append, t("append"), "inline-append-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "append" ? "" : "append";
       const state = getActiveState();
       state.workbench_open = true;
       state.active_panel = "editor";
       queueStatePersist();
-      void ensureResourcesLoaded({ statusMessage: "Prompt Workbench append dropdown loaded" });
+      void ensureResourcesLoaded({ statusMessage: t("appendLoaded") });
       syncUi();
     });
     inlineToolbarNodes.appendButton.setAttribute("aria-haspopup", "dialog");
@@ -789,10 +887,12 @@ export function createPromptWorkbenchShell({
   summaryGrid.dataset.pwUi = "status-strip";
   body.appendChild(summaryGrid);
 
+  const summaryLabels = new Map();
   const createSummaryCard = (key, label) => {
     const card = document.createElement("article");
     card.className = "rookieui-shell__prompt-workbench-card";
-    appendTextElement(card, "span", "rookieui-shell__prompt-workbench-card-label", label);
+    const labelNode = appendTextElement(card, "span", "rookieui-shell__prompt-workbench-card-label", label);
+    summaryLabels.set(key, labelNode);
     const value = document.createElement("strong");
     value.id = `${idPrefix}-${key}`;
     value.className = "rookieui-shell__prompt-workbench-card-value";
@@ -836,6 +936,7 @@ export function createPromptWorkbenchShell({
   secondaryRow.dataset.pwUi = "secondary-entrypoints";
   body.appendChild(secondaryRow);
 
+  const secondaryButtons = new Map();
   const createSecondaryButton = (surface, label, panelId = surface) => {
     const button = createActionButton(`${idPrefix}-quick-${surface}`, label);
     button.classList.add("rookieui-shell__prompt-workbench-secondary-button");
@@ -848,12 +949,13 @@ export function createPromptWorkbenchShell({
       syncUi();
     });
     secondaryRow.appendChild(button);
+    secondaryButtons.set(surface, button);
     return button;
   };
 
-  createSecondaryButton("history", "History");
-  createSecondaryButton("favorites", "Favorites");
-  createSecondaryButton("settings", "Prefs", "format");
+  createSecondaryButton("history", t("panelHistory"));
+  createSecondaryButton("favorites", t("panelFavorites"));
+  createSecondaryButton("settings", t("preferencesShort"), "format");
 
   const secondaryPopover = document.createElement("div");
   secondaryPopover.id = `${idPrefix}-secondary-popover`;
@@ -1200,7 +1302,7 @@ export function createPromptWorkbenchShell({
     shell.dataset.folded = String(!isOpen);
     body.hidden = !isOpen;
     if (normalizedFixedScope) {
-      applyIconButtonLabel(toggleButton, isOpen ? INLINE_TOOLBAR_ICONS.fold : INLINE_TOOLBAR_ICONS.open, isOpen ? "Fold tools" : "Open tools");
+      applyIconButtonLabel(toggleButton, isOpen ? INLINE_TOOLBAR_ICONS.fold : INLINE_TOOLBAR_ICONS.open, isOpen ? t("foldTools") : t("openTools"));
     } else {
       toggleButton.textContent = isOpen ? t("hideWorkbench") : t("openWorkbench");
     }
@@ -1238,6 +1340,54 @@ export function createPromptWorkbenchShell({
 
   function updateStatus(message) {
     setText(detailNodes.status, message);
+  }
+
+  function syncLocalizedUiLabels() {
+    setText(titleNode, t("title"));
+    setText(subtitleNode, t("subtitle"));
+    tabButtons.get("prompt").textContent = t("promptTab");
+    tabButtons.get("negative").textContent = t("negativeTab");
+    summaryLabels.get("state").textContent = t("summaryState");
+    summaryLabels.get("providers").textContent = t("summaryProviders");
+    summaryLabels.get("catalogs").textContent = t("summaryCatalogs");
+    summaryLabels.get("history").textContent = t("summaryHistory");
+    summaryLabels.get("favorites").textContent = t("summaryFavorites");
+    summaryLabels.get("blacklist").textContent = t("summaryBlacklist");
+    panelButtons.forEach((button, panelId) => {
+      button.textContent = t(`panel${panelId.charAt(0).toUpperCase()}${panelId.slice(1)}`);
+    });
+    secondaryButtons.get("history").textContent = t("panelHistory");
+    secondaryButtons.get("favorites").textContent = t("panelFavorites");
+    secondaryButtons.get("settings").textContent = t("preferencesShort");
+    captureButton.textContent = t("captureCurrentText");
+    restoreButton.textContent = t("restoreDraft");
+    if (inlineToolbarNodes.counter) {
+      inlineToolbarNodes.counter.setAttribute("aria-label", t("promptTokenCount"));
+    }
+    if (inlineToolbarNodes.language) {
+      inlineToolbarNodes.language.setAttribute("aria-label", t("languageAndScope"));
+    }
+    if (inlineToolbarNodes.languageSelector) {
+      inlineToolbarNodes.languageSelector.setAttribute("aria-label", t("languageSelector"));
+    }
+    if (inlineToolbarNodes.keywordInput) {
+      inlineToolbarNodes.keywordInput.placeholder = t("enterNewKeyword");
+      inlineToolbarNodes.keywordInput.setAttribute("aria-label", t("keywordInput"));
+      inlineToolbarNodes.keywordInput.setAttribute("title", t("enterToAddKeyword"));
+    }
+    if (inlineToolbarNodes.historyButton) {
+      applyIconButtonLabel(inlineToolbarNodes.historyButton, INLINE_TOOLBAR_ICONS.history, t("panelHistory"));
+    }
+    if (inlineToolbarNodes.favoritesButton) {
+      applyIconButtonLabel(inlineToolbarNodes.favoritesButton, INLINE_TOOLBAR_ICONS.favorites, t("panelFavorites"));
+    }
+    if (inlineToolbarNodes.settingsButton) {
+      applyIconButtonLabel(inlineToolbarNodes.settingsButton, INLINE_TOOLBAR_ICONS.settings, t("preferencesShort"));
+      inlineToolbarNodes.settingsButton.removeAttribute("title");
+    }
+    if (inlineToolbarNodes.appendButton) {
+      applyIconButtonLabel(inlineToolbarNodes.appendButton, INLINE_TOOLBAR_ICONS.append, t("append"));
+    }
   }
 
   function queueStatePersist(namespaceOverride = "") {
@@ -1853,7 +2003,7 @@ export function createPromptWorkbenchShell({
     parent.appendChild(suggestionRow);
 
     if (!suggestions.length) {
-      appendTextElement(suggestionRow, "span", "rookieui-shell__prompt-workbench-detail", "No inline suggestions loaded yet.");
+      appendTextElement(suggestionRow, "span", "rookieui-shell__prompt-workbench-detail", t("noInlineSuggestions"));
       return;
     }
 
@@ -1870,45 +2020,225 @@ export function createPromptWorkbenchShell({
     });
   }
 
-  function renderGroupTagsBoard(parent, surfaceId = "editor") {
+  function normalizeGroupTagEntry(entry) {
+    const insertToken = normalizeTokenText(entry?.insert_token ?? entry?.tag ?? entry?.english_label ?? entry?.label);
+    if (!insertToken) {
+      return null;
+    }
+    const englishLabel = normalizeTokenText(entry?.english_label ?? entry?.tag ?? insertToken) || insertToken;
+    const localLabel = normalizeTokenText(entry?.local_label ?? (entry?.label && entry.label !== englishLabel ? entry.label : ""));
+    return {
+      ...entry,
+      id: normalizeTokenText(entry?.id ?? insertToken).toLowerCase(),
+      tag: normalizeTokenText(entry?.tag ?? englishLabel) || englishLabel,
+      label: normalizeTokenText(entry?.label ?? localLabel ?? englishLabel) || insertToken,
+      local_label: localLabel,
+      english_label: englishLabel,
+      insert_token: insertToken,
+    };
+  }
+
+  function getNormalizedGroupTagGroups() {
     const groups = Array.isArray(catalogPayload?.group_tags?.groups) ? catalogPayload.group_tags.groups : [];
+    return groups
+      .map((group, groupIndex) => {
+        const groupId = normalizeTokenText(group?.id) || `group-${groupIndex + 1}`;
+        const rawSubgroups = Array.isArray(group?.subgroups) && group.subgroups.length
+          ? group.subgroups
+          : [
+              {
+                id: groupId,
+                title: group?.title ?? `Group ${groupIndex + 1}`,
+                tag_entries: Array.isArray(group?.tag_entries)
+                  ? group.tag_entries
+                  : Array.isArray(group?.tags)
+                    ? group.tags.map((tag) => ({ tag, label: tag, insert_token: tag }))
+                    : [],
+              },
+            ];
+        const subgroups = rawSubgroups
+          .map((subgroup, subgroupIndex) => {
+            const rawEntries = Array.isArray(subgroup?.tag_entries)
+              ? subgroup.tag_entries
+              : Array.isArray(subgroup?.tags)
+                ? subgroup.tags.map((tag) => ({ tag, label: tag, insert_token: tag }))
+                : [];
+            const tagEntries = rawEntries.map(normalizeGroupTagEntry).filter(Boolean);
+            if (!tagEntries.length) {
+              return null;
+            }
+            return {
+              id: normalizeTokenText(subgroup?.id) || `${groupId}-${subgroupIndex + 1}`,
+              title: normalizeTokenText(subgroup?.title) || normalizeTokenText(group?.title) || `Group ${groupIndex + 1}`,
+              tag_entries: tagEntries,
+            };
+          })
+          .filter(Boolean);
+        if (!subgroups.length) {
+          return null;
+        }
+        return {
+          id: groupId,
+          title: normalizeTokenText(group?.title) || `Group ${groupIndex + 1}`,
+          subgroups,
+          tag_entries: subgroups.flatMap((subgroup) => subgroup.tag_entries),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function isGroupTagsVisible() {
+    return configState?.ui_preferences?.show_group_tags !== false;
+  }
+
+  function persistGroupTagPreference(patch) {
+    configState.ui_preferences = {
+      ...(configState.ui_preferences ?? {}),
+      ...patch,
+    };
+    queueConfigPersist();
+  }
+
+  function selectActiveGroupTagState(groups) {
+    const preferredGroupId = normalizeTokenText(configState?.ui_preferences?.active_group_tag_group);
+    const activeGroup = groups.find((group) => group.id === preferredGroupId) ?? groups[0] ?? null;
+    const preferredSubgroupId = normalizeTokenText(configState?.ui_preferences?.active_group_tag_subgroup);
+    const activeSubgroup = activeGroup?.subgroups.find((subgroup) => subgroup.id === preferredSubgroupId) ?? activeGroup?.subgroups[0] ?? null;
+    return { activeGroup, activeSubgroup };
+  }
+
+  function hasActivePromptToken(insertToken) {
+    const normalizedInsertToken = normalizeTokenText(insertToken).toLowerCase();
+    return ensureEditorTokens(getActiveNamespace()).some((token) => normalizeTokenText(token.raw_text ?? token.text).toLowerCase() === normalizedInsertToken);
+  }
+
+  function toggleGroupTagEntry(entry) {
+    const insertToken = normalizeTokenText(entry?.insert_token ?? entry?.tag ?? entry?.label);
+    if (!insertToken) {
+      return;
+    }
+    const normalizedInsertToken = insertToken.toLowerCase();
+    const tokens = ensureEditorTokens(getActiveNamespace());
+    const existingIndex = tokens.findIndex((token) => normalizeTokenText(token.raw_text ?? token.text).toLowerCase() === normalizedInsertToken);
+    const label = normalizeTokenText(entry?.label) || insertToken;
+    if (existingIndex >= 0) {
+      tokens.splice(existingIndex, 1);
+      rebuildPromptFromEditor(text("groupTagRemoved", { label }));
+      syncUi();
+      return;
+    }
+    appendPromptFragment(insertToken, {
+      statusMessage: text("groupTagInserted", { label }),
+    });
+  }
+
+  function renderGroupTagsBoard(parent, surfaceId = "editor") {
+    const groups = getNormalizedGroupTagGroups();
     const board = document.createElement("section");
     board.className = "rookieui-shell__prompt-workbench-group-tags-board";
     board.dataset.pwUi = "group-tags-tab-board";
     parent.appendChild(board);
-    appendTextElement(board, "h6", "rookieui-shell__prompt-workbench-pane-title", "Group Tags");
+    const header = document.createElement("div");
+    header.className = "rookieui-shell__prompt-workbench-group-tags-header";
+    board.appendChild(header);
+    appendTextElement(header, "h6", "rookieui-shell__prompt-workbench-pane-title", t("groupTags"));
+    const toggleButton = createActionButton(
+      `${idPrefix}-${surfaceId}-group-tags-visibility`,
+      isGroupTagsVisible() ? t("hideGroupTags") : t("showGroupTags"),
+    );
+    toggleButton.classList.add("rookieui-shell__prompt-workbench-group-tags-toggle");
+    toggleButton.dataset.pwUi = "group-tags-visibility-toggle";
+    toggleButton.setAttribute("aria-pressed", String(isGroupTagsVisible()));
+    toggleButton.addEventListener("click", () => {
+      persistGroupTagPreference({ show_group_tags: !isGroupTagsVisible() });
+      syncUi();
+    });
+    header.appendChild(toggleButton);
 
-    const chipGrid = document.createElement("div");
-    chipGrid.className = "rookieui-shell__prompt-workbench-chip-grid";
-    board.appendChild(chipGrid);
-
-    if (!groups.length) {
-      appendTextElement(chipGrid, "p", "rookieui-shell__prompt-workbench-empty", "No group tags are loaded yet.");
+    if (!isGroupTagsVisible()) {
+      appendTextElement(board, "p", "rookieui-shell__prompt-workbench-empty", t("groupTagsHidden"));
       return;
     }
 
-    groups.slice(0, 4).forEach((group, groupIndex) => {
-      const entries = Array.isArray(group?.tag_entries)
-        ? group.tag_entries
-        : Array.isArray(group?.tags)
-          ? group.tags.map((tag) => ({ id: tag, label: tag }))
-          : [];
-      entries.slice(0, 8).forEach((entry, entryIndex) => {
-        const insertToken = String(entry?.insert_token ?? entry?.tag ?? entry?.label ?? "").trim();
-        if (!insertToken) {
-          return;
-        }
-        const button = createActionButton(`${idPrefix}-${surfaceId}-group-tag-${groupIndex}-${entryIndex}`, String(entry?.label ?? insertToken));
-        button.classList.add("rookieui-shell__prompt-workbench-chip");
-        button.dataset.highlight = getCatalogHighlight(entry);
-        button.title = String(group?.title ?? `Group ${groupIndex + 1}`);
-        button.addEventListener("click", () => {
-          appendPromptFragment(insertToken, {
-            statusMessage: `Inserted ${String(entry?.label ?? insertToken)}`,
-          });
+    if (!groups.length) {
+      appendTextElement(board, "p", "rookieui-shell__prompt-workbench-empty", t("noGroupTags"));
+      return;
+    }
+
+    const { activeGroup, activeSubgroup } = selectActiveGroupTagState(groups);
+    const activeGroupIndex = Math.max(0, groups.findIndex((group) => group.id === activeGroup?.id));
+    const groupTabs = document.createElement("div");
+    groupTabs.className = "rookieui-shell__prompt-workbench-group-tags-tabs";
+    groupTabs.dataset.pwUi = "group-tags-group-tabs";
+    board.appendChild(groupTabs);
+    groups.forEach((group, groupIndex) => {
+      const button = createActionButton(`${idPrefix}-${surfaceId}-group-tags-group-${normalizeDomIdPart(group.id)}`, group.title);
+      button.classList.add("rookieui-shell__prompt-workbench-group-tags-tab");
+      button.dataset.pwUi = "group-tags-group-tab";
+      button.dataset.active = String(group.id === activeGroup?.id);
+      button.setAttribute("aria-pressed", String(group.id === activeGroup?.id));
+      button.addEventListener("click", () => {
+        persistGroupTagPreference({
+          active_group_tag_group: group.id,
+          active_group_tag_subgroup: group.subgroups[0]?.id ?? "",
         });
-        chipGrid.appendChild(button);
+        syncUi();
       });
+      groupTabs.appendChild(button);
+    });
+
+    const subgroupTabs = document.createElement("div");
+    subgroupTabs.className = "rookieui-shell__prompt-workbench-group-tags-tabs rookieui-shell__prompt-workbench-group-tags-tabs--sub";
+    subgroupTabs.dataset.pwUi = "group-tags-subgroup-tabs";
+    board.appendChild(subgroupTabs);
+    (activeGroup?.subgroups ?? []).forEach((subgroup) => {
+      const button = createActionButton(`${idPrefix}-${surfaceId}-group-tags-subgroup-${normalizeDomIdPart(subgroup.id)}`, subgroup.title);
+      button.classList.add("rookieui-shell__prompt-workbench-group-tags-tab");
+      button.dataset.pwUi = "group-tags-subgroup-tab";
+      button.dataset.active = String(subgroup.id === activeSubgroup?.id);
+      button.setAttribute("aria-pressed", String(subgroup.id === activeSubgroup?.id));
+      button.addEventListener("click", () => {
+        persistGroupTagPreference({
+          active_group_tag_group: activeGroup?.id ?? "",
+          active_group_tag_subgroup: subgroup.id,
+        });
+        syncUi();
+      });
+      subgroupTabs.appendChild(button);
+    });
+
+    const entryGrid = document.createElement("div");
+    entryGrid.className = "rookieui-shell__prompt-workbench-chip-grid rookieui-shell__prompt-workbench-group-tags-entry-grid";
+    entryGrid.dataset.pwUi = "group-tags-entry-grid";
+    board.appendChild(entryGrid);
+    (activeSubgroup?.tag_entries ?? []).forEach((entry, entryIndex) => {
+      const insertToken = normalizeTokenText(entry?.insert_token ?? entry?.tag ?? entry?.label);
+      if (!insertToken) {
+        return;
+      }
+      const label = normalizeTokenText(entry?.label) || insertToken;
+      const button = createActionButton(`${idPrefix}-${surfaceId}-group-tag-${activeGroupIndex}-${entryIndex}`, "");
+      button.classList.add("rookieui-shell__prompt-workbench-chip", "rookieui-shell__prompt-workbench-group-tags-entry");
+      button.dataset.pwUi = "group-tags-entry";
+      button.dataset.highlight = getCatalogHighlight(entry);
+      button.dataset.selected = String(hasActivePromptToken(insertToken));
+      button.setAttribute("aria-pressed", button.dataset.selected);
+      button.title = `${activeGroup?.title ?? t("groupTags")} / ${activeSubgroup?.title ?? ""}`.trim();
+      const labelStack = document.createElement("span");
+      labelStack.className = "rookieui-shell__prompt-workbench-group-tags-entry-labels";
+      const localLabel = normalizeTokenText(entry?.local_label);
+      const englishLabel = normalizeTokenText(entry?.english_label) || insertToken;
+      if (localLabel && localLabel !== englishLabel) {
+        appendTextElement(labelStack, "span", "rookieui-shell__prompt-workbench-group-tags-entry-local", localLabel);
+        appendTextElement(labelStack, "span", "rookieui-shell__prompt-workbench-group-tags-entry-en", englishLabel);
+      } else {
+        appendTextElement(labelStack, "span", "rookieui-shell__prompt-workbench-group-tags-entry-local", label);
+      }
+      button.appendChild(labelStack);
+      button.addEventListener("click", () => {
+        toggleGroupTagEntry(entry);
+      });
+      entryGrid.appendChild(button);
     });
   }
 
@@ -1923,18 +2253,18 @@ export function createPromptWorkbenchShell({
 
     const title =
       surface === "settings"
-        ? "Preferences"
+        ? t("preferences")
         : surface === "favorites"
-          ? "Favorites"
+          ? t("panelFavorites")
           : surface === "append"
-            ? "Append"
-            : "History";
+            ? t("append")
+            : t("panelHistory");
     appendTextElement(secondaryPopover, "h6", "rookieui-shell__prompt-workbench-pane-title", title);
 
     if (surface === "settings") {
       [
-        ["format", "Formatting and blacklist"],
-        ["assist", "AI assist"],
+        ["format", t("formattingAndBlacklist")],
+        ["assist", t("panelAssist")],
       ].forEach(([panelId, label], index) => {
         const button = createActionButton(`${idPrefix}-settings-popover-${index}`, label);
         button.addEventListener("click", () => {
@@ -1986,7 +2316,7 @@ export function createPromptWorkbenchShell({
       heading,
       "h6",
       "rookieui-shell__prompt-workbench-pane-title",
-      activeScope === "negative" ? "Negative Prompt Editor" : "Prompt Editor",
+      activeScope === "negative" ? t("editorNegative") : t("editorPrompt"),
     );
 
     const addRow = document.createElement("div");
@@ -3084,6 +3414,7 @@ export function createPromptWorkbenchShell({
     const activeText = String(state.draft_prompt || getActiveInput()?.value || "");
     const activeUnitCount = countPromptUnits(activeText);
 
+    syncLocalizedUiLabels();
     setBodyOpen(readPreferredOpenState());
     tabButtons.forEach((button, scope) => {
       button.dataset.active = String(scope === activeScope);
@@ -3109,7 +3440,7 @@ export function createPromptWorkbenchShell({
       quickSettingsButton.dataset.active = String(activeSecondaryPopover === "settings");
     }
     if (inlineToolbarNodes.counter) {
-      inlineToolbarNodes.counter.textContent = `${activeUnitCount} ${activeUnitCount === 1 ? "tag" : "tags"}`;
+      inlineToolbarNodes.counter.textContent = `${activeUnitCount} ${activeUnitCount === 1 ? t("tagSingular") : t("tagPlural")}`;
     }
     if (inlineToolbarNodes.language) {
       inlineToolbarNodes.language.textContent = `${language} / ${activeScope === "negative" ? "negative" : "prompt"}`;
@@ -3142,22 +3473,35 @@ export function createPromptWorkbenchShell({
     formatPane.hidden = state.active_panel !== "format";
 
     updateShellThemeStyle();
-    setText(summaryNodes.state, state.workbench_open ? "Persisted open" : "Collapsed");
+    setText(summaryNodes.state, state.workbench_open ? t("persistedOpen") : t("collapsed"));
     const assistShippedProviders = Array.isArray(providersPayload?.surfaces?.ai_assist?.shipped_provider_ids)
       ? providersPayload.surfaces.ai_assist.shipped_provider_ids.length
       : 0;
-    setText(summaryNodes.providers, resourcesLoaded ? `${shippedProviders} translate / ${assistShippedProviders} assist / ${language}` : "Lazy");
+    setText(
+      summaryNodes.providers,
+      resourcesLoaded
+        ? `${shippedProviders} ${t("translateProviders")} / ${assistShippedProviders} ${t("assistProviders")} / ${language}`
+        : t("lazy"),
+    );
     setText(
       summaryNodes.catalogs,
-      resourcesLoaded ? `${groupCount} groups / ${libraryCount} sections / ${extraNetworkCount} networks` : "Lazy",
+      resourcesLoaded
+        ? `${groupCount} ${t("groupsCount")} / ${libraryCount} ${t("sectionsCount")} / ${extraNetworkCount} ${t("networksCount")}`
+        : t("lazy"),
     );
-    setText(summaryNodes.history, `${historyItems.length} entries`);
-    setText(summaryNodes.favorites, `${favoriteItems.length} entries`);
-    setText(summaryNodes.blacklist, blacklistState.enabled ? `${(blacklistState.entries ?? []).length} blocked` : "Disabled");
+    setText(summaryNodes.history, `${historyItems.length} ${t("entries")}`);
+    setText(summaryNodes.favorites, `${favoriteItems.length} ${t("entries")}`);
+    setText(summaryNodes.blacklist, blacklistState.enabled ? `${(blacklistState.entries ?? []).length} ${t("blocked")}` : t("disabled"));
 
-    setText(detailNodes.scope, `${activeScope === "prompt" ? "Prompt" : "Negative Prompt"} namespace: ${getActiveNamespace()}`);
-    setText(detailNodes.draft, `Saved draft: ${countPromptUnits(state.draft_prompt)} prompt units`);
-    setText(detailNodes.panel, `Active panel: ${state.active_panel}`);
+    setText(
+      detailNodes.scope,
+      text("scopeDetail", {
+        scope: activeScope === "prompt" ? t("promptNamespace") : t("negativeNamespace"),
+        namespace: getActiveNamespace(),
+      }),
+    );
+    setText(detailNodes.draft, text("savedDraft", { count: countPromptUnits(state.draft_prompt) }));
+    setText(detailNodes.panel, text("activePanel", { panel: state.active_panel }));
 
     renderEditorPane();
     renderCollectionPane(historyPane, "history");

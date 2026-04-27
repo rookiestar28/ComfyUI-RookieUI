@@ -373,7 +373,7 @@ describe("prompt workbench shell", () => {
     expect(document.querySelector("#test-workbench-section [data-pw-ui='group-tags-tab-board']")).toBeTruthy();
     document.getElementById("test-workbench-editor-group-tag-0-0").click();
     await flushPromises();
-    expect(prompt.value).toContain("masterpiece, city skyline, masterpiece, masterpiece");
+    expect(prompt.value).toBe("city skyline, masterpiece");
 
     document.getElementById("test-workbench-quick-history").click();
     await flushPromises();
@@ -615,6 +615,129 @@ describe("prompt workbench shell", () => {
     );
     expect(document.getElementById("inline-language-workbench-language-selector")?.hidden).toBe(true);
     expect(document.activeElement).toBe(document.getElementById("inline-language-workbench-inline-language"));
+  });
+
+  test("localizes inline workbench controls and toggles grouped tags by active language", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const fetchCatalog = vi.fn(async (language = "en") => ({
+      ok: true,
+      data: {
+        group_tags: {
+          language,
+          source: "test",
+          groups: [
+            {
+              id: "facial_expression",
+              title: language === "zh-TW" ? "表情動作" : "Facial expression",
+              tags: ["looking at viewer"],
+              tag_entries: [
+                {
+                  tag: "looking at viewer",
+                  label: language === "zh-TW" ? "看向鏡頭" : "looking at viewer",
+                  local_label: language === "zh-TW" ? "看向鏡頭" : "",
+                  english_label: "looking at viewer",
+                  insert_token: "looking at viewer",
+                  highlight: "composition",
+                },
+              ],
+              subgroups: [
+                {
+                  id: "eyes",
+                  title: language === "zh-TW" ? "眼睛" : "Eyes",
+                  tag_entries: [
+                    {
+                      tag: "looking at viewer",
+                      label: language === "zh-TW" ? "看向鏡頭" : "looking at viewer",
+                      local_label: language === "zh-TW" ? "看向鏡頭" : "",
+                      english_label: "looking at viewer",
+                      insert_token: "looking at viewer",
+                      highlight: "composition",
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        tagcomplete: { language, source: "test", entries: [] },
+        prompt_library: { sections: [] },
+        extra_networks: { embeddings: [], loras: [] },
+        catalog_highlights: { token_families: { plain: { highlight: "plain" } }, catalog_categories: {} },
+      },
+    }));
+    const bootstrapState = createBootstrapState({
+      fetchPromptWorkbenchCatalogRequest: fetchCatalog,
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        config: {
+          ...createBootstrapState().promptWorkbench.config,
+          language: "en",
+        },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese", native_title: "繁體中文" },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "localized-group-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    document.getElementById("localized-group-workbench-inline-language").click();
+    await flushPromises();
+    document.getElementById("localized-group-workbench-language-option-zh-TW").click();
+    await flushPromises();
+    await flushPromises();
+
+    expect(document.querySelector("#localized-group-workbench-section .rookieui-shell__prompt-workbench-title")?.textContent).toBe(
+      "提示詞工作台",
+    );
+    expect(document.getElementById("localized-group-workbench-inline-keyword-input")?.getAttribute("placeholder")).toBe(
+      "請輸入新關鍵詞",
+    );
+
+    document.getElementById("localized-group-workbench-inline-append").click();
+    await flushPromises();
+
+    const groupBoard = document.querySelector(
+      "#localized-group-workbench-secondary-popover [data-pw-ui='group-tags-tab-board']",
+    );
+    expect(groupBoard?.textContent).toContain("分組標籤");
+    expect(groupBoard?.querySelector("[data-pw-ui='group-tags-group-tab']")?.textContent).toContain("表情動作");
+    expect(groupBoard?.querySelector("[data-pw-ui='group-tags-subgroup-tab']")?.textContent).toContain("眼睛");
+    const tagButton = groupBoard?.querySelector("[data-pw-ui='group-tags-entry']");
+    expect(tagButton?.textContent).toContain("看向鏡頭");
+    expect(tagButton?.textContent).toContain("looking at viewer");
+
+    tagButton.click();
+    await flushPromises();
+    expect(prompt.value).toContain("looking at viewer");
+    expect(
+      document.querySelector(
+        "#localized-group-workbench-secondary-popover [data-pw-ui='group-tags-entry']",
+      )?.dataset.selected,
+    ).toBe("true");
+
+    document
+      .querySelector("#localized-group-workbench-secondary-popover [data-pw-ui='group-tags-entry']")
+      .click();
+    await flushPromises();
+    expect(prompt.value).not.toContain("looking at viewer");
   });
 
   test("normalizes alias language codes before rendering and persistence", async () => {

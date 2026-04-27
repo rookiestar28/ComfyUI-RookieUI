@@ -41,9 +41,24 @@ def _normalize_highlight(value: object, fallback: str = "plain") -> str:
     return _HIGHLIGHT_BY_CATEGORY.get(normalized, fallback)
 
 
-def _build_tag_entry(tag: str, *, category: str = "", aliases: object = None, count: object = None, highlight: str = "") -> dict[str, Any]:
+def _build_tag_entry(
+    tag: str,
+    *,
+    category: str = "",
+    aliases: object = None,
+    count: object = None,
+    highlight: str = "",
+    label: object = "",
+    local_label: object = "",
+    english_label: object = "",
+    insert_token: object = "",
+) -> dict[str, Any]:
     normalized_tag = _normalize_catalog_text(tag)
     normalized_category = _normalize_catalog_text(category, max_length=80) or "plain"
+    normalized_insert_token = _normalize_catalog_text(insert_token) or normalized_tag
+    normalized_label = _normalize_catalog_text(label) or normalized_tag
+    normalized_local_label = _normalize_catalog_text(local_label)
+    normalized_english_label = _normalize_catalog_text(english_label) or normalized_tag
     if isinstance(aliases, str):
         alias_list = [entry.strip() for entry in aliases.replace("|", ",").split(",") if entry.strip()]
     elif isinstance(aliases, list):
@@ -53,8 +68,10 @@ def _build_tag_entry(tag: str, *, category: str = "", aliases: object = None, co
     normalized_count = int(count) if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else 0
     return {
         "tag": normalized_tag,
-        "label": normalized_tag,
-        "insert_token": normalized_tag,
+        "label": normalized_label,
+        "local_label": normalized_local_label,
+        "english_label": normalized_english_label,
+        "insert_token": normalized_insert_token,
         "category": normalized_category,
         "aliases": alias_list[:8],
         "count": normalized_count,
@@ -100,42 +117,91 @@ def _normalize_group_tags_payload(payload: object, *, language: str, source: str
         return {"language": language, "source": source, "groups": []}
     groups = payload.get("groups", [])
     normalized_groups: list[dict[str, Any]] = []
+
+    def normalize_tag_entry(tag: object, *, group_id: str) -> dict[str, Any] | None:
+        if isinstance(tag, str) and str(tag).strip():
+            return _build_tag_entry(tag, category=group_id)
+        if not isinstance(tag, dict):
+            return None
+        tag_text = _normalize_catalog_text(tag.get("tag", tag.get("english_label", tag.get("label", tag.get("insert_token", "")))))
+        if not tag_text:
+            return None
+        return _build_tag_entry(
+            tag_text,
+            category=_normalize_catalog_text(tag.get("category", group_id), max_length=80) or group_id,
+            aliases=tag.get("aliases"),
+            count=tag.get("count"),
+            highlight=_normalize_catalog_text(tag.get("highlight", ""), max_length=40),
+            label=tag.get("label", ""),
+            local_label=tag.get("local_label", ""),
+            english_label=tag.get("english_label", ""),
+            insert_token=tag.get("insert_token", ""),
+        )
+
+    def normalize_subgroup(subgroup: dict[str, Any], *, group_id: str, group_title: str, fallback_id: str) -> dict[str, Any] | None:
+        subgroup_id = _normalize_catalog_text(subgroup.get("id", ""), max_length=80) or fallback_id
+        subgroup_title = _normalize_catalog_text(subgroup.get("title", ""), max_length=80) or group_title
+        raw_tags = subgroup.get("tag_entries", subgroup.get("tags", []))
+        if not isinstance(raw_tags, list):
+            return None
+        tag_entries = [entry for entry in (normalize_tag_entry(tag, group_id=group_id) for tag in raw_tags) if entry]
+        tag_entries = tag_entries[:_MAX_CATALOG_ENTRIES]
+        if not tag_entries:
+            return None
+        return {
+            "id": subgroup_id,
+            "title": subgroup_title,
+            "tags": [entry["tag"] for entry in tag_entries],
+            "tag_entries": tag_entries,
+        }
+
     if isinstance(groups, list):
         for group in groups:
             if not isinstance(group, dict):
                 continue
-            group_id = str(group.get("id", "")).strip()
-            title = str(group.get("title", "")).strip()
-            raw_tags = group.get("tags", [])
-            if not group_id or not title or not isinstance(raw_tags, list):
+            group_id = _normalize_catalog_text(group.get("id", ""), max_length=80)
+            title = _normalize_catalog_text(group.get("title", ""), max_length=80)
+            if not group_id or not title:
                 continue
-            tag_entries = []
-            tags = []
-            for tag in raw_tags:
-                if isinstance(tag, str) and str(tag).strip():
-                    tag_entry = _build_tag_entry(tag, category=group_id)
-                elif isinstance(tag, dict):
-                    tag_text = _normalize_catalog_text(tag.get("tag", tag.get("label", tag.get("insert_token", ""))))
-                    if not tag_text:
+
+            subgroups: list[dict[str, Any]] = []
+            raw_subgroups = group.get("subgroups", [])
+            if isinstance(raw_subgroups, list):
+                for index, subgroup in enumerate(raw_subgroups):
+                    if not isinstance(subgroup, dict):
                         continue
-                    tag_entry = _build_tag_entry(
-                        tag_text,
-                        category=_normalize_catalog_text(tag.get("category", group_id), max_length=80) or group_id,
-                        aliases=tag.get("aliases"),
-                        count=tag.get("count"),
-                        highlight=_normalize_catalog_text(tag.get("highlight", ""), max_length=40),
+                    normalized_subgroup = normalize_subgroup(
+                        subgroup,
+                        group_id=group_id,
+                        group_title=title,
+                        fallback_id=f"{group_id}_{index + 1}",
                     )
-                    if _normalize_catalog_text(tag.get("insert_token", "")):
-                        tag_entry["insert_token"] = _normalize_catalog_text(tag.get("insert_token", ""))
-                    if _normalize_catalog_text(tag.get("label", "")):
-                        tag_entry["label"] = _normalize_catalog_text(tag.get("label", ""))
-                else:
-                    continue
-                tag_entries.append(tag_entry)
-                tags.append(tag_entry["tag"])
-            if not tags:
+                    if normalized_subgroup:
+                        subgroups.append(normalized_subgroup)
+
+            raw_group_tags = group.get("tag_entries", group.get("tags", []))
+            if not subgroups and isinstance(raw_group_tags, list):
+                normalized_subgroup = normalize_subgroup(
+                    {"id": group_id, "title": title, "tag_entries": raw_group_tags},
+                    group_id=group_id,
+                    group_title=title,
+                    fallback_id=group_id,
+                )
+                if normalized_subgroup:
+                    subgroups.append(normalized_subgroup)
+
+            tag_entries = [entry for subgroup in subgroups for entry in subgroup["tag_entries"]][:_MAX_CATALOG_ENTRIES]
+            if not tag_entries:
                 continue
-            normalized_groups.append({"id": group_id, "title": title, "tags": tags, "tag_entries": tag_entries})
+            normalized_groups.append(
+                {
+                    "id": group_id,
+                    "title": title,
+                    "tags": [entry["tag"] for entry in tag_entries],
+                    "tag_entries": tag_entries,
+                    "subgroups": subgroups,
+                }
+            )
     return {"language": language, "source": source, "groups": normalized_groups}
 
 
