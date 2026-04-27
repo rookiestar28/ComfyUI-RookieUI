@@ -556,6 +556,108 @@ describe("prompt workbench shell", () => {
     expect(prompt.value).toBe("");
   });
 
+  test("opens inline language selector and synchronizes selected language", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        config: {
+          ...createBootstrapState().promptWorkbench.config,
+          language: "en",
+        },
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+          { code: "ja", title: "Japanese" },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const languageButton = document.getElementById("inline-language-workbench-inline-language");
+    expect(languageButton?.tagName).toBe("BUTTON");
+    expect(languageButton?.getAttribute("aria-haspopup")).toBe("listbox");
+    expect(languageButton?.getAttribute("aria-expanded")).toBe("false");
+
+    languageButton.click();
+    await flushPromises();
+
+    const selector = document.getElementById("inline-language-workbench-language-selector");
+    expect(selector?.dataset.pwUi).toBe("language-selector-popover");
+    expect(selector?.hidden).toBe(false);
+    expect(languageButton?.getAttribute("aria-expanded")).toBe("true");
+    expect(selector?.querySelector("[data-pw-ui='language-option'][data-selected='true']")?.textContent).toContain("en - English");
+
+    document.getElementById("inline-language-workbench-language-option-zh-TW").click();
+    await flushPromises();
+
+    expect(document.getElementById("inline-language-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(document.getElementById("inline-language-workbench-assist-language")?.value).toBe("zh-TW");
+    expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "zh-TW" }),
+    );
+    expect(document.getElementById("inline-language-workbench-language-selector")?.hidden).toBe(true);
+    expect(document.activeElement).toBe(document.getElementById("inline-language-workbench-inline-language"));
+  });
+
+  test("dismisses inline language selector with escape and outside click", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-dismiss-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const languageButton = document.getElementById("inline-language-dismiss-workbench-inline-language");
+    languageButton.click();
+    await flushPromises();
+    expect(document.getElementById("inline-language-dismiss-workbench-language-selector")?.hidden).toBe(false);
+
+    shellApi.element.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+    expect(document.getElementById("inline-language-dismiss-workbench-language-selector")?.hidden).toBe(true);
+    expect(document.activeElement).toBe(languageButton);
+
+    languageButton.click();
+    await flushPromises();
+    expect(document.getElementById("inline-language-dismiss-workbench-language-selector")?.hidden).toBe(false);
+    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    await flushPromises();
+    expect(document.getElementById("inline-language-dismiss-workbench-language-selector")?.hidden).toBe(true);
+    expect(document.activeElement).toBe(languageButton);
+  });
+
   test("localizes core labels and supports import export actions", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const bootstrapState = createBootstrapState({

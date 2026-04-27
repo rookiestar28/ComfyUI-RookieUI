@@ -84,6 +84,12 @@ const INLINE_TOOLBAR_ICONS = Object.freeze({
   translate: "🌐",
 });
 
+function normalizeDomIdPart(value) {
+  return String(value ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, "-") || "option";
+}
+
 function normalizeTokenText(text) {
   return String(text ?? "").trim();
 }
@@ -423,6 +429,7 @@ export function createPromptWorkbenchShell({
   let resourcesReadyPromise = null;
   let activeScope = normalizedFixedScope || "prompt";
   let activeSecondaryPopover = "";
+  let languageSelectorOpen = false;
   let resourcesLoaded = false;
   let dragTokenId = "";
   const assistState = {
@@ -478,6 +485,7 @@ export function createPromptWorkbenchShell({
     settingsHoverBox: null,
     appendButton: null,
     keywordInput: null,
+    languageSelector: null,
   };
 
   const applyIconButtonLabel = (button, icon, label) => {
@@ -638,15 +646,32 @@ export function createPromptWorkbenchShell({
     headerActions.appendChild(counterChip);
     inlineToolbarNodes.counter = counterChip;
 
-    const languageChip = document.createElement("span");
-    languageChip.id = `${idPrefix}-inline-language`;
-    languageChip.className = "rookieui-shell__prompt-workbench-inline-chip";
-    languageChip.dataset.pwUi = "inline-language";
-    languageChip.setAttribute("role", "status");
-    languageChip.setAttribute("aria-label", "Prompt workbench language and scope");
-    languageChip.textContent = "en";
-    headerActions.appendChild(languageChip);
-    inlineToolbarNodes.language = languageChip;
+    const languageButton = createActionButton(`${idPrefix}-inline-language`, "en");
+    languageButton.classList.add("rookieui-shell__prompt-workbench-inline-chip", "rookieui-shell__prompt-workbench-language-button");
+    languageButton.dataset.pwUi = "inline-language";
+    languageButton.setAttribute("aria-label", "Prompt workbench language and scope");
+    languageButton.setAttribute("aria-haspopup", "listbox");
+    languageButton.setAttribute("aria-controls", `${idPrefix}-language-selector`);
+    languageButton.setAttribute("aria-expanded", "false");
+    languageButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      languageSelectorOpen = !languageSelectorOpen;
+      activeSecondaryPopover = "";
+      syncUi();
+    });
+    headerActions.appendChild(languageButton);
+    inlineToolbarNodes.language = languageButton;
+
+    const languageSelector = document.createElement("div");
+    languageSelector.id = `${idPrefix}-language-selector`;
+    languageSelector.className = "rookieui-shell__prompt-workbench-language-selector";
+    languageSelector.dataset.pwUi = "language-selector-popover";
+    languageSelector.setAttribute("role", "listbox");
+    languageSelector.setAttribute("aria-label", "Prompt Workbench language selector");
+    languageSelector.hidden = true;
+    headerActions.appendChild(languageSelector);
+    inlineToolbarNodes.languageSelector = languageSelector;
 
     inlineToolbarNodes.historyButton = createInlineToolbarButton("inline-history", INLINE_TOOLBAR_ICONS.history, "History", "inline-history-anchor", () => {
       activeSecondaryPopover = activeSecondaryPopover === "history" ? "" : "history";
@@ -898,6 +923,64 @@ export function createPromptWorkbenchShell({
     panel: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-detail", ""),
     status: appendTextElement(details, "p", "rookieui-shell__prompt-workbench-status", t("ready")),
   };
+
+  function getLanguageOptions() {
+    const options = (languageOptions.length ? languageOptions : [{ code: "en", title: "English" }])
+      .map((entry) => ({
+        code: String(entry?.code ?? "en").trim() || "en",
+        title: String(entry?.title ?? entry?.code ?? "English").trim() || "English",
+      }))
+      .filter((entry) => entry.code);
+    return options.length ? options : [{ code: "en", title: "English" }];
+  }
+
+  function closeLanguageSelector({ focusTrigger = false } = {}) {
+    if (!languageSelectorOpen) {
+      return;
+    }
+    languageSelectorOpen = false;
+    syncUi();
+    if (focusTrigger) {
+      inlineToolbarNodes.language?.focus();
+    }
+  }
+
+  function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false } = {}) {
+    const normalizedLanguage = String(nextLanguage ?? "en").trim() || "en";
+    if (String(configState.language ?? "en").trim() !== normalizedLanguage) {
+      configState.language = normalizedLanguage;
+      queueConfigPersist();
+    }
+    languageSelectorOpen = false;
+    syncUi();
+    if (focusTrigger) {
+      inlineToolbarNodes.language?.focus();
+    }
+  }
+
+  function renderLanguageSelector() {
+    const selector = inlineToolbarNodes.languageSelector;
+    if (!selector) {
+      return;
+    }
+    clearChildren(selector);
+    selector.hidden = !languageSelectorOpen;
+    const currentLanguage = String(configState?.language ?? "en").trim() || "en";
+    selector.setAttribute("aria-activedescendant", `${idPrefix}-language-option-${normalizeDomIdPart(currentLanguage)}`);
+    getLanguageOptions().forEach((entry) => {
+      const optionButton = createActionButton(`${idPrefix}-language-option-${normalizeDomIdPart(entry.code)}`, `${entry.code} - ${entry.title}`);
+      optionButton.classList.add("rookieui-shell__prompt-workbench-language-option");
+      optionButton.dataset.pwUi = "language-option";
+      optionButton.dataset.languageCode = entry.code;
+      optionButton.dataset.selected = String(entry.code === currentLanguage);
+      optionButton.setAttribute("role", "option");
+      optionButton.setAttribute("aria-selected", String(entry.code === currentLanguage));
+      optionButton.addEventListener("click", () => {
+        setPromptWorkbenchLanguage(entry.code, { focusTrigger: true });
+      });
+      selector.appendChild(optionButton);
+    });
+  }
 
   function getActiveNamespace() {
     return namespaceMap[activeScope];
@@ -2385,8 +2468,7 @@ export function createPromptWorkbenchShell({
     });
     languageSelect.value = String(configState?.language ?? "en");
     languageSelect.addEventListener("change", () => {
-      configState.language = String(languageSelect.value ?? "en").trim() || "en";
-      queueConfigPersist();
+      setPromptWorkbenchLanguage(languageSelect.value);
     });
     renderField("Language", languageSelect);
 
@@ -2848,6 +2930,7 @@ export function createPromptWorkbenchShell({
     }
     if (inlineToolbarNodes.language) {
       inlineToolbarNodes.language.textContent = `${language} / ${activeScope === "negative" ? "negative" : "prompt"}`;
+      inlineToolbarNodes.language.setAttribute("aria-expanded", String(languageSelectorOpen));
     }
     if (inlineToolbarNodes.historyButton) {
       inlineToolbarNodes.historyButton.hidden = !isPanelVisible("history");
@@ -2900,6 +2983,7 @@ export function createPromptWorkbenchShell({
     renderAssistPane();
     renderFormatPane();
     renderSecondaryPopover();
+    renderLanguageSelector();
   }
 
   async function ensureStateLoaded() {
@@ -3036,6 +3120,12 @@ export function createPromptWorkbenchShell({
       updateStatus("Closed Prompt Workbench popover");
       return;
     }
+    if (event.key === "Escape" && languageSelectorOpen && shell.contains(event.target)) {
+      event.preventDefault();
+      closeLanguageSelector({ focusTrigger: true });
+      updateStatus("Closed Prompt Workbench language selector");
+      return;
+    }
     if (shouldIgnoreWorkbenchHotkey(event)) {
       return;
     }
@@ -3054,6 +3144,17 @@ export function createPromptWorkbenchShell({
       event.preventDefault();
       mutateSelectedTokens("translate");
     }
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!languageSelectorOpen) {
+      return;
+    }
+    const target = event.target;
+    if (inlineToolbarNodes.language?.contains(target) || inlineToolbarNodes.languageSelector?.contains(target)) {
+      return;
+    }
+    closeLanguageSelector({ focusTrigger: true });
   });
 
   Object.entries(namespaceMap).forEach(([scope, namespace]) => {
