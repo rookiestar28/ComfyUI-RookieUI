@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from rookieui.contracts.prompt_workbench import build_prompt_workbench_contract_meta
+from rookieui.contracts.prompt_workbench import (
+    build_prompt_workbench_contract_meta,
+    normalize_prompt_workbench_language_code,
+)
 from rookieui.services.model_inventory import discover_model_inventory
 from rookieui.services.prompt_workbench_state import _prompt_workbench_root
 
@@ -302,7 +305,7 @@ def _build_catalog_highlights() -> dict[str, Any]:
 
 
 def build_prompt_workbench_catalog_payload(*, language: object = "en") -> dict[str, Any]:
-    normalized_language = str(language or "").strip() or "en"
+    normalized_language = normalize_prompt_workbench_language_code(language)
     group_tags_path, group_tags_source = _resolve_group_tag_path(normalized_language)
     prompt_library_path, prompt_library_source = _resolve_prompt_library_path()
     group_tags_payload = _normalize_group_tags_payload(

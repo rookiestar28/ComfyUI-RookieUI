@@ -445,7 +445,7 @@ export function createPromptWorkbenchShell({
     busy: false,
   };
   const t = (key) => {
-    const language = String(configState?.language ?? "en").trim();
+    const language = normalizeLanguageCode(configState?.language ?? "en");
     return WORKBENCH_I18N[language]?.[key] ?? WORKBENCH_I18N.en[key] ?? key;
   };
 
@@ -929,9 +929,29 @@ export function createPromptWorkbenchShell({
       .map((entry) => ({
         code: String(entry?.code ?? "en").trim() || "en",
         title: String(entry?.title ?? entry?.code ?? "English").trim() || "English",
+        nativeTitle: String(entry?.native_title ?? entry?.title ?? entry?.code ?? "English").trim() || "English",
+        aliases: Array.isArray(entry?.aliases)
+          ? entry.aliases.map((alias) => String(alias ?? "").trim()).filter(Boolean)
+          : [],
+        fallbackCode: String(entry?.fallback_code ?? "en").trim() || "en",
       }))
       .filter((entry) => entry.code);
-    return options.length ? options : [{ code: "en", title: "English" }];
+    return options.length ? options : [{ code: "en", title: "English", nativeTitle: "English", aliases: [], fallbackCode: "en" }];
+  }
+
+  function getLanguageAliasKey(value) {
+    return String(value ?? "").trim().replace(/_/g, "-").toLowerCase();
+  }
+
+  function normalizeLanguageCode(value) {
+    const aliases = new Map();
+    getLanguageOptions().forEach((entry) => {
+      aliases.set(getLanguageAliasKey(entry.code), entry.code);
+      entry.aliases.forEach((alias) => {
+        aliases.set(getLanguageAliasKey(alias), entry.code);
+      });
+    });
+    return aliases.get(getLanguageAliasKey(value)) ?? aliases.get("en") ?? "en";
   }
 
   function closeLanguageSelector({ focusTrigger = false } = {}) {
@@ -946,7 +966,7 @@ export function createPromptWorkbenchShell({
   }
 
   function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false } = {}) {
-    const normalizedLanguage = String(nextLanguage ?? "en").trim() || "en";
+    const normalizedLanguage = normalizeLanguageCode(nextLanguage);
     if (String(configState.language ?? "en").trim() !== normalizedLanguage) {
       configState.language = normalizedLanguage;
       queueConfigPersist();
@@ -965,10 +985,16 @@ export function createPromptWorkbenchShell({
     }
     clearChildren(selector);
     selector.hidden = !languageSelectorOpen;
-    const currentLanguage = String(configState?.language ?? "en").trim() || "en";
+    const currentLanguage = normalizeLanguageCode(configState?.language ?? "en");
+    if (configState.language !== currentLanguage) {
+      configState.language = currentLanguage;
+    }
     selector.setAttribute("aria-activedescendant", `${idPrefix}-language-option-${normalizeDomIdPart(currentLanguage)}`);
     getLanguageOptions().forEach((entry) => {
-      const optionButton = createActionButton(`${idPrefix}-language-option-${normalizeDomIdPart(entry.code)}`, `${entry.code} - ${entry.title}`);
+      const displayTitle = entry.nativeTitle && entry.nativeTitle !== entry.title
+        ? `${entry.code} - ${entry.title} (${entry.nativeTitle})`
+        : `${entry.code} - ${entry.title}`;
+      const optionButton = createActionButton(`${idPrefix}-language-option-${normalizeDomIdPart(entry.code)}`, displayTitle);
       optionButton.classList.add("rookieui-shell__prompt-workbench-language-option");
       optionButton.dataset.pwUi = "language-option";
       optionButton.dataset.languageCode = entry.code;
@@ -2460,13 +2486,13 @@ export function createPromptWorkbenchShell({
     const languageSelect = document.createElement("select");
     languageSelect.id = `${idPrefix}-assist-language`;
     languageSelect.className = "rookieui-shell__input";
-    (languageOptions.length ? languageOptions : [{ code: "en", title: "English" }]).forEach((entry) => {
+    getLanguageOptions().forEach((entry) => {
       const option = document.createElement("option");
       option.value = String(entry?.code ?? "en");
       option.textContent = `${String(entry?.code ?? "en")} - ${String(entry?.title ?? "English")}`;
       languageSelect.appendChild(option);
     });
-    languageSelect.value = String(configState?.language ?? "en");
+    languageSelect.value = normalizeLanguageCode(configState?.language ?? "en");
     languageSelect.addEventListener("change", () => {
       setPromptWorkbenchLanguage(languageSelect.value);
     });
@@ -2886,7 +2912,10 @@ export function createPromptWorkbenchShell({
     }
     const historyItems = historyCache.get(getActiveNamespace()) ?? [];
     const favoriteItems = favoritesCache.get(getActiveNamespace()) ?? [];
-    const language = String(configState?.language ?? "en").trim() || "en";
+    const language = normalizeLanguageCode(configState?.language ?? "en");
+    if (configState.language !== language) {
+      configState.language = language;
+    }
     const translationSurface = providersPayload?.surfaces?.translation ?? null;
     const shippedProviders = Array.isArray(translationSurface?.shipped_provider_ids)
       ? translationSurface.shipped_provider_ids.length
@@ -3028,7 +3057,7 @@ export function createPromptWorkbenchShell({
     }
     resourcesReadyPromise = Promise.all([
       bootstrapState?.fetchPromptWorkbenchProvidersRequest?.(),
-      bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(configState?.language ?? "en"),
+      bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(normalizeLanguageCode(configState?.language ?? "en")),
       bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.prompt),
       bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.negative),
       bootstrapState?.fetchPromptWorkbenchFavoritesRequest?.(namespaceMap.prompt),

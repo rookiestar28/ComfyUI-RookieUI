@@ -104,6 +104,16 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertEqual(config["ui_preferences"]["preferred_panel"], "editor")
         self.assertEqual(state["active_panel"], "editor")
 
+    def test_language_config_update_normalizes_supported_aliases(self) -> None:
+        config = prompt_workbench_state.update_prompt_workbench_config({"language": "zh_TW"})
+        self.assertEqual(config["language"], "zh-TW")
+
+        config = prompt_workbench_state.update_prompt_workbench_config({"language": "pt_BR"})
+        self.assertEqual(config["language"], "pt-BR")
+
+        config = prompt_workbench_state.update_prompt_workbench_config({"language": "not/a-language"})
+        self.assertEqual(config["language"], "en")
+
     def test_history_and_favorites_support_push_remove_and_reorder(self) -> None:
         history_items = prompt_workbench_state.apply_prompt_workbench_history_action(
             "txt2img_prompt",

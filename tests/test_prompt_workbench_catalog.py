@@ -77,6 +77,16 @@ class PromptWorkbenchCatalogTests(unittest.TestCase):
         self.assertEqual(payload["tagcomplete"]["entries"][1]["insert_token"], "<lora:detail_tweaker:0.8>")
         self.assertEqual(payload["tagcomplete"]["entries"][1]["highlight"], "lora")
 
+    def test_catalog_language_query_normalizes_alias_before_lookup(self) -> None:
+        payload = build_prompt_workbench_catalog_payload(language="zh_TW")
+
+        self.assertEqual(payload["group_tags"]["language"], "zh-TW")
+        self.assertEqual(payload["tagcomplete"]["language"], "zh-TW")
+
+        fallback_payload = build_prompt_workbench_catalog_payload(language="not/a-language")
+        self.assertEqual(fallback_payload["group_tags"]["language"], "en")
+        self.assertEqual(fallback_payload["tagcomplete"]["language"], "en")
+
     def test_analyze_payload_reuses_prompt_semantics_and_inventory_metrics(self) -> None:
         payload = analyze_prompt_workbench_payload(
             {

@@ -19,6 +19,7 @@ from rookieui.contracts.prompt_workbench import (
     build_default_prompt_workbench_config,
     build_default_prompt_workbench_surface_state,
     get_prompt_workbench_provider_catalog_entry,
+    normalize_prompt_workbench_language_code,
 )
 
 _WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
@@ -242,7 +243,10 @@ def _normalize_config_payload(existing: dict[str, Any], payload: object) -> dict
         return merged
 
     if "language" in payload:
-        merged["language"] = _normalize_text(payload.get("language", ""), max_length=32) or defaults["language"]
+        merged["language"] = normalize_prompt_workbench_language_code(
+            _normalize_text(payload.get("language", ""), max_length=32),
+            default=defaults["language"],
+        )
     if "theme_style" in payload:
         merged["theme_style"] = _normalize_text(payload.get("theme_style", ""), max_length=80) or defaults["theme_style"]
     if "history_limit" in payload:

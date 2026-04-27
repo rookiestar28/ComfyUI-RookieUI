@@ -4,14 +4,17 @@ import unittest
 
 from rookieui.contracts.prompt_workbench import (
     PROMPT_WORKBENCH_CONTRACT_VERSION,
+    PROMPT_WORKBENCH_LANGUAGE_OPTIONS,
     PROMPT_WORKBENCH_NAMESPACES,
     PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS,
     PROMPT_WORKBENCH_ROUTE_FAMILY,
     PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
     PromptWorkbenchBootstrapSnapshot,
     build_default_prompt_workbench_surface_state,
+    build_prompt_workbench_language_options,
     build_prompt_workbench_contract_meta,
     build_prompt_workbench_provider_catalog_payload,
+    normalize_prompt_workbench_language_code,
 )
 
 
@@ -39,6 +42,23 @@ class PromptWorkbenchContractTests(unittest.TestCase):
         self.assertEqual(payload["contract"]["provider_secret_field_keys"], PROMPT_WORKBENCH_PROVIDER_SECRET_FIELD_KEYS)
         self.assertEqual(payload["config"]["formatting_rules"]["dedupe_commas"], True)
         self.assertEqual(payload["blacklist"], {"enabled": False, "entries": [], "translation_entries": []})
+
+    def test_language_options_are_expanded_and_alias_normalized(self) -> None:
+        options = build_prompt_workbench_language_options()
+
+        self.assertGreater(len(options), 10)
+        self.assertEqual(options[0]["code"], "en")
+        self.assertEqual(PROMPT_WORKBENCH_LANGUAGE_OPTIONS[0]["code"], "en")
+        self.assertIn("aliases", options[0])
+        self.assertIn("native_title", options[0])
+        self.assertEqual(normalize_prompt_workbench_language_code("en_US"), "en")
+        self.assertEqual(normalize_prompt_workbench_language_code("en-US"), "en")
+        self.assertEqual(normalize_prompt_workbench_language_code("zh_CN"), "zh-CN")
+        self.assertEqual(normalize_prompt_workbench_language_code("zh_TW"), "zh-TW")
+        self.assertEqual(normalize_prompt_workbench_language_code("zh-HK"), "zh-HK")
+        self.assertEqual(normalize_prompt_workbench_language_code("pt_BR"), "pt-BR")
+        self.assertEqual(normalize_prompt_workbench_language_code("<script>"), "en")
+        self.assertTrue(all("<" not in entry["title"] and ">" not in entry["title"] for entry in options))
 
     def test_provider_catalog_truthfully_marks_shipped_and_reference_only_entries(self) -> None:
         payload = build_prompt_workbench_provider_catalog_payload()

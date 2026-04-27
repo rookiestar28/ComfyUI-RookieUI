@@ -617,6 +617,58 @@ describe("prompt workbench shell", () => {
     expect(document.activeElement).toBe(document.getElementById("inline-language-workbench-inline-language"));
   });
 
+  test("normalizes alias language codes before rendering and persistence", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        config: {
+          ...createBootstrapState().promptWorkbench.config,
+          language: "zh_TW",
+        },
+        language_options: [
+          { code: "en", title: "English", aliases: ["en_US", "en-US"] },
+          { code: "zh-TW", title: "Traditional Chinese", native_title: "繁體中文", aliases: ["zh_TW"] },
+          { code: "pt-BR", title: "Portuguese (Brazil)", aliases: ["pt_BR"] },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-alias-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    expect(document.getElementById("inline-language-alias-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    document.getElementById("inline-language-alias-workbench-inline-language").click();
+    await flushPromises();
+    expect(
+      document
+        .getElementById("inline-language-alias-workbench-language-option-zh-TW")
+        ?.getAttribute("aria-selected"),
+    ).toBe("true");
+
+    document.getElementById("inline-language-alias-workbench-language-option-pt-BR").click();
+    await flushPromises();
+
+    expect(bootstrapState.updatePromptWorkbenchConfigRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ language: "pt-BR" }),
+    );
+  });
+
   test("dismisses inline language selector with escape and outside click", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const bootstrapState = createBootstrapState();

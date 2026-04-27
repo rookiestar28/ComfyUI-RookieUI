@@ -38,11 +38,27 @@ DEFAULT_PROMPT_WORKBENCH_AI_ASSIST_PRESET = (
     "Do not add explanation, markdown, numbering, or surrounding quotes. Return prompt text only."
 )
 PROMPT_WORKBENCH_LANGUAGE_OPTIONS = (
-    {"code": "en", "title": "English"},
-    {"code": "zh-TW", "title": "Traditional Chinese"},
-    {"code": "zh-CN", "title": "Simplified Chinese"},
-    {"code": "ja", "title": "Japanese"},
-    {"code": "ko", "title": "Korean"},
+    {"code": "en", "title": "English", "native_title": "English", "aliases": ("en_US", "en-US", "en_GB", "en-GB"), "fallback_code": "en", "source": "rookieui_host"},
+    {"code": "zh-TW", "title": "Traditional Chinese", "native_title": "繁體中文", "aliases": ("zh_TW", "zh-Hant", "zh_Hant"), "fallback_code": "en", "source": "rookieui_host"},
+    {"code": "zh-CN", "title": "Simplified Chinese", "native_title": "简体中文", "aliases": ("zh_CN", "zh", "zh-Hans", "zh_Hans"), "fallback_code": "en", "source": "rookieui_host"},
+    {"code": "zh-HK", "title": "Traditional Chinese (Hong Kong)", "native_title": "繁體中文 (香港)", "aliases": ("zh_HK",), "fallback_code": "zh-TW", "source": "a1111_reference"},
+    {"code": "ja", "title": "Japanese", "native_title": "日本語", "aliases": ("ja_JP", "ja-JP"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "ko", "title": "Korean", "native_title": "한국어", "aliases": ("ko_KR", "ko-KR"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "ar", "title": "Arabic", "native_title": "العربية", "aliases": ("ar_SA", "ar-SA"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "es", "title": "Spanish", "native_title": "Español", "aliases": ("es_ES", "es-ES"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "fa", "title": "Persian", "native_title": "فارسی", "aliases": ("fa_IR", "fa-IR"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "fr", "title": "French", "native_title": "Français", "aliases": ("fr_FR", "fr-FR"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "ru", "title": "Russian", "native_title": "Русский", "aliases": ("ru_RU", "ru-RU"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "tr", "title": "Turkish", "native_title": "Türkçe", "aliases": ("tr_TR", "tr-TR"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "pt-BR", "title": "Portuguese (Brazil)", "native_title": "Português (Brasil)", "aliases": ("pt_BR", "pt"), "fallback_code": "en", "source": "comfyui_frontend"},
+    {"code": "de", "title": "German", "native_title": "Deutsch", "aliases": ("de_DE", "de-DE"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "it", "title": "Italian", "native_title": "Italiano", "aliases": ("it_IT", "it-IT"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "nl", "title": "Dutch", "native_title": "Nederlands", "aliases": ("nl_NL", "nl-NL"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "pl", "title": "Polish", "native_title": "Polski", "aliases": ("pl_PL", "pl-PL"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "uk", "title": "Ukrainian", "native_title": "Українська", "aliases": ("uk_UA", "uk-UA"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "vi", "title": "Vietnamese", "native_title": "Tiếng Việt", "aliases": ("vi_VN", "vi-VN"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "th", "title": "Thai", "native_title": "ไทย", "aliases": ("th_TH", "th-TH"), "fallback_code": "en", "source": "a1111_reference"},
+    {"code": "id", "title": "Indonesian", "native_title": "Bahasa Indonesia", "aliases": ("id_ID", "id-ID"), "fallback_code": "en", "source": "a1111_reference"},
 )
 PROMPT_WORKBENCH_THEME_STYLE_OPTIONS = (
     {
@@ -696,6 +712,35 @@ def build_default_prompt_workbench_config() -> dict[str, Any]:
     }
 
 
+def _language_alias_key(value: object) -> str:
+    return str(value or "").strip().replace("_", "-").lower()
+
+
+def build_prompt_workbench_language_options() -> tuple[dict[str, Any], ...]:
+    return tuple(
+        {
+            "code": str(entry["code"]),
+            "title": str(entry["title"]),
+            "native_title": str(entry.get("native_title", entry["title"])),
+            "aliases": [str(alias) for alias in entry.get("aliases", ())],
+            "fallback_code": str(entry.get("fallback_code", "en")),
+            "source": str(entry.get("source", "rookieui_host")),
+        }
+        for entry in PROMPT_WORKBENCH_LANGUAGE_OPTIONS
+    )
+
+
+def normalize_prompt_workbench_language_code(value: object, *, default: str = "en") -> str:
+    alias_map: dict[str, str] = {}
+    for entry in PROMPT_WORKBENCH_LANGUAGE_OPTIONS:
+        code = str(entry["code"])
+        alias_map[_language_alias_key(code)] = code
+        for alias in entry.get("aliases", ()):
+            alias_map[_language_alias_key(alias)] = code
+    normalized_default = alias_map.get(_language_alias_key(default), "en")
+    return alias_map.get(_language_alias_key(value), normalized_default)
+
+
 def build_default_prompt_workbench_host_actions() -> dict[str, Any]:
     return {
         PROMPT_WORKBENCH_DANBOORU_ACTION_ID: {
@@ -748,7 +793,7 @@ class PromptWorkbenchBootstrapSnapshot:
     config: dict[str, Any] = field(default_factory=build_default_prompt_workbench_config)
     blacklist: dict[str, Any] = field(default_factory=_default_blacklist_state)
     host_actions: dict[str, Any] = field(default_factory=build_default_prompt_workbench_host_actions)
-    language_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_LANGUAGE_OPTIONS
+    language_options: tuple[dict[str, Any], ...] = field(default_factory=build_prompt_workbench_language_options)
     theme_style_options: tuple[dict[str, str], ...] = PROMPT_WORKBENCH_THEME_STYLE_OPTIONS
 
     def to_payload(self) -> dict[str, Any]:
