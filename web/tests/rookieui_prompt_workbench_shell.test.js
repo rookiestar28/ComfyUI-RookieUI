@@ -669,6 +669,98 @@ describe("prompt workbench shell", () => {
     );
   });
 
+  test("refreshes language-sensitive catalog resources and translation targets after language selection", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const fetchCatalog = vi.fn(async (language = "en") => ({
+      ok: true,
+      data: {
+        group_tags: {
+          language,
+          source: "test",
+          groups: [
+            {
+              id: "quality",
+              title: language === "zh-TW" ? "Local Quality" : "Quality",
+              tags: ["masterpiece"],
+              tag_entries: [
+                {
+                  tag: "masterpiece",
+                  label: language === "zh-TW" ? "local masterpiece" : "masterpiece",
+                  insert_token: "masterpiece",
+                  highlight: "quality",
+                },
+              ],
+            },
+          ],
+        },
+        tagcomplete: { language, source: "test", entries: [] },
+        prompt_library: { sections: [] },
+        extra_networks: { embeddings: [], loras: [] },
+        catalog_highlights: { token_families: { plain: { highlight: "plain" } }, catalog_categories: {} },
+      },
+    }));
+    const bootstrapState = createBootstrapState({
+      fetchPromptWorkbenchCatalogRequest: fetchCatalog,
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        config: {
+          ...createBootstrapState().promptWorkbench.config,
+          language: "en",
+          translation: {
+            default_provider: "openai",
+            providers: {},
+          },
+        },
+        language_options: [
+          { code: "en", title: "English", aliases: ["en_US"] },
+          { code: "zh-TW", title: "Traditional Chinese", aliases: ["zh_TW"] },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-sync-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    expect(fetchCatalog).toHaveBeenCalledWith("en");
+    expect(document.getElementById("inline-language-sync-workbench-translate-local")).toBeNull();
+    expect(document.getElementById("inline-language-sync-workbench-token-translation-0")?.textContent).toContain("en");
+
+    document.getElementById("inline-language-sync-workbench-inline-language").click();
+    await flushPromises();
+    document.getElementById("inline-language-sync-workbench-language-option-zh-TW").click();
+    await flushPromises();
+    await flushPromises();
+
+    expect(fetchCatalog).toHaveBeenLastCalledWith("zh-TW");
+    expect(document.getElementById("inline-language-sync-workbench-translate-local")?.textContent).toBe("Translate to zh-TW");
+    expect(document.getElementById("inline-language-sync-workbench-token-translation-0")?.textContent).toContain("zh-TW");
+
+    document.getElementById("inline-language-sync-workbench-inline-append").click();
+    await flushPromises();
+    expect(document.getElementById("inline-language-sync-workbench-secondary-popover")?.textContent).toContain("local masterpiece");
+
+    document.getElementById("inline-language-sync-workbench-translate-local").click();
+    await flushPromises();
+    expect(bootstrapState.translatePromptWorkbenchRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ to_lang: "zh-TW" }),
+    );
+  });
+
   test("dismisses inline language selector with escape and outside click", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const bootstrapState = createBootstrapState();

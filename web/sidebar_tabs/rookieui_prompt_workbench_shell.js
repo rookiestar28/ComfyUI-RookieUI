@@ -967,14 +967,33 @@ export function createPromptWorkbenchShell({
 
   function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false } = {}) {
     const normalizedLanguage = normalizeLanguageCode(nextLanguage);
+    const didChange = String(configState.language ?? "en").trim() !== normalizedLanguage;
     if (String(configState.language ?? "en").trim() !== normalizedLanguage) {
       configState.language = normalizedLanguage;
       queueConfigPersist();
     }
     languageSelectorOpen = false;
     syncUi();
+    if (didChange && resourcesLoaded) {
+      void refreshCatalogForLanguage(normalizedLanguage);
+    }
     if (focusTrigger) {
       inlineToolbarNodes.language?.focus();
+    }
+  }
+
+  async function refreshCatalogForLanguage(language) {
+    const normalizedLanguage = normalizeLanguageCode(language);
+    try {
+      const result = await bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(normalizedLanguage);
+      if (result?.data) {
+        catalogPayload = result.data;
+      }
+      updateStatus(`Prompt Workbench catalog refreshed for ${normalizedLanguage}`);
+    } catch {
+      updateStatus(`Prompt Workbench catalog refresh failed for ${normalizedLanguage}`);
+    } finally {
+      syncUi();
     }
   }
 
@@ -1893,8 +1912,8 @@ export function createPromptWorkbenchShell({
     });
     translateRow.appendChild(translateEnglishButton);
 
-    if (String(configState.language ?? "en").trim().toLowerCase() !== "en") {
-      const localLanguage = String(configState.language ?? "en").trim() || "en";
+    if (normalizeLanguageCode(configState.language ?? "en").toLowerCase() !== "en") {
+      const localLanguage = normalizeLanguageCode(configState.language ?? "en");
       const translateLocalButton = createActionButton(`${idPrefix}-translate-local`, `Translate to ${localLanguage}`);
       translateLocalButton.addEventListener("click", () => {
         translateActivePrompt(localLanguage);
@@ -2044,13 +2063,14 @@ export function createPromptWorkbenchShell({
       row.appendChild(valueInput);
 
       const translatedText = String(token.translated_text ?? "").trim();
+      const localLanguage = normalizeLanguageCode(configState.language ?? "en");
       const translationDetail = document.createElement("span");
       translationDetail.id = `${idPrefix}-token-translation-${index}`;
       translationDetail.className =
         "rookieui-shell__prompt-workbench-token-translation rookieui-shell__prompt-workbench-token-local-language";
       translationDetail.dataset.pwUi = "token-local-language";
       translationDetail.dataset.hasTranslation = String(Boolean(translatedText));
-      translationDetail.textContent = translatedText ? `Translation: ${translatedText}` : "Translation: not available";
+      translationDetail.textContent = translatedText ? `${localLanguage}: ${translatedText}` : `${localLanguage}: not translated`;
       row.appendChild(translationDetail);
 
       const controls = document.createElement("div");
