@@ -1809,10 +1809,8 @@
 }
 
 .rookieui-shell__prompt-workbench-language-selector {
-  position: absolute;
-  z-index: 45;
-  top: calc(100% + 6px);
-  left: 0;
+  position: fixed;
+  z-index: 1200;
   display: grid;
   width: min(360px, calc(100vw - 32px));
   max-height: 320px;

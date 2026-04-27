@@ -84,6 +84,11 @@ const INLINE_TOOLBAR_ICONS = Object.freeze({
   translate: "🌐",
 });
 
+const LANGUAGE_SELECTOR_VIEWPORT_MARGIN = 12;
+const LANGUAGE_SELECTOR_MAX_WIDTH = 360;
+const LANGUAGE_SELECTOR_MIN_WIDTH = 240;
+const LANGUAGE_SELECTOR_MAX_HEIGHT = 320;
+
 function normalizeDomIdPart(value) {
   return String(value ?? "")
     .trim()
@@ -659,6 +664,9 @@ export function createPromptWorkbenchShell({
       languageSelectorOpen = !languageSelectorOpen;
       activeSecondaryPopover = "";
       syncUi();
+      if (languageSelectorOpen) {
+        focusSelectedLanguageOption();
+      }
     });
     headerActions.appendChild(languageButton);
     inlineToolbarNodes.language = languageButton;
@@ -670,6 +678,7 @@ export function createPromptWorkbenchShell({
     languageSelector.setAttribute("role", "listbox");
     languageSelector.setAttribute("aria-label", "Prompt Workbench language selector");
     languageSelector.hidden = true;
+    languageSelector.addEventListener("keydown", handleLanguageSelectorKeydown);
     headerActions.appendChild(languageSelector);
     inlineToolbarNodes.languageSelector = languageSelector;
 
@@ -965,6 +974,126 @@ export function createPromptWorkbenchShell({
     }
   }
 
+  function getViewportSize() {
+    const viewport = globalThis?.visualViewport;
+    const width = Number(viewport?.width ?? globalThis?.innerWidth ?? document?.documentElement?.clientWidth ?? 1024);
+    const height = Number(viewport?.height ?? globalThis?.innerHeight ?? document?.documentElement?.clientHeight ?? 768);
+    return {
+      width: Number.isFinite(width) && width > 0 ? width : 1024,
+      height: Number.isFinite(height) && height > 0 ? height : 768,
+    };
+  }
+
+  function clampOverlayValue(value, min, max) {
+    if (max < min) {
+      return min;
+    }
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function placeLanguageSelector() {
+    const selector = inlineToolbarNodes.languageSelector;
+    const trigger = inlineToolbarNodes.language;
+    if (!selector || !trigger || selector.hidden) {
+      return;
+    }
+    const viewport = getViewportSize();
+    const rect = trigger.getBoundingClientRect?.() ?? { left: LANGUAGE_SELECTOR_VIEWPORT_MARGIN, bottom: LANGUAGE_SELECTOR_VIEWPORT_MARGIN };
+    const availableWidth = Math.max(160, viewport.width - LANGUAGE_SELECTOR_VIEWPORT_MARGIN * 2);
+    const width = Math.min(LANGUAGE_SELECTOR_MAX_WIDTH, Math.max(LANGUAGE_SELECTOR_MIN_WIDTH, Math.min(availableWidth, Math.round(availableWidth))));
+    const left = clampOverlayValue(
+      Math.round(Number(rect.left ?? LANGUAGE_SELECTOR_VIEWPORT_MARGIN)),
+      LANGUAGE_SELECTOR_VIEWPORT_MARGIN,
+      viewport.width - width - LANGUAGE_SELECTOR_VIEWPORT_MARGIN,
+    );
+    const topCandidate = Math.round(Number(rect.bottom ?? LANGUAGE_SELECTOR_VIEWPORT_MARGIN) + 6);
+    const maxHeight = Math.min(
+      LANGUAGE_SELECTOR_MAX_HEIGHT,
+      Math.max(120, viewport.height - topCandidate - LANGUAGE_SELECTOR_VIEWPORT_MARGIN),
+    );
+    const top = clampOverlayValue(topCandidate, LANGUAGE_SELECTOR_VIEWPORT_MARGIN, viewport.height - maxHeight - LANGUAGE_SELECTOR_VIEWPORT_MARGIN);
+
+    selector.dataset.placement = "fixed";
+    selector.style.position = "fixed";
+    selector.style.left = `${left}px`;
+    selector.style.top = `${top}px`;
+    selector.style.width = `${width}px`;
+    selector.style.maxHeight = `${maxHeight}px`;
+  }
+
+  function getLanguageOptionButtons() {
+    return Array.from(inlineToolbarNodes.languageSelector?.querySelectorAll("[data-pw-ui='language-option']") ?? []);
+  }
+
+  function focusLanguageOptionByIndex(index) {
+    const options = getLanguageOptionButtons();
+    if (!options.length) {
+      return;
+    }
+    const nextIndex = clampOverlayValue(index, 0, options.length - 1);
+    const nextOption = options[nextIndex];
+    inlineToolbarNodes.languageSelector?.setAttribute("aria-activedescendant", nextOption.id);
+    nextOption.focus();
+  }
+
+  function focusSelectedLanguageOption() {
+    const options = getLanguageOptionButtons();
+    const selectedIndex = options.findIndex((option) => option.dataset.selected === "true");
+    focusLanguageOptionByIndex(selectedIndex >= 0 ? selectedIndex : 0);
+  }
+
+  function focusRelativeLanguageOption(offset) {
+    const options = getLanguageOptionButtons();
+    if (!options.length) {
+      return;
+    }
+    const activeIndex = options.findIndex((option) => option === document.activeElement);
+    const selectedIndex = options.findIndex((option) => option.dataset.selected === "true");
+    const currentIndex = activeIndex >= 0 ? activeIndex : selectedIndex >= 0 ? selectedIndex : 0;
+    focusLanguageOptionByIndex(currentIndex + offset);
+  }
+
+  function handleLanguageSelectorKeydown(event) {
+    if (!languageSelectorOpen) {
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeLanguageSelector({ focusTrigger: true });
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusRelativeLanguageOption(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusRelativeLanguageOption(-1);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      focusLanguageOptionByIndex(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      focusLanguageOptionByIndex(getLanguageOptionButtons().length - 1);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      const activeOption = document.activeElement?.dataset?.pwUi === "language-option"
+        ? document.activeElement
+        : inlineToolbarNodes.languageSelector?.querySelector("[data-selected='true']");
+      const languageCode = activeOption?.dataset?.languageCode;
+      if (languageCode) {
+        event.preventDefault();
+        setPromptWorkbenchLanguage(languageCode, { focusTrigger: true });
+      }
+    }
+  }
+
   function setPromptWorkbenchLanguage(nextLanguage, { focusTrigger = false } = {}) {
     const normalizedLanguage = normalizeLanguageCode(nextLanguage);
     const didChange = String(configState.language ?? "en").trim() !== normalizedLanguage;
@@ -1020,11 +1149,15 @@ export function createPromptWorkbenchShell({
       optionButton.dataset.selected = String(entry.code === currentLanguage);
       optionButton.setAttribute("role", "option");
       optionButton.setAttribute("aria-selected", String(entry.code === currentLanguage));
+      optionButton.addEventListener("focus", () => {
+        selector.setAttribute("aria-activedescendant", optionButton.id);
+      });
       optionButton.addEventListener("click", () => {
         setPromptWorkbenchLanguage(entry.code, { focusTrigger: true });
       });
       selector.appendChild(optionButton);
     });
+    placeLanguageSelector();
   }
 
   function getActiveNamespace() {
@@ -3205,6 +3338,14 @@ export function createPromptWorkbenchShell({
     }
     closeLanguageSelector({ focusTrigger: true });
   });
+
+  const repositionLanguageSelector = () => {
+    if (languageSelectorOpen) {
+      placeLanguageSelector();
+    }
+  };
+  globalThis?.addEventListener?.("resize", repositionLanguageSelector, { passive: true });
+  globalThis?.addEventListener?.("scroll", repositionLanguageSelector, { passive: true, capture: true });
 
   Object.entries(namespaceMap).forEach(([scope, namespace]) => {
     if (normalizedFixedScope && scope !== normalizedFixedScope) {

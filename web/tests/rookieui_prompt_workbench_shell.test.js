@@ -802,6 +802,101 @@ describe("prompt workbench shell", () => {
     expect(document.activeElement).toBe(languageButton);
   });
 
+  test("places inline language selector with viewport-safe fixed geometry", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState();
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-placement-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const languageButton = document.getElementById("inline-language-placement-workbench-inline-language");
+    languageButton.getBoundingClientRect = () => ({
+      left: 1220,
+      right: 1270,
+      top: 42,
+      bottom: 72,
+      width: 50,
+      height: 30,
+      x: 1220,
+      y: 42,
+      toJSON: () => ({}),
+    });
+
+    languageButton.click();
+    await flushPromises();
+
+    const selector = document.getElementById("inline-language-placement-workbench-language-selector");
+    expect(selector?.dataset.placement).toBe("fixed");
+    expect(selector?.style.position).toBe("fixed");
+    expect(selector?.style.left).toMatch(/px$/);
+    expect(selector?.style.top).toMatch(/px$/);
+    expect(selector?.style.maxHeight).toMatch(/px$/);
+  });
+
+  test("supports keyboard navigation and selection in inline language selector", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    const bootstrapState = createBootstrapState({
+      promptWorkbench: {
+        ...createBootstrapState().promptWorkbench,
+        language_options: [
+          { code: "en", title: "English" },
+          { code: "zh-TW", title: "Traditional Chinese" },
+          { code: "ja", title: "Japanese" },
+        ],
+      },
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "inline-language-keyboard-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      fixedScope: "prompt",
+    });
+
+    await shellApi.openWorkbench();
+    await flushPromises();
+
+    const languageButton = document.getElementById("inline-language-keyboard-workbench-inline-language");
+    const selector = document.getElementById("inline-language-keyboard-workbench-language-selector");
+    languageButton.click();
+    await flushPromises();
+
+    expect(document.activeElement).toBe(document.getElementById("inline-language-keyboard-workbench-language-option-en"));
+
+    selector.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    await flushPromises();
+    expect(document.activeElement).toBe(document.getElementById("inline-language-keyboard-workbench-language-option-zh-TW"));
+
+    selector.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flushPromises();
+    expect(document.getElementById("inline-language-keyboard-workbench-inline-language")?.textContent).toBe("zh-TW / prompt");
+    expect(selector?.hidden).toBe(true);
+    expect(document.activeElement).toBe(languageButton);
+  });
+
   test("localizes core labels and supports import export actions", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const bootstrapState = createBootstrapState({
