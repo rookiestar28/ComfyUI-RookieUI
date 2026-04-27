@@ -946,6 +946,80 @@ async function handleE2EFetch(url, options = {}) {
     );
   }
 
+  if (route === "/rookieui/prompt-tools/config") {
+    const method = String(options.method ?? "GET").toUpperCase();
+    if (method !== "GET") {
+      const payload = JSON.parse(options.body ?? "{}");
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          config: payload,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        config: {
+          language: "en",
+          theme_style: "rookieui_classic",
+          history_limit: 100,
+          favorites_limit: 100,
+          formatting_rules: {
+            dedupe_commas: true,
+            normalize_spacing: true,
+            trim_outer_whitespace: true,
+          },
+          ui_preferences: {
+            default_open: false,
+            preferred_panel: "editor",
+            show_history: true,
+            show_favorites: true,
+          },
+          translation: { default_provider: "", providers: {} },
+          ai_assist: {
+            default_provider: "",
+            providers: {},
+            instruction_preset: "Write a concise Stable Diffusion prompt.",
+          },
+        },
+        blacklist: { enabled: false, entries: [], translation_entries: [] },
+        host_actions: {
+          danbooru_upsample: {
+            action_id: "danbooru_upsample",
+            title: "Upsample Tags",
+            route_path: "/rookieui/prompt-tools/upsample",
+            available: false,
+            availability: {
+              status: "host_missing",
+              detail: "Host-installed Danbooru upsampler node is not available in the active ComfyUI registry.",
+            },
+          },
+        },
+        language_options: [
+          { code: "en", title: "English", native_title: "English", aliases: ["en_US"], fallback_code: "en" },
+          { code: "zh-TW", title: "Traditional Chinese", native_title: "繁體中文", aliases: ["zh_TW"], fallback_code: "en" },
+          { code: "zh-CN", title: "Simplified Chinese", native_title: "简体中文", aliases: ["zh_CN"], fallback_code: "en" },
+          { code: "zh-HK", title: "Traditional Chinese (Hong Kong)", native_title: "繁體中文 (香港)", aliases: ["zh_HK"], fallback_code: "zh-TW" },
+          { code: "ja", title: "Japanese", native_title: "日本語", aliases: ["ja_JP"], fallback_code: "en" },
+          { code: "ko", title: "Korean", native_title: "한국어", aliases: ["ko_KR"], fallback_code: "en" },
+        ],
+        theme_style_options: [
+          { id: "rookieui_classic", title: "RookieUI Classic" },
+          { id: "rookieui_graphite", title: "Graphite Studio" },
+          { id: "rookieui_tagboard", title: "Tag Board" },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
   return new Response(
     JSON.stringify({
       service: "rookieui",

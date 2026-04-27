@@ -15,8 +15,10 @@ function ensureArtifactDir() {
 test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ page }) => {
   const artifactDir = ensureArtifactDir();
   const referencePath = path.join(artifactDir, "reference-prompt-all-in-one-card.png");
+  const referenceLanguageSelectorPath = path.join(artifactDir, "reference-prompt-all-in-one-language-selector.png");
   const currentCardPath = path.join(artifactDir, "current-rookieui-prompt-workbench-card.png");
   const currentPopoverPath = path.join(artifactDir, "current-rookieui-prompt-workbench-popover.png");
+  const currentLanguageSelectorPath = path.join(artifactDir, "current-rookieui-prompt-workbench-language-selector.png");
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.setContent(`<!doctype html>
@@ -90,6 +92,30 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
             border-radius: 5px;
             background: #fff;
           }
+          .reference-language-selector {
+            width: 360px;
+            max-height: 360px;
+            margin-top: 24px;
+            overflow: hidden;
+            border: 1px solid #7c8fad;
+            border-radius: 8px;
+            background: #1b1d21;
+            box-shadow: 0 18px 42px rgb(14 20 30 / 0.38);
+            color: #f5f7fb;
+            padding: 6px;
+          }
+          .reference-language-option {
+            display: flex;
+            min-height: 34px;
+            align-items: center;
+            padding: 0 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            font-weight: 700;
+          }
+          .reference-language-option[data-selected="true"] {
+            background: linear-gradient(90deg, #26c6da, #5965ff);
+          }
         </style>
       </head>
       <body>
@@ -129,10 +155,21 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
             <span class="reference-chip">lighting</span>
           </div>
         </section>
+        <section class="reference-language-selector" data-reference="prompt-all-in-one-language-selector">
+          <div class="reference-language-option">zh_CN - 简体中文 (中国)</div>
+          <div class="reference-language-option">zh_HK - 繁體中文 (中國香港)</div>
+          <div class="reference-language-option">zh_TW - 繁體中文 (中國台灣)</div>
+          <div class="reference-language-option" data-selected="true">en_US - English (US)</div>
+          <div class="reference-language-option">af_ZA - Afrikaans (South Africa)</div>
+          <div class="reference-language-option">sq_AL - Shqip (Shqipëria)</div>
+          <div class="reference-language-option">ja_JP - Japanese (Japan)</div>
+          <div class="reference-language-option">ko_KR - Korean (Korea)</div>
+        </section>
       </body>
     </html>`);
 
   await page.locator("[data-reference='prompt-all-in-one-card']").screenshot({ path: referencePath });
+  await page.locator("[data-reference='prompt-all-in-one-language-selector']").screenshot({ path: referenceLanguageSelectorPath });
 
   await page.goto("test-harness.html");
   await page.locator("#rookieui-prompt").fill("masterpiece, city skyline, cinematic lighting");
@@ -239,6 +276,24 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
 
   await workbench.screenshot({ path: currentCardPath });
 
+  const languageButton = workbench.locator("[data-pw-ui='inline-language']");
+  await languageButton.click();
+  const languageSelector = page.locator("#rookieui-txt2img-workbench-language-selector");
+  await expect(languageSelector).toBeVisible();
+  await expect(languageSelector).toHaveAttribute("data-placement", "fixed");
+  await expect(languageSelector).toBeInViewport();
+  await expect(languageSelector.locator("[data-language-code='zh-TW']")).toBeVisible();
+  await languageSelector.screenshot({ path: currentLanguageSelectorPath });
+  await languageSelector.locator("[data-language-code='zh-TW']").click();
+  await expect(languageButton).toHaveText("zh-TW / prompt");
+  await expect(page.locator("#rookieui-txt2img-workbench-assist-language")).toHaveValue("zh-TW");
+  await expect(languageSelector).toBeHidden();
+  await languageButton.click();
+  await expect(languageSelector).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(languageSelector).toBeHidden();
+  await expect(languageButton).toBeFocused();
+
   await workbench.locator("[data-pw-ui='inline-keyword-input']").fill("soft rim light");
   await workbench.locator("[data-pw-ui='inline-keyword-input']").press("Enter");
   await expect(page.locator("#rookieui-prompt")).toHaveValue(/soft rim light/);
@@ -274,7 +329,7 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(page.locator("#rookieui-prompt")).toHaveValue("");
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("0 tags");
 
-  [referencePath, currentCardPath, currentPopoverPath].forEach((artifactPath) => {
+  [referencePath, referenceLanguageSelectorPath, currentCardPath, currentPopoverPath, currentLanguageSelectorPath].forEach((artifactPath) => {
     expect(fs.statSync(artifactPath).size).toBeGreaterThan(1000);
   });
 });

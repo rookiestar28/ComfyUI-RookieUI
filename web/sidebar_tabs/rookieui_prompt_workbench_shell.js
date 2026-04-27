@@ -1083,9 +1083,10 @@ export function createPromptWorkbenchShell({
       return;
     }
     if (event.key === "Enter" || event.key === " ") {
-      const activeOption = document.activeElement?.dataset?.pwUi === "language-option"
+      const eventOption = event.target?.dataset?.pwUi === "language-option" ? event.target : null;
+      const activeOption = eventOption ?? (document.activeElement?.dataset?.pwUi === "language-option"
         ? document.activeElement
-        : inlineToolbarNodes.languageSelector?.querySelector("[data-selected='true']");
+        : inlineToolbarNodes.languageSelector?.querySelector("[data-selected='true']"));
       const languageCode = activeOption?.dataset?.languageCode;
       if (languageCode) {
         event.preventDefault();
