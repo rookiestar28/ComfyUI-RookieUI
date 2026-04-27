@@ -184,6 +184,8 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("5 tags");
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveAttribute("role", "status");
   await expect(workbench.locator("[data-pw-ui='inline-language']")).toContainText("prompt");
+  const counterFontSize = await workbench.locator("[data-pw-ui='inline-counter']").evaluate((node) => getComputedStyle(node).fontSize);
+  await expect(workbench.locator("[data-pw-ui='inline-language']")).toHaveCSS("font-size", counterFontSize);
   await expect(workbench.locator("[data-pw-ui='inline-language']")).toHaveAttribute(
     "aria-label",
     "Prompt workbench language and scope",

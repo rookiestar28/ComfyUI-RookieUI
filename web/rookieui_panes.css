@@ -1794,7 +1794,7 @@
 
 .rookieui-shell__prompt-workbench-language-button {
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
 }
 
 .rookieui-shell__prompt-workbench-language-button:is(:hover, :focus-visible) {
