@@ -25,11 +25,22 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Testing workflow and hosted API regression hardening (stability/tooling)</strong></summary>
+<summary><strong>Prompt Workbench language selector and host-safe overlay parity (new functionality/stability)</strong></summary>
 
-- Updated the repository testing SOPs to make problem reproduction the first goal of every bugfix or high-risk validation flow, so new tests are expected to fail for the user-visible bug class they guard.
-- Expanded frontend and E2E coverage for hosted ComfyUI API integration, including runtime API resolver submission paths, model inventory recovery from ComfyUI `object_info`, and full txt2img/img2img submission payload drift.
-- Hardened the standard test workflow around deterministic Windows/WSL execution, project-local Python environments, Node version checks, pre-commit hygiene, and full unit plus Playwright E2E validation.
+- Added an inline language control in the `Prompt Workbench` header, so local-language selection is available directly from the prompt authoring surface instead of only from the assist panel.
+- Expanded Prompt Workbench language options with host-aware locale aliases and deterministic fallback/normalization for A1111/ComfyUI-style codes such as `en_US`, `zh_TW`, and `zh_CN`.
+- Language selection now synchronizes persisted config, inline labels, the Assist language selector, local translation targets, token local-language rows, and language-sensitive catalog/group-tag refresh.
+- Hardened selector placement, dismissal, focus return, and keyboard behavior so the control remains usable inside ComfyUI/RookieUI sidebar containers.
+
+</details>
+
+<details>
+
+<summary><strong>Hosted API integration hardening (stability)</strong></summary>
+
+- Hardened hosted ComfyUI API integration for runtime API resolver submission paths.
+- Improved model inventory recovery from ComfyUI `object_info`, reducing blank or degraded model lists when the host catalog is still available through the API.
+- Tightened txt2img/img2img submission payload alignment so generated requests stay closer to the active host contract.
 
 </details>
 
@@ -291,7 +302,7 @@ Current extension seams:
 - Added advanced mask editing operations for inpaint usability: rectangle selection, selection fill/erase/invert, and bounded selection move controls.
 - Introduced a dedicated Img2Img mode router contract so visible mode switching and backend mode payload stay synchronized through one deterministic path.
 - Upgraded Img2Img mode UX to A1111-style second-level generation subtabs (`img2img`, `Sketch`, `Inpaint`, `Inpaint sketch`, `Inpaint upload`, `Batch`) while preserving existing backend compatibility.
-- Hardened high-risk UI paths with focused regression coverage and reran full backend/frontend validation gates after each stage.
+- Hardened high-risk UI paths around mode switching, mask editing, and backend payload synchronization.
 
 </details>
 </details>
@@ -387,6 +398,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 - integrated prompt-band workbench in `txt2img` and `img2img`
 - persisted `prompt` / `negative` namespace state, history, and favorites
+- inline language selector with host-aware locale alias normalization and synchronized local translation/catalog state
 - quick-insert catalogs for group tags, prompt-library entries, embeddings, and LoRA references
 - translation, prompt analysis, AI assist delivery, and blacklist-aware formatting tools
 - truthful Danbooru host-action support for `Upsample Tags` when the host-side upsampler node is installed and available
@@ -511,16 +523,21 @@ Prompt semantics note:
 Simple usage:
 
 1. Open `txt2img` or `img2img`, then click `Open Workbench` in the prompt band.
-2. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit, then use `Capture Current Text` if you want to pull the current field value into the workbench explicitly.
-3. Use the `Editor`, `History`, `Favorites`, `Catalog`, `Assist`, and `Format` panels as needed; token insertion, formatting cleanup, blacklist application, translation, and AI assist all operate on the active scope.
-4. Choose a configured shipped translation or AI-assist provider before running translation/assist actions, then apply the returned text back into the active RookieUI prompt field.
-5. Use `Upsample Tags` when you want the active prompt expanded through the host-installed Danbooru upsampler node; the returned text writes back into the current Prompt Workbench draft and prompt field.
-6. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
+2. Use the inline language control in the workbench header to choose the local language for translation, assist, and catalog labeling; the Assist panel language selector stays synchronized with the same setting.
+3. Switch between the `Prompt` and `Negative` scopes depending on which field you want to edit, then use `Capture Current Text` if you want to pull the current field value into the workbench explicitly.
+4. Use the `Editor`, `History`, `Favorites`, `Catalog`, `Assist`, and `Format` panels as needed; token insertion, formatting cleanup, blacklist application, translation, and AI assist all operate on the active scope.
+5. Choose a configured shipped translation or AI-assist provider before running translation/assist actions, then apply the returned text back into the active RookieUI prompt field.
+6. Use `Upsample Tags` when you want the active prompt expanded through the host-installed Danbooru upsampler node; the returned text writes back into the current Prompt Workbench draft and prompt field.
+7. Insert, rewrite, or clean prompt text; the active scope writes back to the current RookieUI prompt field and persists across refreshes.
 
 Behavior and compatibility:
 
 - `Prompt Workbench` is built directly into RookieUI's prompt band instead of relying on an A1111 textarea hijack or a separate external extension surface.
 - State is persisted separately for the shipped `txt2img` / `img2img` prompt and negative namespaces.
+- Inline language selection is shared by the prompt and negative workbench scopes and persists through the Prompt Workbench config.
+- The language catalog accepts common A1111/ComfyUI locale aliases such as `en_US`, `zh_TW`, and `zh_CN`, then normalizes them to RookieUI display codes.
+- Changing language refreshes language-sensitive catalog/group-tag resources and updates local translation controls and token local-language rows.
+- The language selector uses viewport-safe overlay placement with Escape/outside-click dismissal and focus return for ComfyUI-hosted layouts.
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, reference-only, or otherwise unavailable on the current host/setup.
 - Shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist uses the OpenAI-compatible provider contract.
@@ -653,11 +670,11 @@ Current shipped SD-family parity surface:
 - attention markers such as `(text:1.2)`, `(text)`, and `[text]`
 - inventory-aware embeddings / textual inversion tokens on the shipped prompt path
 
-Runtime and validation notes:
+Runtime notes:
 
 - `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
 - Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
-- The shipped parity surface is backed by golden parser/translator fixtures and reference-backed differential coverage.
+- The shipped parity surface is covered by parser/translator compatibility checks.
 - Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
 
 Other official non-SD or image-edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
