@@ -1951,9 +1951,15 @@
 .rookieui-shell__prompt-workbench-inline-setting-select select {
   max-width: 160px;
   border: 0;
-  background: transparent;
-  color: inherit;
+  /* IMPORTANT: native select popups do not reliably inherit dark host colors. */
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 88%, black 12%);
+  color: var(--rookieui-text-strong);
   font-size: 11px;
+}
+
+.rookieui-shell__prompt-workbench-inline-setting-select select option {
+  background: var(--rookieui-bg-panel);
+  color: var(--rookieui-text-strong);
 }
 
 .rookieui-shell__prompt-workbench-inline-keyword-input {
