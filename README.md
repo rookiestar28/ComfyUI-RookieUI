@@ -25,6 +25,27 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Stable Diffusion single-node A1111 prompt encoder parity (new functionality/stability)</strong></summary>
+
+- `RookieUI A1111 CLIP Text Encode` and `RookieUI A1111 CLIP Text Encode SDXL` now handle more A1111-style prompt conditioning behavior inside the encoder node itself instead of relying only on outer workflow graph composition.
+- Added single-node handling for prompt schedules, alternates, `AND`, `BREAK`, branch strength metadata, timestep ranges, token rebatching, and SDXL global/local channel pairing.
+- Added mean-normalized weighted conditioning behavior for weighted prompt text when the active host returns ComfyUI-style conditioning pairs.
+- Kept a legacy encoder fallback option so existing host environments can restore the previous tokenization path if needed without changing required node inputs.
+
+</details>
+
+<details>
+
+<summary><strong>Prompt Workbench frontend modularization and inline surface hardening (stability)</strong></summary>
+
+- Split the enlarged Prompt Workbench frontend shell into focused modules for i18n, language selection, group tags, catalogs, token-board behavior, and secondary surfaces.
+- Added regression coverage around extracted module boundaries so tab switching, cross-pane routing, and Prompt Workbench state stay stable after frontend changes.
+- Tightened inline Prompt Workbench behavior for compact toolbar affordances, icon-first controls, hover settings, keyword input, and model-library dropdowns.
+
+</details>
+
+<details>
+
 <summary><strong>Prompt Workbench localized group tags and language sync closure (new functionality/stability)</strong></summary>
 
 - Added an inline Group Tags board with group/subgroup tabs, localized tag labels, show/hide behavior, and add/remove interaction on the prompt authoring surface.
@@ -387,7 +408,7 @@ If your host or Manager install path does not automatically install custom-node 
 - `img2img` request normalization with guarded asset-handle path
 - `img2img` mode surface: `img2img`, `sketch`, `inpaint`, `inpaint_sketch`, `inpaint_upload`, `batch`
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
-- Stable Diffusion family prompt semantics parity for `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, and embeddings / textual inversion tokens
+- Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
@@ -449,7 +470,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Model Controls
 
-- SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics and inventory-aware embeddings / textual inversion handling
+- SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics, single-node conditioning composition, and inventory-aware embeddings / textual inversion handling
 - Official non-SD template presets now surface family-specific controls only when the upstream workflow exposes them, including `Shift`, `Flux Guidance`, and `Prompt Enhancement`
 - Fixed template-owned encoder bundles keep `Text Encoder` controls hidden on the shipped official non-SD preset matrix instead of implying a user-selectable pairing that the official template does not expose
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
@@ -673,7 +694,7 @@ Behavior and compatibility:
 
 ### Stable Diffusion Prompt Parity
 
-RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough.
+RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough. The SD1.5 and SDXL RookieUI encoder nodes now handle A1111-style conditioning composition directly inside the node path where practical, while keeping existing workflow translation compatibility.
 
 Current shipped SD-family parity surface:
 
@@ -682,13 +703,17 @@ Current shipped SD-family parity surface:
 - scheduling slices such as `[from:to:at]`
 - alternate prompt scheduling such as `[a|b]`
 - attention markers such as `(text:1.2)`, `(text)`, and `[text]`
+- single-node timestep metadata and branch-strength conditioning for RookieUI A1111 CLIP Text Encode nodes
+- SDXL global/local text-channel pairing for RookieUI A1111 CLIP Text Encode SDXL
+- mean-normalized weighted conditioning when the host returns ComfyUI-style conditioning pairs
 - inventory-aware embeddings / textual inversion tokens on the shipped prompt path
 
 Runtime notes:
 
 - `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
+- The RookieUI A1111 CLIP Text Encode nodes keep optional legacy fallback controls for host compatibility; existing workflows do not need new required inputs.
 - Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
-- The shipped parity surface is covered by parser/translator compatibility checks.
+- The shipped parity surface is covered by parser, node-level encoder, and translator compatibility checks.
 - Newer/non-SD families remain available in RookieUI, but they continue to use native ComfyUI prompt/runtime semantics instead of claiming A1111 parity.
 
 Other official non-SD or image-edit presets may remain unavailable on a given host until the required diffusion model, encoder bundle, VAE, template-owned LoRA, or other official template asset is installed in that specific ComfyUI environment. RookieUI now treats those as host prerequisites instead of silently claiming fallback parity.
