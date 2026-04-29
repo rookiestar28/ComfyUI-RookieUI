@@ -9,6 +9,7 @@ from typing import Any
 from PIL import Image
 
 from rookieui.contracts.aliases import (
+    HIRES_UPSCALE_METHODS as _HIRES_UPSCALE_METHODS,
     INPAINT_AREA_ALIASES as _INPAINT_AREA_ALIASES,
     MASKED_CONTENT_ALIASES as _MASKED_CONTENT_ALIASES,
     MASK_MODE_ALIASES as _MASK_MODE_ALIASES,
@@ -37,6 +38,30 @@ _PARAM_RE = re.compile(r'\s*(\w[\w \-/]+):\s*("(?:\\.|[^\\"])+"|[^,]*)(?:,|$)')
 _IMAGE_SIZE_RE = re.compile(r"^(\d+)x(\d+)$")
 _SCHEDULER_SUFFIXES = (" karras", " exponential", " sgm uniform", " simple")
 _INPAINT_MARKERS = {"Mask mode", "Masked content", "Inpaint area", "Masked area padding"}
+_HIRES_MARKERS = {
+    "Hires upscale",
+    "Hires upscaler",
+    "Hires steps",
+    "Hires resize-1",
+    "Hires resize-2",
+}
+_HIRES_UPSCALER_ALIASES = {
+    "area": "area",
+    "bicubic": "bicubic",
+    "bilinear": "bilinear",
+    "bislerp": "bislerp",
+    "latent": "bislerp",
+    "latent (area)": "area",
+    "latent (bicubic)": "bicubic",
+    "latent (bilinear)": "bilinear",
+    "latent (bislerp)": "bislerp",
+    "latent (nearest)": "nearest-exact",
+    "latent (nearest-exact)": "nearest-exact",
+    "nearest": "nearest-exact",
+    "nearest exact": "nearest-exact",
+    "nearest-exact": "nearest-exact",
+}
+_DEFAULT_HIRES_UPSCALE_METHOD = "bislerp"
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 
 
@@ -186,6 +211,30 @@ def _normalize_schedule_type(
         return default_scheduler
 
 
+def _has_hires_marker(raw_parameters: dict[str, object]) -> bool:
+    return bool(_HIRES_MARKERS.intersection(raw_parameters))
+
+
+def _normalize_hires_upscale_method(raw_upscaler: object, *, warnings: list[str]) -> str:
+    label = str(raw_upscaler or "").strip()
+    if not label:
+        return _DEFAULT_HIRES_UPSCALE_METHOD
+
+    normalized = re.sub(r"\s+", " ", label.replace("_", "-").strip().lower())
+    if normalized in _HIRES_UPSCALE_METHODS:
+        return normalized
+
+    mapped = _HIRES_UPSCALER_ALIASES.get(normalized)
+    if mapped:
+        return mapped
+
+    warnings.append(
+        f"Imported Hires upscaler '{label}' is not available in RookieUI latent hires "
+        f"and fell back to '{_DEFAULT_HIRES_UPSCALE_METHOD}'."
+    )
+    return _DEFAULT_HIRES_UPSCALE_METHOD
+
+
 def _infer_profile(raw_parameters: dict[str, object]) -> str:
     model_name = " ".join(
         str(raw_parameters.get(key, "")).strip().lower()
@@ -212,6 +261,10 @@ def _infer_target_form(raw_parameters: dict[str, object]) -> str:
     has_inpaint_marker = bool(_INPAINT_MARKERS.intersection(raw_parameters))
     if has_img2img_marker and has_inpaint_marker:
         return "inpaint"
+    # IMPORTANT: A1111 Hires.fix txt2img infotext also includes Denoising strength;
+    # keep it out of the img2img path when hires markers are present.
+    if has_img2img_marker and _has_hires_marker(raw_parameters):
+        return "txt2img"
     if has_img2img_marker:
         return "img2img"
     return "txt2img"
@@ -364,6 +417,30 @@ def parse_pnginfo_payload(payload: dict[str, object]) -> PNGInfoParseResult:
             consumed_fields.add("Batch size")
         else:
             payload_map["batch_size"] = 1
+        if _has_hires_marker(raw_parameters):
+            payload_map["hires_enabled"] = True
+            payload_map["hires_scale"] = _coerce_float(
+                raw_parameters.get("Hires upscale"),
+                "Hires upscale",
+                default=1.5,
+            )
+            payload_map["hires_steps"] = _coerce_int(
+                raw_parameters.get("Hires steps"),
+                "Hires steps",
+                default=0,
+            )
+            payload_map["hires_denoise"] = _coerce_float(
+                raw_parameters.get("Denoising strength"),
+                "Denoising strength",
+                default=0.35,
+            )
+            payload_map["hires_upscale_method"] = _normalize_hires_upscale_method(
+                raw_parameters.get("Hires upscaler"),
+                warnings=warnings,
+            )
+            consumed_fields.update(
+                {"Denoising strength", "Hires upscale", "Hires upscaler", "Hires steps"}
+            )
     else:
         payload_map["mode"] = "inpaint" if target_form == "inpaint" else "img2img"
         payload_map["width"] = _coerce_int(

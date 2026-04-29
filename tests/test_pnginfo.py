@@ -12,6 +12,8 @@ from rookieui.api import routes
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.security.request_guard import MAX_INFOTEXT_LENGTH
 from rookieui.services.pnginfo import parse_pnginfo_payload
+from rookieui.services.txt2img import normalize_txt2img_request
+from rookieui.services.workflow_translation import translate_txt2img_request
 
 
 class _FakeJsonRequest:
@@ -56,6 +58,41 @@ class PNGInfoParsingTests(unittest.TestCase):
         self.assertEqual(result["payload"]["sampler_name"], "euler_ancestral")
         self.assertEqual(result["payload"]["width"], 768)
         self.assertEqual(result["payload"]["clip_skip"], 2)
+
+    def test_parse_pnginfo_payload_keeps_a1111_hires_metadata_on_txt2img_sdxl_encoder_path(self) -> None:
+        result = parse_pnginfo_payload(
+            {
+                "image_data": self._build_a1111_parameters_image_data(
+                    (
+                        "1girl, japanese clothes, umbrella\n"
+                        "Negative prompt: worst quality, bad quality,\n"
+                        "Steps: 20, Sampler: Euler a, Schedule type: Automatic, CFG scale: 7, "
+                        "Seed: 3322577650, Size: 832x1216, Model hash: b4fb5f829a, "
+                        "Model: hassakuWIPV3, VAE hash: 235745af8d, VAE: sdxl_vaeFix.safetensors, "
+                        "Denoising strength: 0.38, Hires upscale: 1.3, "
+                        "Hires upscaler: R-ESRGAN 4x+ Anime6B, Version: v1.10.1"
+                    )
+                ),
+            }
+        ).to_payload()
+
+        self.assertEqual(result["target_form"], "txt2img")
+        self.assertEqual(result["payload"]["profile"], "sdxl")
+        self.assertTrue(result["payload"]["hires_enabled"])
+        self.assertEqual(result["payload"]["hires_scale"], 1.3)
+        self.assertEqual(result["payload"]["hires_denoise"], 0.38)
+        self.assertEqual(result["payload"]["hires_upscale_method"], "bislerp")
+        self.assertTrue(
+            any("R-ESRGAN 4x+ Anime6B" in warning for warning in result["warnings"])
+        )
+
+        normalized = normalize_txt2img_request(result["payload"])
+        translated = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in translated["workflow"].values()}
+
+        self.assertEqual(translated["workflow_kind"], "txt2img-sdxl-hires")
+        self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", class_types)
+        self.assertNotIn("CLIPTextEncode", class_types)
 
     def test_parse_pnginfo_payload_maps_inpaint_markers(self) -> None:
         result = parse_pnginfo_payload(
