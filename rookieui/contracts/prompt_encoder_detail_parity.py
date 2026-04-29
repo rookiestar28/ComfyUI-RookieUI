@@ -159,7 +159,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             title="Live Tensor Differential",
             reference_surface="same-model smZNodes/A1111 tensor comparison",
             rookieui_target="Provide optional local report-only tensor comparison tooling.",
-            status="planned_optional_live",
+            status="implemented",
             roadmap_item="F236",
             acceptance_signal="CLI tests prove prerequisite detection and skipped-report behavior without private assets.",
         ),
@@ -211,7 +211,7 @@ def _item_entries() -> tuple[PromptEncoderDetailItem, ...]:
         PromptEncoderDetailItem(
             item_id="F236",
             title="Live Tensor Differential Harness",
-            status="planned_optional_live",
+            status="completed",
             covers=("live_tensor_differential",),
             acceptance_signal="harness tests cover safe skip/report behavior.",
         ),

@@ -32,7 +32,7 @@ class PromptEncoderDetailParityTests(unittest.TestCase):
             },
         )
         self.assertEqual(dimensions["a1111_default_parser"]["status"], "implemented")
-        self.assertEqual(dimensions["live_tensor_differential"]["status"], "planned_optional_live")
+        self.assertEqual(dimensions["live_tensor_differential"]["status"], "implemented")
 
     def test_matrix_keeps_roadmap_items_aligned(self) -> None:
         payload = build_prompt_encoder_detail_parity_payload()
@@ -42,6 +42,7 @@ class PromptEncoderDetailParityTests(unittest.TestCase):
         self.assertEqual(items["R197"]["status"], "completed")
         self.assertEqual(items["F232"]["covers"], ["parser_mode_matrix"])
         self.assertIn("sdxl_dual_channel_embedding", items["F235"]["covers"])
+        self.assertEqual(items["F236"]["status"], "completed")
 
     def test_matrix_uses_allowed_statuses_and_acceptance_signals(self) -> None:
         payload = build_prompt_encoder_detail_parity_payload()
