@@ -34,6 +34,11 @@ from rookieui.services.controlnet_advanced_runtime import (
     build_controlnet_stage_weights,
 )
 from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted_encode
+from rookieui.services.a1111_prompt_encoding import (
+    A1111PromptEncodingOptions,
+    encode_a1111_prompt_conditioning,
+    encode_a1111_sdxl_prompt_conditioning,
+)
 from rookieui.services.prompt_token_rebatch import (
     tokenize_channel_with_rookieui_rebatch,
     tokenize_with_rookieui_rebatch,
@@ -98,15 +103,42 @@ class RookieUIA1111CLIPTextEncode:
             "required": {
                 "text": ("STRING", {"multiline": True, "dynamicPrompts": True}),
                 "clip": ("CLIP",),
-            }
+            },
+            "optional": {
+                "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
+                "a1111_engine": (["parity", "legacy"],),
+                "mean_normalization": ("BOOLEAN", {"default": True}),
+                "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
+            },
         }
 
     CATEGORY = "RookieUI/conditioning"
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "encode"
 
-    def encode(self, clip, text):
+    def encode(
+        self,
+        clip,
+        text,
+        steps=10,
+        a1111_engine="parity",
+        mean_normalization=True,
+        use_old_emphasis_implementation=False,
+    ):
         _require_clip_input(clip)
+        if str(a1111_engine or "parity").strip().lower() != "legacy":
+            return (
+                encode_a1111_prompt_conditioning(
+                    clip,
+                    text,
+                    tokenizer=tokenize_with_rookieui_rebatch,
+                    options=A1111PromptEncodingOptions(
+                        step_count=int(steps or 10),
+                        mean_normalization=bool(mean_normalization),
+                        use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+                    ),
+                ),
+            )
         normalized_text = normalize_prompt_attention_for_weighted_encode(text)
         tokens = tokenize_with_rookieui_rebatch(clip, normalized_text)
         return (clip.encode_from_tokens_scheduled(tokens),)
@@ -126,39 +158,80 @@ class RookieUIA1111CLIPTextEncodeSDXL:
                 "target_height": ("INT", {"default": 1024, "min": 0, "max": 16384}),
                 "text_g": ("STRING", {"multiline": True, "dynamicPrompts": True}),
                 "text_l": ("STRING", {"multiline": True, "dynamicPrompts": True}),
-            }
+            },
+            "optional": {
+                "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
+                "a1111_engine": (["parity", "legacy"],),
+                "mean_normalization": ("BOOLEAN", {"default": True}),
+                "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
+            },
         }
 
     CATEGORY = "RookieUI/conditioning"
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "encode"
 
-    def encode(self, clip, width, height, crop_w, crop_h, target_width, target_height, text_g, text_l):
-        _require_clip_input(clip)
-        normalized_text_g = normalize_prompt_attention_for_weighted_encode(text_g)
-        normalized_text_l = normalize_prompt_attention_for_weighted_encode(text_l)
-        tokens_g = tokenize_channel_with_rookieui_rebatch(clip, normalized_text_g, channel_key="g")
-        tokens_l = tokenize_channel_with_rookieui_rebatch(clip, normalized_text_l, channel_key="l")
+    @staticmethod
+    def _tokenize_sdxl_pair(clip, text_g: str, text_l: str):
+        tokens_g = tokenize_channel_with_rookieui_rebatch(clip, text_g, channel_key="g")
+        tokens_l = tokenize_channel_with_rookieui_rebatch(clip, text_l, channel_key="l")
         if not isinstance(tokens_g, list) or not isinstance(tokens_l, list):
             raise RuntimeError("RookieUI SDXL prompt encode requires a dual-token CLIP payload.")
         tokens = {"g": tokens_g, "l": tokens_l}
-        if "g" in tokens and "l" in tokens:
-            empty = clip.tokenize("")
-            while len(tokens["l"]) < len(tokens["g"]):
-                tokens["l"] += empty["l"]
-            while len(tokens["l"]) > len(tokens["g"]):
-                tokens["g"] += empty["g"]
+        empty = clip.tokenize("")
+        while len(tokens["l"]) < len(tokens["g"]):
+            tokens["l"] += empty["l"]
+        while len(tokens["l"]) > len(tokens["g"]):
+            tokens["g"] += empty["g"]
+        return tokens
+
+    def encode(
+        self,
+        clip,
+        width,
+        height,
+        crop_w,
+        crop_h,
+        target_width,
+        target_height,
+        text_g,
+        text_l,
+        steps=10,
+        a1111_engine="parity",
+        mean_normalization=True,
+        use_old_emphasis_implementation=False,
+    ):
+        _require_clip_input(clip)
+        add_dict = {
+            "width": width,
+            "height": height,
+            "crop_w": crop_w,
+            "crop_h": crop_h,
+            "target_width": target_width,
+            "target_height": target_height,
+        }
+        if str(a1111_engine or "parity").strip().lower() != "legacy":
+            return (
+                encode_a1111_sdxl_prompt_conditioning(
+                    clip,
+                    text_g=text_g,
+                    text_l=text_l,
+                    tokenizer=type(self)._tokenize_sdxl_pair,
+                    options=A1111PromptEncodingOptions(
+                        step_count=int(steps or 10),
+                        mean_normalization=bool(mean_normalization),
+                        use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+                    ),
+                    add_dict=add_dict,
+                ),
+            )
+        normalized_text_g = normalize_prompt_attention_for_weighted_encode(text_g)
+        normalized_text_l = normalize_prompt_attention_for_weighted_encode(text_l)
+        tokens = type(self)._tokenize_sdxl_pair(clip, normalized_text_g, normalized_text_l)
         return (
             clip.encode_from_tokens_scheduled(
                 tokens,
-                add_dict={
-                    "width": width,
-                    "height": height,
-                    "crop_w": crop_w,
-                    "crop_h": crop_h,
-                    "target_width": target_width,
-                    "target_height": target_height,
-                },
+                add_dict=add_dict,
             ),
         )
 

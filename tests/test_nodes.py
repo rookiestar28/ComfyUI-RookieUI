@@ -84,7 +84,7 @@ class RookieUINodesTests(unittest.TestCase):
         self.assertEqual(clip.tokenized, ["portrait (eyes:1.3)"])
         self.assertEqual(conditioning["tokens"], ["portrait (eyes:1.3)"])
 
-    def test_a1111_clip_text_encode_preserves_alternate_groups(self) -> None:
+    def test_a1111_clip_text_encode_expands_alternate_groups_inside_single_node(self) -> None:
         class _FakeClip:
             def __init__(self) -> None:
                 self.tokenized: list[str] = []
@@ -94,15 +94,45 @@ class RookieUINodesTests(unittest.TestCase):
                 return [text]
 
             def encode_from_tokens_scheduled(self, tokens, add_dict=None):
-                return {"tokens": tokens, "add_dict": add_dict or {}}
+                return [[tokens[0], add_dict or {}]]
 
         clip = _FakeClip()
         node = nodes.RookieUIA1111CLIPTextEncode()
 
         conditioning, = node.encode(clip, "portrait [warm|cool] light")
 
-        self.assertEqual(clip.tokenized, ["portrait [warm|cool] light"])
-        self.assertEqual(conditioning["tokens"], ["portrait [warm|cool] light"])
+        self.assertEqual(
+            clip.tokenized,
+            [
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+            ],
+        )
+        self.assertEqual(
+            [item[0] for item in conditioning],
+            [
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+                "portrait warm light",
+                "portrait cool light",
+            ],
+        )
+        self.assertEqual(conditioning[0][1]["start_percent"], 0.0)
+        self.assertEqual(conditioning[-1][1]["end_percent"], 1.0)
 
     def test_a1111_clip_text_encode_rebatches_recent_comma_boundary_when_supported(self) -> None:
         class _FakeTokenizerChannel:
