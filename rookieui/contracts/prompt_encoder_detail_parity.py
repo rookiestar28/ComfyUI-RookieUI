@@ -218,9 +218,9 @@ def _item_entries() -> tuple[PromptEncoderDetailItem, ...]:
         PromptEncoderDetailItem(
             item_id="R198",
             title="smZNodes Detail Parity Acceptance Closure",
-            status="planned",
+            status="completed",
             covers=tuple(entry.dimension_id for entry in _dimension_entries()),
-            acceptance_signal="closure requires implementation records, full gate, and truthfulness review.",
+            acceptance_signal="closure records and full gate completed after all Phase 101 items passed.",
         ),
     )
 

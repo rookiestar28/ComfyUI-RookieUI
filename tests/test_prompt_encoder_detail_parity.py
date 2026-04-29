@@ -43,6 +43,19 @@ class PromptEncoderDetailParityTests(unittest.TestCase):
         self.assertEqual(items["F232"]["covers"], ["parser_mode_matrix"])
         self.assertIn("sdxl_dual_channel_embedding", items["F235"]["covers"])
         self.assertEqual(items["F236"]["status"], "completed")
+        self.assertEqual(items["R198"]["status"], "completed")
+
+    def test_acceptance_closure_has_no_planned_phase_items(self) -> None:
+        payload = build_prompt_encoder_detail_parity_payload()
+        items = {entry["item_id"]: entry for entry in payload["items"]}
+
+        non_completed = [
+            item_id
+            for item_id, entry in sorted(items.items())
+            if entry["status"] != "completed"
+        ]
+
+        self.assertEqual(non_completed, [])
 
     def test_matrix_uses_allowed_statuses_and_acceptance_signals(self) -> None:
         payload = build_prompt_encoder_detail_parity_payload()
