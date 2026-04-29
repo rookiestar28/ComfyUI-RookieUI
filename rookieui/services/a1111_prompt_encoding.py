@@ -19,6 +19,7 @@ from rookieui.services.prompt_dsl import (
     _build_prompt_semantic_plan,
     normalize_prompt_attention_for_weighted_encode,
 )
+from rookieui.services.textual_inversion_resolver import resolve_textual_inversion_prompt
 
 PROMPT_PARSER_MODE_OPTIONS = ("A1111", "full", "comfy++", "fixed attention")
 _PROMPT_PARSER_MODE_ALIASES = {
@@ -44,6 +45,8 @@ class A1111PromptEncodingOptions:
     mean_normalization: bool = True
     use_old_emphasis_implementation: bool = False
     parser_mode: str = "A1111"
+    embedding_names: str | tuple[str, ...] = ""
+    embedding_directory: str = ""
 
 
 def normalize_a1111_prompt_parser_mode(parser_mode: str | None) -> str:
@@ -68,6 +71,35 @@ def _normalize_prompt_text_for_parser(text: str, parser_mode: str | None) -> str
 
 def _options_or_default(options: A1111PromptEncodingOptions | None) -> A1111PromptEncodingOptions:
     return options or A1111PromptEncodingOptions()
+
+
+def _merge_encode_metadata(
+    base: dict[str, Any] | None,
+    extra: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not extra:
+        return base
+    merged = _clone_metadata(base)
+    for key, value in extra.items():
+        if isinstance(value, list) and isinstance(merged.get(key), list):
+            merged[key] = [*merged[key], *value]
+        else:
+            merged[key] = value
+    return merged
+
+
+def _resolve_textual_inversion_for_encode(
+    text: str,
+    options: A1111PromptEncodingOptions,
+) -> tuple[str, dict[str, Any]]:
+    if not options.embedding_names and not options.embedding_directory:
+        return str(text or ""), {}
+    result = resolve_textual_inversion_prompt(
+        str(text or ""),
+        embedding_names=options.embedding_names,
+        embedding_directory=options.embedding_directory,
+    )
+    return result.resolved_text, result.metadata()
 
 
 def build_a1111_prompt_encoding_plan(
@@ -387,7 +419,9 @@ def _encode_text(
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     resolved_options = _options_or_default(options)
-    normalized_text = _prepare_text_for_weighted_encode(text, resolved_options)
+    resolved_text, resolver_metadata = _resolve_textual_inversion_for_encode(text, resolved_options)
+    encode_add_dict = _merge_encode_metadata(add_dict, resolver_metadata)
+    normalized_text = _prepare_text_for_weighted_encode(resolved_text, resolved_options)
     if (
         bool(resolved_options.use_old_emphasis_implementation)
         and _parser_mode_uses_attention_weights(resolved_options.parser_mode)
@@ -397,10 +431,10 @@ def _encode_text(
             normalized_text,
             tokenizer=tokenizer,
             options=resolved_options,
-            add_dict=add_dict,
+            add_dict=encode_add_dict,
         )
     tokens = tokenizer(clip, normalized_text)
-    weighted = clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
+    weighted = clip.encode_from_tokens_scheduled(tokens, add_dict=encode_add_dict)
     if (
         not bool(resolved_options.mean_normalization)
         or not _parser_mode_uses_attention_weights(resolved_options.parser_mode)
@@ -411,7 +445,7 @@ def _encode_text(
     if not plain_text or plain_text == normalized_text:
         return weighted
     reference_tokens = tokenizer(clip, plain_text)
-    reference = clip.encode_from_tokens_scheduled(reference_tokens, add_dict=add_dict)
+    reference = clip.encode_from_tokens_scheduled(reference_tokens, add_dict=encode_add_dict)
     if not _is_conditioning_pair_list(reference):
         return weighted
     return _mean_normalize_conditioning(weighted, reference)
@@ -751,10 +785,16 @@ def _encode_sdxl_pair(
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     resolved_options = _options_or_default(options)
+    resolved_text_g, resolver_metadata_g = _resolve_textual_inversion_for_encode(text_g, resolved_options)
+    resolved_text_l, resolver_metadata_l = _resolve_textual_inversion_for_encode(text_l, resolved_options)
+    encode_add_dict = _merge_encode_metadata(
+        _merge_encode_metadata(add_dict, resolver_metadata_g),
+        resolver_metadata_l,
+    )
     tokens = tokenizer(
         clip,
-        _prepare_text_for_weighted_encode(text_g, resolved_options),
-        _prepare_text_for_weighted_encode(text_l, resolved_options),
+        _prepare_text_for_weighted_encode(resolved_text_g, resolved_options),
+        _prepare_text_for_weighted_encode(resolved_text_l, resolved_options),
     )
     if (
         bool(resolved_options.use_old_emphasis_implementation)
@@ -762,10 +802,10 @@ def _encode_sdxl_pair(
     ):
         weight_batches = _collect_token_weight_batches(tokens)
         if weight_batches:
-            conditioning = clip.encode_from_tokens_scheduled(_unweight_token_payload(tokens), add_dict=add_dict)
+            conditioning = clip.encode_from_tokens_scheduled(_unweight_token_payload(tokens), add_dict=encode_add_dict)
             return _apply_old_emphasis_conditioning(
                 conditioning,
                 weight_batches=weight_batches,
                 mean_normalization=bool(resolved_options.mean_normalization),
             )
-    return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
+    return clip.encode_from_tokens_scheduled(tokens, add_dict=encode_add_dict)

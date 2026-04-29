@@ -111,6 +111,8 @@ class RookieUIA1111CLIPTextEncode:
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
                 "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
+                "embedding_directory": ("STRING", {"default": ""}),
+                "embedding_names": ("STRING", {"multiline": True, "default": ""}),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -127,6 +129,8 @@ class RookieUIA1111CLIPTextEncode:
         steps=10,
         a1111_engine="parity",
         parser="A1111",
+        embedding_directory="",
+        embedding_names="",
         mean_normalization=True,
         use_old_emphasis_implementation=False,
     ):
@@ -137,6 +141,8 @@ class RookieUIA1111CLIPTextEncode:
             mean_normalization=bool(mean_normalization),
             use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
             parser_mode=parser,
+            embedding_names=str(embedding_names or ""),
+            embedding_directory=str(embedding_directory or ""),
         )
         if engine_mode == "text_only":
             # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.
@@ -181,6 +187,8 @@ class RookieUIA1111CLIPTextEncodeSDXL:
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
                 "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
+                "embedding_directory": ("STRING", {"default": ""}),
+                "embedding_names": ("STRING", {"multiline": True, "default": ""}),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -218,6 +226,8 @@ class RookieUIA1111CLIPTextEncodeSDXL:
         steps=10,
         a1111_engine="parity",
         parser="A1111",
+        embedding_directory="",
+        embedding_names="",
         mean_normalization=True,
         use_old_emphasis_implementation=False,
     ):
@@ -236,6 +246,8 @@ class RookieUIA1111CLIPTextEncodeSDXL:
             mean_normalization=bool(mean_normalization),
             use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
             parser_mode=parser,
+            embedding_names=str(embedding_names or ""),
+            embedding_directory=str(embedding_directory or ""),
         )
         if engine_mode == "text_only":
             # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.

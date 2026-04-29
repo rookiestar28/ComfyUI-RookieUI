@@ -301,6 +301,33 @@ class A1111PromptEncodingTests(unittest.TestCase):
         self.assertEqual(conditioning[0][1]["rookieui_emphasis_implementation"], "old")
         self.assertAlmostEqual(conditioning[0][1]["rookieui_old_emphasis_weight_mean"], 1.075)
 
+    def test_node_resolves_textual_inversion_aliases_from_embedding_names(self) -> None:
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(
+            clip,
+            "portrait badhandv4 embedding:missing_style",
+            embedding_names="badhandv4.pt::vectors=2",
+        )
+
+        self.assertEqual(
+            conditioning[0][0],
+            "cond::portrait embedding:badhandv4.pt missing_style",
+        )
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_embeddings"],
+            ["embedding:badhandv4.pt"],
+        )
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_missing"],
+            ["embedding:missing_style"],
+        )
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_fixes"],
+            [{"offset": 1, "name": "badhandv4.pt", "token": "embedding:badhandv4.pt", "vectors": 2}],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
