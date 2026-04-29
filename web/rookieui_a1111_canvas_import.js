@@ -171,11 +171,11 @@ async function buildA1111PngImportContext(file, inspectPngInfoRequest) {
 
   const buffer = await readFileBuffer(file);
   const metadata = extractPngTextMetadataFromArrayBuffer(buffer);
-  const parameters = metadata.parameters;
-  if (hasEmbeddedComfyWorkflow(metadata) || !isLikelyA1111Parameters(parameters)) {
+  if (hasEmbeddedComfyWorkflow(metadata)) {
     return null;
   }
 
+  let parameters = metadata.parameters;
   let inspectionData = null;
   if (typeof inspectPngInfoRequest === "function") {
     try {
@@ -184,9 +184,20 @@ async function buildA1111PngImportContext(file, inspectPngInfoRequest) {
       if (inspectionData?.source_type && inspectionData.source_type !== "a1111") {
         return null;
       }
+      parameters =
+        parameters ??
+        inspectionData?.metadata_items?.parameters ??
+        inspectionData?.metadata_items?.Parameters ??
+        inspectionData?.raw_parameters?.parameters ??
+        "";
     } catch (_error) {
       inspectionData = null;
     }
+  }
+
+  // DEBUG HOTSPOT: real A1111 PNGs may store compressed text chunks that the lightweight frontend parser cannot see; trust the backend inspector when it identifies A1111.
+  if (inspectionData?.source_type !== "a1111" && !isLikelyA1111Parameters(parameters)) {
+    return null;
   }
 
   const payload = inspectionData?.payload && typeof inspectionData.payload === "object" ? inspectionData.payload : {};

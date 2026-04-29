@@ -299,4 +299,75 @@ describe("A1111 PNG direct canvas import encoder routing", () => {
     expect(fetchImpl.mock.calls.some(([url]) => url === "/rookieui/pnginfo/inspect")).toBe(false);
     expect(graph._nodes.map((node) => node.comfyClass)).toContain("CLIPTextEncode");
   });
+
+  test("uses backend PNG inspection when local metadata extraction cannot see A1111 parameters", async () => {
+    const graph = createMockGraph();
+    const originalHandleFile = vi.fn(async () => {
+      createNativeA1111ImportGraph(graph);
+    });
+    const app = {
+      rootGraph: graph,
+      canvas: { setDirty: vi.fn(), setDirtyCanvas: vi.fn() },
+      handleFile: originalHandleFile,
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "canvas-import-backend-only-client",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        registerSidebarTab() {},
+      },
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === "/rookieui/capabilities") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return createDefaultCapabilities();
+          },
+        };
+      }
+      if (url === "/rookieui/pnginfo/inspect") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              status: "ok",
+              source_type: "a1111",
+              target_form: "txt2img",
+              payload: {
+                profile: "sdxl",
+                prompt: "backend positive prompt",
+                negative_prompt: "backend negative prompt",
+                width: 832,
+                height: 1216,
+                steps: 20,
+              },
+            };
+          },
+        };
+      }
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        },
+      };
+    });
+
+    await registerRookieUIBootstrapExtension({ app, fetchImpl });
+    const file = buildPngTextFile({});
+
+    await app.handleFile(file);
+
+    expect(fetchImpl).toHaveBeenCalledWith("/rookieui/pnginfo/inspect", expect.any(Object));
+    expect(graph._nodes.map((node) => node.comfyClass)).not.toContain("CLIPTextEncode");
+    expect(graph._nodes.filter((node) => node.comfyClass === "RookieUIA1111CLIPTextEncodeSDXL")).toHaveLength(2);
+  });
 });

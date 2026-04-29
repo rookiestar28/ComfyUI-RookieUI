@@ -260,13 +260,17 @@
   });
   dropzone.addEventListener("dragover", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     dropzone.dataset.dragging = "true";
   });
-  dropzone.addEventListener("dragleave", () => {
+  dropzone.addEventListener("dragleave", (event) => {
+    event.stopPropagation();
     dropzone.dataset.dragging = "false";
   });
   dropzone.addEventListener("drop", async (event) => {
     event.preventDefault();
+    // DEBUG HOTSPOT: without containment, the same A1111 PNG drop bubbles to ComfyUI's canvas importer and creates a native workflow behind PNG Info.
+    event.stopPropagation();
     dropzone.dataset.dragging = "false";
     const [file] = Array.from(event.dataTransfer?.files ?? []);
     if (!file) {
