@@ -20,12 +20,54 @@ from rookieui.services.prompt_dsl import (
     normalize_prompt_attention_for_weighted_encode,
 )
 
+PROMPT_PARSER_MODE_OPTIONS = ("A1111", "full", "comfy++", "fixed attention")
+_PROMPT_PARSER_MODE_ALIASES = {
+    "": "A1111",
+    "a1111": "A1111",
+    "automatic1111": "A1111",
+    "automatic 1111": "A1111",
+    "parity": "A1111",
+    "full": "full",
+    "full parser": "full",
+    "comfy++": "comfy++",
+    "comfy_plus": "comfy++",
+    "comfy plus": "comfy++",
+    "fixed": "fixed attention",
+    "fixed attention": "fixed attention",
+    "fixed_attention": "fixed attention",
+}
+
 
 @dataclass(frozen=True)
 class A1111PromptEncodingOptions:
     step_count: int = 10
     mean_normalization: bool = True
     use_old_emphasis_implementation: bool = False
+    parser_mode: str = "A1111"
+
+
+def normalize_a1111_prompt_parser_mode(parser_mode: str | None) -> str:
+    return _PROMPT_PARSER_MODE_ALIASES.get(str(parser_mode or "").strip().lower(), "A1111")
+
+
+def _parser_mode_runs_a1111_semantic_compiler(parser_mode: str | None) -> bool:
+    return normalize_a1111_prompt_parser_mode(parser_mode) in {"A1111", "full"}
+
+
+def _parser_mode_uses_attention_weights(parser_mode: str | None) -> bool:
+    return normalize_a1111_prompt_parser_mode(parser_mode) != "fixed attention"
+
+
+def _normalize_prompt_text_for_parser(text: str, parser_mode: str | None) -> str:
+    prompt_text = str(text or "")
+    if normalize_a1111_prompt_parser_mode(parser_mode) != "full":
+        return prompt_text
+    cleaned = re.sub(r"[\x00-\x1f\x7f]+", " ", prompt_text)
+    return " ".join(cleaned.split())
+
+
+def _options_or_default(options: A1111PromptEncodingOptions | None) -> A1111PromptEncodingOptions:
+    return options or A1111PromptEncodingOptions()
 
 
 def build_a1111_prompt_encoding_plan(
@@ -33,9 +75,10 @@ def build_a1111_prompt_encoding_plan(
     *,
     options: A1111PromptEncodingOptions | None = None,
 ) -> PromptSemanticPlan:
-    resolved_options = options or A1111PromptEncodingOptions()
+    resolved_options = _options_or_default(options)
+    normalized_prompt_text = _normalize_prompt_text_for_parser(prompt_text, resolved_options.parser_mode)
     plan, _warnings = _build_prompt_semantic_plan(
-        str(prompt_text or ""),
+        normalized_prompt_text,
         step_count=max(1, int(resolved_options.step_count or 10)),
     )
     return plan
@@ -99,6 +142,14 @@ def _concat_conditioning(conditioning_to: list[Any], conditioning_from: list[Any
 
 def _normalize_slice_text(text: str) -> str:
     return normalize_prompt_attention_for_weighted_encode(str(text or ""))
+
+
+def _prepare_text_for_weighted_encode(text: str, options: A1111PromptEncodingOptions | None) -> str:
+    resolved_options = _options_or_default(options)
+    prepared_text = _normalize_prompt_text_for_parser(text, resolved_options.parser_mode)
+    if not _parser_mode_uses_attention_weights(resolved_options.parser_mode):
+        return prepared_text
+    return _normalize_slice_text(prepared_text)
 
 
 def strip_a1111_attention_weights(text: str) -> str:
@@ -169,11 +220,15 @@ def _encode_text(
     options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
-    normalized_text = _normalize_slice_text(text)
+    resolved_options = _options_or_default(options)
+    normalized_text = _prepare_text_for_weighted_encode(text, resolved_options)
     tokens = tokenizer(clip, normalized_text)
     weighted = clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
-    resolved_options = options or A1111PromptEncodingOptions()
-    if not bool(resolved_options.mean_normalization) or not _is_conditioning_pair_list(weighted):
+    if (
+        not bool(resolved_options.mean_normalization)
+        or not _parser_mode_uses_attention_weights(resolved_options.parser_mode)
+        or not _is_conditioning_pair_list(weighted)
+    ):
         return weighted
     plain_text = strip_a1111_attention_weights(normalized_text)
     if not plain_text or plain_text == normalized_text:
@@ -254,7 +309,10 @@ def encode_a1111_prompt_conditioning(
     options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
-    plan = build_a1111_prompt_encoding_plan(prompt_text, options=options)
+    resolved_options = _options_or_default(options)
+    if not _parser_mode_runs_a1111_semantic_compiler(resolved_options.parser_mode):
+        return _encode_text(clip, prompt_text, tokenizer=tokenizer, options=resolved_options, add_dict=add_dict)
+    plan = build_a1111_prompt_encoding_plan(prompt_text, options=resolved_options)
     if not prompt_requires_single_node_compiler(plan):
         return _encode_text(clip, plan.normalized_text, tokenizer=tokenizer, options=options, add_dict=add_dict)
 
@@ -270,7 +328,7 @@ def encode_a1111_prompt_conditioning(
                 clip,
                 branch,
                 tokenizer=tokenizer,
-                options=options,
+                options=resolved_options,
                 add_dict=add_dict,
             )
             for branch in branches
@@ -369,6 +427,7 @@ def _compile_sdxl_slice_pair(
     start: float,
     end: float,
     tokenizer: Callable[[Any, str, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     conditioning = _encode_sdxl_pair(
@@ -376,6 +435,7 @@ def _compile_sdxl_slice_pair(
         text_g=_chunk_slice_text_at(chunk_g, start=start, end=end),
         text_l=_chunk_slice_text_at(chunk_l, start=start, end=end),
         tokenizer=tokenizer,
+        options=options,
         add_dict=add_dict,
     )
     if start > 0.0 or end < 1.0:
@@ -389,6 +449,7 @@ def _compile_sdxl_chunk_pair(
     chunk_g: PromptChunkSemantic,
     chunk_l: PromptChunkSemantic,
     tokenizer: Callable[[Any, str, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     intervals = _boundaries_to_intervals(_chunk_boundary_points(chunk_g) | _chunk_boundary_points(chunk_l))
@@ -401,6 +462,7 @@ def _compile_sdxl_chunk_pair(
                 start=start,
                 end=end,
                 tokenizer=tokenizer,
+                options=options,
                 add_dict=add_dict,
             )
             for start, end in intervals
@@ -414,6 +476,7 @@ def _compile_sdxl_branch_pair(
     branch_g: PromptBranchSemantic,
     branch_l: PromptBranchSemantic,
     tokenizer: Callable[[Any, str, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     chunk_count = max(len(branch_g.chunks or []), len(branch_l.chunks or []), 1)
@@ -423,6 +486,7 @@ def _compile_sdxl_branch_pair(
             chunk_g=_chunk_at(branch_g, index),
             chunk_l=_chunk_at(branch_l, index),
             tokenizer=tokenizer,
+            options=options,
             add_dict=add_dict,
         )
         for index in range(chunk_count)
@@ -449,10 +513,28 @@ def encode_a1111_sdxl_prompt_conditioning(
     options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
-    plan_g = build_a1111_prompt_encoding_plan(text_g, options=options)
-    plan_l = build_a1111_prompt_encoding_plan(text_l, options=options)
+    resolved_options = _options_or_default(options)
+    if not _parser_mode_runs_a1111_semantic_compiler(resolved_options.parser_mode):
+        return _encode_sdxl_pair(
+            clip,
+            text_g=text_g,
+            text_l=text_l,
+            tokenizer=tokenizer,
+            options=resolved_options,
+            add_dict=add_dict,
+        )
+
+    plan_g = build_a1111_prompt_encoding_plan(text_g, options=resolved_options)
+    plan_l = build_a1111_prompt_encoding_plan(text_l, options=resolved_options)
     if not prompt_requires_single_node_compiler(plan_g) and not prompt_requires_single_node_compiler(plan_l):
-        return _encode_sdxl_pair(clip, text_g=plan_g.normalized_text, text_l=plan_l.normalized_text, tokenizer=tokenizer, add_dict=add_dict)
+        return _encode_sdxl_pair(
+            clip,
+            text_g=plan_g.normalized_text,
+            text_l=plan_l.normalized_text,
+            tokenizer=tokenizer,
+            options=resolved_options,
+            add_dict=add_dict,
+        )
 
     branch_count = max(len(plan_g.branches or []), len(plan_l.branches or []), 1)
     return _combine_conditioning(
@@ -462,6 +544,7 @@ def encode_a1111_sdxl_prompt_conditioning(
                 branch_g=_branch_at(plan_g, index),
                 branch_l=_branch_at(plan_l, index),
                 tokenizer=tokenizer,
+                options=resolved_options,
                 add_dict=add_dict,
             )
             for index in range(branch_count)
@@ -475,9 +558,10 @@ def encode_a1111_sdxl_prompt_text_conditioning(
     text_g: str,
     text_l: str,
     tokenizer: Callable[[Any, str, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
-    return _encode_sdxl_pair(clip, text_g=text_g, text_l=text_l, tokenizer=tokenizer, add_dict=add_dict)
+    return _encode_sdxl_pair(clip, text_g=text_g, text_l=text_l, tokenizer=tokenizer, options=options, add_dict=add_dict)
 
 
 def _encode_sdxl_pair(
@@ -486,11 +570,12 @@ def _encode_sdxl_pair(
     text_g: str,
     text_l: str,
     tokenizer: Callable[[Any, str, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     tokens = tokenizer(
         clip,
-        _normalize_slice_text(text_g),
-        _normalize_slice_text(text_l),
+        _prepare_text_for_weighted_encode(text_g, options),
+        _prepare_text_for_weighted_encode(text_l, options),
     )
     return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)

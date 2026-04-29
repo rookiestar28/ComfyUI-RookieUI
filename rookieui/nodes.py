@@ -36,6 +36,7 @@ from rookieui.services.controlnet_advanced_runtime import (
 from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted_encode
 from rookieui.services.a1111_prompt_encoding import (
     A1111PromptEncodingOptions,
+    PROMPT_PARSER_MODE_OPTIONS,
     encode_a1111_prompt_conditioning,
     encode_a1111_prompt_text_conditioning,
     encode_a1111_sdxl_prompt_conditioning,
@@ -109,6 +110,7 @@ class RookieUIA1111CLIPTextEncode:
             "optional": {
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
+                "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -124,6 +126,7 @@ class RookieUIA1111CLIPTextEncode:
         text,
         steps=10,
         a1111_engine="parity",
+        parser="A1111",
         mean_normalization=True,
         use_old_emphasis_implementation=False,
     ):
@@ -133,6 +136,7 @@ class RookieUIA1111CLIPTextEncode:
             step_count=int(steps or 10),
             mean_normalization=bool(mean_normalization),
             use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+            parser_mode=parser,
         )
         if engine_mode == "text_only":
             # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.
@@ -176,6 +180,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
             "optional": {
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
+                "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -212,6 +217,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
         text_l,
         steps=10,
         a1111_engine="parity",
+        parser="A1111",
         mean_normalization=True,
         use_old_emphasis_implementation=False,
     ):
@@ -229,6 +235,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
             step_count=int(steps or 10),
             mean_normalization=bool(mean_normalization),
             use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+            parser_mode=parser,
         )
         if engine_mode == "text_only":
             # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.
@@ -238,6 +245,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
                     text_g=text_g,
                     text_l=text_l,
                     tokenizer=type(self)._tokenize_sdxl_pair,
+                    options=options,
                     add_dict=add_dict,
                 ),
             )

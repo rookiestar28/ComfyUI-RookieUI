@@ -52,6 +52,15 @@ class _FakeSDXLClip(_FakeClip):
 
 
 class A1111PromptEncodingTests(unittest.TestCase):
+    def test_nodes_expose_parser_mode_matrix(self) -> None:
+        expected_modes = ["A1111", "full", "comfy++", "fixed attention"]
+
+        sd15_modes = nodes.RookieUIA1111CLIPTextEncode.INPUT_TYPES()["optional"]["parser"][0]
+        sdxl_modes = nodes.RookieUIA1111CLIPTextEncodeSDXL.INPUT_TYPES()["optional"]["parser"][0]
+
+        self.assertEqual(sd15_modes, expected_modes)
+        self.assertEqual(sdxl_modes, expected_modes)
+
     def test_build_a1111_prompt_encoding_plan_freezes_multicond_reference_contract(self) -> None:
         plan = build_a1111_prompt_encoding_plan(
             "(hero:1.2) BREAK [day:night:0.5] AND villain:0.7",
@@ -163,6 +172,57 @@ class A1111PromptEncodingTests(unittest.TestCase):
         self.assertEqual(conditioning, [["cond::[day:night:0.5]", {"pooled_output": "pooled::[day:night:0.5]"}]])
         self.assertTrue(clip.tokenized)
         self.assertEqual({call[0] for call in clip.tokenized}, {"[day:night:0.5]"})
+
+    def test_full_parser_normalizes_control_whitespace_before_encoding(self) -> None:
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "hero\r\n\tportrait", parser="full")
+
+        self.assertEqual(conditioning, [["cond::hero portrait", {"pooled_output": "pooled::hero portrait"}]])
+        self.assertEqual(clip.tokenized[0], ("hero portrait", False))
+
+    def test_comfy_plus_parser_keeps_a1111_schedule_literal(self) -> None:
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "[day:night:0.5]", parser="comfy++", steps=4)
+
+        self.assertEqual(conditioning, [["cond::[day:night:0.5]", {"pooled_output": "pooled::[day:night:0.5]"}]])
+        self.assertEqual({call[0] for call in clip.tokenized}, {"[day:night:0.5]"})
+
+    def test_fixed_attention_parser_preserves_literal_attention_markers(self) -> None:
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "portrait [soft light]", parser="fixed attention")
+
+        self.assertEqual(conditioning, [["cond::portrait [soft light]", {"pooled_output": "pooled::portrait [soft light]"}]])
+        self.assertEqual({call[0] for call in clip.tokenized}, {"portrait [soft light]"})
+
+    def test_sdxl_comfy_plus_parser_keeps_dual_channel_schedule_literal(self) -> None:
+        clip = _FakeSDXLClip()
+        node = nodes.RookieUIA1111CLIPTextEncodeSDXL()
+
+        conditioning, = node.encode(
+            clip,
+            1024,
+            768,
+            0,
+            0,
+            1024,
+            768,
+            "[day:night:0.5]",
+            "low [quality:artifact:0.5]",
+            parser="comfy++",
+            steps=4,
+        )
+
+        self.assertEqual(conditioning[0][0], "cond::g::[day:night:0.5]|l::low [quality:artifact:0.5]")
+        tokenized_texts = {call[0] for call in clip.tokenized}
+        self.assertTrue({"[day:night:0.5]", "low [quality:artifact:0.5]"}.issubset(tokenized_texts))
+        self.assertNotIn("day", tokenized_texts)
+        self.assertNotIn("night", tokenized_texts)
 
     def test_mean_normalization_scales_weighted_conditioning_against_plain_reference(self) -> None:
         class _FakeClip:
