@@ -212,6 +212,172 @@ def _mean_normalize_conditioning(weighted: list[Any], reference: list[Any]) -> l
     return normalized
 
 
+def _token_entry_weight(entry: Any) -> float | None:
+    if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+        return None
+    try:
+        return float(entry[1])
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_token_entry(entry: Any) -> bool:
+    return _token_entry_weight(entry) is not None
+
+
+def _collect_token_weight_batches(token_payload: Any) -> list[list[float]]:
+    batches: list[list[float]] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            for channel_value in value.values():
+                visit(channel_value)
+            return
+        if not isinstance(value, list):
+            return
+        if value and all(_is_token_entry(entry) for entry in value):
+            batches.append([float(_token_entry_weight(entry) or 1.0) for entry in value])
+            return
+        for item in value:
+            visit(item)
+
+    visit(token_payload)
+    return batches
+
+
+def _unweight_token_payload(token_payload: Any) -> Any:
+    if isinstance(token_payload, dict):
+        return token_payload.__class__(
+            {key: _unweight_token_payload(value) for key, value in token_payload.items()}
+        )
+    if isinstance(token_payload, list):
+        if _is_token_entry(token_payload):
+            updated = list(token_payload)
+            updated[1] = 1.0
+            return updated
+        return [_unweight_token_payload(item) for item in token_payload]
+    if isinstance(token_payload, tuple) and _is_token_entry(token_payload):
+        updated = list(token_payload)
+        updated[1] = 1.0
+        return tuple(updated)
+    return token_payload
+
+
+def _token_weight_mean(weight_batches: list[list[float]]) -> float:
+    weights = [weight for batch in weight_batches for weight in batch]
+    if not weights:
+        return 1.0
+    return float(sum(weights) / len(weights))
+
+
+def _scale_tensor_with_token_weights(value: Any, weight_batches: list[list[float]], restore_mean: bool) -> Any:
+    if torch is None or not hasattr(value, "shape") or not weight_batches:
+        return None
+    try:
+        shape = tuple(value.shape)
+        if len(shape) < 2:
+            return None
+        batch_count = int(shape[0])
+        token_count = int(shape[1])
+        if batch_count <= 0 or token_count <= 0:
+            return None
+        rows: list[list[float]] = []
+        for batch_index in range(batch_count):
+            row = list(weight_batches[batch_index] if batch_index < len(weight_batches) else weight_batches[0])
+            if len(row) < token_count:
+                row.extend([1.0] * (token_count - len(row)))
+            rows.append(row[:token_count])
+        kwargs: dict[str, Any] = {}
+        dtype = getattr(value, "dtype", None)
+        device = getattr(value, "device", None)
+        if dtype is not None:
+            kwargs["dtype"] = dtype
+        if device is not None:
+            kwargs["device"] = device
+        multipliers = torch.asarray(rows, **kwargs).reshape(
+            batch_count,
+            token_count,
+            *([1] * (len(shape) - 2)),
+        )
+        original_mean = value.mean()
+        scaled = value * multipliers
+        if not restore_mean:
+            return scaled
+        new_mean = scaled.mean()
+        if abs(float(new_mean)) <= 1e-12:
+            return scaled
+        return scaled * (original_mean / new_mean)
+    except Exception:
+        return None
+
+
+def _scale_value_with_old_emphasis(value: Any, weight_batches: list[list[float]], restore_mean: bool) -> Any:
+    tensor_value = _scale_tensor_with_token_weights(value, weight_batches, restore_mean)
+    if tensor_value is not None:
+        return tensor_value
+
+    weight_mean = _token_weight_mean(weight_batches)
+    scaled = _scale_value(value, weight_mean)
+    if not restore_mean:
+        return scaled
+    original_mean = _value_mean(value)
+    scaled_mean = _value_mean(scaled)
+    if original_mean is None or scaled_mean is None or abs(scaled_mean) <= 1e-12:
+        return scaled
+    return _scale_value(scaled, original_mean / scaled_mean)
+
+
+def _apply_old_emphasis_conditioning(
+    conditioning: list[Any],
+    *,
+    weight_batches: list[list[float]],
+    mean_normalization: bool,
+) -> list[Any]:
+    if not _is_conditioning_pair_list(conditioning) or not weight_batches:
+        return conditioning
+    weight_mean = round(_token_weight_mean(weight_batches), 6)
+    updated: list[Any] = []
+    for item in conditioning:
+        metadata = _clone_metadata(item[1])
+        metadata.update(
+            {
+                "rookieui_emphasis_implementation": "old",
+                "rookieui_old_emphasis_weight_mean": weight_mean,
+            }
+        )
+        updated.append(
+            [
+                _scale_value_with_old_emphasis(
+                    item[0],
+                    weight_batches,
+                    bool(mean_normalization),
+                ),
+                metadata,
+            ]
+        )
+    return updated
+
+
+def _encode_text_with_old_emphasis(
+    clip: Any,
+    text: str,
+    *,
+    tokenizer: Callable[[Any, str], Any],
+    options: A1111PromptEncodingOptions,
+    add_dict: dict[str, Any] | None = None,
+) -> list[Any]:
+    tokens = tokenizer(clip, text)
+    weight_batches = _collect_token_weight_batches(tokens)
+    if not weight_batches:
+        return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
+    conditioning = clip.encode_from_tokens_scheduled(_unweight_token_payload(tokens), add_dict=add_dict)
+    return _apply_old_emphasis_conditioning(
+        conditioning,
+        weight_batches=weight_batches,
+        mean_normalization=bool(options.mean_normalization),
+    )
+
+
 def _encode_text(
     clip: Any,
     text: str,
@@ -222,6 +388,17 @@ def _encode_text(
 ) -> list[Any]:
     resolved_options = _options_or_default(options)
     normalized_text = _prepare_text_for_weighted_encode(text, resolved_options)
+    if (
+        bool(resolved_options.use_old_emphasis_implementation)
+        and _parser_mode_uses_attention_weights(resolved_options.parser_mode)
+    ):
+        return _encode_text_with_old_emphasis(
+            clip,
+            normalized_text,
+            tokenizer=tokenizer,
+            options=resolved_options,
+            add_dict=add_dict,
+        )
     tokens = tokenizer(clip, normalized_text)
     weighted = clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)
     if (
@@ -573,9 +750,22 @@ def _encode_sdxl_pair(
     options: A1111PromptEncodingOptions | None = None,
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
+    resolved_options = _options_or_default(options)
     tokens = tokenizer(
         clip,
-        _prepare_text_for_weighted_encode(text_g, options),
-        _prepare_text_for_weighted_encode(text_l, options),
+        _prepare_text_for_weighted_encode(text_g, resolved_options),
+        _prepare_text_for_weighted_encode(text_l, resolved_options),
     )
+    if (
+        bool(resolved_options.use_old_emphasis_implementation)
+        and _parser_mode_uses_attention_weights(resolved_options.parser_mode)
+    ):
+        weight_batches = _collect_token_weight_batches(tokens)
+        if weight_batches:
+            conditioning = clip.encode_from_tokens_scheduled(_unweight_token_payload(tokens), add_dict=add_dict)
+            return _apply_old_emphasis_conditioning(
+                conditioning,
+                weight_batches=weight_batches,
+                mean_normalization=bool(resolved_options.mean_normalization),
+            )
     return clip.encode_from_tokens_scheduled(tokens, add_dict=add_dict)

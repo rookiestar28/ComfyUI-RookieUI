@@ -246,6 +246,61 @@ class A1111PromptEncodingTests(unittest.TestCase):
         self.assertEqual(clip.encoded_texts, ["hero (eyes:1.3)", "hero eyes"])
         self.assertEqual(conditioning, [[5.0, {"pooled_output": "pooled::hero (eyes:1.3)"}]])
 
+    def test_mean_normalization_can_be_disabled(self) -> None:
+        class _FakeClip:
+            def __init__(self) -> None:
+                self.encoded_texts: list[str] = []
+
+            def tokenize(self, text, return_word_ids=False):
+                return {"l": [[("BOS", 1.0), (text, 1.0), ("EOS", 1.0)]]}
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                text = tokens["l"][0][1][0]
+                self.encoded_texts.append(text)
+                value = 20.0 if text == "hero (eyes:1.3)" else 5.0
+                return [[value, {"pooled_output": f"pooled::{text}", **(add_dict or {})}]]
+
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "hero (eyes:1.3)", mean_normalization=False)
+
+        self.assertEqual(clip.encoded_texts, ["hero (eyes:1.3)"])
+        self.assertEqual(conditioning, [[20.0, {"pooled_output": "pooled::hero (eyes:1.3)"}]])
+
+    def test_old_emphasis_encodes_unweighted_tokens_then_applies_multipliers(self) -> None:
+        class _WeightedClip:
+            def __init__(self) -> None:
+                self.encoded_token_weights: list[list[float]] = []
+
+            def tokenize(self, text, return_word_ids=False):
+                if text != "hero (eyes:1.3)":
+                    return {"l": [[("BOS", 1.0), (text, 1.0), ("EOS", 1.0)]]}
+                if return_word_ids:
+                    return {
+                        "l": [[("BOS", 1.0, 0), ("hero", 1.0, 1), ("eyes", 1.3, 2), ("EOS", 1.0, 0)]]
+                    }
+                return {"l": [[("BOS", 1.0), ("hero", 1.0), ("eyes", 1.3), ("EOS", 1.0)]]}
+
+            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+                self.encoded_token_weights.append([float(entry[1]) for entry in tokens["l"][0]])
+                return [[10.0, {"pooled_output": "pooled::old", **(add_dict or {})}]]
+
+        clip = _WeightedClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(
+            clip,
+            "hero (eyes:1.3)",
+            use_old_emphasis_implementation=True,
+            mean_normalization=False,
+        )
+
+        self.assertEqual(clip.encoded_token_weights, [[1.0, 1.0, 1.0, 1.0]])
+        self.assertAlmostEqual(conditioning[0][0], 10.75)
+        self.assertEqual(conditioning[0][1]["rookieui_emphasis_implementation"], "old")
+        self.assertAlmostEqual(conditioning[0][1]["rookieui_old_emphasis_weight_mean"], 1.075)
+
 
 if __name__ == "__main__":
     unittest.main()
