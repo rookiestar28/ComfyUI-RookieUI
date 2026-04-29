@@ -495,9 +495,28 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   const submitButton = document.createElement("button");
   submitButton.id = "rookieui-txt2img-submit";
   submitButton.className = "rookieui-shell__button rookieui-shell__button--hero";
-  submitButton.type = "submit";
+  submitButton.type = "button";
   submitButton.textContent = "Generate";
   actionRail.appendChild(submitButton);
+  let txt2imgSubmitInFlight = false;
+  const runTxt2ImgSubmission = async () => {
+    if (txt2imgSubmitInFlight) {
+      return;
+    }
+    txt2imgSubmitInFlight = true;
+    submitButton.disabled = true;
+    try {
+      await submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, txt2imgPreviewBox);
+    } finally {
+      txt2imgSubmitInFlight = false;
+      submitButton.disabled = false;
+    }
+  };
+  submitButton.addEventListener("click", (event) => {
+    // DEBUG HOTSPOT: host integrations can intercept form submit events; the visible Generate button must drive generation directly.
+    event.preventDefault();
+    void runTxt2ImgSubmission();
+  });
 
   const actionRow = document.createElement("div");
   actionRow.className = "rookieui-shell__mini-actions";
@@ -953,7 +972,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    await submitTxt2Img(bootstrapState, elements, statusNode, runtimeState, txt2imgPreviewBox);
+    await runTxt2ImgSubmission();
   });
 
   const txt2imgStateLock = installPaneStateLock(formRegistry, "txt2img", elements, () => {

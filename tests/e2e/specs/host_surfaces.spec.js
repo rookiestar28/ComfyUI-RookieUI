@@ -33,6 +33,29 @@ test("submits txt2img through the ComfyUI runtime API resolver when root API pat
   expect(requestCapture.rootFetchPaths).toEqual([]);
 });
 
+test("keeps txt2img Generate clickable when host submit listeners intercept the form event", async ({ page }) => {
+  await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1");
+  await expect(page.locator("#rookieui-root")).toContainText('"clientId":"e2e-runtime-api-client"');
+  await page.locator("#rookieui-prompt").fill("click-only cat");
+  await page.evaluate(() => {
+    document.getElementById("rookieui-txt2img-form")?.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      },
+      true,
+    );
+  });
+
+  await page.locator("#rookieui-txt2img-submit").click();
+
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText(/(Queued prompt|Completed:) e2e-prompt-123/);
+  const submittedPrompts = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__?.txt2img?.map((entry) => entry.prompt));
+  expect(submittedPrompts).toContain("click-only cat");
+  expect(submittedPrompts.filter((prompt) => prompt === "click-only cat")).toHaveLength(1);
+});
+
 test("routes bootstrap request bindings through the ComfyUI runtime API resolver", async ({ page }) => {
   await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1");
   await expect(page.locator("#rookieui-root")).toContainText('"clientId":"e2e-runtime-api-client"');
