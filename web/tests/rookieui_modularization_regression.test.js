@@ -70,7 +70,7 @@ function createBootstrapState() {
     },
     models: {
       source: "test",
-      checkpoints: ["model.safetensors"],
+      checkpoints: ["model.safetensors", "alternate-model.safetensors"],
       vae: ["Automatic"],
       text_encoders: ["Automatic"],
       embeddings: [],
@@ -138,6 +138,7 @@ describe("rookieui modularization regression seams", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
     document.head.innerHTML = "";
+    window.sessionStorage.clear();
   });
 
   test("preserves visibility contract while switching top-level tabs", () => {
@@ -178,6 +179,27 @@ describe("rookieui modularization regression seams", () => {
 
     document.getElementById("rookieui-tab-txt2img")?.click();
     expect(document.getElementById("rookieui-prompt")?.value).toBe("persisted modular prompt");
+  });
+
+  test("keeps user form state when the host re-renders the sidebar panel", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    renderRookieUISidebar(container, createBootstrapState());
+
+    const promptInput = document.getElementById("rookieui-prompt");
+    promptInput.value = "persist across host panel reopen";
+    promptInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const checkpointSelect = document.getElementById("rookieui-checkpoint");
+    checkpointSelect.value = "alternate-model.safetensors";
+    checkpointSelect.dispatchEvent(new Event("change", { bubbles: true }));
+
+    document.getElementById("rookieui-tab-img2img")?.click();
+    renderRookieUISidebar(container, createBootstrapState());
+
+    expect(document.getElementById("rookieui-tab-img2img")?.classList.contains("is-active")).toBe(true);
+    expect(document.getElementById("rookieui-prompt")?.value).toBe("persist across host panel reopen");
+    expect(document.getElementById("rookieui-checkpoint")?.value).toBe("alternate-model.safetensors");
   });
 
   test("routes cross-pane apply payloads into extracted img2img pane via queue actions", () => {

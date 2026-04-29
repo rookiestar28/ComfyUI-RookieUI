@@ -15,6 +15,7 @@ const [
   queuePaneModule,
   tabContractModule,
   shellStateModule,
+  shellPersistenceModule,
   maskCanvasModule,
   maskEditorModule,
   img2imgModeRouterModule,
@@ -36,6 +37,7 @@ const [
   importRevisionedModule("./sidebar_tabs/rookieui_queue_pane.js", import.meta.url),
   importRevisionedModule("./sidebar_tabs/rookieui_tab_contract.js", import.meta.url),
   importRevisionedModule("./sidebar_tabs/rookieui_shell_state_contract.js", import.meta.url),
+  importRevisionedModule("./sidebar_tabs/rookieui_shell_persistence.js", import.meta.url),
   importRevisionedModule("./sidebar_tabs/rookieui_img2img_mask_canvas.js", import.meta.url),
   importRevisionedModule("./sidebar_tabs/rookieui_img2img_mask_editor.js", import.meta.url),
   importRevisionedModule("./sidebar_tabs/rookieui_img2img_mode_router.js", import.meta.url),
@@ -81,6 +83,7 @@ export const { buildExtrasPane } = extrasPaneModule;
 export const { buildQueuePane } = queuePaneModule;
 export const { assertTopLevelTabDefinitions } = tabContractModule;
 export const { createShellStateEventContract } = shellStateModule;
+export const { createShellPersistenceController, installPaneStateLock } = shellPersistenceModule;
 export const { createImg2ImgMaskCanvasContract } = maskCanvasModule;
 export const { createImg2ImgMaskCanvasEditor } = maskEditorModule;
 export const { createImg2ImgModeRouter } = img2imgModeRouterModule;

@@ -33,6 +33,8 @@ import {
   buildQueuePane,
   assertTopLevelTabDefinitions,
   createShellStateEventContract,
+  createShellPersistenceController,
+  installPaneStateLock,
   createImg2ImgMaskCanvasContract,
   createImg2ImgMaskCanvasEditor,
   createImg2ImgModeRouter,
@@ -399,70 +401,6 @@ function syncPrimaryModelSelectorForPreset(preset, elements, modelsPayload) {
   // to miss their real model path and surface empty/invalid model lists.
   replaceSelectOptions(elements.checkpoint, candidateItems, selectedValue);
   elements.checkpoint.dataset.modelCategory = categoryId;
-}
-
-function snapshotElementState(elements) {
-  const snapshot = {};
-  Object.entries(elements).forEach(([key, element]) => {
-    if (!element || !element.id || element.type === "file") {
-      return;
-    }
-    snapshot[key] = element.type === "checkbox" ? Boolean(element.checked) : String(element.value ?? "");
-  });
-  return snapshot;
-}
-
-function restoreElementState(elements, snapshot) {
-  if (!snapshot || typeof snapshot !== "object") {
-    return;
-  }
-  Object.entries(snapshot).forEach(([key, value]) => {
-    if (!(key in elements)) {
-      return;
-    }
-    const element = elements[key];
-    if (!element || element.type === "file") {
-      return;
-    }
-    setElementValue(element, value);
-    if (element.type === "range") {
-      element.__syncSliderVisual?.();
-    }
-  });
-  syncBoundControls(Object.values(elements));
-}
-
-function installPaneStateLock(formRegistry, paneId, elements, afterRestore = null) {
-  let snapshot = snapshotElementState(elements);
-  const capture = () => {
-    snapshot = snapshotElementState(elements);
-  };
-  // CRITICAL: keep per-pane state lock here; top-tab switches must not silently reset user-selected models/parameters.
-  const restore = () => {
-    restoreElementState(elements, snapshot);
-    if (typeof afterRestore === "function") {
-      afterRestore();
-    }
-  };
-
-  Object.values(elements).forEach((element) => {
-    if (!element || typeof element.addEventListener !== "function" || element.type === "file") {
-      return;
-    }
-    element.addEventListener("input", capture);
-    element.addEventListener("change", capture);
-  });
-
-  if (formRegistry && paneId) {
-    const shellStateContract = formRegistry.__shellStateContract;
-    if (shellStateContract?.registerPaneStateLock) {
-      shellStateContract.registerPaneStateLock(paneId, { capture, restore });
-    } else {
-      formRegistry.__paneStateLocks ??= {};
-      formRegistry.__paneStateLocks[paneId] = { capture, restore };
-    }
-  }
-  return { capture, restore };
 }
 
 function populateList(listNode, values) {
@@ -1674,6 +1612,8 @@ export function renderRookieUISidebar(container, bootstrapState) {
   container.className = "rookieui-shell";
   container.dataset.theme = resolveIntegratedShellTheme(container.ownerDocument);
   const formRegistry = {};
+  formRegistry.__syncBoundControls = syncBoundControls;
+  formRegistry.__shellPersistence = createShellPersistenceController(container, bootstrapState);
   const shellStateContract = createShellStateEventContract(formRegistry);
   formRegistry.__shellStateContract = shellStateContract;
   const shellTabs = {};
@@ -1687,11 +1627,16 @@ export function renderRookieUISidebar(container, bootstrapState) {
   ];
   // CRITICAL: top-level tab contract validation must run before render to catch missing/duplicate pane ownership during modularization stages.
   assertTopLevelTabDefinitions(tabDefinitions);
+  const persistedActiveTopTab = formRegistry.__shellPersistence.readActiveTopTab();
 
   buildShellHeader(container, bootstrapState);
   // IMPORTANT: keep tab wiring in per-tab modules so pane ownership is explicit and future tab-level refactors do not reopen a single giant definition block.
   buildTabbedShell(container, tabDefinitions, shellTabs, {
-    onActiveTabIdChange: (tabId) => shellStateContract.setActiveTopTab(tabId),
+    onActiveTabIdChange: (tabId) => {
+      shellStateContract.setActiveTopTab(tabId);
+      formRegistry.__shellPersistence.writeActiveTopTab(tabId);
+    },
   });
+  shellTabs.activateTabById(persistedActiveTopTab);
   buildShellFooter(container, bootstrapState);
 }
