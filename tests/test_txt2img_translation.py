@@ -684,6 +684,15 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertIn("ConditioningCombine", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
+        encoder_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUIA1111CLIPTextEncode"
+            and str(node["inputs"].get("text") or "").strip()
+        ]
+        self.assertTrue(encoder_nodes)
+        self.assertTrue(all(node["inputs"].get("a1111_engine") == "text_only" for node in encoder_nodes))
+
     def test_translate_txt2img_request_compiles_prompt_semantics_for_sdxl(self) -> None:
         normalized = normalize_txt2img_request(
             {
@@ -696,6 +705,15 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         class_types = {node["class_type"] for node in result["workflow"].values()}
         self.assertIn("RookieUIA1111CLIPTextEncodeSDXL", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
+
+        encoder_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUIA1111CLIPTextEncodeSDXL"
+            and str(node["inputs"].get("text_g") or "").strip()
+        ]
+        self.assertTrue(encoder_nodes)
+        self.assertTrue(all(node["inputs"].get("a1111_engine") == "text_only" for node in encoder_nodes))
 
     def test_translate_txt2img_request_compiles_alternate_prompt_scheduling(self) -> None:
         normalized = normalize_txt2img_request(

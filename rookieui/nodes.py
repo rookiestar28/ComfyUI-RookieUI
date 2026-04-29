@@ -37,7 +37,9 @@ from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted
 from rookieui.services.a1111_prompt_encoding import (
     A1111PromptEncodingOptions,
     encode_a1111_prompt_conditioning,
+    encode_a1111_prompt_text_conditioning,
     encode_a1111_sdxl_prompt_conditioning,
+    encode_a1111_sdxl_prompt_text_conditioning,
 )
 from rookieui.services.prompt_token_rebatch import (
     tokenize_channel_with_rookieui_rebatch,
@@ -106,7 +108,7 @@ class RookieUIA1111CLIPTextEncode:
             },
             "optional": {
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
-                "a1111_engine": (["parity", "legacy"],),
+                "a1111_engine": (["parity", "text_only", "legacy"],),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -126,17 +128,29 @@ class RookieUIA1111CLIPTextEncode:
         use_old_emphasis_implementation=False,
     ):
         _require_clip_input(clip)
-        if str(a1111_engine or "parity").strip().lower() != "legacy":
+        engine_mode = str(a1111_engine or "parity").strip().lower()
+        options = A1111PromptEncodingOptions(
+            step_count=int(steps or 10),
+            mean_normalization=bool(mean_normalization),
+            use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+        )
+        if engine_mode == "text_only":
+            # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.
+            return (
+                encode_a1111_prompt_text_conditioning(
+                    clip,
+                    text,
+                    tokenizer=tokenize_with_rookieui_rebatch,
+                    options=options,
+                ),
+            )
+        if engine_mode != "legacy":
             return (
                 encode_a1111_prompt_conditioning(
                     clip,
                     text,
                     tokenizer=tokenize_with_rookieui_rebatch,
-                    options=A1111PromptEncodingOptions(
-                        step_count=int(steps or 10),
-                        mean_normalization=bool(mean_normalization),
-                        use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
-                    ),
+                    options=options,
                 ),
             )
         normalized_text = normalize_prompt_attention_for_weighted_encode(text)
@@ -161,7 +175,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
             },
             "optional": {
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
-                "a1111_engine": (["parity", "legacy"],),
+                "a1111_engine": (["parity", "text_only", "legacy"],),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
             },
@@ -210,18 +224,31 @@ class RookieUIA1111CLIPTextEncodeSDXL:
             "target_width": target_width,
             "target_height": target_height,
         }
-        if str(a1111_engine or "parity").strip().lower() != "legacy":
+        engine_mode = str(a1111_engine or "parity").strip().lower()
+        options = A1111PromptEncodingOptions(
+            step_count=int(steps or 10),
+            mean_normalization=bool(mean_normalization),
+            use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
+        )
+        if engine_mode == "text_only":
+            # IMPORTANT: workflow compiler sends pre-sliced prompt text with text_only to avoid nested A1111 schedule/AND/BREAK compilation.
+            return (
+                encode_a1111_sdxl_prompt_text_conditioning(
+                    clip,
+                    text_g=text_g,
+                    text_l=text_l,
+                    tokenizer=type(self)._tokenize_sdxl_pair,
+                    add_dict=add_dict,
+                ),
+            )
+        if engine_mode != "legacy":
             return (
                 encode_a1111_sdxl_prompt_conditioning(
                     clip,
                     text_g=text_g,
                     text_l=text_l,
                     tokenizer=type(self)._tokenize_sdxl_pair,
-                    options=A1111PromptEncodingOptions(
-                        step_count=int(steps or 10),
-                        mean_normalization=bool(mean_normalization),
-                        use_old_emphasis_implementation=bool(use_old_emphasis_implementation),
-                    ),
+                    options=options,
                     add_dict=add_dict,
                 ),
             )

@@ -88,33 +88,40 @@ def _append_prompt_encode_node(
     use_rookieui_prompt_encoder: bool = False,
     width: int | None = None,
     height: int | None = None,
+    a1111_engine: str | None = None,
 ) -> str:
     node_id = allocator.next()
     if prompt_encoder == "sdxl":
         resolved_width = int(width or 1024)
         resolved_height = int(height or 1024)
+        inputs = {
+            "clip": clip_source,
+            "width": resolved_width,
+            "height": resolved_height,
+            "crop_w": 0,
+            "crop_h": 0,
+            "target_width": resolved_width,
+            "target_height": resolved_height,
+            "text_g": text,
+            "text_l": text,
+        }
+        if use_rookieui_prompt_encoder and a1111_engine:
+            inputs["a1111_engine"] = a1111_engine
         workflow[node_id] = {
             "class_type": "RookieUIA1111CLIPTextEncodeSDXL" if use_rookieui_prompt_encoder else "CLIPTextEncodeSDXL",
-            "inputs": {
-                "clip": clip_source,
-                "width": resolved_width,
-                "height": resolved_height,
-                "crop_w": 0,
-                "crop_h": 0,
-                "target_width": resolved_width,
-                "target_height": resolved_height,
-                "text_g": text,
-                "text_l": text,
-            },
+            "inputs": inputs,
         }
         return node_id
 
+    inputs = {
+        "text": text,
+        "clip": clip_source,
+    }
+    if use_rookieui_prompt_encoder and a1111_engine:
+        inputs["a1111_engine"] = a1111_engine
     workflow[node_id] = {
         "class_type": "RookieUIA1111CLIPTextEncode" if use_rookieui_prompt_encoder else "CLIPTextEncode",
-        "inputs": {
-            "text": text,
-            "clip": clip_source,
-        },
+        "inputs": inputs,
     }
     return node_id
 
@@ -231,6 +238,7 @@ def _compile_prompt_semantic_conditioning(
                     use_rookieui_prompt_encoder=use_rookieui_prompt_encoder,
                     width=width,
                     height=height,
+                    a1111_engine="text_only",
                 )
                 start = float(raw_slice.get("start", 0.0))
                 end = float(raw_slice.get("end", 1.0))

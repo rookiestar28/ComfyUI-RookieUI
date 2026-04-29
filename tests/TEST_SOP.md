@@ -32,12 +32,13 @@ Required minimum gate:
 
 1. `pre-commit run detect-secrets --all-files`
 2. `pre-commit run --all-files --show-diff-on-failure`
-3. backend unit tests (`scripts/run_unittests.py`)
-4. frontend tests (`npm test`)
-5. targeted frontend type validation for TS-first seams (`npm run test:types`) when the change touches the typed frontend foundation
+3. prompt compiler guard tests for A1111 node/workflow double-compilation regressions
+4. backend unit tests (`scripts/run_unittests.py`)
+5. frontend tests (`npm test`)
+6. targeted frontend type validation for TS-first seams (`npm run test:types`) when the change touches the typed frontend foundation
 Optional (recommended for runtime/host-integration changes):
 
-6. host-embedded E2E lane (`scripts/run_host_embedded_e2e.py`, which delegates to `scripts/run_live_smoke_tests.py`)
+7. host-embedded E2E lane (`scripts/run_host_embedded_e2e.py`, which delegates to `scripts/run_live_smoke_tests.py`)
 
 ### Bugfix/Hotfix Rule (Reproduce -> Pin -> Sweep)
 

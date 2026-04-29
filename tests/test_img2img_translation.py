@@ -728,6 +728,15 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertIn("ConditioningCombine", class_types)
         self.assertIn("ConditioningSetTimestepRange", class_types)
 
+        encoder_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUIA1111CLIPTextEncode"
+            and str(node["inputs"].get("text") or "").strip()
+        ]
+        self.assertTrue(encoder_nodes)
+        self.assertTrue(all(node["inputs"].get("a1111_engine") == "text_only" for node in encoder_nodes))
+
     def test_translate_img2img_request_compiles_alternate_prompt_scheduling(self) -> None:
         normalized = normalize_img2img_request(
             {

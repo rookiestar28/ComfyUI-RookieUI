@@ -278,6 +278,17 @@ def encode_a1111_prompt_conditioning(
     )
 
 
+def encode_a1111_prompt_text_conditioning(
+    clip: Any,
+    prompt_text: str,
+    *,
+    tokenizer: Callable[[Any, str], Any],
+    options: A1111PromptEncodingOptions | None = None,
+    add_dict: dict[str, Any] | None = None,
+) -> list[Any]:
+    return _encode_text(clip, prompt_text, tokenizer=tokenizer, options=options, add_dict=add_dict)
+
+
 def _collect_boundary_points(plan: PromptSemanticPlan) -> set[float]:
     boundaries: set[float] = {0.0, 1.0}
     for branch in plan.branches:
@@ -456,6 +467,17 @@ def encode_a1111_sdxl_prompt_conditioning(
             for index in range(branch_count)
         ]
     )
+
+
+def encode_a1111_sdxl_prompt_text_conditioning(
+    clip: Any,
+    *,
+    text_g: str,
+    text_l: str,
+    tokenizer: Callable[[Any, str, str], Any],
+    add_dict: dict[str, Any] | None = None,
+) -> list[Any]:
+    return _encode_sdxl_pair(clip, text_g=text_g, text_l=text_l, tokenizer=tokenizer, add_dict=add_dict)
 
 
 def _encode_sdxl_pair(

@@ -154,6 +154,16 @@ class A1111PromptEncodingTests(unittest.TestCase):
         self.assertEqual(conditioning, [["cond::[day:night:0.5]", {"pooled_output": "pooled::[day:night:0.5]"}]])
         self.assertEqual(clip.tokenized[0], ("[day:night:0.5]", False))
 
+    def test_text_only_mode_prevents_inner_schedule_compilation(self) -> None:
+        clip = _FakeClip()
+        node = nodes.RookieUIA1111CLIPTextEncode()
+
+        conditioning, = node.encode(clip, "[day:night:0.5]", a1111_engine="text_only", steps=4)
+
+        self.assertEqual(conditioning, [["cond::[day:night:0.5]", {"pooled_output": "pooled::[day:night:0.5]"}]])
+        self.assertTrue(clip.tokenized)
+        self.assertEqual({call[0] for call in clip.tokenized}, {"[day:night:0.5]"})
+
     def test_mean_normalization_scales_weighted_conditioning_against_plain_reference(self) -> None:
         class _FakeClip:
             def __init__(self) -> None:
