@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Recent debug fixes and UI state hardening (stability)</strong></summary>
+
+- PNG Info import now keeps A1111 txt2img Hires.fix metadata on the txt2img path, so SDXL-size A1111 images continue into the RookieUI A1111 SDXL prompt encoder workflow instead of falling back to native ComfyUI text encode nodes.
+- Imported A1111 Hires.fix values now populate existing RookieUI hires controls where supported, while unsupported external upscaler labels fall back safely with a warning instead of producing an invalid request.
+- RookieUI sidebar fields now survive host sidebar hide/show re-renders during the same browser session, including prompt text, selected menu values, checkbox/range fields, and the active top tab.
+- Added regression coverage for these debug paths so PNG Info routing and sidebar state persistence stay pinned during future frontend/backend changes.
+
+</details>
+
+<details>
+
 <summary><strong>Stable Diffusion single-node A1111 prompt encoder parity (new functionality/stability)</strong></summary>
 
 - `RookieUI A1111 CLIP Text Encode` and `RookieUI A1111 CLIP Text Encode SDXL` now handle more A1111-style prompt conditioning behavior inside the encoder node itself instead of relying only on outer workflow graph composition.
