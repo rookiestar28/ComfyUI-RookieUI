@@ -59,6 +59,24 @@ class TextualInversionResolverTests(unittest.TestCase):
         self.assertEqual(result.references[0].canonical_token, "missing_style")
         self.assertEqual(list(result.missing_tokens), ["embedding:missing_style"])
 
+    def test_resolve_textual_inversion_prompt_honors_sdxl_channel_filters(self) -> None:
+        global_result = resolve_textual_inversion_prompt(
+            "portrait local_style",
+            embedding_names=["local_style.safetensors::vectors=2::channels=clip_l"],
+            channel="clip_g",
+        )
+        local_result = resolve_textual_inversion_prompt(
+            "portrait local_style",
+            embedding_names=["local_style.safetensors::vectors=2::channels=clip_l"],
+            channel="clip_l",
+        )
+
+        self.assertEqual(global_result.resolved_text, "portrait local_style")
+        self.assertEqual(list(global_result.channel_mismatch_tokens), ["local_style"])
+        self.assertEqual(local_result.resolved_text, "portrait embedding:local_style.safetensors")
+        self.assertEqual(local_result.references[0].vectors, 2)
+        self.assertEqual(local_result.fixes[0].vectors, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

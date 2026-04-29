@@ -150,7 +150,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             title="SDXL Dual-Channel Embedding",
             reference_surface="smZNodes SDXL clip_g/clip_l textual inversion vectors",
             rookieui_target="Validate and apply SDXL global/local vectors per channel.",
-            status="planned",
+            status="implemented",
             roadmap_item="F235",
             acceptance_signal="unit tests cover g/l vector selection, mismatches, and fallback behavior.",
         ),
@@ -204,7 +204,7 @@ def _item_entries() -> tuple[PromptEncoderDetailItem, ...]:
         PromptEncoderDetailItem(
             item_id="F235",
             title="SDXL Embedding and Dual-Channel Resolver Parity",
-            status="planned",
+            status="completed",
             covers=("sdxl_dual_channel_embedding",),
             acceptance_signal="SDXL resolver tests cover dual-channel behavior.",
         ),

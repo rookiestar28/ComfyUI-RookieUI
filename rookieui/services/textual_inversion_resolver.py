@@ -49,6 +49,7 @@ class TextualInversionResolveResult:
     resolved_text: str
     references: tuple[TextualInversionReference, ...] = ()
     missing_tokens: tuple[str, ...] = ()
+    channel_mismatch_tokens: tuple[str, ...] = ()
     fixes: tuple[TextualInversionFix, ...] = ()
 
     def metadata(self) -> dict[str, Any]:
@@ -58,6 +59,8 @@ class TextualInversionResolveResult:
             metadata["rookieui_textual_inversion_embeddings"] = embeddings
         if self.missing_tokens:
             metadata["rookieui_textual_inversion_missing"] = list(self.missing_tokens)
+        if self.channel_mismatch_tokens:
+            metadata["rookieui_textual_inversion_channel_mismatch"] = list(self.channel_mismatch_tokens)
         if self.fixes:
             metadata["rookieui_textual_inversion_fixes"] = [fix.to_payload() for fix in self.fixes]
         return metadata
@@ -80,6 +83,15 @@ def _strip_embedding_extension(name: str) -> str:
 
 def _embedding_lookup_key(name: str) -> str:
     return _normalize_embedding_name(name).lower()
+
+
+def _normalize_channel_name(channel: str | None) -> str:
+    normalized = str(channel or "").strip().lower()
+    if normalized in {"g", "global"}:
+        return "clip_g"
+    if normalized in {"l", "local"}:
+        return "clip_l"
+    return normalized
 
 
 def _iter_aliases(name: str) -> set[str]:
@@ -128,7 +140,11 @@ def _parse_embedding_info(entry: str) -> TextualInversionEmbeddingInfo | None:
             except (TypeError, ValueError):
                 vectors = 1
         elif normalized_key == "channels":
-            channels = tuple(channel.strip() for channel in value.split("|") if channel.strip())
+            channels = tuple(
+                _normalize_channel_name(channel)
+                for channel in value.split("|")
+                if _normalize_channel_name(channel)
+            )
     return TextualInversionEmbeddingInfo(name=name, vectors=vectors, channels=channels)
 
 
@@ -191,6 +207,13 @@ def _find_info(lookup: dict[str, TextualInversionEmbeddingInfo], name: str) -> T
     return lookup.get(_embedding_lookup_key(name))
 
 
+def _channel_matches(info: TextualInversionEmbeddingInfo, channel: str | None) -> bool:
+    requested_channel = _normalize_channel_name(channel)
+    if not requested_channel or not info.channels:
+        return True
+    return requested_channel in {_normalize_channel_name(value) for value in info.channels}
+
+
 def _build_fixes(
     resolved_text: str,
     references: list[TextualInversionReference],
@@ -222,6 +245,7 @@ def resolve_textual_inversion_prompt(
     *,
     embedding_names: str | Iterable[str] | None = None,
     embedding_directory: str | os.PathLike[str] | None = None,
+    channel: str | None = None,
 ) -> TextualInversionResolveResult:
     lookup, bare_pattern = _build_embedding_lookup(
         embedding_names=embedding_names,
@@ -232,14 +256,18 @@ def resolve_textual_inversion_prompt(
 
     references: list[TextualInversionReference] = []
     missing_tokens: list[str] = []
+    channel_mismatch_tokens: list[str] = []
 
     def replace_explicit(match: re.Match[str]) -> str:
         token = match.group(0)
         name = match.group("name")
         info = _find_info(lookup, name)
-        if info is None:
+        if info is None or not _channel_matches(info, channel):
             fallback_name = _normalize_embedding_name(name)
-            missing_tokens.append(token)
+            if info is None:
+                missing_tokens.append(token)
+            else:
+                channel_mismatch_tokens.append(token)
             references.append(
                 TextualInversionReference(
                     token=token,
@@ -271,6 +299,19 @@ def resolve_textual_inversion_prompt(
             info = _find_info(lookup, token)
             if info is None:
                 return token
+            if not _channel_matches(info, channel):
+                channel_mismatch_tokens.append(token)
+                references.append(
+                    TextualInversionReference(
+                        token=token,
+                        canonical_token=_normalize_embedding_name(token),
+                        name=info.name,
+                        exists=False,
+                        syntax="bare",
+                        vectors=info.vectors,
+                    )
+                )
+                return token
             canonical_token = f"embedding:{info.name}"
             references.append(
                 TextualInversionReference(
@@ -291,5 +332,6 @@ def resolve_textual_inversion_prompt(
         resolved_text=resolved_text,
         references=tuple(references),
         missing_tokens=tuple(missing_tokens),
+        channel_mismatch_tokens=tuple(channel_mismatch_tokens),
         fixes=_build_fixes(resolved_text, references),
     )

@@ -224,6 +224,37 @@ class A1111PromptEncodingTests(unittest.TestCase):
         self.assertNotIn("day", tokenized_texts)
         self.assertNotIn("night", tokenized_texts)
 
+    def test_sdxl_node_resolves_textual_inversion_per_clip_channel(self) -> None:
+        clip = _FakeSDXLClip()
+        node = nodes.RookieUIA1111CLIPTextEncodeSDXL()
+
+        conditioning, = node.encode(
+            clip,
+            1024,
+            768,
+            0,
+            0,
+            1024,
+            768,
+            "local_style",
+            "local_style",
+            embedding_names="local_style.safetensors::vectors=2::channels=clip_l",
+        )
+
+        self.assertEqual(conditioning[0][0], "cond::g::local_style|l::embedding:local_style.safetensors")
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_embeddings"],
+            ["embedding:local_style.safetensors"],
+        )
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_channel_mismatch"],
+            ["local_style"],
+        )
+        self.assertEqual(
+            conditioning[0][1]["rookieui_textual_inversion_fixes"],
+            [{"offset": 0, "name": "local_style.safetensors", "token": "embedding:local_style.safetensors", "vectors": 2}],
+        )
+
     def test_mean_normalization_scales_weighted_conditioning_against_plain_reference(self) -> None:
         class _FakeClip:
             def __init__(self) -> None:

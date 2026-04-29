@@ -91,6 +91,8 @@ def _merge_encode_metadata(
 def _resolve_textual_inversion_for_encode(
     text: str,
     options: A1111PromptEncodingOptions,
+    *,
+    channel: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     if not options.embedding_names and not options.embedding_directory:
         return str(text or ""), {}
@@ -98,6 +100,7 @@ def _resolve_textual_inversion_for_encode(
         str(text or ""),
         embedding_names=options.embedding_names,
         embedding_directory=options.embedding_directory,
+        channel=channel,
     )
     return result.resolved_text, result.metadata()
 
@@ -785,8 +788,16 @@ def _encode_sdxl_pair(
     add_dict: dict[str, Any] | None = None,
 ) -> list[Any]:
     resolved_options = _options_or_default(options)
-    resolved_text_g, resolver_metadata_g = _resolve_textual_inversion_for_encode(text_g, resolved_options)
-    resolved_text_l, resolver_metadata_l = _resolve_textual_inversion_for_encode(text_l, resolved_options)
+    resolved_text_g, resolver_metadata_g = _resolve_textual_inversion_for_encode(
+        text_g,
+        resolved_options,
+        channel="clip_g",
+    )
+    resolved_text_l, resolver_metadata_l = _resolve_textual_inversion_for_encode(
+        text_l,
+        resolved_options,
+        channel="clip_l",
+    )
     encode_add_dict = _merge_encode_metadata(
         _merge_encode_metadata(add_dict, resolver_metadata_g),
         resolver_metadata_l,
