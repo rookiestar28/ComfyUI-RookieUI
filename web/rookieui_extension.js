@@ -15,12 +15,12 @@ import {
   submitRookieUITxt2Img,
   describeHostSurface,
   detectHostSurface,
+  installA1111CanvasImportParityPatch,
   isHostSurfaceSupported,
   renderRookieUISidebar,
 } from "./rookieui_extension_deps.js";
 import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
 import { loadRookieUIBootstrapData } from "./rookieui_feature_registry.js";
-
 /** @typedef {import("./types/rookieui_frontend").RookieUIRegisterExtensionOptions} RookieUIRegisterExtensionOptions */
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
@@ -195,6 +195,8 @@ export function registerRookieUIBootstrapExtension({
         ...createXYZPlotRequestBindings(apiFetch),
       };
 
+      installA1111CanvasImportParityPatch({ app, windowRef, inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest });
+
       if (app?.extensionManager?.registerSidebarTab) {
         app.extensionManager.registerSidebarTab({
           id: "comfyui-rookieui",
@@ -211,9 +213,7 @@ export function registerRookieUIBootstrapExtension({
         installLegacyLauncher(documentRef, bootstrapState);
       }
 
-      windowRef.__ROOKIEUI_BOOTSTRAP__ = {
-        ...bootstrapState,
-      };
+      windowRef.__ROOKIEUI_BOOTSTRAP__ = { ...bootstrapState };
     },
   });
 }

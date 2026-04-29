@@ -1,9 +1,10 @@
 import { importRevisionedModule } from "./rookieui_asset_revision.js";
 
-const [apiModule, hostSurfaceModule, sidebarShellModule] = await Promise.all([
+const [apiModule, hostSurfaceModule, sidebarShellModule, canvasImportModule] = await Promise.all([
   importRevisionedModule("./rookieui_api.js", import.meta.url),
   importRevisionedModule("./rookieui_host_surface.js", import.meta.url),
   importRevisionedModule("./rookieui_sidebar_shell.js", import.meta.url),
+  importRevisionedModule("./rookieui_a1111_canvas_import.js", import.meta.url),
 ]);
 
 export const {
@@ -93,3 +94,4 @@ export const {
 } = hostSurfaceModule;
 
 export const { renderRookieUISidebar } = sidebarShellModule;
+export const { installA1111CanvasImportParityPatch } = canvasImportModule;
