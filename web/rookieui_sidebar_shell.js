@@ -1359,6 +1359,22 @@ function updateExtrasPreview(previewBox, dataUrl, fallbackText) {
   setPreviewContent(previewBox, dataUrl, fallbackText);
 }
 
+function summarizeExtrasRuntimeStatus(resultData) {
+  const warnings = Array.isArray(resultData?.warnings) ? resultData.warnings.filter(Boolean) : [];
+  const diagnostics = Array.isArray(resultData?.diagnostics) ? resultData.diagnostics : [];
+  const diagnosticMessages = diagnostics
+    .map((entry) => {
+      const faceRestoration = String(entry?.face_restoration ?? "").trim();
+      const status = String(entry?.status ?? "").trim();
+      if (!faceRestoration || faceRestoration === "none" || !status) {
+        return "";
+      }
+      return `${faceRestoration}: ${status}`;
+    })
+    .filter(Boolean);
+  return [...warnings, ...diagnosticMessages];
+}
+
 async function submitExtras(bootstrapState, state, elements, statusNode, previewBox) {
   statusNode.textContent = "Running Extras...";
   const payload = {
@@ -1396,7 +1412,9 @@ async function submitExtras(bootstrapState, state, elements, statusNode, preview
     result.data.preview_data_url ?? "",
     "Extras preview will appear here after processing.",
   );
-  statusNode.textContent = `Generated ${result.data.output_assets?.length ?? 0} extras output(s)`;
+  const runtimeStatus = summarizeExtrasRuntimeStatus(result.data);
+  const statusSuffix = runtimeStatus.length ? ` | ${runtimeStatus.join(" | ")}` : "";
+  statusNode.textContent = `Generated ${result.data.output_assets?.length ?? 0} extras output(s)${statusSuffix}`;
 }
 
 function buildExtrasSection(parent, bootstrapState, formRegistry) {

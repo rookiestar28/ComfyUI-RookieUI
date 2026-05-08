@@ -49,6 +49,7 @@ export interface RookieUIFeatureBootstrapRegistryEntry {
 
 export interface RookieUIExtensionRuntimeApi {
   clientId?: string;
+  fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;
   addEventListener?: (...args: unknown[]) => void;
   removeEventListener?: (...args: unknown[]) => void;
 }
@@ -64,7 +65,9 @@ export interface RookieUIExtensionApp {
       tooltip: string;
       type: string;
       render: (container: HTMLElement) => void;
+      destroy?: () => void;
     }) => void;
+    unregisterSidebarTab?: (id: string) => void;
   } | null;
 }
 

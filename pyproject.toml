@@ -19,6 +19,7 @@ Documentation = "https://github.com/rookiestar28/ComfyUI-RookieUI#readme"
 PublisherId = "rookiestar"
 DisplayName = "ComfyUI RookieUI"
 Icon = ""
+web = "web"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

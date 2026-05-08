@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-EXTRAS_CONTRACT_VERSION = "r119-20260417"
+EXTRAS_CONTRACT_VERSION = "r206f207f208f209-20260508"
 EXTRAS_CONTRACT_SURFACE = "extras_run"
 
 
@@ -14,7 +14,7 @@ def build_extras_contract_meta() -> dict[str, object]:
         "execution_mode": "synchronous_postprocess",
         "supported_modes": ["single_image", "batch"],
         "supports_color_correction": True,
-        "face_restoration_behavior": "guarded_warning_skip",
+        "face_restoration_behavior": "runtime_adapter_or_guarded_warning",
     }
 
 
@@ -71,6 +71,7 @@ class ExtrasExecutionResult:
     preview_asset: str
     preview_data_url: str
     warnings: list[str] = field(default_factory=list)
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

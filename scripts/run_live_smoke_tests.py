@@ -1900,6 +1900,20 @@ def _validate_extras_execution_response(response_payload: dict[str, Any]) -> lis
     if not isinstance(warnings, list) or not any("without face restoration" in str(warning).lower() for warning in warnings):
         errors.append("extras: guarded face-restoration warning was missing.")
 
+    diagnostics = response_payload.get("diagnostics")
+    if not isinstance(diagnostics, list) or not diagnostics:
+        errors.append("extras: diagnostics missing.")
+    else:
+        first_diagnostic = diagnostics[0]
+        if not isinstance(first_diagnostic, dict):
+            errors.append("extras: diagnostics[0] was not an object.")
+        else:
+            if first_diagnostic.get("face_restoration") != "codeformer":
+                errors.append("extras: diagnostics[0].face_restoration did not retain 'codeformer'.")
+            restored_faces = first_diagnostic.get("restored_faces")
+            if not isinstance(restored_faces, int) or restored_faces < 0:
+                errors.append("extras: diagnostics[0].restored_faces was not a non-negative integer.")
+
     output_assets = response_payload.get("output_assets")
     preview_asset = str(response_payload.get("preview_asset", "")).strip()
     preview_data_url = str(response_payload.get("preview_data_url", "")).strip()

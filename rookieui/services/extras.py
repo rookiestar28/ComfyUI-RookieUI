@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from PIL import Image, ImageOps
 
 from rookieui.contracts.extras import (
@@ -28,6 +30,82 @@ _MAX_SCALE_BY = 8.0
 _MIN_TARGET_DIMENSION = 64
 _MAX_TARGET_DIMENSION = 4096
 _UPSCALE_NONE = "None"
+
+
+def _is_selected_upscaler(value: str) -> bool:
+    return bool(value and value != _UPSCALE_NONE)
+
+
+def _target_size_for_request(image: Image.Image, request: NormalizedExtrasRequest) -> tuple[int, int]:
+    if request.scale_mode == "scale_to":
+        return (request.target_width, request.target_height)
+    return (
+        max(_MIN_TARGET_DIMENSION, int(round(image.width * request.scale_by))),
+        max(_MIN_TARGET_DIMENSION, int(round(image.height * request.scale_by))),
+    )
+
+
+def _resize_with_pil(image: Image.Image, target_size: tuple[int, int]) -> Image.Image:
+    return image.resize(target_size, Image.Resampling.LANCZOS)
+
+
+class _ComfyUpscalerBackend:
+    def __init__(self) -> None:
+        self._models: dict[str, Any] = {}
+
+    def _load_model(self, model_name: str) -> Any:
+        if model_name in self._models:
+            return self._models[model_name]
+        try:
+            from comfy_extras.nodes_upscale_model import UpscaleModelLoader
+        except Exception as exc:  # pragma: no cover - depends on ComfyUI host modules
+            raise RuntimeError("ComfyUI upscaler loader is unavailable.") from exc
+
+        loaded = UpscaleModelLoader().load_model(model_name)
+        model = _extract_node_output_value(loaded)
+        self._models[model_name] = model
+        return model
+
+    def upscale(self, image: Image.Image, model_name: str, target_size: tuple[int, int]) -> Image.Image:
+        try:
+            import numpy as np
+            import torch
+            from comfy_extras.nodes_upscale_model import ImageUpscaleWithModel
+        except Exception as exc:  # pragma: no cover - depends on ComfyUI host modules
+            raise RuntimeError("ComfyUI upscaler runtime is unavailable.") from exc
+
+        model = self._load_model(model_name)
+        array = np.asarray(image.convert("RGB"), dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(array)[None,]
+        output = ImageUpscaleWithModel().upscale(model, tensor)
+        output_tensor = _extract_node_output_value(output)
+        output_array = output_tensor.detach().cpu().numpy()[0]
+        output_array = np.clip(output_array * 255.0, 0, 255).astype(np.uint8)
+        upscaled = Image.fromarray(output_array, mode="RGB")
+        if upscaled.size != target_size:
+            upscaled = _resize_with_pil(upscaled, target_size)
+        return upscaled
+
+
+def _extract_node_output_value(output: Any) -> Any:
+    if isinstance(output, (list, tuple)):
+        return output[0]
+    result = getattr(output, "result", None)
+    if isinstance(result, (list, tuple)):
+        return result[0]
+    return output
+
+
+def _build_default_upscaler_backend() -> _ComfyUpscalerBackend | None:
+    try:
+        return _ComfyUpscalerBackend()
+    except Exception:
+        return None
+
+
+def _build_default_face_restoration_backend() -> None:
+    return None
+
 
 def _coerce_dimension(value: object, field_name: str) -> int:
     normalized = _coerce_int(value, field_name)
@@ -113,10 +191,6 @@ def normalize_extras_request(payload: dict[str, object]) -> NormalizedExtrasRequ
     ).lower() or "none"
     if face_restoration not in {"none", "codeformer", "gfpgan"}:
         raise ValueError("face_restoration must be none, codeformer, or gfpgan.")
-    if face_restoration != "none":
-        warnings.append(
-            f"{face_restoration} is not available inside the RookieUI workspace pipeline yet; the request will continue without face restoration."
-        )
 
     codeformer_weight = round(_coerce_float(request.codeformer_weight, "codeformer_weight"), 2)
     if codeformer_weight < 0.0 or codeformer_weight > 1.0:
@@ -141,25 +215,101 @@ def normalize_extras_request(payload: dict[str, object]) -> NormalizedExtrasRequ
     )
 
 
-def _resize_image(image: Image.Image, request: NormalizedExtrasRequest) -> Image.Image:
+def _resize_image(
+    image: Image.Image,
+    request: NormalizedExtrasRequest,
+    *,
+    warnings: list[str] | None = None,
+    upscaler_backend: Any | None = None,
+) -> Image.Image:
     if not request.upscale_enabled:
         return image
 
-    if request.scale_mode == "scale_to":
-        target_size = (request.target_width, request.target_height)
-    else:
-        target_size = (
-            max(_MIN_TARGET_DIMENSION, int(round(image.width * request.scale_by))),
-            max(_MIN_TARGET_DIMENSION, int(round(image.height * request.scale_by))),
+    target_size = _target_size_for_request(image, request)
+    selected_upscaler_1 = _is_selected_upscaler(request.upscaler_1)
+    selected_upscaler_2 = _is_selected_upscaler(request.upscaler_2) and request.upscaler_2_visibility > 0.0
+    if not selected_upscaler_1 and not selected_upscaler_2:
+        return _resize_with_pil(image, target_size)
+
+    backend = upscaler_backend if upscaler_backend is not None else _build_default_upscaler_backend()
+    if backend is None:
+        if warnings is not None:
+            selected = request.upscaler_1 if selected_upscaler_1 else request.upscaler_2
+            warnings.append(f"Selected upscaler '{selected}' is unavailable; used PIL Lanczos fallback.")
+        return _resize_with_pil(image, target_size)
+
+    try:
+        first = (
+            backend.upscale(image, request.upscaler_1, target_size)
+            if selected_upscaler_1
+            else _resize_with_pil(image, target_size)
         )
-    return image.resize(target_size, Image.Resampling.LANCZOS)
+        if not selected_upscaler_2:
+            return first
+        second = backend.upscale(image, request.upscaler_2, target_size)
+        return Image.blend(first.convert("RGB"), second.convert("RGB"), request.upscaler_2_visibility)
+    except Exception as exc:
+        if warnings is not None:
+            selected = request.upscaler_1 if selected_upscaler_1 else request.upscaler_2
+            warnings.append(f"Selected upscaler '{selected}' failed; used PIL Lanczos fallback. Detail: {exc}")
+        return _resize_with_pil(image, target_size)
 
 
-def execute_extras_request(request: NormalizedExtrasRequest) -> ExtrasExecutionResult:
+def _apply_face_restoration(
+    image: Image.Image,
+    request: NormalizedExtrasRequest,
+    *,
+    warnings: list[str],
+    face_restoration_backend: Any | None = None,
+) -> tuple[Image.Image, dict[str, object]]:
+    diagnostic: dict[str, object] = {
+        "face_restoration": request.face_restoration,
+        "restored_faces": 0,
+    }
+    if request.face_restoration == "none":
+        return image, diagnostic
+
+    backend = (
+        face_restoration_backend
+        if face_restoration_backend is not None
+        else _build_default_face_restoration_backend()
+    )
+    if backend is None:
+        warnings.append(
+            f"{request.face_restoration} face restoration is unavailable; continuing without face restoration."
+        )
+        diagnostic["status"] = "unavailable"
+        return image, diagnostic
+
+    try:
+        restored_image, restored_faces = backend.restore(
+            image,
+            request.face_restoration,
+            request.codeformer_weight,
+        )
+    except Exception as exc:
+        warnings.append(
+            f"{request.face_restoration} face restoration failed; continuing without face restoration. Detail: {exc}"
+        )
+        diagnostic["status"] = "failed"
+        return image, diagnostic
+
+    diagnostic["status"] = "applied"
+    diagnostic["restored_faces"] = int(restored_faces or 0)
+    return restored_image.convert("RGB"), diagnostic
+
+
+def execute_extras_request(
+    request: NormalizedExtrasRequest,
+    *,
+    upscaler_backend: Any | None = None,
+    face_restoration_backend: Any | None = None,
+) -> ExtrasExecutionResult:
     output_assets: list[str] = []
     preview_asset = ""
     preview_data_url = ""
     warnings = list(request.warnings)
+    diagnostics: list[dict[str, object]] = []
 
     for asset_handle in request.source_assets:
         source_path = resolve_asset_path(asset_handle)
@@ -172,7 +322,14 @@ def execute_extras_request(request: NormalizedExtrasRequest) -> ExtrasExecutionR
         }
 
         processed = image.convert("RGB")
-        processed = _resize_image(processed, request)
+        processed = _resize_image(processed, request, warnings=warnings, upscaler_backend=upscaler_backend)
+        processed, diagnostic = _apply_face_restoration(
+            processed,
+            request,
+            warnings=warnings,
+            face_restoration_backend=face_restoration_backend,
+        )
+        diagnostics.append(diagnostic)
         if request.color_correction:
             processed = ImageOps.autocontrast(processed)
 
@@ -193,4 +350,5 @@ def execute_extras_request(request: NormalizedExtrasRequest) -> ExtrasExecutionR
         preview_asset=preview_asset,
         preview_data_url=preview_data_url,
         warnings=warnings,
+        diagnostics=diagnostics,
     )
