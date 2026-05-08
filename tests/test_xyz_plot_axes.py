@@ -28,6 +28,7 @@ class XYZPlotAxisRegistryTests(unittest.TestCase):
                 "discover_model_inventory",
                 return_value=mock.Mock(
                     checkpoints=["dreamshaper.safetensors"],
+                    diffusion_models=[],
                     vae=["anime.vae.safetensors"],
                     upscale_models=["4x-UltraSharp"],
                 ),
@@ -45,6 +46,37 @@ class XYZPlotAxisRegistryTests(unittest.TestCase):
             ["Latent", "Latent (bicubic)", "Latent (nearest-exact)", "Area", "Bislerp"],
         )
         self.assertEqual(payload["axes"]["hires_upscaler"]["choice_source"], "rookieui.fixed.hires_upscale_method")
+
+    def test_checkpoint_name_axis_includes_diffusion_model_inventory_entries(self) -> None:
+        with mock.patch.object(
+            xyz_plot_axes,
+            "discover_model_inventory",
+            return_value=mock.Mock(
+                checkpoints=["SD15\\dreamshaper.safetensors"],
+                diffusion_models=[
+                    "Qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+                    "Z-Image\\z_image_bf16.safetensors",
+                ],
+                vae=[],
+                upscale_models=[],
+            ),
+        ):
+            payload = xyz_plot_axes.build_xyz_plot_axes_payload()
+
+        checkpoint_axis = payload["axes"]["checkpoint_name"]
+        expected_choices = [
+            "SD15\\dreamshaper.safetensors",
+            "Qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
+            "Z-Image\\z_image_bf16.safetensors",
+        ]
+        self.assertEqual(checkpoint_axis["choices"], expected_choices)
+        self.assertEqual(
+            [entry["value"] for entry in checkpoint_axis["choice_entries"]],
+            expected_choices,
+        )
+        self.assertIn("qwen_image_2512_fp8_e4m3fn.safetensors", checkpoint_axis["choice_entries"][1]["aliases"])
+        self.assertIn("z_image_bf16.safetensors", checkpoint_axis["choice_entries"][2]["aliases"])
+        self.assertEqual(checkpoint_axis["choice_source"], "model_inventory.checkpoints+diffusion_models")
 
     def test_axis_summary_preserves_truthfulness_tiers(self) -> None:
         payload = xyz_plot_axes.build_xyz_plot_axes_payload()

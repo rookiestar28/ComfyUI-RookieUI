@@ -74,6 +74,16 @@ def _build_choice_entry(
     }
 
 
+def _checkpoint_axis_selectors(inventory: Any) -> list[str]:
+    # IMPORTANT: non-SD ComfyUI models such as Qwen/Z-Image live under diffusion_models.
+    return _dedupe_preserve_order(
+        [
+            *list(getattr(inventory, "checkpoints", []) or []),
+            *list(getattr(inventory, "diffusion_models", []) or []),
+        ]
+    )
+
+
 def _compatibility_sampler_choices() -> list[str]:
     payload = build_compatibility_payload()
     samplers = payload.get("samplers", [])
@@ -131,7 +141,7 @@ def _compatibility_scheduler_choice_entries() -> list[dict[str, Any]]:
 def _checkpoint_choice_entries() -> list[dict[str, Any]]:
     inventory = discover_model_inventory()
     entries: list[dict[str, Any]] = []
-    for selector in list(inventory.checkpoints or []):
+    for selector in _checkpoint_axis_selectors(inventory):
         normalized_selector = str(selector).strip()
         if not normalized_selector:
             continue
@@ -190,7 +200,7 @@ def _axis_dynamic_choices(axis_id: str) -> tuple[list[str], str]:
     if axis_id == "scheduler":
         return ([entry["label"] for entry in _compatibility_scheduler_choice_entries()], "compatibility.schedulers")
     if axis_id == "checkpoint_name":
-        return (list(inventory.checkpoints or []), "model_inventory.checkpoints")
+        return (_checkpoint_axis_selectors(inventory), "model_inventory.checkpoints+diffusion_models")
     if axis_id == "vae":
         return ([entry["label"] for entry in _vae_choice_entries()], "model_inventory.vae")
     if axis_id == "hires_upscaler":
