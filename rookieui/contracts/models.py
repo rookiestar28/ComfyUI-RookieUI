@@ -11,6 +11,7 @@ PRIMARY_MODEL_CATEGORY_BY_FAMILY: dict[str, str] = build_primary_model_category_
 @dataclass(frozen=True)
 class ModelInventorySnapshot:
     source: str
+    background_removal: list[str] = field(default_factory=list)
     checkpoints: list[str] = field(default_factory=list)
     clip: list[str] = field(default_factory=list)
     clip_vision: list[str] = field(default_factory=list)
@@ -19,6 +20,7 @@ class ModelInventorySnapshot:
     vae: list[str] = field(default_factory=list)
     text_encoders: list[str] = field(default_factory=list)
     embeddings: list[str] = field(default_factory=list)
+    latent_upscale_models: list[str] = field(default_factory=list)
     loras: list[str] = field(default_factory=list)
     ultralytics: list[str] = field(default_factory=list)
     ultralytics_bbox: list[str] = field(default_factory=list)
@@ -65,6 +67,8 @@ class ModelInventorySnapshot:
                     "title": "Postprocessing",
                     "categories": [
                         "upscale_models",
+                        "latent_upscale_models",
+                        "background_removal",
                         "ultralytics",
                         "ultralytics_bbox",
                         "ultralytics_segm",
@@ -78,6 +82,12 @@ class ModelInventorySnapshot:
                     "items": self.checkpoints,
                     "default_value": self.default_checkpoint,
                     "sidebar_visible": True,
+                },
+                "background_removal": {
+                    "title": "Background Removal",
+                    "items": self.background_removal,
+                    "default_value": "",
+                    "sidebar_visible": False,
                 },
                 "clip": {
                     "title": "CLIP",
@@ -114,6 +124,12 @@ class ModelInventorySnapshot:
                     "items": self.loras,
                     "default_value": "",
                     "sidebar_visible": True,
+                },
+                "latent_upscale_models": {
+                    "title": "Latent Upscale Models",
+                    "items": self.latent_upscale_models,
+                    "default_value": "",
+                    "sidebar_visible": False,
                 },
                 "text_encoders": {
                     "title": "Text Encoders",

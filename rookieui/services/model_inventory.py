@@ -25,12 +25,14 @@ from rookieui.contracts.model_family_registry import get_model_family_registry_e
 from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
 
 _HOST_MODEL_FOLDERS = (
+    "background_removal",
     "checkpoints",
     "clip",
     "clip_vision",
     "controlnet",
     "diffusion_models",
     "embeddings",
+    "latent_upscale_models",
     "loras",
     "text_encoders",
     "ultralytics",
@@ -206,12 +208,14 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
         for folder_name in _HOST_MODEL_FOLDERS
     }
 
+    background_removal = inventory_map["background_removal"]
     checkpoints = inventory_map["checkpoints"]
     clip = inventory_map["clip"]
     clip_vision = inventory_map["clip_vision"]
     controlnet = inventory_map["controlnet"]
     diffusion_models = inventory_map["diffusion_models"]
     embeddings = inventory_map["embeddings"]
+    latent_upscale_models = inventory_map["latent_upscale_models"]
     loras = inventory_map["loras"]
     text_encoders = inventory_map["text_encoders"]
     ultralytics = inventory_map["ultralytics"]
@@ -238,6 +242,7 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
 
     return ModelInventorySnapshot(
         source=source,
+        background_removal=background_removal,
         checkpoints=checkpoints,
         clip=clip,
         clip_vision=clip_vision,
@@ -246,6 +251,7 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
         vae=vae,
         text_encoders=text_encoders,
         embeddings=embeddings,
+        latent_upscale_models=latent_upscale_models,
         loras=loras,
         ultralytics=ultralytics,
         ultralytics_bbox=ultralytics_bbox,

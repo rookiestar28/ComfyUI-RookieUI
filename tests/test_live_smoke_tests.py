@@ -1441,7 +1441,14 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
                     "color_correction": True,
                 },
                 "warnings": [
-                    "codeformer is not available inside the RookieUI workspace pipeline yet; the request will continue without face restoration."
+                    "codeformer face restoration is unavailable; continuing without face restoration."
+                ],
+                "diagnostics": [
+                    {
+                        "face_restoration": "codeformer",
+                        "restored_faces": 0,
+                        "status": "unavailable",
+                    }
                 ],
                 "output_assets": ["rookieui_extras_1.png"],
                 "preview_asset": "rookieui_extras_1.png",
@@ -1450,6 +1457,34 @@ class LiveSmokeAuxiliaryPipelineTests(unittest.TestCase):
         )
 
         self.assertEqual(errors, [])
+
+    def test_validate_extras_execution_response_rejects_missing_diagnostics(self) -> None:
+        errors = live_smoke._validate_extras_execution_response(
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "contract": {
+                    "surface": "extras_run",
+                    "version": live_smoke.EXTRAS_CONTRACT_VERSION,
+                },
+                "mode": "single_image",
+                "normalized_request": {
+                    "scale_mode": "scale_to",
+                    "target_width": 128,
+                    "target_height": 160,
+                    "face_restoration": "codeformer",
+                    "color_correction": True,
+                },
+                "warnings": [
+                    "codeformer face restoration is unavailable; continuing without face restoration."
+                ],
+                "output_assets": ["rookieui_extras_1.png"],
+                "preview_asset": "rookieui_extras_1.png",
+                "preview_data_url": "data:image/png;base64,abc",
+            }
+        )
+
+        self.assertIn("extras: diagnostics missing.", errors)
 
     def test_validate_pnginfo_parse_response_accepts_txt2img_case(self) -> None:
         context = live_smoke._build_auxiliary_pipeline_context({"default_checkpoint": "SD15\\BravNew.safetensors"})

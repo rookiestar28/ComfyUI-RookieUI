@@ -21,6 +21,7 @@ import {
 } from "./rookieui_extension_deps.js";
 import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
 import { loadRookieUIBootstrapData } from "./rookieui_feature_registry.js";
+import { installRookieUISidebarTab } from "./rookieui_sidebar_registration.js";
 /** @typedef {import("./types/rookieui_frontend").RookieUIRegisterExtensionOptions} RookieUIRegisterExtensionOptions */
 
 const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
@@ -197,21 +198,14 @@ export function registerRookieUIBootstrapExtension({
 
       installA1111CanvasImportParityPatch({ app, windowRef, inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest });
 
-      if (app?.extensionManager?.registerSidebarTab) {
-        app.extensionManager.registerSidebarTab({
-          id: "comfyui-rookieui",
-          icon: "pi pi-compass",
-          title: "RookieUI",
-          tooltip: "Rookie-friendly generation shell",
-          type: "custom",
-          render: (container) => {
-            enforceSidebarMinWidth(container);
-            renderRookieUISidebar(container, bootstrapState);
-          },
-        });
-      } else {
-        installLegacyLauncher(documentRef, bootstrapState);
-      }
+      installRookieUISidebarTab({
+        app,
+        documentRef,
+        bootstrapState,
+        enforceSidebarMinWidth,
+        renderRookieUISidebar,
+        installLegacyLauncher,
+      });
 
       windowRef.__ROOKIEUI_BOOTSTRAP__ = { ...bootstrapState };
     },

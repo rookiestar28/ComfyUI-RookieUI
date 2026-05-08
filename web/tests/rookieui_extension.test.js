@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
@@ -143,6 +144,57 @@ describe("registerRookieUIBootstrapExtension", () => {
     await hostFetch("/rookieui/health", { headers: { Accept: "application/json" } });
 
     expect(fetchImpl).toHaveBeenCalledWith("/rookieui/health", { headers: { Accept: "application/json" } });
+  });
+
+  test("declares the ComfyUI fetchApi host contract used by runtime requests", () => {
+    const declarationText = readFileSync("web/types/rookieui_frontend.d.ts", "utf8");
+
+    expect(declarationText).toContain("fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;");
+  });
+
+  test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+    let registeredTab = null;
+    const unregisterSidebarTab = vi.fn();
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-cleanup",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        unregisterSidebarTab,
+        registerSidebarTab(tab) {
+          registeredTab = tab;
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    await registerRookieUIBootstrapExtension({
+      app,
+      windowRef: window,
+      documentRef: document,
+      fetchImpl: async () => ({ ok: false, status: 404 }),
+    });
+
+    expect(unregisterSidebarTab).toHaveBeenCalledWith("comfyui-rookieui");
+    expect(typeof registeredTab?.destroy).toBe("function");
+    expect(document.getElementById("mock-sidebar-tabs").textContent).toContain("RookieUI");
+
+    registeredTab.destroy();
+
+    expect(document.getElementById("mock-sidebar-tabs").textContent).toBe("");
   });
 
   test("registers a sidebar tab and renders the rookie shell", async () => {

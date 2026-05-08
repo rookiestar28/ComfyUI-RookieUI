@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import pathlib
 import sys
+import tomllib
 import unittest
 
 
@@ -26,3 +27,10 @@ class EntryPointTests(unittest.TestCase):
         self.assertIn("RookieUILoadAssetMask", module.NODE_CLASS_MAPPINGS)
         self.assertIn("RookieUILoadAssetImage", module.NODE_DISPLAY_NAME_MAPPINGS)
         self.assertIn("RookieUILoadAssetMask", module.NODE_DISPLAY_NAME_MAPPINGS)
+
+    def test_pyproject_declares_current_comfy_web_metadata_without_dropping_legacy_web_directory(self) -> None:
+        root_dir = pathlib.Path(__file__).resolve().parents[1]
+        pyproject = tomllib.loads((root_dir / "pyproject.toml").read_text(encoding="utf-8"))
+        comfy_metadata = pyproject["tool"]["comfy"]
+
+        self.assertEqual(comfy_metadata["web"], "web")

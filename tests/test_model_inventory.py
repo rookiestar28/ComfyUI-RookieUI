@@ -26,10 +26,12 @@ class ModelInventoryTests(unittest.TestCase):
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
                 "checkpoints": ["dreamshaper.safetensors"],
+                "background_removal": ["BiRefNet-general.safetensors"],
                 "clip": ["clip_l.safetensors"],
                 "clip_vision": ["clip_vision_g.safetensors"],
                 "controlnet": ["depth_v11.safetensors"],
                 "diffusion_models": ["flux1-dev.safetensors"],
+                "latent_upscale_models": ["latent-upscaler.safetensors"],
                 "vae": ["vae-ft-mse.safetensors"],
                 "text_encoders": ["clip_l.safetensors"],
                 "embeddings": ["badhandv4.pt"],
@@ -43,6 +45,7 @@ class ModelInventoryTests(unittest.TestCase):
         snapshot = discover_model_inventory(folder_paths_module=module)
 
         self.assertEqual(snapshot.source, "host")
+        self.assertEqual(snapshot.background_removal, ["BiRefNet-general.safetensors"])
         self.assertEqual(snapshot.default_checkpoint, "dreamshaper.safetensors")
         self.assertEqual(snapshot.default_vae, "vae-ft-mse.safetensors")
         self.assertEqual(snapshot.default_text_encoder, "clip_l.safetensors")
@@ -51,6 +54,7 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.controlnet, ["depth_v11.safetensors"])
         self.assertEqual(snapshot.diffusion_models, ["flux1-dev.safetensors"])
         self.assertEqual(snapshot.embeddings, ["badhandv4.pt"])
+        self.assertEqual(snapshot.latent_upscale_models, ["latent-upscaler.safetensors"])
         self.assertEqual(snapshot.loras, ["detail_tweaker.safetensors"])
         self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt", "person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.ultralytics_bbox, ["face_yolov8m.pt"])
@@ -158,6 +162,10 @@ class ModelInventoryTests(unittest.TestCase):
             "diffusion_models",
         )
         self.assertIn("checkpoints", payload["catalog"]["categories"])
+        self.assertIn("background_removal", payload["catalog"]["categories"])
+        self.assertFalse(payload["catalog"]["categories"]["background_removal"]["sidebar_visible"])
+        self.assertIn("latent_upscale_models", payload["catalog"]["categories"])
+        self.assertFalse(payload["catalog"]["categories"]["latent_upscale_models"]["sidebar_visible"])
         self.assertIn("upscale_models", payload["catalog"]["categories"])
         self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
         self.assertIn("ultralytics_segm", payload["catalog"]["categories"])
@@ -746,4 +754,4 @@ class ModelInventoryTests(unittest.TestCase):
 
         self.assertEqual(first.default_checkpoint, "cache-checkpoint.safetensors")
         self.assertEqual(second.default_checkpoint, "cache-checkpoint.safetensors")
-        self.assertEqual(call_count, 12)
+        self.assertEqual(call_count, 14)

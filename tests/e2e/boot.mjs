@@ -406,7 +406,8 @@ async function handleE2EFetch(url, options = {}) {
         output_assets: ["rookieui_extras_output.png"],
         preview_asset: "rookieui_extras_output.png",
         preview_data_url: "data:image/png;base64,ZmFrZQ==",
-        warnings: [],
+        warnings: ["Selected upscaler 'model-a.pth' is unavailable; used PIL Lanczos fallback."],
+        diagnostics: [{ face_restoration: "gfpgan", restored_faces: 0, status: "unavailable" }],
       }),
       {
         status: 200,

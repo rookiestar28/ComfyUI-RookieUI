@@ -880,6 +880,8 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   });
   await page.locator("#rookieui-extras-submit").click();
   await expect(page.locator("#rookieui-extras-status")).toContainText("Generated 1 extras output");
+  await expect(page.locator("#rookieui-extras-status")).toContainText("PIL Lanczos fallback");
+  await expect(page.locator("#rookieui-extras-status")).toContainText("gfpgan: unavailable");
   const extrasRequests = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.extras);
   expect(extrasRequests).toHaveLength(1);
   expect(extrasRequests[0].mode).toBe("single_image");
