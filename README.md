@@ -25,6 +25,18 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Extras postprocessing runtime and ComfyUI host compatibility refresh (new functionality/stability)</strong></summary>
+
+- `Extras` now has a RookieUI-managed postprocessing execution path for single-image and batch inputs, including scale-by/scale-to resizing, output asset generation, preview data, and preserved source metadata where available.
+- Selected ComfyUI upscale models can be used for Extras upscaling when the active host exposes the matching model/runtime; a second upscaler can be blended by visibility, and unavailable upscalers fall back to PIL Lanczos with explicit warnings.
+- `GFPGAN` and `CodeFormer` face-restoration requests now use a runtime-adapter contract with per-image diagnostics; when no compatible backend is available, RookieUI continues without face restoration and reports that status clearly.
+- Frontend host integration now declares and uses the ComfyUI `fetchApi` runtime surface, handles sidebar tab unregister/re-register cleanup, and keeps the legacy launcher fallback for older host surfaces.
+- Model inventory now recognizes current ComfyUI postprocessing-related folders such as latent upscalers and background-removal models as diagnostic catalog categories, while package metadata also declares RookieUI web assets through the current ComfyUI custom-node metadata path.
+
+</details>
+
+<details>
+
 <summary><strong>Recent debug fixes and UI state hardening (stability)</strong></summary>
 
 - PNG Info import now keeps A1111 txt2img Hires.fix metadata on the txt2img path, so SDXL-size A1111 images continue into the RookieUI A1111 SDXL prompt encoder workflow instead of falling back to native ComfyUI text encode nodes.
@@ -369,6 +381,7 @@ Current extension seams:
   - [ADetailer Support](#adetailer-support)
   - [Support for Other Extensions](#support-for-other-extensions)
 - [Runtime and Host Integration](#runtime-and-host-integration)
+  - [ComfyUI Host Compatibility](#comfyui-host-compatibility)
   - [Stable Diffusion Prompt Parity](#stable-diffusion-prompt-parity)
   - [Default Model Read Paths](#default-model-read-paths-host-comfyui)
 - [License](#license)
@@ -414,6 +427,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Progress text and queue/history integration in sidebar flow
 - Live preview panel with runtime updates and flicker-mitigated rendering
 - Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
+- Host-aware sidebar registration with stale-tab cleanup on current ComfyUI frontends and a legacy launcher fallback for older hosts
 
 ### Generation
 
@@ -468,9 +482,12 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Extras
 
-- single-image/batch postprocessing surface
-- dedicated extras contract and execution path
-- truthful guarded warning behavior for face-restoration requests that are not yet executed inside RookieUI's workspace-local pipeline
+- single-image/batch postprocessing surface with RookieUI-managed output assets and preview payloads
+- scale-by and scale-to resizing through a dedicated extras contract and execution path
+- selected ComfyUI upscaler model execution when available, plus PIL Lanczos fallback with explicit warnings when the host runtime or model is unavailable
+- optional second-upscaler blending through `upscaler_2_visibility`
+- optional color-correction postprocessing through autocontrast
+- `GFPGAN` and `CodeFormer` face-restoration request handling through a runtime-adapter seam, with guarded warnings and diagnostics when no compatible backend is available
 
 ### ADetailer
 
@@ -486,6 +503,7 @@ If your host or Manager install path does not automatically install custom-node 
 - SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics, single-node conditioning composition, parser-mode selection, old-emphasis compatibility, and inventory-aware embeddings / textual inversion handling
 - Official non-SD template presets now surface family-specific controls only when the upstream workflow exposes them, including `Shift`, `Flux Guidance`, and `Prompt Enhancement`
 - Fixed template-owned encoder bundles keep `Text Encoder` controls hidden on the shipped official non-SD preset matrix instead of implying a user-selectable pairing that the official template does not expose
+- Model inventory includes current ComfyUI postprocessing-related catalog categories such as upscale models, latent upscalers, and background-removal models; some categories are diagnostic-only until a shipped RookieUI surface uses them directly
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
 ### Official Non-SD Template Presets
@@ -705,6 +723,14 @@ Behavior and compatibility:
 
 ## Runtime and Host Integration
 
+### ComfyUI Host Compatibility
+
+- RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
+- Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
+- Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
+- The custom-node package declares its web asset directory through current ComfyUI package metadata while retaining the legacy `WEB_DIRECTORY` export used by existing hosts.
+- Host model discovery uses ComfyUI `folder_paths` keys rather than scanning arbitrary filesystem locations directly.
+
 ### Stable Diffusion Prompt Parity
 
 RookieUI's strongest A1111-style parity claims are intentionally limited to the Stable Diffusion family. On these profiles, prompt execution is routed through RookieUI-owned encoder nodes instead of relying on raw stock `CLIPTextEncode*` passthrough. The SD1.5 and SDXL RookieUI encoder nodes now handle A1111-style conditioning composition, parser selection, weighted emphasis behavior, and textual inversion resolution directly inside the node path where practical, while keeping existing workflow translation compatibility.
@@ -748,6 +774,8 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 - Embeddings: `<ComfyUI>/models/embeddings`
 - CLIP Vision: `<ComfyUI>/models/clip_vision`
 - Upscale Models: `<ComfyUI>/models/upscale_models`
+- Latent Upscale Models: host `folder_paths`-defined location for `latent_upscale_models` when the active ComfyUI build exposes that key
+- Background Removal: host `folder_paths`-defined location for `background_removal` when the active ComfyUI build exposes that key
 - ControlNet: `<ComfyUI>/models/controlnet`, `<ComfyUI>/models/t2i_adapter`
 - Ultralytics: host `folder_paths`-defined location (commonly `<ComfyUI>/models/ultralytics` on hosts that provide this key)
 
