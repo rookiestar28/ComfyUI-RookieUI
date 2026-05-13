@@ -29,7 +29,7 @@ node -v
 npm -v
 python --version
 
-npm install
+npm ci
 npx playwright install chromium
 npm test
 ```
@@ -59,7 +59,7 @@ python3 --version
 mkdir -p .tmp/bin
 ln -sf "$(command -v python3)" .tmp/bin/python
 
-npm install
+npm ci
 npx playwright install chromium
 
 mkdir -p .tmp/playwright
@@ -92,7 +92,7 @@ ROOKIEUI_E2E_PORT=4300 npm test
 - Browser missing:
   - run `npx playwright install chromium`
 - Dependency drift:
-  - remove `node_modules` and rerun `npm install`
+  - remove `node_modules` and rerun `npm ci`; if `package.json` changed intentionally, refresh `package-lock.json` in a dependency-maintenance change first
 
 ## Optional Host-Embedded E2E Contract
 
