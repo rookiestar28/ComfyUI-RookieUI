@@ -143,8 +143,9 @@ if ($nodeMajor -lt 18) {
 }
 
 if (-not (Test-Path (Join-Path $root "node_modules\@playwright\test\package.json"))) {
-  Write-Host "[tests] Installing frontend dependencies via npm install ..."
-  Invoke-Checked "npm install" { npm install }
+  # SECURITY: use lockfile-frozen installs in validation paths.
+  Write-Host "[tests] Installing frontend dependencies via npm ci ..."
+  Invoke-Checked "npm ci" { npm ci }
 }
 
 $env:ROOKIEUI_E2E_PYTHON = $venvPython

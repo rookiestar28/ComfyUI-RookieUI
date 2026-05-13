@@ -139,7 +139,7 @@ MOLTBOT_STATE_DIR="$(pwd)/moltbot_state/_local_unit" \
 
 ```bash
 node -v
-npm install
+npm ci
 npx playwright install chromium
 npm run test:types
 npm test

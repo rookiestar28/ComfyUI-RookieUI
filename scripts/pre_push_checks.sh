@@ -199,8 +199,9 @@ ensure_npm_deps() {
   if [ -f "$ROOT_DIR/node_modules/@playwright/test/package.json" ]; then
     return 0
   fi
-  echo "[pre-push] Installing frontend dependencies via npm install ..."
-  npm install
+  # SECURITY: use lockfile-frozen installs in validation paths.
+  echo "[pre-push] Installing frontend dependencies via npm ci ..."
+  npm ci
 }
 
 ensure_python_command_for_playwright() {
