@@ -25,6 +25,16 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Supply-chain validation hardening (security/stability)</strong></summary>
+
+- Repository validation now uses lockfile-frozen frontend installs, reducing accidental dependency drift during local and CI checks.
+- Added a repo-local supply-chain scan for known affected npm/PyPI package versions, suspicious persistence indicators, and unexpected npm install scripts.
+- GitHub Actions dependency review and pinned workflow action references now cover dependency changes and token-bearing registry publication paths.
+
+</details>
+
+<details>
+
 <summary><strong>Extras postprocessing runtime and ComfyUI host compatibility refresh (new functionality/stability)</strong></summary>
 
 - `Extras` now has a RookieUI-managed postprocessing execution path for single-image and batch inputs, including scale-by/scale-to resizing, output asset generation, preview data, and preserved source metadata where available.
