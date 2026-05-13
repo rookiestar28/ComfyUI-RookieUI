@@ -155,10 +155,13 @@ if (-not $env:ROOKIEUI_E2E_PORT) {
 Write-Host "[tests] Playwright harness python: $env:ROOKIEUI_E2E_PYTHON"
 Write-Host "[tests] Playwright harness port: $env:ROOKIEUI_E2E_PORT"
 
-Write-Host "[tests] 1/6 detect-secrets"
+Write-Host "[tests] 1/7 supply-chain hardening scan"
+Invoke-Checked "supply-chain hardening scan" { & $venvPython scripts\check_supply_chain_hardening.py --root $root }
+
+Write-Host "[tests] 2/7 detect-secrets"
 Invoke-Checked "detect-secrets" { & $venvPython -m pre_commit run detect-secrets --all-files }
 
-Write-Host "[tests] 2/6 pre-commit all hooks"
+Write-Host "[tests] 3/7 pre-commit all hooks"
 $worktreeBefore = Get-GitDiffSnapshot
 $indexBefore = Get-GitDiffSnapshot -Cached
 & $venvPython -m pre_commit run --all-files --show-diff-on-failure
@@ -168,26 +171,26 @@ if ($LASTEXITCODE -ne 0) {
 }
 Assert-PreCommitDidNotMutateRepo -BeforeWorktree $worktreeBefore -BeforeIndex $indexBefore
 
-Write-Host "[tests] 3/6 prompt compiler guard tests"
+Write-Host "[tests] 4/7 prompt compiler guard tests"
 $env:MOLTBOT_STATE_DIR = "$root\moltbot_state\_local_unit"
 Invoke-Checked "prompt encoder guard tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_a1111_prompt_encoding.py" }
 Invoke-Checked "txt2img prompt compiler guard tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_txt2img_translation.py" }
 Invoke-Checked "img2img prompt compiler guard tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_img2img_translation.py" }
 
-Write-Host "[tests] 4/6 backend unit tests"
+Write-Host "[tests] 5/7 backend unit tests"
 $env:MOLTBOT_STATE_DIR = "$root\moltbot_state\_local_unit"
 Invoke-Checked "unit tests" { & $venvPython scripts\run_unittests.py --start-dir tests --pattern "test_*.py" }
 
-Write-Host "[tests] 5/6 frontend type validation + test suite"
+Write-Host "[tests] 6/7 frontend type validation + test suite"
 Invoke-Checked "npm run test:types" { npm run test:types }
 Invoke-Checked "npm test" { npm test }
 
 if ($env:ROOKIEUI_RUN_LIVE_SMOKE -eq "1") {
-  Write-Host "[tests] 6/6 optional host-embedded E2E lane"
+  Write-Host "[tests] 7/7 optional host-embedded E2E lane"
   Invoke-Checked "host-embedded E2E" { & $venvPython scripts\run_host_embedded_e2e.py }
 }
 else {
-  Write-Host "[tests] 6/6 optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
+  Write-Host "[tests] 7/7 optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
 }
 
 Write-Host "[tests] PASS: full test gate completed."
