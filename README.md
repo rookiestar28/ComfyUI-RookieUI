@@ -25,6 +25,16 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Supply-chain validation hardening (security/stability)</strong></summary>
+
+- Repository validation now uses lockfile-frozen frontend installs, reducing accidental dependency drift during local and CI checks.
+- Added a repo-local supply-chain scan for known affected npm/PyPI package versions, suspicious persistence indicators, and unexpected npm install scripts.
+- GitHub Actions dependency review and pinned workflow action references now cover dependency changes and token-bearing registry publication paths.
+
+</details>
+
+<details>
+
 <summary><strong>Recent debug fixes and UI state hardening (stability)</strong></summary>
 
 - PNG Info import now keeps A1111 txt2img Hires.fix metadata on the txt2img path, so SDXL-size A1111 images continue into the RookieUI A1111 SDXL prompt encoder workflow instead of falling back to native ComfyUI text encode nodes.
