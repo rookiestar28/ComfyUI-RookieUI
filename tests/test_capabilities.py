@@ -202,6 +202,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertIn("ernie_image", family_ids)
         self.assertIn("qwen_image_edit", family_ids)
         self.assertIn("qwen_image_edit_multi_lora", family_ids)
+        self.assertIn("qwen_image_edit_2511", family_ids)
         self.assertIn("firered_image_edit", family_ids)
         self.assertIn("firered_image_edit_lightning", family_ids)
         self.assertIn("flux_kontext_dev_edit", family_ids)
@@ -228,6 +229,9 @@ class CapabilitySnapshotTests(unittest.TestCase):
         qwen_edit_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit")
         qwen_edit_multi_entry = next(
             entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit_multi_lora"
+        )
+        qwen_edit_2511_entry = next(
+            entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit_2511"
         )
         firered_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "firered_image_edit")
         firered_lightning_entry = next(
@@ -264,6 +268,17 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(qwen_edit_multi_entry["reference_input_mode"], "single")
         self.assertEqual(qwen_edit_multi_entry["max_direct_references"], 1)
         self.assertEqual(qwen_edit_multi_entry["template_lora_chain_mode"], "triple")
+        self.assertTrue(qwen_edit_2511_entry["image_edit_profile"])
+        self.assertEqual(qwen_edit_2511_entry["request_contract_surface"], "img2img")
+        self.assertEqual(qwen_edit_2511_entry["reference_input_mode"], "multi")
+        self.assertEqual(qwen_edit_2511_entry["max_direct_references"], 3)
+        self.assertEqual(qwen_edit_2511_entry["encoder_family"], "qwen_image_edit_2511")
+        self.assertEqual(qwen_edit_2511_entry["template_lora_chain_mode"], "none")
+        self.assertTrue(qwen_edit_2511_entry["shift_visible"])
+        self.assertEqual(qwen_edit_2511_entry["default_shift"], 3.1)
+        self.assertFalse(qwen_edit_2511_entry["edit_megapixels_visible"])
+        self.assertFalse(qwen_edit_2511_entry["template_lora_visible"])
+        self.assertEqual(qwen_edit_2511_entry["available_surface_flows"], ["img2img"])
         self.assertTrue(firered_entry["image_edit_profile"])
         self.assertEqual(firered_entry["reference_input_mode"], "multi")
         self.assertEqual(firered_entry["max_direct_references"], 3)

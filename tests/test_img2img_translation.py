@@ -43,6 +43,22 @@ class Img2ImgTranslationTests(unittest.TestCase):
             default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
         )
 
+    def _build_qwen_2511_edit_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["__host_default__"],
+            diffusion_models=[
+                "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
+                "Qwen\\qwen_image_edit_2511_bf16.safetensors",
+            ],
+            vae=["qwen_image_vae.safetensors"],
+            text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
+            loras=["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
+            default_checkpoint="__host_default__",
+            default_vae="qwen_image_vae.safetensors",
+            default_text_encoder="qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        )
+
     def _build_qwen_plus_inventory(self) -> ModelInventorySnapshot:
         return ModelInventorySnapshot(
             source="host",
@@ -853,6 +869,61 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.reference_image_assets, ["traveler-a", "traveler-b", "traveler-c"])
         self.assertEqual(normalized.main_reference_index, 1)
 
+    def test_normalize_img2img_request_resolves_qwen_2511_edit_selectors_and_references(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_qwen_2511_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "preserve the character and change the outfit",
+                    "negative_prompt": "blurry",
+                    "profile": "qwen_image_edit_2511",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "character-main"},
+                        {"image_asset": "style-reference"},
+                        {"image_asset": "pose-reference"},
+                    ],
+                    "main_reference_index": 0,
+                }
+            )
+
+        self.assertEqual(normalized.profile, "qwen_image_edit_2511")
+        self.assertEqual(normalized.mode, "img2img")
+        self.assertEqual(normalized.execution_mode, "edit")
+        self.assertEqual(normalized.checkpoint_name, "Qwen\\qwen_image_edit_2511_bf16.safetensors")
+        self.assertEqual(normalized.text_encoder_name, "qwen_2.5_vl_7b_fp8_scaled.safetensors")
+        self.assertEqual(normalized.vae_name, "qwen_image_vae.safetensors")
+        self.assertEqual(normalized.template_lora_name, "")
+        self.assertEqual(normalized.shift, 3.1)
+        self.assertIsNone(normalized.edit_megapixels)
+        self.assertEqual(normalized.steps, 40)
+        self.assertEqual(normalized.cfg_scale, 4.0)
+        self.assertEqual(normalized.reference_image_assets, ["character-main", "style-reference", "pose-reference"])
+        self.assertEqual(normalized.main_reference_index, 0)
+
+    def test_normalize_img2img_request_rejects_qwen_2511_reference_count_above_manifest_limit(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_qwen_2511_edit_inventory(),
+        ):
+            with self.assertRaisesRegex(ValueError, "supports at most 3 direct reference image"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "preserve the character and change the outfit",
+                        "profile": "qwen_image_edit_2511",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": "character-main"},
+                            {"image_asset": "style-reference"},
+                            {"image_asset": "pose-reference"},
+                            {"image_asset": "extra-reference"},
+                        ],
+                        "main_reference_index": 0,
+                    }
+                )
+
     def test_normalize_img2img_request_rejects_firered_reference_count_above_manifest_limit(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):
             with self.assertRaisesRegex(ValueError, "supports at most 3 direct reference image"):
@@ -1054,6 +1125,86 @@ class Img2ImgTranslationTests(unittest.TestCase):
         sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
         self.assertEqual(sampler_node["inputs"]["steps"], 40)
         self.assertEqual(sampler_node["inputs"]["cfg"], 4.0)
+
+    def test_translate_img2img_request_builds_qwen_2511_official_edit_workflow(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_qwen_2511_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "preserve the character and change the outfit",
+                    "negative_prompt": "blurry",
+                    "profile": "qwen_image_edit_2511",
+                    "mode": "img2img",
+                    "reference_images": [
+                        {"image_asset": "character-main"},
+                        {"image_asset": "style-reference"},
+                        {"image_asset": "pose-reference"},
+                    ],
+                    "main_reference_index": 0,
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        encode_nodes = [node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEditPlus"]
+        reference_method_nodes = [
+            node for node in workflow.values() if node["class_type"] == "FluxKontextMultiReferenceLatentMethod"
+        ]
+        scale_id = next(
+            node_id for node_id, node in workflow.items() if node["class_type"] == "FluxKontextImageScale"
+        )
+        load_ids = {
+            node["inputs"]["asset_handle"]: node_id
+            for node_id, node in workflow.items()
+            if node["class_type"] == "RookieUILoadAssetImage"
+        }
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+        model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
+        vae_encode_node = next(node for node in workflow.values() if node["class_type"] == "VAEEncode")
+
+        self.assertEqual(result["workflow_kind"], "img2img-qwen_image_edit_2511")
+        self.assertIn("CFGNorm", class_types)
+        self.assertIn("VAEDecode", class_types)
+        self.assertNotIn("LoraLoaderModelOnly", class_types)
+        self.assertNotIn("ImageScaleToTotalPixels", class_types)
+        self.assertEqual(len(encode_nodes), 2)
+        self.assertEqual(len(reference_method_nodes), 2)
+        self.assertEqual(reference_method_nodes[0]["inputs"]["reference_latents_method"], "index_timestep_zero")
+        self.assertEqual(encode_nodes[0]["inputs"]["image1"], [scale_id, 0])
+        self.assertEqual(encode_nodes[0]["inputs"]["image2"], [load_ids["style-reference"], 0])
+        self.assertEqual(encode_nodes[0]["inputs"]["image3"], [load_ids["pose-reference"], 0])
+        self.assertEqual(vae_encode_node["inputs"]["pixels"], [scale_id, 0])
+        self.assertEqual(model_sampling_node["inputs"]["shift"], 3.1)
+        self.assertEqual(sampler_node["inputs"]["steps"], 40)
+        self.assertEqual(sampler_node["inputs"]["cfg"], 4.0)
+        self.assertEqual(workflow[sampler_node["inputs"]["positive"][0]]["class_type"], "FluxKontextMultiReferenceLatentMethod")
+        self.assertEqual(workflow[sampler_node["inputs"]["negative"][0]]["class_type"], "FluxKontextMultiReferenceLatentMethod")
+
+    def test_translate_img2img_request_builds_qwen_2511_workflow_with_single_reference(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_qwen_2511_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "preserve the character and change the outfit",
+                    "negative_prompt": "blurry",
+                    "profile": "qwen_image_edit_2511",
+                    "mode": "img2img",
+                    "image_asset": "character-main",
+                }
+            )
+
+        workflow = translate_img2img_request(normalized).to_payload()["workflow"]
+        encode_nodes = [node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEditPlus"]
+
+        self.assertEqual(len(encode_nodes), 2)
+        self.assertIn("image1", encode_nodes[0]["inputs"])
+        self.assertNotIn("image2", encode_nodes[0]["inputs"])
+        self.assertNotIn("image3", encode_nodes[0]["inputs"])
 
     def test_translate_img2img_request_builds_firered_lightning_workflow_with_template_lora(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):

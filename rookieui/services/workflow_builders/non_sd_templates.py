@@ -26,6 +26,7 @@ from rookieui.services.workflow_builders.image_edit_foundation import (
     _append_flux2_advanced_sampler_bundle,
     _append_flux_kv_cache_node,
     _append_flux_reference_method_branch,
+    _append_flux_kontext_image_scale_node,
     _append_mirrored_reference_latent_chains,
     _append_reference_latent_chain,
     _append_reference_vae_latents,
@@ -578,8 +579,39 @@ def _build_qwen_family_conditioning_nodes(
     vae_source: list[object],
     reference_image_node_ids: tuple[str, ...],
     main_image_node_id: str,
-) -> tuple[str, str]:
+) -> tuple[str | list[object], str | list[object]]:
     encoder_family = str(getattr(profile_entry, "encoder_family", "") or "").strip().lower()
+    if encoder_family == "qwen_image_edit_2511":
+        positive_id = _append_qwen_image_edit_plus_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_ids=reference_image_node_ids,
+        )
+        negative_id = _append_qwen_image_edit_plus_encode_node(
+            workflow,
+            allocator=allocator,
+            prompt_text=request.negative_prompt,
+            clip_source=clip_source,
+            vae_source=vae_source,
+            image_ids=reference_image_node_ids,
+        )
+        return (
+            _append_flux_reference_method_branch(
+                workflow,
+                allocator=allocator,
+                conditioning_source=positive_id,
+                reference_method="index_timestep_zero",
+            ),
+            _append_flux_reference_method_branch(
+                workflow,
+                allocator=allocator,
+                conditioning_source=negative_id,
+                reference_method="index_timestep_zero",
+            ),
+        )
     if encoder_family == "qwen_image_edit_plus":
         positive_id = _append_qwen_image_edit_plus_encode_node(
             workflow,
@@ -1565,7 +1597,10 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
 def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     profile_entry = get_model_family_registry_entry(request.profile)
     encoder_family = str(profile_entry.encoder_family or "").strip().lower()
-    scale_mode = "all" if encoder_family == "qwen_image_edit_plus" else "main_only"
+    if encoder_family == "qwen_image_edit_2511":
+        scale_mode = "none"
+    else:
+        scale_mode = "all" if encoder_family == "qwen_image_edit_plus" else "main_only"
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
     references = _build_image_edit_reference_bundle(
@@ -1576,6 +1611,20 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
         megapixels=float(request.edit_megapixels or profile_entry.default_edit_megapixels or 1.0),
         scale_mode=scale_mode,
     )
+    if encoder_family == "qwen_image_edit_2511":
+        scaled_main_image_id = _append_flux_kontext_image_scale_node(
+            workflow,
+            allocator=allocator,
+            image_id=references.main_image_node_id,
+        )
+        reference_image_node_ids = tuple(
+            scaled_main_image_id if index == references.main_reference_index else image_node_id
+            for index, image_node_id in enumerate(references.image_node_ids)
+        )
+        latent_image_node_id = scaled_main_image_id
+    else:
+        reference_image_node_ids = references.image_node_ids
+        latent_image_node_id = references.main_image_node_id
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
     clip_source = _build_single_clip_source(
@@ -1591,13 +1640,13 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
         profile_entry=profile_entry,
         clip_source=clip_source,
         vae_source=[vae_id, 0],
-        reference_image_node_ids=references.image_node_ids,
-        main_image_node_id=references.main_image_node_id,
+        reference_image_node_ids=reference_image_node_ids,
+        main_image_node_id=latent_image_node_id,
     )
     latent_id = _append_vae_encode_node(
         workflow,
         allocator=allocator,
-        image_id=references.main_image_node_id,
+        image_id=latent_image_node_id,
         vae_source=[vae_id, 0],
     )
     unet_id = allocator.next()

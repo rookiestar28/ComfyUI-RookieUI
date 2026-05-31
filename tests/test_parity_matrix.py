@@ -39,6 +39,7 @@ class ParityMatrixTests(unittest.TestCase):
                 "qwen_image",
                 "qwen_image_edit",
                 "qwen_image_edit_multi_lora",
+                "qwen_image_edit_2511",
                 "firered_image_edit",
                 "firered_image_edit_lightning",
                 "flux_kontext_dev_edit",
