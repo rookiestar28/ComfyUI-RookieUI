@@ -8,6 +8,7 @@ from rookieui.services.adetailer import build_adetailer_capability_payload
 from rookieui.services.parity_matrix import build_parity_payload
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from rookieui.services.version import resolve_shell_version
+from rookieui.services.z_image_controlnet import build_z_image_controlnet_capability_payload
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,9 @@ class RookieUICapabilitiesSnapshot:
     model_families: dict[str, object] = field(default_factory=build_model_family_registry_payload)
     prompt_semantics: dict[str, object] = field(default_factory=build_prompt_capability_matrix_payload)
     adetailer: dict[str, object] = field(default_factory=build_adetailer_capability_payload)
+    z_image_controlnet: dict[str, object] = field(
+        default_factory=build_z_image_controlnet_capability_payload
+    )
     routes: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:

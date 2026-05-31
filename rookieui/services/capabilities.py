@@ -215,6 +215,48 @@ def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object
     return normalized
 
 
+def _normalize_z_image_controlnet_payload(payload: dict[str, object]) -> dict[str, object]:
+    normalized: dict[str, object] = {
+        "contract_version": normalize_metadata_text(payload.get("contract_version", "")),
+        "source_model_category": normalize_metadata_text(payload.get("source_model_category", "")),
+        "forbidden_model_category": normalize_metadata_text(payload.get("forbidden_model_category", "")),
+        "available": bool(payload.get("available", False)),
+        "required_nodes": _normalize_metadata_list(payload.get("required_nodes", [])),
+        "missing_nodes": _normalize_metadata_list(payload.get("missing_nodes", [])),
+        "model_patches": [],
+        "diagnostics": _normalize_metadata_list(payload.get("diagnostics", [])),
+        "graph_contract": {},
+    }
+
+    patch_entries = payload.get("model_patches", [])
+    if isinstance(patch_entries, list):
+        normalized_patches = []
+        for patch_entry in patch_entries:
+            if not isinstance(patch_entry, dict):
+                continue
+            normalized_patches.append(
+                {
+                    "selector": normalize_metadata_text(patch_entry.get("selector", "")),
+                    "model_category": normalize_metadata_text(patch_entry.get("model_category", "")),
+                    "family": normalize_metadata_text(patch_entry.get("family", "")),
+                    "profile_hint": normalize_metadata_text(patch_entry.get("profile_hint", "")),
+                    "variant": normalize_metadata_text(patch_entry.get("variant", "")),
+                    "turbo": bool(patch_entry.get("turbo", False)),
+                }
+            )
+        normalized["model_patches"] = normalized_patches
+
+    graph_contract = payload.get("graph_contract", {})
+    if isinstance(graph_contract, dict):
+        normalized["graph_contract"] = {
+            "loader_node": normalize_metadata_text(graph_contract.get("loader_node", "")),
+            "patch_apply_node": normalize_metadata_text(graph_contract.get("patch_apply_node", "")),
+            "sampling_node": normalize_metadata_text(graph_contract.get("sampling_node", "")),
+            "forbidden_nodes": _normalize_metadata_list(graph_contract.get("forbidden_nodes", [])),
+        }
+    return normalized
+
+
 def build_capabilities_payload(
     *,
     routes: list[str],
@@ -297,4 +339,7 @@ def build_capabilities_payload(
     adetailer = payload.get("adetailer", {})
     if isinstance(adetailer, dict):
         payload["adetailer"] = _normalize_adetailer_payload(adetailer)
+    z_image_controlnet = payload.get("z_image_controlnet", {})
+    if isinstance(z_image_controlnet, dict):
+        payload["z_image_controlnet"] = _normalize_z_image_controlnet_payload(z_image_controlnet)
     return payload

@@ -107,12 +107,18 @@ class ModelInventoryTests(unittest.TestCase):
             def INPUT_TYPES(cls) -> dict[str, object]:
                 return {"required": {"unet_name": (["flux\\flux1-dev.safetensors"],)}}
 
+        class ModelPatchLoader:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"patch_name": (["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],)}}
+
         folder_paths_module = types.SimpleNamespace(get_filename_list=lambda _folder_name: [])
         nodes_module = types.SimpleNamespace(
             NODE_CLASS_MAPPINGS={
                 "CheckpointLoaderSimple": CheckpointLoaderSimple,
                 "VAELoader": VAELoader,
                 "UNETLoader": UNETLoader,
+                "ModelPatchLoader": ModelPatchLoader,
             }
         )
 
@@ -124,6 +130,10 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertEqual(snapshot.vae, ["vae-ft-mse.safetensors"])
         self.assertEqual(snapshot.default_vae, "vae-ft-mse.safetensors")
         self.assertEqual(snapshot.diffusion_models, ["flux\\flux1-dev.safetensors"])
+        self.assertEqual(
+            snapshot.model_patches,
+            ["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],
+        )
 
     def test_ensure_native_ultralytics_model_paths_updates_extensions(self) -> None:
         module = types.SimpleNamespace(

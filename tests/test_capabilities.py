@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import sys
+import types
 import unittest
+from unittest import mock
 
 from rookieui.api.routes import build_capabilities_snapshot
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
+from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.version import resolve_runtime_build_fingerprint, resolve_shell_version
@@ -23,6 +27,80 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertTrue(payload["features"]["pngInfo"])
         self.assertTrue(payload["features"]["queue"])
         self.assertIn("/rookieui/capabilities", payload["routes"])
+
+    def test_capabilities_snapshot_exposes_z_image_controlnet_contract(self) -> None:
+        class ModelPatchLoader:
+            pass
+
+        class QwenImageDiffsynthControlnet:
+            pass
+
+        class ModelSamplingAuraFlow:
+            pass
+
+        inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["realvisxl.safetensors"],
+            controlnet=["sdxl-controlnet-depth.safetensors"],
+            model_patches=[
+                "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors",
+                "Qwen\\qwen-controlnet-union.safetensors",
+            ],
+        )
+        nodes_module = types.SimpleNamespace(
+            NODE_CLASS_MAPPINGS={
+                "ModelPatchLoader": ModelPatchLoader,
+                "QwenImageDiffsynthControlnet": QwenImageDiffsynthControlnet,
+                "ModelSamplingAuraFlow": ModelSamplingAuraFlow,
+            }
+        )
+
+        with (
+            mock.patch("rookieui.services.z_image_controlnet.discover_model_inventory", return_value=inventory),
+            mock.patch.dict(sys.modules, {"nodes": nodes_module}),
+        ):
+            payload = build_capabilities_snapshot()
+
+        capability = payload["z_image_controlnet"]
+        self.assertTrue(capability["available"])
+        self.assertEqual(capability["source_model_category"], "model_patches")
+        self.assertEqual(capability["forbidden_model_category"], "controlnet")
+        self.assertEqual(capability["missing_nodes"], [])
+        self.assertEqual(capability["diagnostics"], [])
+        self.assertEqual(
+            [entry["selector"] for entry in capability["model_patches"]],
+            ["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],
+        )
+        self.assertEqual(capability["model_patches"][0]["variant"], "union")
+        self.assertTrue(capability["model_patches"][0]["turbo"])
+        self.assertNotIn("sdxl-controlnet-depth.safetensors", str(capability["model_patches"]))
+
+    def test_capabilities_snapshot_reports_z_image_controlnet_missing_dependencies(self) -> None:
+        inventory = ModelInventorySnapshot(
+            source="host",
+            checkpoints=["realvisxl.safetensors"],
+            controlnet=["Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],
+            model_patches=[],
+        )
+        nodes_module = types.SimpleNamespace(NODE_CLASS_MAPPINGS={"ModelPatchLoader": object})
+
+        with (
+            mock.patch("rookieui.services.z_image_controlnet.discover_model_inventory", return_value=inventory),
+            mock.patch.dict(sys.modules, {"nodes": nodes_module}),
+        ):
+            payload = build_capabilities_snapshot()
+
+        capability = payload["z_image_controlnet"]
+        self.assertFalse(capability["available"])
+        self.assertEqual(capability["model_patches"], [])
+        self.assertEqual(
+            capability["missing_nodes"],
+            ["QwenImageDiffsynthControlnet", "ModelSamplingAuraFlow"],
+        )
+        self.assertIn("missing_model_patches:z_image_controlnet", capability["diagnostics"])
+        self.assertIn("missing_node:QwenImageDiffsynthControlnet", capability["diagnostics"])
+        self.assertIn("missing_node:ModelSamplingAuraFlow", capability["diagnostics"])
+        self.assertNotIn("Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors", str(capability["model_patches"]))
 
     def test_capabilities_snapshot_contains_overview_tab(self) -> None:
         payload = build_capabilities_snapshot()
