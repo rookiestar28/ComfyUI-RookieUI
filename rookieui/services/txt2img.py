@@ -372,9 +372,19 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     if not profile.supports_clip_skip:
         clip_skip = 1
 
+    primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
+        profile.id, inventory
+    )
+    # CRITICAL: Z-Image ControlNet files are ComfyUI model patches; routing them through generic controlnet
+    # inventory makes strict host validation reject the official Turbo graph before translation.
+    controlnet_inventory_models = (
+        inventory.model_patches
+        if profile.id == "z_image_turbo" and primary_model_category == "diffusion_models"
+        else inventory.controlnet
+    )
     controlnet_units, controlnet_warning_codes, controlnet_warnings = normalize_controlnet_units(
         payload,
-        inventory_models=inventory.controlnet,
+        inventory_models=controlnet_inventory_models,
         strict_model_match=inventory_is_host,
     )
     # IMPORTANT: keep ADetailer normalization detached from main ControlNet ownership here.
@@ -387,9 +397,6 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         primary_controlnet_unit_count=len([unit for unit in controlnet_units if unit.enabled]),
     )
 
-    primary_model_category, primary_model_selectors, primary_model_default = resolve_primary_model_selector_context(
-        profile.id, inventory
-    )
     # CRITICAL: host-backed defaults arrive as sentinel strings from request/dataclass/UI contracts;
     # convert them back to unresolved state before strict host matching or bare generate requests fail early.
     raw_checkpoint_selector = "" if _is_unresolved_inventory_selector(request.checkpoint_name) else request.checkpoint_name

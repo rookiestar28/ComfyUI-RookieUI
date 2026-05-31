@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.family_template_manifest import (
     build_non_sd_runtime_adapter_map,
     list_non_sd_edit_manifest_entries,
@@ -88,6 +89,118 @@ def _append_conditioning_zero_out_node(
         },
     }
     return node_id
+
+
+def _read_controlnet_unit_value(unit: NormalizedControlNetUnit, key: str) -> object:
+    return getattr(unit, key, None)
+
+
+def _append_model_patch_loader_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    patch_name: str,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ModelPatchLoader",
+        "inputs": {
+            "name": patch_name,
+        },
+    }
+    return node_id
+
+
+def _append_z_image_controlnet_image_preprocess_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest,
+    unit: NormalizedControlNetUnit,
+) -> tuple[str, list[object] | None]:
+    image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
+    if not image_asset:
+        raise ValueError("Z-Image Turbo ControlNet requires controlnet_units[0].image_asset.")
+    image_id = allocator.next()
+    workflow[image_id] = {
+        "class_type": "RookieUILoadAssetImage",
+        "inputs": {
+            "asset_handle": image_asset,
+        },
+    }
+    image_ref = [image_id, 0]
+
+    mask_ref: list[object] | None = None
+    mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
+    use_mask = bool(_read_controlnet_unit_value(unit, "use_mask"))
+    if use_mask and mask_asset:
+        mask_id = allocator.next()
+        workflow[mask_id] = {
+            "class_type": "RookieUILoadAssetMask",
+            "inputs": {
+                "asset_handle": mask_asset,
+                "channel": "red",
+                "invert": False,
+                "blur_radius": 0,
+            },
+        }
+        mask_ref = [mask_id, 0]
+
+    preprocess_id = allocator.next()
+    preprocess_inputs: dict[str, object] = {
+        "image": image_ref,
+        "module": str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none",
+        "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
+        "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
+        "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
+        "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
+        "target_width": int(request.width),
+        "target_height": int(request.height),
+        "resize_mode": str(_read_controlnet_unit_value(unit, "resize_mode") or "crop_and_resize"),
+        "use_mask": bool(use_mask and mask_ref),
+    }
+    if use_mask and mask_ref is not None:
+        preprocess_inputs["mask"] = mask_ref
+    workflow[preprocess_id] = {
+        "class_type": "RookieUIControlNetPreprocess",
+        "inputs": preprocess_inputs,
+    }
+    return preprocess_id, mask_ref
+
+
+def _append_z_image_controlnet_model_patch_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    model_source: list[object],
+    vae_source: list[object],
+    control_image_source: list[object],
+    mask_source: list[object] | None,
+    unit: NormalizedControlNetUnit,
+) -> list[object]:
+    patch_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
+    if not patch_name:
+        raise ValueError("Z-Image Turbo ControlNet requires a model-patch selector.")
+    patch_id = _append_model_patch_loader_node(
+        workflow,
+        allocator=allocator,
+        patch_name=patch_name,
+    )
+    node_id = allocator.next()
+    inputs: dict[str, object] = {
+        "model": model_source,
+        "model_patch": [patch_id, 0],
+        "vae": vae_source,
+        "image": control_image_source,
+        "strength": float(_read_controlnet_unit_value(unit, "weight") or 1.0),
+    }
+    if mask_source is not None:
+        inputs["mask"] = mask_source
+    workflow[node_id] = {
+        "class_type": "QwenImageDiffsynthControlnet",
+        "inputs": inputs,
+    }
+    return [node_id, 0]
 
 
 def _append_random_noise_node(
@@ -1038,6 +1151,11 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
 def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
+    enabled_controlnet_units = [unit for unit in request.controlnet_units if unit.enabled]
+    if enabled_controlnet_units and not turbo:
+        raise ValueError("Z-Image ControlNet is currently supported only for z_image_turbo.")
+    if len(enabled_controlnet_units) > 1:
+        raise ValueError("Z-Image Turbo ControlNet currently supports exactly one enabled unit.")
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
     base_model_source = _append_model_only_lora_chain(
@@ -1054,6 +1172,22 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
     )
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    if enabled_controlnet_units:
+        preprocess_id, mask_ref = _append_z_image_controlnet_image_preprocess_node(
+            workflow,
+            allocator=allocator,
+            request=request,
+            unit=enabled_controlnet_units[0],
+        )
+        base_model_source = _append_z_image_controlnet_model_patch_node(
+            workflow,
+            allocator=allocator,
+            model_source=base_model_source,
+            vae_source=[vae_id, 0],
+            control_image_source=[preprocess_id, 0],
+            mask_source=mask_ref,
+            unit=enabled_controlnet_units[0],
+        )
     model_source = _append_model_sampling_node(
         workflow,
         allocator=allocator,

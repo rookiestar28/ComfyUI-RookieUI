@@ -30,6 +30,8 @@ def _should_use_official_non_sd_txt2img_template(request: NormalizedTxt2ImgReque
         return False
     if not is_official_non_sd_txt2img_profile(request.profile):
         return False
+    if request.profile == "z_image_turbo" and bool(request.controlnet_units):
+        return not (request.hires_enabled or request.adetailer.enabled)
     # IMPORTANT: official non-SD template builders currently own the base template path only.
     # Extended seams such as ControlNet, ADetailer, and Hires must stay on the legacy augmented graph until
     # those feature chains get explicit official-template parity builders instead of being silently dropped.

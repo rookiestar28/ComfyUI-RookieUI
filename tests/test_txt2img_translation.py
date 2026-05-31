@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from rookieui.api import routes
@@ -19,6 +20,20 @@ class _FakeJsonRequest:
 
 
 class Txt2ImgTranslationTests(unittest.TestCase):
+    def _z_image_turbo_inventory(self) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["zimage\\z_image_turbo_bf16.safetensors"],
+            vae=["ae.safetensors"],
+            text_encoders=["qwen_3_4b.safetensors"],
+            controlnet=["sdxl-controlnet-depth.safetensors"],
+            model_patches=["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors"],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="ae.safetensors",
+            default_text_encoder="qwen_3_4b.safetensors",
+        )
+
     def test_normalize_txt2img_request_applies_sd15_defaults(self) -> None:
         request = normalize_txt2img_request({"prompt": "city skyline"})
 
@@ -85,6 +100,120 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         )
         self.assertEqual(request.adetailer.units[0].detector, "face_yolov8n.pt")
         self.assertEqual(request.adetailer.units[0].controlnet.mode, "passthrough")
+
+    def test_normalize_txt2img_request_accepts_z_image_turbo_controlnet_model_patch(self) -> None:
+        with (
+            mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=self._z_image_turbo_inventory()),
+            mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+        ):
+            request = normalize_txt2img_request(
+                {
+                    "prompt": "city skyline",
+                    "profile": "z_image_turbo",
+                    "controlnet_units": [
+                        {
+                            "enabled": True,
+                            "module": "none",
+                            "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                            "image_asset": "source-image",
+                        }
+                    ],
+                }
+            )
+
+        self.assertEqual(request.profile, "z_image_turbo")
+        self.assertEqual(request.controlnet_units[0].model, "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors")
+
+    def test_translate_txt2img_request_builds_z_image_turbo_model_patch_controlnet_graph(self) -> None:
+        with (
+            mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=self._z_image_turbo_inventory()),
+            mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "city skyline",
+                    "profile": "z_image_turbo",
+                    "controlnet_units": [
+                        {
+                            "enabled": True,
+                            "module": "none",
+                            "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                            "image_asset": "source-image",
+                            "weight": 0.75,
+                        }
+                    ],
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+
+        self.assertEqual(result["workflow_kind"], "txt2img-z_image_turbo")
+        self.assertIn("ModelPatchLoader", class_types)
+        self.assertIn("QwenImageDiffsynthControlnet", class_types)
+        self.assertIn("ModelSamplingAuraFlow", class_types)
+        self.assertIn("EmptySD3LatentImage", class_types)
+        self.assertIn("CLIPTextEncode", class_types)
+        self.assertIn("ConditioningZeroOut", class_types)
+        self.assertIn("KSampler", class_types)
+        self.assertNotIn("ControlNetLoader", class_types)
+        self.assertNotIn("DiffControlNetLoader", class_types)
+        self.assertNotIn("RookieUIControlNetApplyNativeAdvanced", class_types)
+
+        patch_loader_id, patch_loader = next(
+            (node_id, node) for node_id, node in workflow.items() if node["class_type"] == "ModelPatchLoader"
+        )
+        qwen_control_id, qwen_control = next(
+            (node_id, node) for node_id, node in workflow.items() if node["class_type"] == "QwenImageDiffsynthControlnet"
+        )
+        sampling_node_id, sampling_node = next(
+            (node_id, node) for node_id, node in workflow.items() if node["class_type"] == "ModelSamplingAuraFlow"
+        )
+        sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
+
+        self.assertEqual(patch_loader["inputs"]["name"], "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors")
+        self.assertEqual(qwen_control["inputs"]["model_patch"], [patch_loader_id, 0])
+        self.assertEqual(qwen_control["inputs"]["strength"], 0.75)
+        self.assertEqual(sampling_node["inputs"]["model"], [qwen_control_id, 0])
+        self.assertEqual(sampler_node["inputs"]["model"], [sampling_node_id, 0])
+
+    def test_translate_txt2img_request_builds_z_image_turbo_controlnet_module_shapes(self) -> None:
+        for module_name in ("none", "canny", "depth", "openpose"):
+            with self.subTest(module_name=module_name):
+                with (
+                    mock.patch(
+                        "rookieui.services.txt2img.discover_model_inventory",
+                        return_value=self._z_image_turbo_inventory(),
+                    ),
+                    mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+                ):
+                    normalized = normalize_txt2img_request(
+                        {
+                            "prompt": "city skyline",
+                            "profile": "z_image_turbo",
+                            "controlnet_units": [
+                                {
+                                    "enabled": True,
+                                    "module": module_name,
+                                    "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                                    "image_asset": "source-image",
+                                }
+                            ],
+                        }
+                    )
+                workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+                preprocess_node_id, preprocess_node = next(
+                    (node_id, node)
+                    for node_id, node in workflow.items()
+                    if node["class_type"] == "RookieUIControlNetPreprocess"
+                )
+                qwen_control = next(
+                    node for node in workflow.values() if node["class_type"] == "QwenImageDiffsynthControlnet"
+                )
+
+                self.assertEqual(preprocess_node["inputs"]["module"], module_name)
+                self.assertEqual(qwen_control["inputs"]["image"], [preprocess_node_id, 0])
 
     def test_normalize_txt2img_request_reports_adetailer_no_active_units(self) -> None:
         request = normalize_txt2img_request(
