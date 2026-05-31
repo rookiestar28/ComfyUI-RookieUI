@@ -15,6 +15,17 @@ import {
 } from "./rookieui_canvas_surface_contract.js";
 import { createSourceCanvasBrushController } from "./rookieui_canvas_brush_deps.js";
 import { buildImg2ImgPayloadFromElements } from "./rookieui_generation_payload_state.js";
+import {
+  buildImageEditReferencePayloadFromElements,
+  resolveActiveImg2ImgProfile,
+  syncImageEditProfileStateFromElements,
+} from "./img2img/rookieui_img2img_reference_state.js";
+import {
+  setImg2ImgFieldVisibility,
+  syncImageEditReferenceUi,
+  syncImg2ImgModeAvailability,
+  syncImg2ImgModeParameterFields,
+} from "./img2img/rookieui_img2img_mode_surface.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -510,72 +521,12 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     libraryHeading: null,
     libraryHost: null,
   };
-  const getActiveProfile = () =>
-    profileLookup.get(String(elements.profileState.value ?? "").trim().toLowerCase()) ??
-    profileLookup.get(elements.profileState.value) ??
-    null;
-  const buildImageEditReferencePayload = (referenceLimit = null) => {
-    const resolvedLimit = Math.max(0, Number(referenceLimit ?? elements.maxDirectReferences?.value ?? 0) || 0);
-    if (resolvedLimit <= 0) {
-      return {
-        referenceImages: [],
-        mainReferenceIndex: 0,
-        selectedMainSlot: 0,
-      };
-    }
-    const normalizedLimit = Math.max(1, resolvedLimit);
-    const orderedSlots = [
-      {
-        image_asset: String(elements.imageAsset?.value ?? "").trim(),
-        image_data: String(elements.imageData?.value ?? "").trim(),
-      },
-      {
-        image_asset: String(elements.referenceAsset2?.value ?? "").trim(),
-        image_data: String(elements.referenceData2?.value ?? "").trim(),
-      },
-      {
-        image_asset: String(elements.referenceAsset3?.value ?? "").trim(),
-        image_data: String(elements.referenceData3?.value ?? "").trim(),
-      },
-    ].slice(0, normalizedLimit);
-    const selectedMainSlot = Math.min(
-      Math.max(0, Number(elements.mainReferenceIndex?.value ?? 0) || 0),
-      Math.max(0, normalizedLimit - 1),
-    );
-    const referenceImages = [];
-    let mainReferenceIndex = -1;
-    orderedSlots.forEach((entry, slotIndex) => {
-      if (!entry.image_asset && !entry.image_data) {
-        return;
-      }
-      if (slotIndex === selectedMainSlot) {
-        mainReferenceIndex = referenceImages.length;
-      }
-      referenceImages.push(entry);
-    });
-    return {
-      referenceImages,
-      mainReferenceIndex,
-      selectedMainSlot,
-    };
-  };
+  const getActiveProfile = () => resolveActiveImg2ImgProfile(profileLookup, elements.profileState.value);
+  const buildImageEditReferencePayload = (referenceLimit = null) =>
+    buildImageEditReferencePayloadFromElements(elements, referenceLimit);
   const syncImageEditProfileState = () => {
     const activeProfile = getActiveProfile();
-    const imageEditProfile = Boolean(activeProfile?.image_edit_profile);
-    const referenceLimit = imageEditProfile ? Math.max(1, Number(activeProfile?.max_direct_references ?? 0) || 0) : 0;
-    elements.imageEditProfile.value = imageEditProfile ? "true" : "false";
-    elements.maxDirectReferences.value = String(referenceLimit);
-    const normalizedMainSlot = Math.min(
-      Math.max(0, Number(elements.mainReferenceIndex.value ?? 0) || 0),
-      Math.max(0, referenceLimit - 1),
-    );
-    elements.mainReferenceIndex.value = String(normalizedMainSlot);
-    return {
-      activeProfile,
-      imageEditProfile,
-      referenceLimit,
-      normalizedMainSlot,
-    };
+    return syncImageEditProfileStateFromElements(elements, activeProfile);
   };
 
   const buildXYZBaseRequest = () => {
@@ -780,15 +731,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     elements.softInpaintingDifferenceContrastSlider,
   ];
   let img2imgModeRouter = null;
-  const setFieldVisibility = (fieldNode, visible) => {
-    if (!fieldNode) {
-      return;
-    }
-    fieldNode.hidden = !visible;
-    fieldNode.querySelectorAll("input, select, textarea, button").forEach((control) => {
-      control.disabled = !visible;
-    });
-  };
   const resolvePresetTemplateLoraDefault = () =>
     String(presetLookup.get(elements.preset.value)?.template_lora_name ?? "").trim();
   const resolveTemplateLoraOfficialLabel = () =>
@@ -801,7 +743,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     const presetDefault = resolvePresetTemplateLoraDefault();
     const officialLabel = resolveTemplateLoraOfficialLabel();
     const officialResolved = presetDefault || officialLabel;
-    setFieldVisibility(templateLoraControls.field, visible);
+    setImg2ImgFieldVisibility(templateLoraControls.field, visible);
     if (templateLoraControls.libraryHeading) {
       templateLoraControls.libraryHeading.hidden = !visible;
     }
@@ -873,62 +815,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     }
     return nextPresetId;
   };
-  const syncImageEditReferenceUi = (profileState = syncImageEditProfileState()) => {
-    const { imageEditProfile, referenceLimit, normalizedMainSlot } = profileState;
-    if (img2imgModeUi.referenceSection) {
-      img2imgModeUi.referenceSection.hidden = !imageEditProfile;
-    }
-    if (img2imgModeUi.referenceHintNode) {
-      img2imgModeUi.referenceHintNode.textContent =
-        referenceLimit > 1
-          ? `Reference 1 uses the source image canvas above. Add up to ${referenceLimit - 1} more ordered references here and choose the main reference.`
-          : "Reference 1 uses the source image canvas above. This profile accepts only one direct reference image.";
-    }
-    img2imgModeUi.referenceSlots.forEach((slot) => {
-      const visible = imageEditProfile && slot.slotIndex < referenceLimit;
-      if (slot.card) {
-        slot.card.hidden = !visible;
-      }
-      if (slot.mainRadio) {
-        slot.mainRadio.disabled = !visible;
-        slot.mainRadio.checked = visible && slot.slotIndex === normalizedMainSlot;
-      }
-      if (slot.assetInput) {
-        slot.assetInput.disabled = !visible;
-      }
-      if (slot.fileInput) {
-        slot.fileInput.disabled = !visible;
-      }
-      slot.updateStatus?.();
-    });
-  };
-  const syncImg2ImgModeAvailability = (profileState = syncImageEditProfileState()) => {
-    if (profileState.imageEditProfile && elements.mode.value !== "img2img") {
-      setElementValue(elements.mode, "img2img");
-      img2imgModeRouter?.activateSubtab?.("img2img", { dispatchChange: false });
-    }
-    img2imgModeUi.modeButtons.forEach((button, tabId) => {
-      const allowed = !profileState.imageEditProfile || tabId === "img2img";
-      button.disabled = !allowed;
-      button.setAttribute("aria-disabled", String(!allowed));
-    });
-  };
-  const syncImg2ImgModeParameterFields = (profileState = syncImageEditProfileState()) => {
-    const editEnabled = profileState.imageEditProfile;
-    setFieldVisibility(modeAwareFieldControls.widthField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.heightField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.resizeModeField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.denoiseField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.growMaskField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.batchSizeField, !editEnabled);
-    setFieldVisibility(modeAwareFieldControls.clipSkipField, !editEnabled);
-    if (modeAwareFieldControls.hiresSection) {
-      modeAwareFieldControls.hiresSection.hidden = editEnabled;
-      modeAwareFieldControls.hiresSection.querySelectorAll("input, select, textarea, button").forEach((control) => {
-        control.disabled = editEnabled;
-      });
-    }
-  };
   const syncImg2ImgModeSurface = () => {
     const resolvedPresetId = syncVisiblePresetOptions(elements.mode.value);
     if (resolvedPresetId) {
@@ -943,10 +829,16 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     }
     const profileState = syncImageEditProfileState();
-    syncImg2ImgModeAvailability(profileState);
-    syncImageEditReferenceUi(profileState);
+    syncImg2ImgModeAvailability({
+      profileState,
+      elements,
+      modeRouter: img2imgModeRouter,
+      modeUi: img2imgModeUi,
+      setElementValue,
+    });
+    syncImageEditReferenceUi(profileState, img2imgModeUi);
     syncTemplateLoraControls();
-    syncImg2ImgModeParameterFields(profileState);
+    syncImg2ImgModeParameterFields(profileState, modeAwareFieldControls);
     syncMaskField(elements.mode, elements.maskAsset, inpaintModeControls, {
       imageEditProfile: profileState.imageEditProfile,
       referenceLimit: profileState.referenceLimit,

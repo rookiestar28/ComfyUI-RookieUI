@@ -22,6 +22,8 @@
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_catalog.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_i18n.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_tokens.js",
+    "web/sidebar_tabs/img2img/rookieui_img2img_mode_surface.js",
+    "web/sidebar_tabs/img2img/rookieui_img2img_reference_state.js",
     "web/sidebar_tabs/rookieui_generation_payload_state.js",
     "web/sidebar_tabs/rookieui_shell_persistence.js",
     "web/sidebar_tabs/rookieui_shell_state_contract.js",
