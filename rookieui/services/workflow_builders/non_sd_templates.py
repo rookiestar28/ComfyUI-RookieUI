@@ -111,13 +111,106 @@ def _append_model_patch_loader_node(
     return node_id
 
 
-def _append_z_image_controlnet_image_preprocess_node(
+def _append_get_image_size_node(
     workflow: dict[str, object],
     *,
     allocator: NodeIdAllocator,
-    request: NormalizedTxt2ImgRequest,
+    image_source: list[object],
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "GetImageSize",
+        "inputs": {
+            "image": image_source,
+        },
+    }
+    return node_id
+
+
+def _append_image_scale_to_total_pixels_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    image_source: list[object],
+    upscale_method: str,
+    megapixels: float = 1.0,
+    resolution_steps: int = 1,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "ImageScaleToTotalPixels",
+        "inputs": {
+            "image": image_source,
+            "upscale_method": upscale_method,
+            "megapixels": float(megapixels),
+            "resolution_steps": int(resolution_steps),
+        },
+    }
+    return node_id
+
+
+def _normalize_z_image_canny_threshold(value: object, *, default: float) -> float:
+    try:
+        threshold = float(value)
+    except (TypeError, ValueError):
+        return default
+    if threshold > 1.0:
+        threshold = threshold / 100.0
+    return max(0.01, min(0.99, threshold))
+
+
+def _resolve_z_image_canny_thresholds(unit: NormalizedControlNetUnit) -> tuple[float, float]:
+    raw_low = _read_controlnet_unit_value(unit, "threshold_a")
+    raw_high = _read_controlnet_unit_value(unit, "threshold_b")
+    if float(raw_low or 0.0) == 64.0 and float(raw_high or 0.0) == 64.0:
+        return 0.3, 0.4
+    return (
+        _normalize_z_image_canny_threshold(raw_low, default=0.3),
+        _normalize_z_image_canny_threshold(raw_high, default=0.4),
+    )
+
+
+def _append_canny_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    image_source: list[object],
     unit: NormalizedControlNetUnit,
-) -> tuple[str, list[object] | None]:
+) -> str:
+    low_threshold, high_threshold = _resolve_z_image_canny_thresholds(unit)
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "Canny",
+        "inputs": {
+            "image": image_source,
+            "low_threshold": low_threshold,
+            "high_threshold": high_threshold,
+        },
+    }
+    return node_id
+
+
+def _classify_z_image_controlnet_module(unit: NormalizedControlNetUnit) -> str:
+    module = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower()
+    if module in {"", "none", "controlnet", "passthrough", "reference"}:
+        return "controlnet"
+    if "canny" in module:
+        return "canny"
+    if "depth" in module:
+        return "depth"
+    if "pose" in module:
+        return "pose"
+    raise ValueError(
+        f"Unsupported Z-Image Turbo ControlNet module '{module}'. Supported modules: none, canny, depth, openpose."
+    )
+
+
+def _append_z_image_controlnet_image_adapter(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    unit: NormalizedControlNetUnit,
+) -> tuple[list[object], list[object], list[object] | None]:
     image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
     if not image_asset:
         raise ValueError("Z-Image Turbo ControlNet requires controlnet_units[0].image_asset.")
@@ -146,26 +239,34 @@ def _append_z_image_controlnet_image_preprocess_node(
         }
         mask_ref = [mask_id, 0]
 
-    preprocess_id = allocator.next()
-    preprocess_inputs: dict[str, object] = {
-        "image": image_ref,
-        "module": str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none",
-        "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
-        "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
-        "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
-        "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
-        "target_width": int(request.width),
-        "target_height": int(request.height),
-        "resize_mode": str(_read_controlnet_unit_value(unit, "resize_mode") or "crop_and_resize"),
-        "use_mask": bool(use_mask and mask_ref),
-    }
-    if use_mask and mask_ref is not None:
-        preprocess_inputs["mask"] = mask_ref
-    workflow[preprocess_id] = {
-        "class_type": "RookieUIControlNetPreprocess",
-        "inputs": preprocess_inputs,
-    }
-    return preprocess_id, mask_ref
+    module = _classify_z_image_controlnet_module(unit)
+    if module == "canny":
+        scale_id = _append_image_scale_to_total_pixels_node(
+            workflow,
+            allocator=allocator,
+            image_source=image_ref,
+            upscale_method="nearest-exact",
+        )
+        canny_id = _append_canny_node(
+            workflow,
+            allocator=allocator,
+            image_source=[scale_id, 0],
+            unit=unit,
+        )
+        canny_ref = [canny_id, 0]
+        return canny_ref, canny_ref, mask_ref
+    if module == "depth":
+        # IMPORTANT: the 0.9.91 packaged Depth blueprint contains a Lotus subgraph, but its Qwen
+        # ControlNet image edge is still the scaled input image; do not invent a Lotus runtime branch here.
+        scale_id = _append_image_scale_to_total_pixels_node(
+            workflow,
+            allocator=allocator,
+            image_source=image_ref,
+            upscale_method="lanczos",
+        )
+        scale_ref = [scale_id, 0]
+        return scale_ref, scale_ref, mask_ref
+    return image_ref, image_ref, mask_ref
 
 
 def _append_z_image_controlnet_model_patch_node(
@@ -1152,6 +1253,7 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
     enabled_controlnet_units = [unit for unit in request.controlnet_units if unit.enabled]
+    control_image_size_source: list[object] | None = None
     if enabled_controlnet_units and not turbo:
         raise ValueError("Z-Image ControlNet is currently supported only for z_image_turbo.")
     if len(enabled_controlnet_units) > 1:
@@ -1173,10 +1275,9 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
     if enabled_controlnet_units:
-        preprocess_id, mask_ref = _append_z_image_controlnet_image_preprocess_node(
+        control_image_ref, control_image_size_source, mask_ref = _append_z_image_controlnet_image_adapter(
             workflow,
             allocator=allocator,
-            request=request,
             unit=enabled_controlnet_units[0],
         )
         base_model_source = _append_z_image_controlnet_model_patch_node(
@@ -1184,7 +1285,7 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
             allocator=allocator,
             model_source=base_model_source,
             vae_source=[vae_id, 0],
-            control_image_source=[preprocess_id, 0],
+            control_image_source=control_image_ref,
             mask_source=mask_ref,
             unit=enabled_controlnet_units[0],
         )
@@ -1202,12 +1303,22 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
         request=request,
         negative_mode="zero_out" if turbo else "encode",
     )
+    latent_width: int | list[object] = request.width
+    latent_height: int | list[object] = request.height
+    if control_image_size_source is not None:
+        size_id = _append_get_image_size_node(
+            workflow,
+            allocator=allocator,
+            image_source=control_image_size_source,
+        )
+        latent_width = [size_id, 0]
+        latent_height = [size_id, 1]
     latent_id = _append_empty_latent_node(
         workflow,
         allocator=allocator,
         class_type="EmptySD3LatentImage",
-        width=request.width,
-        height=request.height,
+        width=latent_width,
+        height=latent_height,
         batch_size=request.batch_size,
     )
     sampler_id = allocator.next()
