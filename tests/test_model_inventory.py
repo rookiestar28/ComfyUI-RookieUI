@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from rookieui.services.model_inventory import (
+    _HOST_MODEL_FOLDERS,
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
     ensure_native_ultralytics_model_paths,
@@ -25,42 +26,70 @@ class ModelInventoryTests(unittest.TestCase):
     def test_discover_model_inventory_uses_host_folder_paths_when_available(self) -> None:
         module = types.SimpleNamespace(
             get_filename_list=lambda folder_name: {
+                "audio_encoders": ["stable_audio_encoder.safetensors"],
                 "checkpoints": ["dreamshaper.safetensors"],
                 "background_removal": ["BiRefNet-general.safetensors"],
+                "classifiers": ["nsfw_classifier.onnx"],
                 "clip": ["clip_l.safetensors"],
                 "clip_vision": ["clip_vision_g.safetensors"],
+                "configs": ["v1-inference.yaml"],
                 "controlnet": ["depth_v11.safetensors"],
+                "detection": ["sam3_detector.safetensors"],
+                "diffusers": ["flux-diffusers-folder"],
                 "diffusion_models": ["flux1-dev.safetensors"],
+                "frame_interpolation": ["rife.safetensors"],
+                "geometry_estimation": ["moge.safetensors"],
+                "gligen": ["gligen_sd14.safetensors"],
+                "hypernetworks": ["style_hypernetwork.pt"],
                 "latent_upscale_models": ["latent-upscaler.safetensors"],
                 "vae": ["vae-ft-mse.safetensors"],
                 "text_encoders": ["clip_l.safetensors"],
                 "embeddings": ["badhandv4.pt"],
                 "loras": ["detail_tweaker.safetensors"],
+                "model_patches": ["patches.safetensors"],
+                "optical_flow": ["raft.safetensors"],
+                "photomaker": ["photomaker-v1.bin"],
+                "style_models": ["style_adapter.safetensors"],
                 "ultralytics": ["face_yolov8m.pt", "person_yolov8m-seg.pt"],
                 "unet": ["sdxl_unet.safetensors"],
                 "upscale_models": ["4x_foolhardy.pth"],
+                "vae_approx": ["vaeapprox-sdxl.pt"],
             }.get(folder_name, [])
         )
 
         snapshot = discover_model_inventory(folder_paths_module=module)
 
         self.assertEqual(snapshot.source, "host")
+        self.assertEqual(snapshot.audio_encoders, ["stable_audio_encoder.safetensors"])
         self.assertEqual(snapshot.background_removal, ["BiRefNet-general.safetensors"])
+        self.assertEqual(snapshot.classifiers, ["nsfw_classifier.onnx"])
         self.assertEqual(snapshot.default_checkpoint, "dreamshaper.safetensors")
         self.assertEqual(snapshot.default_vae, "vae-ft-mse.safetensors")
         self.assertEqual(snapshot.default_text_encoder, "clip_l.safetensors")
         self.assertEqual(snapshot.clip, ["clip_l.safetensors"])
         self.assertEqual(snapshot.clip_vision, ["clip_vision_g.safetensors"])
+        self.assertEqual(snapshot.configs, ["v1-inference.yaml"])
         self.assertEqual(snapshot.controlnet, ["depth_v11.safetensors"])
+        self.assertEqual(snapshot.detection, ["sam3_detector.safetensors"])
+        self.assertEqual(snapshot.diffusers, ["flux-diffusers-folder"])
         self.assertEqual(snapshot.diffusion_models, ["flux1-dev.safetensors"])
         self.assertEqual(snapshot.embeddings, ["badhandv4.pt"])
+        self.assertEqual(snapshot.frame_interpolation, ["rife.safetensors"])
+        self.assertEqual(snapshot.geometry_estimation, ["moge.safetensors"])
+        self.assertEqual(snapshot.gligen, ["gligen_sd14.safetensors"])
+        self.assertEqual(snapshot.hypernetworks, ["style_hypernetwork.pt"])
         self.assertEqual(snapshot.latent_upscale_models, ["latent-upscaler.safetensors"])
         self.assertEqual(snapshot.loras, ["detail_tweaker.safetensors"])
+        self.assertEqual(snapshot.model_patches, ["patches.safetensors"])
+        self.assertEqual(snapshot.optical_flow, ["raft.safetensors"])
+        self.assertEqual(snapshot.photomaker, ["photomaker-v1.bin"])
+        self.assertEqual(snapshot.style_models, ["style_adapter.safetensors"])
         self.assertEqual(snapshot.ultralytics, ["face_yolov8m.pt", "person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.ultralytics_bbox, ["face_yolov8m.pt"])
         self.assertEqual(snapshot.ultralytics_segm, ["person_yolov8m-seg.pt"])
         self.assertEqual(snapshot.unet, ["sdxl_unet.safetensors"])
         self.assertEqual(snapshot.upscale_models, ["4x_foolhardy.pth"])
+        self.assertEqual(snapshot.vae_approx, ["vaeapprox-sdxl.pt"])
 
     def test_discover_model_inventory_falls_back_to_host_node_input_choices(self) -> None:
         class CheckpointLoaderSimple:
@@ -169,6 +198,29 @@ class ModelInventoryTests(unittest.TestCase):
         self.assertIn("upscale_models", payload["catalog"]["categories"])
         self.assertIn("ultralytics_bbox", payload["catalog"]["categories"])
         self.assertIn("ultralytics_segm", payload["catalog"]["categories"])
+        diagnostic_categories = {
+            "audio_encoders",
+            "classifiers",
+            "configs",
+            "detection",
+            "diffusers",
+            "frame_interpolation",
+            "geometry_estimation",
+            "gligen",
+            "hypernetworks",
+            "model_patches",
+            "optical_flow",
+            "photomaker",
+            "style_models",
+            "vae_approx",
+        }
+        host_diagnostics_group = next(
+            group for group in payload["catalog"]["surface_groups"] if group["id"] == "host_diagnostics"
+        )
+        self.assertEqual(set(host_diagnostics_group["categories"]), diagnostic_categories)
+        for category_id in diagnostic_categories:
+            self.assertIn(category_id, payload["catalog"]["categories"])
+            self.assertFalse(payload["catalog"]["categories"][category_id]["sidebar_visible"])
 
     def test_build_preset_payload_uses_inventory_defaults(self) -> None:
         module = types.SimpleNamespace(
@@ -754,4 +806,4 @@ class ModelInventoryTests(unittest.TestCase):
 
         self.assertEqual(first.default_checkpoint, "cache-checkpoint.safetensors")
         self.assertEqual(second.default_checkpoint, "cache-checkpoint.safetensors")
-        self.assertEqual(call_count, 14)
+        self.assertEqual(call_count, len(_HOST_MODEL_FOLDERS))

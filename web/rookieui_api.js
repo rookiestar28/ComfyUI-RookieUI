@@ -1306,10 +1306,45 @@ async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.
 }
 
 function createFallbackModelInventory() {
+  const diagnosticCategories = {
+    audio_encoders: "Audio Encoders",
+    background_removal: "Background Removal",
+    classifiers: "Classifiers",
+    configs: "Configs",
+    detection: "Detection",
+    diffusers: "Diffusers",
+    frame_interpolation: "Frame Interpolation",
+    geometry_estimation: "Geometry Estimation",
+    gligen: "GLIGEN",
+    hypernetworks: "Hypernetworks",
+    latent_upscale_models: "Latent Upscale Models",
+    model_patches: "Model Patches",
+    optical_flow: "Optical Flow",
+    photomaker: "PhotoMaker",
+    style_models: "Style Models",
+    ultralytics: "Ultralytics",
+    ultralytics_bbox: "Ultralytics BBox",
+    ultralytics_segm: "Ultralytics Segm",
+    unet: "UNet",
+    upscale_models: "Upscale Models",
+    vae_approx: "VAE Approx",
+  };
+  const diagnosticEntries = Object.fromEntries(
+    Object.entries(diagnosticCategories).map(([id, title]) => [
+      id,
+      {
+        title,
+        items: [],
+        default_value: "",
+        sidebar_visible: false,
+      },
+    ]),
+  );
   return {
     // IMPORTANT: __host_default__ is an inventory-discovery fallback, not a valid model choice;
     // if it reaches the UI, debug /rookieui/models and /object_info before changing preset defaults.
     source: "fallback",
+    ...Object.fromEntries(Object.keys(diagnosticCategories).map((id) => [id, []])),
     checkpoints: ["__host_default__"],
     clip: [],
     clip_vision: [],
@@ -1319,9 +1354,6 @@ function createFallbackModelInventory() {
     text_encoders: ["Automatic"],
     embeddings: [],
     loras: [],
-    ultralytics: [],
-    unet: [],
-    upscale_models: [],
     default_checkpoint: "__host_default__",
     default_vae: "Automatic",
     default_text_encoder: "Automatic",
@@ -1332,9 +1364,15 @@ function createFallbackModelInventory() {
           title: "SD Generation",
           categories: ["checkpoints", "diffusion_models", "vae", "text_encoders", "embeddings", "loras"],
         },
+        {
+          id: "host_diagnostics",
+          title: "Host Diagnostics",
+          categories: Object.keys(diagnosticCategories),
+        },
       ],
       primary_model_category_by_family: { ...DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY },
       categories: {
+        ...diagnosticEntries,
         checkpoints: {
           title: "Checkpoints",
           items: ["__host_default__"],

@@ -11,22 +11,36 @@ PRIMARY_MODEL_CATEGORY_BY_FAMILY: dict[str, str] = build_primary_model_category_
 @dataclass(frozen=True)
 class ModelInventorySnapshot:
     source: str
+    audio_encoders: list[str] = field(default_factory=list)
     background_removal: list[str] = field(default_factory=list)
     checkpoints: list[str] = field(default_factory=list)
+    classifiers: list[str] = field(default_factory=list)
     clip: list[str] = field(default_factory=list)
     clip_vision: list[str] = field(default_factory=list)
+    configs: list[str] = field(default_factory=list)
     controlnet: list[str] = field(default_factory=list)
+    detection: list[str] = field(default_factory=list)
+    diffusers: list[str] = field(default_factory=list)
     diffusion_models: list[str] = field(default_factory=list)
     vae: list[str] = field(default_factory=list)
     text_encoders: list[str] = field(default_factory=list)
     embeddings: list[str] = field(default_factory=list)
+    frame_interpolation: list[str] = field(default_factory=list)
+    geometry_estimation: list[str] = field(default_factory=list)
+    gligen: list[str] = field(default_factory=list)
+    hypernetworks: list[str] = field(default_factory=list)
     latent_upscale_models: list[str] = field(default_factory=list)
     loras: list[str] = field(default_factory=list)
+    model_patches: list[str] = field(default_factory=list)
+    optical_flow: list[str] = field(default_factory=list)
+    photomaker: list[str] = field(default_factory=list)
+    style_models: list[str] = field(default_factory=list)
     ultralytics: list[str] = field(default_factory=list)
     ultralytics_bbox: list[str] = field(default_factory=list)
     ultralytics_segm: list[str] = field(default_factory=list)
     unet: list[str] = field(default_factory=list)
     upscale_models: list[str] = field(default_factory=list)
+    vae_approx: list[str] = field(default_factory=list)
     default_checkpoint: str = "__host_default__"
     default_vae: str = "Automatic"
     default_text_encoder: str = "Automatic"
@@ -74,9 +88,35 @@ class ModelInventorySnapshot:
                         "ultralytics_segm",
                     ],
                 },
+                {
+                    "id": "host_diagnostics",
+                    "title": "Host Diagnostics",
+                    "categories": [
+                        "audio_encoders",
+                        "classifiers",
+                        "configs",
+                        "detection",
+                        "diffusers",
+                        "frame_interpolation",
+                        "geometry_estimation",
+                        "gligen",
+                        "hypernetworks",
+                        "model_patches",
+                        "optical_flow",
+                        "photomaker",
+                        "style_models",
+                        "vae_approx",
+                    ],
+                },
             ],
             "primary_model_category_by_family": dict(PRIMARY_MODEL_CATEGORY_BY_FAMILY),
             "categories": {
+                "audio_encoders": {
+                    "title": "Audio Encoders",
+                    "items": self.audio_encoders,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
                 "checkpoints": {
                     "title": "Checkpoints",
                     "items": self.checkpoints,
@@ -86,6 +126,12 @@ class ModelInventorySnapshot:
                 "background_removal": {
                     "title": "Background Removal",
                     "items": self.background_removal,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "classifiers": {
+                    "title": "Classifiers",
+                    "items": self.classifiers,
                     "default_value": "",
                     "sidebar_visible": False,
                 },
@@ -101,9 +147,27 @@ class ModelInventorySnapshot:
                     "default_value": "",
                     "sidebar_visible": False,
                 },
+                "configs": {
+                    "title": "Configs",
+                    "items": self.configs,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
                 "controlnet": {
                     "title": "ControlNet",
                     "items": self.controlnet,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "detection": {
+                    "title": "Detection",
+                    "items": self.detection,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "diffusers": {
+                    "title": "Diffusers",
+                    "items": self.diffusers,
                     "default_value": "",
                     "sidebar_visible": False,
                 },
@@ -119,6 +183,30 @@ class ModelInventorySnapshot:
                     "default_value": "",
                     "sidebar_visible": True,
                 },
+                "frame_interpolation": {
+                    "title": "Frame Interpolation",
+                    "items": self.frame_interpolation,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "geometry_estimation": {
+                    "title": "Geometry Estimation",
+                    "items": self.geometry_estimation,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "gligen": {
+                    "title": "GLIGEN",
+                    "items": self.gligen,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "hypernetworks": {
+                    "title": "Hypernetworks",
+                    "items": self.hypernetworks,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
                 "loras": {
                     "title": "LoRAs",
                     "items": self.loras,
@@ -128,6 +216,30 @@ class ModelInventorySnapshot:
                 "latent_upscale_models": {
                     "title": "Latent Upscale Models",
                     "items": self.latent_upscale_models,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "model_patches": {
+                    "title": "Model Patches",
+                    "items": self.model_patches,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "optical_flow": {
+                    "title": "Optical Flow",
+                    "items": self.optical_flow,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "photomaker": {
+                    "title": "PhotoMaker",
+                    "items": self.photomaker,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "style_models": {
+                    "title": "Style Models",
+                    "items": self.style_models,
                     "default_value": "",
                     "sidebar_visible": False,
                 },
@@ -164,6 +276,12 @@ class ModelInventorySnapshot:
                 "upscale_models": {
                     "title": "Upscale Models",
                     "items": self.upscale_models,
+                    "default_value": "",
+                    "sidebar_visible": False,
+                },
+                "vae_approx": {
+                    "title": "VAE Approx",
+                    "items": self.vae_approx,
                     "default_value": "",
                     "sidebar_visible": False,
                 },

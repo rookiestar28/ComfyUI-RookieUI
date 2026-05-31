@@ -25,20 +25,34 @@ from rookieui.contracts.model_family_registry import get_model_family_registry_e
 from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
 
 _HOST_MODEL_FOLDERS = (
+    "audio_encoders",
     "background_removal",
     "checkpoints",
+    "classifiers",
     "clip",
     "clip_vision",
+    "configs",
     "controlnet",
+    "detection",
+    "diffusers",
     "diffusion_models",
     "embeddings",
+    "frame_interpolation",
+    "geometry_estimation",
+    "gligen",
+    "hypernetworks",
     "latent_upscale_models",
     "loras",
+    "model_patches",
+    "optical_flow",
+    "photomaker",
+    "style_models",
     "text_encoders",
     "ultralytics",
     "unet",
     "upscale_models",
     "vae",
+    "vae_approx",
 )
 _INVENTORY_CACHE_TTL_SECONDS = 5.0
 _inventory_cache_lock = threading.Lock()
@@ -208,15 +222,28 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
         for folder_name in _HOST_MODEL_FOLDERS
     }
 
+    audio_encoders = inventory_map["audio_encoders"]
     background_removal = inventory_map["background_removal"]
     checkpoints = inventory_map["checkpoints"]
+    classifiers = inventory_map["classifiers"]
     clip = inventory_map["clip"]
     clip_vision = inventory_map["clip_vision"]
+    configs = inventory_map["configs"]
     controlnet = inventory_map["controlnet"]
+    detection = inventory_map["detection"]
+    diffusers = inventory_map["diffusers"]
     diffusion_models = inventory_map["diffusion_models"]
     embeddings = inventory_map["embeddings"]
+    frame_interpolation = inventory_map["frame_interpolation"]
+    geometry_estimation = inventory_map["geometry_estimation"]
+    gligen = inventory_map["gligen"]
+    hypernetworks = inventory_map["hypernetworks"]
     latent_upscale_models = inventory_map["latent_upscale_models"]
     loras = inventory_map["loras"]
+    model_patches = inventory_map["model_patches"]
+    optical_flow = inventory_map["optical_flow"]
+    photomaker = inventory_map["photomaker"]
+    style_models = inventory_map["style_models"]
     text_encoders = inventory_map["text_encoders"]
     ultralytics = inventory_map["ultralytics"]
     ultralytics_bbox, ultralytics_segm = _partition_ultralytics_models(ultralytics)
@@ -227,6 +254,7 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
         diffusion_models = list(unet)
     upscale_models = inventory_map["upscale_models"]
     vae = inventory_map["vae"]
+    vae_approx = inventory_map["vae_approx"]
 
     source = "host" if module is not None else "fallback"
     if not checkpoints:
@@ -242,22 +270,36 @@ def _build_inventory_snapshot(module: Any | None) -> ModelInventorySnapshot:
 
     return ModelInventorySnapshot(
         source=source,
+        audio_encoders=audio_encoders,
         background_removal=background_removal,
         checkpoints=checkpoints,
+        classifiers=classifiers,
         clip=clip,
         clip_vision=clip_vision,
+        configs=configs,
         controlnet=controlnet,
+        detection=detection,
+        diffusers=diffusers,
         diffusion_models=diffusion_models,
         vae=vae,
         text_encoders=text_encoders,
         embeddings=embeddings,
+        frame_interpolation=frame_interpolation,
+        geometry_estimation=geometry_estimation,
+        gligen=gligen,
+        hypernetworks=hypernetworks,
         latent_upscale_models=latent_upscale_models,
         loras=loras,
+        model_patches=model_patches,
+        optical_flow=optical_flow,
+        photomaker=photomaker,
+        style_models=style_models,
         ultralytics=ultralytics,
         ultralytics_bbox=ultralytics_bbox,
         ultralytics_segm=ultralytics_segm,
         unet=unet,
         upscale_models=upscale_models,
+        vae_approx=vae_approx,
         default_checkpoint=checkpoints[0],
         default_vae=vae[0],
         default_text_encoder=text_encoders[0],
