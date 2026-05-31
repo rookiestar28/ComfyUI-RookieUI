@@ -281,7 +281,7 @@ class ModelInventoryTests(unittest.TestCase):
                 ],
                 "loras": [
                     "Flux_2-Turbo-LoRA_comfyui.safetensors",
-                    "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                    "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                     "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
                     "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
                 ],
@@ -325,7 +325,7 @@ class ModelInventoryTests(unittest.TestCase):
         )
         self.assertEqual(
             preset_lookup["qwen_image"]["template_lora_name"],
-            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+            "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         )
         self.assertEqual(
             preset_lookup["qwen_image_edit"]["checkpoint_name"],
@@ -543,7 +543,7 @@ class ModelInventoryTests(unittest.TestCase):
                 ],
                 "loras": [
                     "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
-                    "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                    "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                 ],
             }.get(folder_name, [])
         )
@@ -626,7 +626,7 @@ class ModelInventoryTests(unittest.TestCase):
         )
         self.assertEqual(
             resolve_template_lora_selector_context("qwen_image", snapshot),
-            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+            "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         )
 
     def test_profile_matrix_uses_family_aligned_defaults_for_first_wave_image_edit_profiles(self) -> None:
@@ -708,7 +708,7 @@ class ModelInventoryTests(unittest.TestCase):
                     "Flux\\Flux_2-Lightning-4steps.safetensors",
                     "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
                     "Qwen-image\\Qwen-Image-Turbo-Lightning-4steps.safetensors",
-                    "Qwen-image\\Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                    "Qwen-image\\Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                     "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
                     "Qwen-image\\Qwen-Image-Edit-2509-Lightning-4steps-V1.0-bf16.safetensors",
                     "Qwen-image\\FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
@@ -723,7 +723,7 @@ class ModelInventoryTests(unittest.TestCase):
         )
         self.assertEqual(
             resolve_template_lora_selector_context("qwen_image", snapshot),
-            "Qwen-image\\Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+            "Qwen-image\\Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         )
         self.assertEqual(
             resolve_template_lora_selector_context("qwen_image_edit", snapshot),

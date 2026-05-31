@@ -726,7 +726,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             ],
             loras=[
                 "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors",
-                "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
             ],
             default_checkpoint="SDXL\\realvisxl.safetensors",
             default_vae="qwen_image_vae.safetensors",
@@ -815,11 +815,16 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                         self.assertEqual(normalized.flux_guidance, 4.0)
                     if profile_id in {"ernie_image", "ernie_image_turbo"}:
                         self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
+                    if profile_id == "ernie_image":
+                        self.assertEqual(normalized.steps, 20)
                     if profile_id == "qwen_image":
                         self.assertEqual(
                             normalized.template_lora_name,
-                            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                            "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                         )
+                        self.assertEqual(normalized.steps, 50)
+                        self.assertEqual(normalized.cfg_scale, 4.0)
+                        self.assertEqual(normalized.shift, 3.1)
 
     def test_normalize_txt2img_request_accepts_template_lora_override_for_qwen_image(self) -> None:
         mocked_inventory = mock.Mock(
@@ -829,7 +834,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             vae=["qwen_image_vae.safetensors"],
             text_encoders=["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
             loras=[
-                "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                 "Qwen-image\\My-Custom-Qwen-Image-LoRA.safetensors",
             ],
             default_checkpoint="SDXL\\realvisxl.safetensors",

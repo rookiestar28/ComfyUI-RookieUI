@@ -111,7 +111,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertTrue(qwen_entry.template_lora_override_allowed)
         self.assertEqual(
             qwen_entry.official_template_lora_label,
-            "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+            "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
         )
         self.assertTrue(qwen_edit_entry.template_lora_visible)
         self.assertTrue(qwen_edit_entry.template_lora_override_allowed)
