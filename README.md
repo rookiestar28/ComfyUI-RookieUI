@@ -25,6 +25,36 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Official template parity refresh for Qwen, Flux, and Z-Image (new functionality/stability)</strong></summary>
+
+- Added Qwen-Image Edit 2511 as an official `img2img` image-edit profile, including the plus edit encoder path, multi-reference request handling, Flux reference-method latent setup, and official default model-hint behavior.
+- Added official txt2img profile coverage for `Flux.1 Krea Dev` and `Flux.2 Dev`, including family-specific defaults, hidden official encoder bundles, Flux guidance where applicable, and source-backed model/text-encoder/VAE/LoRA selector hints.
+- Rechecked existing Qwen, Z-Image, ERNIE, FireRed, Flux.2 edit/Klein, and Longcat official profile hints so visible selectors describe real host prerequisites instead of accepting broad fallback matches.
+
+</details>
+
+<details>
+
+<summary><strong>Z-Image Turbo ControlNet model-patch workflow support (new functionality/stability)</strong></summary>
+
+- Z-Image Turbo ControlNet now uses the official model-patch workflow path with `ModelPatchLoader` and `QwenImageDiffsynthControlnet` instead of the generic SD ControlNet loader/apply chain.
+- RookieUI recognizes Z-Image ControlNet artifacts from the host `model_patches` inventory, classifies Union/Tile, Turbo/non-Turbo, lite, release-tag, and condition support metadata, and reports missing model-patch or node prerequisites explicitly.
+- The shipped Z-Image Turbo path supports one enabled ControlNet unit at a time, with dedicated Canny, Depth, and Pose/control-image adapter behavior while keeping generic ControlNet behavior unchanged for SD-family workflows.
+
+</details>
+
+<details>
+
+<summary><strong>Frontend maintainability and API contract hardening (stability/maintainability)</strong></summary>
+
+- Added broader frontend architecture budgets, TypeScript contract checks, and regression tests to prevent high-churn sidebar/API files from silently regrowing.
+- Extracted generation payload state conversion, Img2Img mode/reference helpers, generation API domain calls, ControlNet preview/preprocessor surfaces, design tokens, and ControlNet stylesheet ownership into focused frontend modules.
+- Kept public sidebar behavior stable while improving typed API request/response seams and making future `txt2img`, `img2img`, ControlNet, and official-template changes easier to validate.
+
+</details>
+
+<details>
+
 <summary><strong>Supply-chain validation hardening (security/stability)</strong></summary>
 
 - Repository validation now uses lockfile-frozen frontend installs, reducing accidental dependency drift during local and CI checks.
@@ -158,6 +188,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>Official non-SD template preset expansion, inline LoRA chaining, and truthful host gating (new functionality/stability)</strong></summary>
 
 - Expanded RookieUI's non-SD preset matrix to official ComfyUI text-to-image template families, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- Recent official template refreshes also add `Flux.1 Krea Dev` and `Flux.2 Dev` as txt2img profiles, and `Qwen-Image Edit 2511` as an image-edit profile on the `img2img` surface.
 - Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
 - Shipped official non-SD template paths now also support prompt-inline `<lora:model_name:weight>` chaining, preserving any template-owned LoRA first and then appending user inline LoRAs through model-only `Load LoRA` nodes before host submission.
 - Tightened catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
@@ -200,6 +231,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Split `ControlNet` and `ADetailer` backend ownership into focused catalog, normalization, runtime/refinement, and warning modules behind stable route-facing façades.
 - Added backend/frontend integrated feature registries so sidebar bootstrap ownership no longer depends on ad-hoc one-off wiring.
 - Added manifest-backed architecture guardrails, import-cycle checks, and façade size budgets to keep the refactor honest as these high-churn surfaces continue to expand.
+- Added frontend architecture budgets, typed API contracts, generation payload state seams, Img2Img helper modules, ControlNet preview/preprocessor modules, design tokens, and ControlNet-owned CSS so future sidebar changes stay bounded.
 
 **Architecture**
 
@@ -228,6 +260,14 @@ ComfyUI process (single runtime)
    |  +- adetailer_* modules
    |  +- integrated_feature_registry.py
    |
+   +- extracted frontend ownership seams
+      +- web/api/*
+      +- web/types/*
+      +- web/sidebar_tabs/img2img/*
+      +- web/sidebar_tabs/controlnet/*
+      +- web/rookieui_tokens.css
+      +- web/rookieui_controlnet.css
+   |
    +- workflow submission into host ComfyUI queue
 ```
 
@@ -236,7 +276,9 @@ Current extension seams:
 - `workflow_translation.py` is now a stable orchestration facade that delegates graph-building work into `rookieui/services/workflow_builders/*`.
 - `controlnet.py` and `adetailer.py` stay as route-facing facades while catalog, normalization, runtime/refinement, and warning ownership live in focused vertical modules.
 - `web/rookieui_extension.js` and `web/rookieui_feature_registry.js` now own integrated bootstrap loading explicitly, instead of scattering one-off feature fetch wiring through the extension entrypoint.
-- The refactor is guarded by manifest-backed boundary checks, facade size budgets, and import-cycle regression coverage.
+- `web/rookieui_api.js` remains a compatibility facade while generated requests move through focused API transport/domain modules and typed frontend contracts.
+- `txt2img` / `img2img` generation payloads, Img2Img reference and mode behavior, and ControlNet preview/preprocessor UI are now guarded by dedicated module-level tests.
+- The refactor is guarded by manifest-backed boundary checks, facade/file-size budgets, type checks, CSS ownership checks, and import-cycle regression coverage.
 
 </details>
 
@@ -447,6 +489,8 @@ If your host or Manager install path does not automatically install custom-node 
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
 - Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including parser modes, `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, old-emphasis compatibility, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
+- Official txt2img profiles include newer Flux lanes such as `Flux.1 Krea Dev` and `Flux.2 Dev`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
+- Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
 - ComfyUI-native prompt submission with RookieUI origin metadata
 
 ### Image-Edit Workflows
@@ -458,7 +502,7 @@ If your host or Manager install path does not automatically install custom-node 
 <br>
 
 - official image-edit workflows live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
-- visible image-edit profiles: `Qwen-Image Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
+- visible image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
 - image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
 - image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
 - family-specific edit builders now cover template-owned LoRA chaining, Qwen/Qwen+ edit encoders, Flux/Klein multi-reference latent setup, and Longcat edit guidance on dedicated non-SD runtime paths
@@ -518,19 +562,19 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Official Non-SD Template Presets
 
-- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - These presets follow official template defaults for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
-  - `Flux Guidance`: `Longcat BF16`
+  - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
 - Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
-- RookieUI's visible official ComfyUI `imageEdit` coverage includes `Qwen-Image Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- RookieUI's visible official ComfyUI `imageEdit` coverage includes `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
-- Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
+- Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `Qwen-Image Edit 2511`, `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` hides official non-SD presets that are not aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
 - Official templates that preload a fixed LoRA are treated as template-owned dependencies rather than silent hidden assets:
   - RookieUI shows the official default explicitly
@@ -538,6 +582,7 @@ If your host or Manager install path does not automatically install custom-node 
   - and warns when a custom override no longer matches the official ComfyUI template exactly
 - Template-owned LoRA controls are exposed for visible profiles:
   - `Flux.1 Dev FP8`
+  - `Flux.2 Dev`
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
   - `FireRed Image Edit Lightning`
@@ -576,7 +621,7 @@ Behavior and limits:
 ### Model Support
 
 - Stable Diffusion family
-- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1` / `Flux.2 Klein`, `HiDream i1`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
+- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1`, `Flux.2`, `HiDream i1`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
 - `Z-Image` also covers the Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
 
 Prompt semantics note:
@@ -692,11 +737,13 @@ Behavior and compatibility:
 - Selected preprocessor variants are dispatched to matching host annotator nodes when available, including exact OpenPose-family variant routing.
 - Pose-capable preprocessors can return bounded OpenPose-format JSON metadata through the detect payload when the active host annotator exposes it; non-pose preprocessors do not claim this output.
 - Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
+- Z-Image Turbo ControlNet is a family-specific workflow path: matching Z-Image ControlNet files are read from host `model_patches`, loaded through `ModelPatchLoader`, and applied with `QwenImageDiffsynthControlnet` rather than the generic `ControlNetLoader` / `DiffControlNetLoader` path.
+- The Z-Image Turbo path currently supports one enabled unit at a time, with Canny, Depth, and Pose/control-image adapter behavior. Unsupported modules fail explicitly instead of silently falling back to the SD ControlNet graph.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
   - `/controlnet/*`
-- ControlNet still requires host-side ControlNet model files; when a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
+- Generic SD-family ControlNet still requires host-side ControlNet model files. Z-Image Turbo ControlNet requires matching host-side model-patch files and the required ComfyUI model-patch nodes. When a requested host preprocessor/runtime capability is unavailable, RookieUI returns explicit warning diagnostics and fallback status.
 
 ---
 
@@ -740,6 +787,7 @@ Behavior and compatibility:
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
 - The custom-node package declares its web asset directory through current ComfyUI package metadata while retaining the legacy `WEB_DIRECTORY` export used by existing hosts.
 - Host model discovery uses ComfyUI `folder_paths` keys rather than scanning arbitrary filesystem locations directly.
+- Z-Image ControlNet capability discovery uses the host `model_patches` catalog and reports those files separately from generic ControlNet model folders.
 
 ### Stable Diffusion Prompt Parity
 
@@ -787,6 +835,7 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 - Latent Upscale Models: host `folder_paths`-defined location for `latent_upscale_models` when the active ComfyUI build exposes that key
 - Background Removal: host `folder_paths`-defined location for `background_removal` when the active ComfyUI build exposes that key
 - ControlNet: `<ComfyUI>/models/controlnet`, `<ComfyUI>/models/t2i_adapter`
+- Model Patches: host `folder_paths`-defined location for `model_patches` when the active ComfyUI build exposes that key
 - Ultralytics: host `folder_paths`-defined location (commonly `<ComfyUI>/models/ultralytics` on hosts that provide this key)
 
 
