@@ -21,6 +21,8 @@
     "web/rookieui_sidebar_registration.js",
     "web/api/rookieui_api_transport.js",
     "web/api/rookieui_generation_api.js",
+    "web/sidebar_tabs/controlnet/rookieui_controlnet_preprocessor_surface.js",
+    "web/sidebar_tabs/controlnet/rookieui_controlnet_preview_surface.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_catalog.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_i18n.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_tokens.js",

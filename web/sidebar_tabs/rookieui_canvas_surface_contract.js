@@ -40,7 +40,9 @@ function resolveFullscreenElement() {
   if (!doc || typeof doc !== "object") {
     return null;
   }
-  return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+  // IMPORTANT: Safari/WebKit fullscreen properties are intentionally typed locally; widening global DOM types would hide host-browser drift.
+  const fullscreenDocument = /** @type {Document & { webkitFullscreenElement?: Element | null }} */ (doc);
+  return fullscreenDocument.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement ?? null;
 }
 
 export function isCanvasElementFullscreen(element) {
@@ -64,7 +66,9 @@ async function exitCanvasFullscreen() {
   if (!doc || typeof doc !== "object") {
     return false;
   }
-  const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen;
+  // IMPORTANT: keep the prefixed branch for embedded WebKit shells that do not expose the standard method.
+  const fullscreenDocument = /** @type {Document & { webkitExitFullscreen?: () => Promise<void> | void }} */ (doc);
+  const exit = fullscreenDocument.exitFullscreen ?? fullscreenDocument.webkitExitFullscreen;
   if (typeof exit !== "function") {
     return false;
   }
