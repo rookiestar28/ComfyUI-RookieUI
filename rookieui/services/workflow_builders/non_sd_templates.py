@@ -359,6 +359,24 @@ def _append_cfg_guider_node(
     return node_id
 
 
+def _append_basic_guider_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    model_source: list[object],
+    conditioning_id: str | list[object],
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "BasicGuider",
+        "inputs": {
+            "model": model_source,
+            "conditioning": _to_node_ref(conditioning_id),
+        },
+    }
+    return node_id
+
+
 def _append_basic_scheduler_node(
     workflow: dict[str, object],
     *,
@@ -1216,6 +1234,88 @@ def _build_klein_workflow(request: NormalizedTxt2ImgRequest, *, distilled: bool)
     return workflow
 
 
+def _build_flux2_dev_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    profile_entry = get_model_family_registry_entry(request.profile)
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        template_lora_name=request.template_lora_name,
+        inline_lora_activations=request.lora_activations,
+    )
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="flux2",
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    positive_id = prompt_conditioning._append_prompt_encode_node(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        text=request.prompt,
+        prompt_encoder="sd15",
+    )
+    positive_id = _append_flux_guidance_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+    )
+    latent_id = _append_empty_latent_node(
+        workflow,
+        allocator=allocator,
+        class_type="EmptyFlux2LatentImage",
+        width=request.width,
+        height=request.height,
+        batch_size=request.batch_size,
+    )
+    noise_id = _append_random_noise_node(workflow, allocator=allocator, noise_seed=request.execution_seed)
+    guider_id = _append_basic_guider_node(
+        workflow,
+        allocator=allocator,
+        model_source=model_source,
+        conditioning_id=positive_id,
+    )
+    sampler_select_id = _append_ksampler_select_node(
+        workflow,
+        allocator=allocator,
+        sampler_name=request.sampler_name,
+    )
+    scheduler_id = _append_flux2_scheduler_node(
+        workflow,
+        allocator=allocator,
+        steps=request.steps,
+        width=request.width,
+        height=request.height,
+    )
+    sampler_id = _append_sampler_custom_advanced_node(
+        workflow,
+        allocator=allocator,
+        noise_id=noise_id,
+        guider_id=guider_id,
+        sampler_id=sampler_select_id,
+        sigmas_id=scheduler_id,
+        latent_id=latent_id,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+    )
+    return workflow
+
+
 def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
@@ -1585,6 +1685,7 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
     "flux": _build_flux_workflow,
     "hidream": _build_hidream_workflow,
     "chroma": _build_chroma_workflow,
+    "flux2_dev": _build_flux2_dev_workflow,
     "klein": lambda request: _build_klein_workflow(request, distilled=False),
     "klein_distilled": lambda request: _build_klein_workflow(request, distilled=True),
     "qwen_image": _build_qwen_image_workflow,

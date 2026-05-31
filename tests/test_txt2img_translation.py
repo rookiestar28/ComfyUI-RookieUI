@@ -685,6 +685,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             checkpoints=["SDXL\\realvisxl.safetensors"],
             diffusion_models=[
                 "flux\\flux1-dev.safetensors",
+                "flux\\flux1-krea-dev_fp8_scaled.safetensors",
+                "flux\\flux2_dev_fp8mixed.safetensors",
                 "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
                 "klein\\flux-2-klein-4b.safetensors",
                 "klein\\flux-2-klein-base-4b.safetensors",
@@ -714,6 +716,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "ernie-image-prompt-enhancer.safetensors",
                 "llama_3.1_8b_instruct_fp8_scaled.safetensors",
                 "ministral-3-3b.safetensors",
+                "mistral_3_small_flux2_bf16.safetensors",
                 "qwen_2.5_vl_7b_fp8_scaled.safetensors",
                 "qwen_3_06b_base.safetensors",
                 "qwen_3_4b.safetensors",
@@ -732,6 +735,16 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         )
         expectations = {
             "flux": ("flux\\flux1-dev.safetensors", "clip_l.safetensors|t5xxl_fp16.safetensors", "ae.safetensors"),
+            "flux_krea_dev": (
+                "flux\\flux1-krea-dev_fp8_scaled.safetensors",
+                "clip_l.safetensors|t5xxl_fp16.safetensors",
+                "ae.safetensors",
+            ),
+            "flux2_dev": (
+                "flux\\flux2_dev_fp8mixed.safetensors",
+                "mistral_3_small_flux2_bf16.safetensors",
+                "full_encoder_small_decoder.safetensors",
+            ),
             "qwen_image": (
                 "qwen\\qwen_image_2512_fp8_e4m3fn.safetensors",
                 "qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -795,6 +808,11 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     self.assertEqual(normalized.vae_name, expected_vae)
                     if profile_id == "flux":
                         self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+                    if profile_id == "flux_krea_dev":
+                        self.assertEqual(normalized.template_lora_name, "")
+                    if profile_id == "flux2_dev":
+                        self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+                        self.assertEqual(normalized.flux_guidance, 4.0)
                     if profile_id in {"ernie_image", "ernie_image_turbo"}:
                         self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
                     if profile_id == "qwen_image":
@@ -1148,6 +1166,97 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertNotIn("RookieUIA1111CLIPTextEncode", class_types)
         self.assertNotIn("CLIPTextEncodeSDXL", class_types)
         self.assertNotIn("CheckpointLoaderSimple", class_types)
+
+    def test_translate_txt2img_request_builds_flux_krea_dev_without_template_lora(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux1-krea-dev_fp8_scaled.safetensors"],
+                vae=["ae.safetensors"],
+                text_encoders=["clip_l.safetensors", "t5xxl_fp16.safetensors"],
+                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="ae.safetensors",
+                default_text_encoder="clip_l.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux_krea_dev",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        class_types = {node["class_type"] for node in result["workflow"].values()}
+        sampler_node = next(node for node in result["workflow"].values() if node["class_type"] == "KSampler")
+
+        self.assertEqual(result["workflow_kind"], "txt2img-flux_krea_dev")
+        self.assertEqual(normalized.checkpoint_name, "flux\\flux1-krea-dev_fp8_scaled.safetensors")
+        self.assertEqual(normalized.template_lora_name, "")
+        self.assertIn("DualCLIPLoader", class_types)
+        self.assertIn("EmptySD3LatentImage", class_types)
+        self.assertNotIn("LoraLoaderModelOnly", class_types)
+        self.assertEqual(sampler_node["inputs"]["steps"], 20)
+        self.assertEqual(sampler_node["inputs"]["cfg"], 1.0)
+
+    def test_translate_txt2img_request_builds_flux2_dev_custom_sampler_graph(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=mock.Mock(
+                source="host",
+                checkpoints=["SDXL\\realvisxl.safetensors"],
+                diffusion_models=["flux\\flux2_dev_fp8mixed.safetensors"],
+                vae=["full_encoder_small_decoder.safetensors"],
+                text_encoders=["mistral_3_small_flux2_bf16.safetensors"],
+                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
+                default_checkpoint="SDXL\\realvisxl.safetensors",
+                default_vae="full_encoder_small_decoder.safetensors",
+                default_text_encoder="mistral_3_small_flux2_bf16.safetensors",
+                controlnet=[],
+            ),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux2_dev",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        workflow = result["workflow"]
+        class_types = {node["class_type"] for node in workflow.values()}
+        lora_node = next(node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly")
+        clip_node = next(node for node in workflow.values() if node["class_type"] == "CLIPLoader")
+        guidance_node = next(node for node in workflow.values() if node["class_type"] == "FluxGuidance")
+        scheduler_node = next(node for node in workflow.values() if node["class_type"] == "Flux2Scheduler")
+        latent_node = next(node for node in workflow.values() if node["class_type"] == "EmptyFlux2LatentImage")
+
+        self.assertEqual(result["workflow_kind"], "txt2img-flux2_dev")
+        self.assertEqual(normalized.checkpoint_name, "flux\\flux2_dev_fp8mixed.safetensors")
+        self.assertEqual(normalized.text_encoder_name, "mistral_3_small_flux2_bf16.safetensors")
+        self.assertEqual(normalized.vae_name, "full_encoder_small_decoder.safetensors")
+        self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+        self.assertIn("BasicGuider", class_types)
+        self.assertIn("RandomNoise", class_types)
+        self.assertIn("KSamplerSelect", class_types)
+        self.assertIn("SamplerCustomAdvanced", class_types)
+        self.assertNotIn("KSampler", class_types)
+        self.assertEqual(lora_node["inputs"]["lora_name"], "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+        self.assertEqual(clip_node["inputs"]["type"], "flux2")
+        self.assertEqual(guidance_node["inputs"]["guidance"], 4.0)
+        self.assertEqual(scheduler_node["inputs"]["steps"], 20)
+        self.assertEqual(latent_node["inputs"]["width"], 1024)
+        self.assertEqual(latent_node["inputs"]["height"], 1024)
 
     def test_translate_txt2img_request_appends_inline_lora_after_template_owned_lora_for_flux(self) -> None:
         with mock.patch(

@@ -28,6 +28,8 @@ class ParityMatrixTests(unittest.TestCase):
                 "ernie_image",
                 "ernie_image_turbo",
                 "flux",
+                "flux_krea_dev",
+                "flux2_dev",
                 "klein_4b_distilled",
                 "klein_4b",
                 "klein_9b_distilled",
