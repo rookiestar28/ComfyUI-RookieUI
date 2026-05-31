@@ -19,6 +19,8 @@
     "web/rookieui_feature_registry.js",
     "web/rookieui_host_surface.js",
     "web/rookieui_sidebar_registration.js",
+    "web/api/rookieui_api_transport.js",
+    "web/api/rookieui_generation_api.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_catalog.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_i18n.js",
     "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_tokens.js",

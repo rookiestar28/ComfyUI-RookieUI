@@ -1,4 +1,12 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
+import { inspectRookieUIPngInfo } from "./api/rookieui_generation_api.js";
+import { postRookieUIJson, toErrorDetail } from "./api/rookieui_api_transport.js";
+export {
+  inspectRookieUIPngInfo,
+  submitRookieUIExtras,
+  submitRookieUIImg2Img,
+  submitRookieUITxt2Img,
+} from "./api/rookieui_generation_api.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
 const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423";
@@ -1232,16 +1240,6 @@ export function createDefaultCapabilities() {
   return JSON.parse(JSON.stringify(DEFAULT_CAPABILITIES));
 }
 
-function toErrorDetail(error) {
-  if (!error) {
-    return "";
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
 export async function fetchRookieUICapabilities(fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
     rookieUIDebugWarn("api.capabilities", "Using fallback capabilities because fetch() is unavailable.");
@@ -1985,36 +1983,6 @@ function buildPromptWorkbenchNamespacePath(basePath, namespace) {
   return `${basePath}?${params.toString()}`;
 }
 
-async function postRookieUIJson(path, payload, fallbackData, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    rookieUIDebugWarn("api.resource_post", "Using fallback payload because fetch() is unavailable.", { path });
-    return { ok: false, status: 0, data: fallbackData };
-  }
-
-  try {
-    const response = await fetchImpl(path, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload ?? {}),
-    });
-    const data = await response.json();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (_error) {
-    rookieUIDebugWarn("api.resource_post", "POST request failed; returning fallback payload.", {
-      path,
-      error: toErrorDetail(_error),
-    });
-    return { ok: false, status: 0, data: fallbackData };
-  }
-}
-
 export async function fetchRookieUIPromptWorkbenchState(namespace, fetchImpl = globalThis.fetch) {
   const normalizedNamespace = String(namespace ?? "").trim();
   return fetchRookieUIResource(
@@ -2637,182 +2605,6 @@ export async function fetchRookieUIHistoryPrompt(promptId, fetchImpl = globalThi
     };
   }
   return fetchRookieUIResource(`/history/${encodeURIComponent(normalizedPromptId)}`, {}, fetchImpl);
-}
-
-export async function submitRookieUITxt2Img(payload, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    rookieUIDebugWarn("api.submit_txt2img", "Submission skipped because fetch() is unavailable.");
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI txt2img submission is unavailable without fetch().",
-      },
-    };
-  }
-
-  try {
-    const response = await fetchImpl("/rookieui/generate/txt2img", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (_error) {
-    rookieUIDebugWarn("api.submit_txt2img", "Submission failed before reaching backend.", {
-      error: toErrorDetail(_error),
-    });
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI txt2img submission failed before reaching the backend.",
-      },
-    };
-  }
-}
-
-export async function submitRookieUIImg2Img(payload, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    rookieUIDebugWarn("api.submit_img2img", "Submission skipped because fetch() is unavailable.");
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI img2img submission is unavailable without fetch().",
-      },
-    };
-  }
-
-  try {
-    const response = await fetchImpl("/rookieui/generate/img2img", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (_error) {
-    rookieUIDebugWarn("api.submit_img2img", "Submission failed before reaching backend.", {
-      error: toErrorDetail(_error),
-    });
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI img2img submission failed before reaching the backend.",
-      },
-    };
-  }
-}
-
-export async function inspectRookieUIPngInfo(payload, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    rookieUIDebugWarn("api.inspect_pnginfo", "Inspection skipped because fetch() is unavailable.");
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI pnginfo inspection is unavailable without fetch().",
-      },
-    };
-  }
-
-  try {
-    const response = await fetchImpl("/rookieui/pnginfo/inspect", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (_error) {
-    rookieUIDebugWarn("api.inspect_pnginfo", "Inspection request failed before reaching backend.", {
-      error: toErrorDetail(_error),
-    });
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI pnginfo inspection failed before reaching the backend.",
-      },
-    };
-  }
-}
-
-export async function submitRookieUIExtras(payload, fetchImpl = globalThis.fetch) {
-  if (typeof fetchImpl !== "function") {
-    rookieUIDebugWarn("api.submit_extras", "Submission skipped because fetch() is unavailable.");
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI extras submission is unavailable without fetch().",
-      },
-    };
-  }
-
-  try {
-    const response = await fetchImpl("/rookieui/extras/run", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-    return {
-      ok: response.ok,
-      status: response.status,
-      data,
-    };
-  } catch (_error) {
-    rookieUIDebugWarn("api.submit_extras", "Submission failed before reaching backend.", {
-      error: toErrorDetail(_error),
-    });
-    return {
-      ok: false,
-      status: 0,
-      data: {
-        status: "network-unavailable",
-        detail: "RookieUI extras submission failed before reaching the backend.",
-      },
-    };
-  }
 }
 
 export { inspectRookieUIPngInfo as parseRookieUIPngInfo };
