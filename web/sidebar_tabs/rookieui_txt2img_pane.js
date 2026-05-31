@@ -4,30 +4,7 @@ import {
   createPromptWorkbenchShell,
   createXYZPlotShell,
 } from "./rookieui_pane_deps.js";
-
-function parseJsonObjectField(rawValue, fallback = {}) {
-  if (typeof rawValue !== "string" || !rawValue.trim()) {
-    return { ...fallback };
-  }
-  try {
-    const parsed = JSON.parse(rawValue);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : { ...fallback };
-  } catch (_error) {
-    return { ...fallback };
-  }
-}
-
-function parseJsonObjectArrayField(rawValue) {
-  if (typeof rawValue !== "string" || !rawValue.trim()) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(rawValue);
-    return Array.isArray(parsed) ? parsed.filter((entry) => entry && typeof entry === "object") : [];
-  } catch (_error) {
-    return [];
-  }
-}
+import { buildTxt2ImgPayloadFromElements } from "./rookieui_generation_payload_state.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -313,10 +290,6 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   elements.prompt.placeholder = "Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
   elements.negativePrompt.placeholder =
     "Negative Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
-  const readOptionalNumeric = (input) => {
-    const rawValue = String(input?.value ?? "").trim();
-    return rawValue ? Number(rawValue) : null;
-  };
   const advancedParameterControls = {
     shiftField: null,
     shiftInput: elements.shift,
@@ -389,40 +362,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     templateLoraControls.statusNode.textContent = `Custom override active: ${currentValue}. Official default is ${officialResolved}; exact official template parity no longer applies.`;
   };
 
-  const buildXYZBaseRequest = () => ({
-    prompt: elements.prompt.value,
-    negative_prompt: elements.negativePrompt.value,
-    profile: elements.profileState.value,
-    dtype_profile: elements.lowBits.value,
-    checkpoint_name: elements.checkpoint.value,
-    vae_name: elements.vae.value,
-    text_encoder_name: elements.textEncoder.value,
-    width: Number(elements.width.value),
-    height: Number(elements.height.value),
-    steps: Number(elements.steps.value),
-    cfg_scale: Number(elements.cfgScale.value),
-    shift: readOptionalNumeric(elements.shift),
-    flux_guidance: readOptionalNumeric(elements.fluxGuidance),
-    sampler_name: elements.sampler.value,
-    scheduler_name: elements.scheduler.value,
-    prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
-    seed: Number(elements.seed.value),
-    seed_extra: elements.seedExtra.checked,
-    batch_size: Number(elements.batchSize.value),
-    batch_count: Number(elements.batchCount.value),
-    clip_skip: Number(elements.clipSkip.value),
-    hires_enabled: elements.hiresEnabled.checked,
-    hires_scale: Number(elements.hiresScale.value),
-    hires_steps: Number(elements.hiresSteps.value),
-    hires_denoise: Number(elements.hiresDenoise.value),
-    hires_upscale_method: elements.hiresUpscaleMethod.value,
-    template_lora_name: elements.templateLoraName.value,
-    lora_name: elements.loraName.value,
-    lora_strength_model: Number(elements.loraStrengthModel.value),
-    lora_strength_clip: Number(elements.loraStrengthClip.value),
-    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}", {}),
-    controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
-  });
+  const buildXYZBaseRequest = () => buildTxt2ImgPayloadFromElements(elements);
 
   const quicksettings = document.createElement("div");
   quicksettings.className = "rookieui-shell__quicksettings";
