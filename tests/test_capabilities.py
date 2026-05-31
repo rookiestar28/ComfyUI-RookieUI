@@ -73,7 +73,79 @@ class CapabilitySnapshotTests(unittest.TestCase):
         )
         self.assertEqual(capability["model_patches"][0]["variant"], "union")
         self.assertTrue(capability["model_patches"][0]["turbo"])
+        self.assertEqual(capability["model_patches"][0]["rookieui_support"], "turbo_union_single_control")
+        self.assertEqual(capability["model_patches"][0]["recommendation"], "candidate")
         self.assertNotIn("sdxl-controlnet-depth.safetensors", str(capability["model_patches"]))
+
+    def test_capabilities_snapshot_classifies_z_image_controlnet_21_variant_matrix(self) -> None:
+        inventory = ModelInventorySnapshot(
+            source="host",
+            model_patches=[
+                "Z-Image-Fun-Controlnet-Union-2.1.safetensors",
+                "Z-Image-Fun-Controlnet-Union-2.1-lite.safetensors",
+                "Z-Image-Fun-Controlnet-Tile-2.1.safetensors",
+                "Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
+                "Z-Image-Turbo-Fun-Controlnet-Union-2.1-2601-8steps.safetensors",
+                "Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors",
+                "Z-Image-Turbo-Fun-Controlnet-Union-2.1-2602-8steps.safetensors",
+                "Z-Image-Turbo-Fun-Controlnet-Tile-2.1-lite-2601-8steps.safetensors",
+            ],
+        )
+        nodes_module = types.SimpleNamespace(
+            NODE_CLASS_MAPPINGS={
+                "ModelPatchLoader": object,
+                "QwenImageDiffsynthControlnet": object,
+                "ModelSamplingAuraFlow": object,
+            }
+        )
+
+        with (
+            mock.patch("rookieui.services.z_image_controlnet.discover_model_inventory", return_value=inventory),
+            mock.patch.dict(sys.modules, {"nodes": nodes_module}),
+        ):
+            payload = build_capabilities_snapshot()
+
+        entries = {entry["selector"]: entry for entry in payload["z_image_controlnet"]["model_patches"]}
+        fun_union = entries["Z-Image-Fun-Controlnet-Union-2.1.safetensors"]
+        fun_lite = entries["Z-Image-Fun-Controlnet-Union-2.1-lite.safetensors"]
+        turbo_8steps = entries["Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors"]
+        turbo_2601 = entries["Z-Image-Turbo-Fun-Controlnet-Union-2.1-2601-8steps.safetensors"]
+        turbo_lite_2602 = entries["Z-Image-Turbo-Fun-Controlnet-Union-2.1-lite-2602-8steps.safetensors"]
+        turbo_2602 = entries["Z-Image-Turbo-Fun-Controlnet-Union-2.1-2602-8steps.safetensors"]
+        turbo_tile_lite = entries["Z-Image-Turbo-Fun-Controlnet-Tile-2.1-lite-2601-8steps.safetensors"]
+
+        self.assertEqual(fun_union["z_image_family"], "fun")
+        self.assertEqual(fun_union["variant"], "union")
+        self.assertFalse(fun_union["turbo"])
+        self.assertEqual(fun_union["generation"], "2.1")
+        self.assertEqual(fun_union["rookieui_support"], "deferred_non_turbo")
+        self.assertEqual(fun_union["recommendation"], "deferred")
+        self.assertIn("gray", fun_union["supported_conditions"])
+        self.assertIn("inpaint", fun_union["supported_conditions"])
+        self.assertTrue(fun_lite["lite"])
+
+        self.assertEqual(turbo_8steps["distilled_steps"], 8)
+        self.assertEqual(turbo_8steps["rookieui_support"], "turbo_union_single_control")
+        self.assertNotIn("scribble", turbo_8steps["supported_conditions"])
+        self.assertNotIn("gray", turbo_8steps["supported_conditions"])
+
+        self.assertEqual(turbo_2601["release_tag"], "2601")
+        self.assertIn("scribble", turbo_2601["supported_conditions"])
+        self.assertNotIn("gray", turbo_2601["supported_conditions"])
+
+        self.assertEqual(turbo_lite_2602["release_tag"], "2602")
+        self.assertTrue(turbo_lite_2602["lite"])
+        self.assertIn("scribble", turbo_lite_2602["supported_conditions"])
+        self.assertIn("gray", turbo_lite_2602["supported_conditions"])
+        self.assertEqual(turbo_lite_2602["recommendation"], "candidate")
+
+        self.assertEqual(turbo_2602["recommendation"], "preferred")
+        self.assertEqual(turbo_2602["source_control_context_scale_range"], [0.65, 1.0])
+
+        self.assertEqual(turbo_tile_lite["variant"], "tile")
+        self.assertEqual(turbo_tile_lite["supported_conditions"], ["tile"])
+        self.assertEqual(turbo_tile_lite["rookieui_support"], "deferred_tile_surface")
+        self.assertEqual(turbo_tile_lite["recommendation"], "deferred")
 
     def test_capabilities_snapshot_reports_z_image_controlnet_missing_dependencies(self) -> None:
         inventory = ModelInventorySnapshot(

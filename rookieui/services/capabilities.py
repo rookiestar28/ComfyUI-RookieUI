@@ -242,6 +242,29 @@ def _normalize_z_image_controlnet_payload(payload: dict[str, object]) -> dict[st
                     "profile_hint": normalize_metadata_text(patch_entry.get("profile_hint", "")),
                     "variant": normalize_metadata_text(patch_entry.get("variant", "")),
                     "turbo": bool(patch_entry.get("turbo", False)),
+                    "z_image_family": normalize_metadata_text(patch_entry.get("z_image_family", "")),
+                    "generation": normalize_metadata_text(patch_entry.get("generation", "")),
+                    "release_tag": (
+                        normalize_metadata_text(patch_entry.get("release_tag", ""))
+                        if patch_entry.get("release_tag") not in (None, "")
+                        else None
+                    ),
+                    "distilled_steps": (
+                        int(patch_entry.get("distilled_steps"))
+                        if patch_entry.get("distilled_steps") not in (None, "")
+                        else None
+                    ),
+                    "lite": bool(patch_entry.get("lite", False)),
+                    "supported_conditions": _normalize_metadata_list(
+                        patch_entry.get("supported_conditions", [])
+                    ),
+                    "source_control_context_scale_range": [
+                        float(value)
+                        for value in patch_entry.get("source_control_context_scale_range", [])
+                        if isinstance(value, (int, float))
+                    ],
+                    "rookieui_support": normalize_metadata_text(patch_entry.get("rookieui_support", "")),
+                    "recommendation": normalize_metadata_text(patch_entry.get("recommendation", "")),
                 }
             )
         normalized["model_patches"] = normalized_patches

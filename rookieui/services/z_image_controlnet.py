@@ -6,7 +6,7 @@ from typing import Mapping
 from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.model_inventory import discover_model_inventory
 
-Z_IMAGE_CONTROLNET_CONTRACT_VERSION = "f258-20260531"
+Z_IMAGE_CONTROLNET_CONTRACT_VERSION = "f260-20260531"
 Z_IMAGE_CONTROLNET_REQUIRED_NODES: tuple[str, ...] = (
     "ModelPatchLoader",
     "QwenImageDiffsynthControlnet",
@@ -29,6 +29,14 @@ _CONTROLNET_TOKENS = (
     "control_net",
     "control-net",
 )
+_BASE_UNION_CONDITIONS = (
+    "canny",
+    "depth",
+    "pose",
+    "mlsd",
+    "hed",
+)
+_CONTROL_CONTEXT_SCALE_RANGE = (0.65, 1.0)
 
 
 def _normalize_selector_token(value: str) -> str:
@@ -46,15 +54,80 @@ def _classify_patch_variant(selector: str) -> str:
     normalized = _normalize_selector_token(selector)
     if "tile" in normalized:
         return "tile"
+    if "union" in normalized:
+        return "union"
     if "canny" in normalized:
         return "canny"
     if "depth" in normalized:
         return "depth"
     if "pose" in normalized or "openpose" in normalized:
         return "pose"
-    if "union" in normalized:
-        return "union"
     return "unknown"
+
+
+def _classify_generation(selector: str) -> str:
+    normalized = _normalize_selector_token(selector)
+    if "2.0" in normalized:
+        return "2.0"
+    if "2.1" in normalized:
+        return "2.1"
+    return "unknown"
+
+
+def _classify_release_tag(selector: str) -> str | None:
+    normalized = _normalize_selector_token(selector)
+    if "2602" in normalized:
+        return "2602"
+    if "2601" in normalized:
+        return "2601"
+    return None
+
+
+def _classify_distilled_steps(selector: str) -> int | None:
+    normalized = _normalize_selector_token(selector)
+    if "8steps" in normalized or "8-steps" in normalized:
+        return 8
+    return None
+
+
+def _classify_supported_conditions(*, turbo: bool, variant: str, release_tag: str | None) -> list[str]:
+    if variant == "tile":
+        return ["tile"]
+    if variant != "union":
+        return []
+    conditions = list(_BASE_UNION_CONDITIONS)
+    if not turbo:
+        conditions.extend(["scribble", "gray", "inpaint"])
+        return conditions
+    if release_tag in {"2601", "2602"}:
+        conditions.append("scribble")
+    if release_tag == "2602":
+        conditions.append("gray")
+    return conditions
+
+
+def _classify_rookieui_support(*, turbo: bool, variant: str) -> str:
+    if variant == "tile":
+        return "deferred_tile_surface"
+    if not turbo:
+        return "deferred_non_turbo"
+    if variant == "union":
+        return "turbo_union_single_control"
+    return "deferred_unverified"
+
+
+def _classify_recommendation(
+    *,
+    rookieui_support: str,
+    release_tag: str | None,
+    distilled_steps: int | None,
+    lite: bool,
+) -> str:
+    if rookieui_support != "turbo_union_single_control":
+        return "deferred"
+    if release_tag == "2602" and distilled_steps == 8 and not lite:
+        return "preferred"
+    return "candidate"
 
 
 def _resolve_node_class_mappings(
@@ -75,14 +148,38 @@ def _build_patch_entries(selectors: list[str]) -> list[dict[str, object]]:
         if not _looks_like_z_image_controlnet_patch(selector):
             continue
         normalized = _normalize_selector_token(selector)
+        turbo = "turbo" in normalized
+        variant = _classify_patch_variant(selector)
+        release_tag = _classify_release_tag(selector)
+        distilled_steps = _classify_distilled_steps(selector)
+        lite = "lite" in normalized
+        rookieui_support = _classify_rookieui_support(turbo=turbo, variant=variant)
         entries.append(
             {
                 "selector": selector,
                 "model_category": "model_patches",
                 "family": "z_image",
-                "profile_hint": "z_image_turbo" if "turbo" in normalized else "z_image",
-                "variant": _classify_patch_variant(selector),
-                "turbo": "turbo" in normalized,
+                "profile_hint": "z_image_turbo" if turbo else "z_image",
+                "variant": variant,
+                "turbo": turbo,
+                "z_image_family": "turbo" if turbo else "fun",
+                "generation": _classify_generation(selector),
+                "release_tag": release_tag,
+                "distilled_steps": distilled_steps,
+                "lite": lite,
+                "supported_conditions": _classify_supported_conditions(
+                    turbo=turbo,
+                    variant=variant,
+                    release_tag=release_tag,
+                ),
+                "source_control_context_scale_range": list(_CONTROL_CONTEXT_SCALE_RANGE),
+                "rookieui_support": rookieui_support,
+                "recommendation": _classify_recommendation(
+                    rookieui_support=rookieui_support,
+                    release_tag=release_tag,
+                    distilled_steps=distilled_steps,
+                    lite=lite,
+                ),
             }
         )
     return entries
