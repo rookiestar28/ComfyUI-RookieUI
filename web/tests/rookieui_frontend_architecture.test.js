@@ -17,6 +17,10 @@ function countLines(relativePath) {
   return readFile(relativePath).split(/\r?\n/).length;
 }
 
+function countBytes(relativePath) {
+  return fs.statSync(path.join(repoRoot, relativePath)).size;
+}
+
 function listShippedFrontendFiles(rootDir) {
   const collected = [];
   const walk = (currentDir) => {
@@ -42,6 +46,21 @@ function listShippedFrontendFiles(rootDir) {
   walk(rootDir);
   return collected.sort();
 }
+
+const SHIPPED_FRONTEND_GLOBAL_BUDGETS = Object.freeze({
+  maxJsBytes: 125_564,
+  maxCssBytes: 70_263,
+});
+
+const SHIPPED_FRONTEND_TARGET_BUDGETS = Object.freeze({
+  "web/sidebar_tabs/rookieui_prompt_workbench_shell.js": { bytes: 125_564, lines: 2_977 },
+  "web/sidebar_tabs/rookieui_img2img_pane.js": { bytes: 106_110, lines: 2_498 },
+  "web/rookieui_api.js": { bytes: 96_768, lines: 2_819 },
+  "web/sidebar_tabs/rookieui_controlnet_units.js": { bytes: 79_366, lines: 2_130 },
+  "web/rookieui_panes.css": { bytes: 70_263, lines: 2_772 },
+  "web/rookieui_sidebar_shell.js": { bytes: 63_565, lines: 1_661 },
+  "web/sidebar_tabs/rookieui_txt2img_pane.js": { bytes: 43_523, lines: 1_059 },
+});
 
 function computeShippedFrontendFingerprint() {
   const webRoot = path.join(repoRoot, "web");
@@ -73,6 +92,37 @@ describe("frontend architecture guardrails", () => {
   test("keeps sidebar shell within the modularization size budget", () => {
     // IMPORTANT: this budget is the regression tripwire for R67; if the shell grows past it, extract another service seam instead of accreting helpers back into the monolith.
     expect(countLines("web/rookieui_sidebar_shell.js")).toBeLessThanOrEqual(1700);
+  });
+
+  test("keeps shipped frontend files within Phase 102 no-growth budgets", () => {
+    const files = listShippedFrontendFiles(path.join(repoRoot, "web"));
+    const overBudgetFiles = [];
+
+    for (const relativePath of files) {
+      const bytes = countBytes(relativePath);
+      if (relativePath.endsWith(".js") && bytes > SHIPPED_FRONTEND_GLOBAL_BUDGETS.maxJsBytes) {
+        overBudgetFiles.push({ relativePath, bytes, budget: SHIPPED_FRONTEND_GLOBAL_BUDGETS.maxJsBytes });
+      }
+      if (relativePath.endsWith(".css") && bytes > SHIPPED_FRONTEND_GLOBAL_BUDGETS.maxCssBytes) {
+        overBudgetFiles.push({ relativePath, bytes, budget: SHIPPED_FRONTEND_GLOBAL_BUDGETS.maxCssBytes });
+      }
+    }
+
+    expect(overBudgetFiles).toEqual([]);
+  });
+
+  test("keeps targeted large frontend modules within their Phase 102 budgets", () => {
+    const budgetDrift = [];
+
+    for (const [relativePath, budget] of Object.entries(SHIPPED_FRONTEND_TARGET_BUDGETS)) {
+      const bytes = countBytes(relativePath);
+      const lines = countLines(relativePath);
+      if (bytes > budget.bytes || lines > budget.lines) {
+        budgetDrift.push({ relativePath, bytes, byteBudget: budget.bytes, lines, lineBudget: budget.lines });
+      }
+    }
+
+    expect(budgetDrift).toEqual([]);
   });
 
   test("keeps Prompt Workbench shell behind extracted module ownership boundaries", () => {
