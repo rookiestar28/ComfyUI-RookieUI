@@ -82,7 +82,7 @@ _HOST_NODE_INPUT_FALLBACKS: dict[str, tuple[tuple[str, str], ...]] = {
     "controlnet": (("ControlNetLoader", "control_net_name"),),
     "diffusion_models": (("UNETLoader", "unet_name"),),
     "loras": (("LoraLoader", "lora_name"),),
-    "model_patches": (("ModelPatchLoader", "patch_name"),),
+    "model_patches": (("ModelPatchLoader", "name"),),
     "upscale_models": (("UpscaleModelLoader", "model_name"),),
     "vae": (("VAELoader", "vae_name"),),
 }

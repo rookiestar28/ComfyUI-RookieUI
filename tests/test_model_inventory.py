@@ -110,7 +110,7 @@ class ModelInventoryTests(unittest.TestCase):
         class ModelPatchLoader:
             @classmethod
             def INPUT_TYPES(cls) -> dict[str, object]:
-                return {"required": {"patch_name": (["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],)}}
+                return {"required": {"name": (["Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union-2.1.safetensors"],)}}
 
         folder_paths_module = types.SimpleNamespace(get_filename_list=lambda _folder_name: [])
         nodes_module = types.SimpleNamespace(
