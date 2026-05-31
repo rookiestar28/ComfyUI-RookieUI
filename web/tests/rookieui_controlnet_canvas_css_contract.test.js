@@ -1,12 +1,10 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { describe, expect, test } from "vitest";
+
+import { readRookieUIShippedCss } from "./helpers/rookieui_css_assets.js";
 
 describe("ControlNet source canvas CSS contract", () => {
   test("keeps brush toolbar and controls bounded inside preview stages", () => {
-    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
-    const css = readFileSync(cssPath, "utf8");
+    const css = readRookieUIShippedCss();
 
     expect(css).toMatch(
       /\.rookieui-shell__controlnet-preview-toolbar\s*\{[\s\S]*max-width:\s*calc\(100%\s*-\s*16px\);[\s\S]*\}/,
@@ -20,8 +18,7 @@ describe("ControlNet source canvas CSS contract", () => {
   });
 
   test("hides overlay toolbars by default on pointer-hover surfaces and reveals them on hover/focus", () => {
-    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
-    const css = readFileSync(cssPath, "utf8");
+    const css = readRookieUIShippedCss();
 
     expect(css).toMatch(/@media\s*\(hover:\s*hover\)\s*and\s*\(pointer:\s*fine\)\s*\{[\s\S]*\}/);
     expect(css).toMatch(
@@ -36,8 +33,7 @@ describe("ControlNet source canvas CSS contract", () => {
   });
 
   test("defines explicit circular brush indicator layer for edit-mode cursor parity", () => {
-    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
-    const css = readFileSync(cssPath, "utf8");
+    const css = readRookieUIShippedCss();
 
     expect(css).toMatch(
       /\.rookieui-shell__canvas-brush-indicator\s*\{[\s\S]*position:\s*absolute;[\s\S]*border-radius:\s*999px;[\s\S]*pointer-events:\s*none;[\s\S]*\}/,
@@ -51,8 +47,7 @@ describe("ControlNet source canvas CSS contract", () => {
   });
 
   test("defines fullscreen auto-fit stage rules and fullscreen zoom slider chrome", () => {
-    const cssPath = resolve(process.cwd(), "web", "rookieui_panes.css");
-    const css = readFileSync(cssPath, "utf8");
+    const css = readRookieUIShippedCss();
 
     expect(css).toMatch(
       /\.rookieui-shell__controlnet-preview-stage:fullscreen[\s\S]*width:\s*100vw;[\s\S]*height:\s*100vh;[\s\S]*min-height:\s*100vh;[\s\S]*\}/,

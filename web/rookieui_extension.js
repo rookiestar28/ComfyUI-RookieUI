@@ -100,7 +100,13 @@ function enforceSidebarMinWidth(container) {
   }
 }
 
-const ROOKIEUI_STYLESHEETS = [["rookieui-styles", "./rookieui.css"], ["rookieui-styles-foundation", "./rookieui_shell_foundation.css"], ["rookieui-styles-panes", "./rookieui_panes.css"]];
+const ROOKIEUI_STYLESHEETS = [
+  ["rookieui-styles-tokens", "./rookieui_tokens.css"],
+  ["rookieui-styles", "./rookieui.css"],
+  ["rookieui-styles-foundation", "./rookieui_shell_foundation.css"],
+  ["rookieui-styles-panes", "./rookieui_panes.css"],
+  ["rookieui-styles-controlnet", "./rookieui_controlnet.css"],
+];
 function ensureCssInjected(documentRef) {
   if (!documentRef?.head) return;
   for (const [id, specifier] of ROOKIEUI_STYLESHEETS) {

@@ -1283,9 +1283,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.querySelector(".side-bar-panel").style.minWidth).toBe("980px");
     expect(document.querySelector(".sidebar-content-container").style.minWidth).toBe("980px");
     expect(document.getElementById("mock-sidebar-tabs").dataset.theme).toBe("normal");
+    expect(document.getElementById("rookieui-styles-tokens").href).toContain(ROOKIEUI_ASSET_REVISION);
     expect(document.getElementById("rookieui-styles").href).toContain(ROOKIEUI_ASSET_REVISION);
     expect(document.getElementById("rookieui-styles-foundation").href).toContain(ROOKIEUI_ASSET_REVISION);
     expect(document.getElementById("rookieui-styles-panes").href).toContain(ROOKIEUI_ASSET_REVISION);
+    expect(document.getElementById("rookieui-styles-controlnet").href).toContain(ROOKIEUI_ASSET_REVISION);
     expect(document.getElementById("rookieui-txt2img-preview-fullscreen")).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-preview-fullscreen")).not.toBeNull();
     expect(window.__ROOKIEUI_BOOTSTRAP__.models.catalog.primary_model_category_by_family.flux).toBe(

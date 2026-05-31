@@ -1,0 +1,53 @@
+.rookieui-shell {
+  --rookieui-prompt-primary-height: 108px;
+  --rookieui-generate-height-scale: 0.7225;
+  --rookieui-bg-root: #eff2f7;
+  --rookieui-bg-panel: #f8fafc;
+  --rookieui-bg-panel-soft: #eef3f9;
+  --rookieui-bg-input: #f4f7fb;
+  --rookieui-bg-elevated: #ffffff;
+  --rookieui-bg-preview-top: rgba(224, 232, 243, 0.95);
+  --rookieui-bg-preview-bottom: rgba(210, 221, 235, 0.95);
+  --rookieui-border: rgba(42, 57, 82, 0.18);
+  --rookieui-border-strong: rgba(232, 120, 21, 0.55);
+  --rookieui-text-primary: #17202e;
+  --rookieui-text-secondary: #4f6077;
+  --rookieui-text-muted: #697a92;
+  --rookieui-text-inverse: #fff8f1;
+  --rookieui-accent: #ff8a1c;
+  --rookieui-accent-soft: rgba(255, 138, 28, 0.12);
+  --rookieui-accent-strong: #ff6a00;
+  --rookieui-tone-queue: #3a78d4;
+  --rookieui-tone-danger: #c15a47;
+  --rookieui-tone-metadata: #b17f2f;
+  --rookieui-tone-transfer: #2a8a6f;
+  --rookieui-tone-extras: #3b8d43;
+  --rookieui-tone-neutral: #6a7890;
+  --rookieui-sidebar-min-width: 980px;
+  --rookieui-generate-button-width: 272px;
+}
+
+.rookieui-shell[data-theme="dark"] {
+  --rookieui-bg-root: #0f141d;
+  --rookieui-bg-panel: #11161f;
+  --rookieui-bg-panel-soft: #171d28;
+  --rookieui-bg-input: #1c2431;
+  --rookieui-bg-elevated: #0f1622;
+  --rookieui-bg-preview-top: rgba(34, 42, 54, 0.95);
+  --rookieui-bg-preview-bottom: rgba(24, 30, 38, 0.95);
+  --rookieui-border: rgba(255, 255, 255, 0.12);
+  --rookieui-border-strong: rgba(255, 148, 45, 0.58);
+  --rookieui-text-primary: #eef2f6;
+  --rookieui-text-secondary: #c5cfdd;
+  --rookieui-text-muted: #9aa8ba;
+  --rookieui-text-inverse: #fffaf2;
+  --rookieui-accent: #ff9a32;
+  --rookieui-accent-soft: rgba(255, 154, 50, 0.14);
+  --rookieui-accent-strong: #ff6d00;
+  --rookieui-tone-queue: #76a8ff;
+  --rookieui-tone-danger: #ff9f8e;
+  --rookieui-tone-metadata: #e2b266;
+  --rookieui-tone-transfer: #64ceaf;
+  --rookieui-tone-extras: #7cd487;
+  --rookieui-tone-neutral: #b8c3d4;
+}

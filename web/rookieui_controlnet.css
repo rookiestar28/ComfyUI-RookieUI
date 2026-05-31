@@ -1,0 +1,371 @@
+/* ControlNet pane styles are split from rookieui_panes.css so preview and preprocessor UI can evolve under a focused owner. */
+
+.rookieui-shell__controlnet-note {
+  margin-top: 0;
+}
+
+.rookieui-shell__controlnet-tabs {
+  margin-bottom: 0;
+}
+
+.rookieui-shell__controlnet-panel-host {
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--rookieui-bg-panel) 92%, transparent);
+}
+
+.rookieui-shell__controlnet-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.rookieui-shell__controlnet-panel[hidden] {
+  display: none !important;
+}
+
+.rookieui-shell__controlnet-panel.is-active {
+  display: grid;
+}
+
+.rookieui-shell__field--full {
+  grid-column: 1 / -1;
+}
+
+.rookieui-shell__controlnet-preview-dual-pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.rookieui-shell__controlnet-preview-dual-pane[data-generated-visible="true"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rookieui-shell__controlnet-preview-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--rookieui-bg-panel) 90%, transparent);
+  background-image:
+    linear-gradient(45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%);
+  background-size: 28px 28px;
+  background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+  cursor: pointer;
+}
+
+.rookieui-shell__controlnet-preview-stage::before,
+.rookieui-shell__canvas-upload-surface::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 104px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rookieui-bg-shell) 82%, transparent) 0%,
+    color-mix(in srgb, var(--rookieui-bg-shell) 18%, transparent) 72%,
+    transparent 100%
+  );
+}
+
+.rookieui-shell__controlnet-preview-stage[data-interaction-mode="edit"] {
+  cursor: crosshair;
+}
+
+.rookieui-shell__controlnet-preview-stage[data-dragging="true"] {
+  border-color: var(--rookieui-accent);
+  background: var(--rookieui-accent-soft);
+}
+
+.rookieui-shell__controlnet-preview-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  box-sizing: border-box;
+  padding: 5px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 84%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-stage:fullscreen,
+.rookieui-shell__controlnet-preview-stage:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  border: 0;
+  border-radius: 0;
+}
+
+.rookieui-shell__controlnet-preview-stage:fullscreen .rookieui-shell__controlnet-preview-toolbar,
+.rookieui-shell__controlnet-preview-stage:-webkit-full-screen .rookieui-shell__controlnet-preview-toolbar {
+  top: 16px;
+  left: 16px;
+  max-width: calc(100% - 32px);
+}
+
+.rookieui-shell__controlnet-preview-toolbar .rookieui-shell__mini-action {
+  width: 28px;
+  min-width: 28px;
+  min-height: 24px;
+  padding: 0;
+}
+
+.rookieui-shell__controlnet-preview-toolbar .rookieui-shell__mini-action.is-active {
+  border-color: var(--rookieui-border-strong);
+  background: var(--rookieui-accent-soft);
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__controlnet-preview-image {
+  position: absolute;
+  /* CRITICAL: do not switch back to `inset: 0`; it pins right/bottom and blocks JS-driven zoom width/height updates. */
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 68%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-placeholder {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  color: var(--rookieui-text-secondary);
+  padding: 12px;
+}
+
+.rookieui-shell__controlnet-preview-placeholder-icon {
+  font-size: 48px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--rookieui-text-primary) 88%, transparent);
+}
+
+.rookieui-shell__controlnet-preview-placeholder-text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rookieui-shell__controlnet-generated-preview {
+  position: relative;
+  min-height: 300px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--rookieui-bg-panel) 90%, transparent);
+  background-image:
+    linear-gradient(45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(150, 166, 190, 0.2) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(150, 166, 190, 0.2) 75%);
+  background-size: 28px 28px;
+  background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+}
+
+.rookieui-shell__controlnet-generated-preview[hidden] {
+  display: none !important;
+}
+
+.rookieui-shell__controlnet-generated-preview-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--rookieui-bg-shell) 72%, transparent);
+}
+
+.rookieui-shell__controlnet-generated-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--rookieui-text-muted);
+  font-size: 12px;
+}
+
+.rookieui-shell__controlnet-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.rookieui-shell__inline-checkbox-field.rookieui-shell__controlnet-toggle-field {
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.rookieui-shell__controlnet-toggle-field .rookieui-shell__field-label {
+  line-height: 1.2;
+}
+
+.rookieui-shell__controlnet-radio-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rookieui-shell__controlnet-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 999px;
+  background: var(--rookieui-bg-input);
+}
+
+.rookieui-shell__controlnet-radio-option[data-active="true"] {
+  border-color: var(--rookieui-border-strong);
+  background: color-mix(in srgb, var(--rookieui-accent) 16%, var(--rookieui-bg-input));
+}
+
+.rookieui-shell__controlnet-radio-option .rookieui-shell__checkbox {
+  width: 14px;
+  height: 14px;
+}
+
+.rookieui-shell__controlnet-selector-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: end;
+}
+
+.rookieui-shell__controlnet-selector-row .rookieui-shell__field {
+  min-width: 0;
+}
+
+.rookieui-shell__controlnet-selector-field {
+  min-width: 0;
+}
+
+.rookieui-shell__controlnet-selector-field .rookieui-shell__input {
+  min-height: 32px;
+  width: 100%;
+}
+
+.rookieui-shell__controlnet-run-preprocessor-slot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 34px;
+  padding-bottom: 2px;
+}
+
+.rookieui-shell__controlnet-run-preprocessor {
+  width: 34px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+
+.rookieui-shell__controlnet-weight-field {
+  display: grid;
+  gap: 5px;
+}
+
+.rookieui-shell__controlnet-weight-field .rookieui-shell__slider {
+  width: 100%;
+}
+
+.rookieui-shell__controlnet-timestep-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-timestep-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 88px));
+  justify-content: end;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-timestep-values .rookieui-shell__input {
+  padding-block: 5px;
+}
+
+.rookieui-shell__controlnet-timestep-sliders {
+  display: grid;
+  gap: 4px;
+}
+
+.rookieui-shell__controlnet-slider-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--rookieui-text-muted);
+  font-size: 10px;
+}
+
+.rookieui-shell__controlnet-segmented-field {
+  display: grid;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rookieui-shell__controlnet-segmented-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 1px solid var(--rookieui-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  background: var(--rookieui-bg-input);
+  color: var(--rookieui-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.rookieui-shell__controlnet-segmented-option[data-active="true"] {
+  border-color: var(--rookieui-border-strong);
+  background: color-mix(in srgb, var(--rookieui-accent) 18%, var(--rookieui-bg-input));
+  color: var(--rookieui-text-primary);
+}
+
+.rookieui-shell__controlnet-upload-row {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.rookieui-shell__controlnet-upload-row--legacy-source {
+  display: none !important;
+}
+
+.rookieui-shell__controlnet-upload-row .rookieui-shell__action-target-row {
+  width: 100%;
+}
