@@ -521,7 +521,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       extras: "Opened Extras",
     };
     if (actionTarget.value === "img2img") {
-      void transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, txt2imgPreviewBox);
+      void transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, txt2imgPreviewBox, {
+        inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
+      });
       return;
     }
     if (actionTarget.value === "pnginfo") {
@@ -756,7 +758,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           const button = createIconActionButton(action.id, action.iconClass, action.label, action.tone);
           button.addEventListener("click", async () => {
             if (action.id === "rookieui-txt2img-preview-img2img") {
-              await transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox);
+              await transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox, {
+                inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
+              });
               return;
             }
             if (action.id === "rookieui-txt2img-preview-pnginfo") {

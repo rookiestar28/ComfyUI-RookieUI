@@ -374,9 +374,16 @@ async function handleE2EFetch(url, options = {}) {
         payload: {
           prompt: "e2e imported prompt",
           negative_prompt: "e2e imported negative",
+          steps: 31,
+          cfg_scale: 6.5,
+          seed: 987654,
           width: 768,
           height: 768,
           sampler_name: "euler_ancestral",
+          scheduler_name: "normal",
+          checkpoint_name: "realvisxl.safetensors",
+          vae_name: "Automatic",
+          clip_skip: 2,
           image_asset: "pnginfo_asset.png",
         },
         metadata_items: {

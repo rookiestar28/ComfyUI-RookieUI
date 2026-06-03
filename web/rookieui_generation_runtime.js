@@ -268,6 +268,87 @@ function buildPreviewActionArtifact({
   };
 }
 
+const IMG2IMG_METADATA_PAYLOAD_KEYS = Object.freeze([
+  "prompt",
+  "negative_prompt",
+  "profile",
+  "checkpoint_name",
+  "vae_name",
+  "text_encoder_name",
+  "dtype_profile",
+  "width",
+  "height",
+  "resize_mode",
+  "steps",
+  "cfg_scale",
+  "shift",
+  "flux_guidance",
+  "edit_megapixels",
+  "sampler_name",
+  "scheduler_name",
+  "prompt_enhancement_enabled",
+  "seed",
+  "seed_extra",
+  "batch_size",
+  "clip_skip",
+  "denoise_strength",
+  "hires_enabled",
+  "hires_scale",
+  "hires_steps",
+  "hires_denoise",
+  "hires_upscale_method",
+  "template_lora_name",
+  "lora_name",
+  "lora_strength_model",
+  "lora_strength_clip",
+]);
+
+function sanitizeImg2ImgMetadataPayload(rawPayload) {
+  if (!rawPayload || typeof rawPayload !== "object") {
+    return {};
+  }
+  const payload = {};
+  for (const key of IMG2IMG_METADATA_PAYLOAD_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(rawPayload, key)) {
+      payload[key] = rawPayload[key];
+    }
+  }
+  return payload;
+}
+
+async function inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest) {
+  if (!imageDataUrl || typeof inspectPngInfoRequest !== "function") {
+    return { ok: false, payload: {}, sourceType: "", error: null };
+  }
+  try {
+    const result = await inspectPngInfoRequest({ image_data: imageDataUrl });
+    if (!result?.ok) {
+      return { ok: false, payload: {}, sourceType: "", error: result?.data ?? null };
+    }
+    return {
+      ok: true,
+      payload: sanitizeImg2ImgMetadataPayload(result.data?.payload),
+      sourceType: String(result.data?.source_type ?? ""),
+      error: null,
+    };
+  } catch (error) {
+    return { ok: false, payload: {}, sourceType: "", error };
+  }
+}
+
+function buildImg2ImgPreviewActionPayload({ imageDataUrl = "", fallbackAsset = "", metadataPayload = {} } = {}) {
+  return {
+    ...metadataPayload,
+    // IMPORTANT: preview send-to must always overwrite image/mask/batch handoff fields; metadata parsers may expose source fields from the inspected PNG that must not revive stale inpaint or batch state.
+    mode: "img2img",
+    image_asset: imageDataUrl ? "" : fallbackAsset,
+    image_data: imageDataUrl,
+    mask_asset: "",
+    mask_data: "",
+    batch_images: [],
+  };
+}
+
 function extractPrimaryHistoryImage(historyPayload, promptId) {
   const promptHistory = historyPayload?.[promptId];
   if (!promptHistory || typeof promptHistory !== "object") {
@@ -488,7 +569,13 @@ export function createGenerationRuntimeHelpers({
     throw new Error("Generation runtime helpers require debug, preview, cross-pane apply, and tab-activation callbacks.");
   }
 
-  const transferPreviewToImg2Img = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
+  const transferPreviewToImg2Img = async (
+    formRegistry,
+    runtimeState,
+    statusNode,
+    previewBox = null,
+    { inspectPngInfoRequest = null } = {},
+  ) => {
     const { previewUrl, imageDataUrl, fallbackAsset } = await resolvePreviewImagePayload(runtimeState, previewBox);
     if (!previewUrl) {
       activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
@@ -502,28 +589,33 @@ export function createGenerationRuntimeHelpers({
       return;
     }
     if (imageDataUrl) {
-      const applied = applyCrossPanePayload(formRegistry, "img2img", {
-        mode: "img2img",
-        image_asset: "",
-        image_data: imageDataUrl,
-        mask_asset: "",
-        mask_data: "",
-        batch_images: [],
-      });
+      const metadataResult = await inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest);
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        buildImg2ImgPreviewActionPayload({
+          imageDataUrl,
+          fallbackAsset: "",
+          metadataPayload: metadataResult.payload,
+        }),
+      );
       if (applied && statusNode) {
-        statusNode.textContent = "Sent preview image to Img2Img";
+        statusNode.textContent =
+          metadataResult.ok && Object.keys(metadataResult.payload).length
+            ? "Sent preview image and metadata to Img2Img"
+            : "Sent preview image to Img2Img (metadata unavailable)";
       }
       return;
     }
     if (fallbackAsset) {
-      const applied = applyCrossPanePayload(formRegistry, "img2img", {
-        mode: "img2img",
-        image_asset: fallbackAsset,
-        image_data: "",
-        mask_asset: "",
-        mask_data: "",
-        batch_images: [],
-      });
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        buildImg2ImgPreviewActionPayload({
+          imageDataUrl: "",
+          fallbackAsset,
+        }),
+      );
       if (applied && statusNode) {
         statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
       }
