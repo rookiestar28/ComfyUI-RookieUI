@@ -2393,6 +2393,31 @@ describe("registerRookieUIBootstrapExtension", () => {
       '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
     const originalFetchForPreviewActions = globalThis.fetch;
     globalThis.fetch = fetchImpl;
+    const expectImg2ImgPreviewTransferFields = (mode) => {
+      // IMPORTANT: Issue 3 action-target parity depends on field transfer, not just active pane/image handoff.
+      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+      expect(document.querySelector("#rookieui-img2img-preview img")).not.toBeNull();
+      expect(document.getElementById("rookieui-img2img-mode").value).toBe(mode);
+      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
+      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
+      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
+      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
+      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
+      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
+      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
+      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
+      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
+      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
+      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+      if (staleMaskDataField) {
+        expect(staleMaskDataField.value).toBe("");
+      }
+      if (staleBatchImagesField) {
+        expect(staleBatchImagesField.value).toBe("[]");
+      }
+    };
     try {
       document.getElementById("rookieui-txt2img-preview-extras").click();
       for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -2412,29 +2437,7 @@ describe("registerRookieUIBootstrapExtension", () => {
           break;
         }
       }
-      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
-      const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
-      expect(transferredPreviewImage).not.toBeNull();
-      expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
-      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
-      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
-      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
-      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
-      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
-      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
-      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
-      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
-      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
-      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
-      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
-      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
-      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
-      if (staleMaskDataField) {
-        expect(staleMaskDataField.value).toBe("");
-      }
-      if (staleBatchImagesField) {
-        expect(staleBatchImagesField.value).toBe("[]");
-      }
+      expectImg2ImgPreviewTransferFields("img2img");
       document.getElementById("rookieui-tab-txt2img").click();
       document.getElementById("rookieui-txt2img-preview").innerHTML =
         '<img class="rookieui-shell__preview-image" src="data:image/png;base64,aW5wYWludA==" alt="preview">';
@@ -2445,27 +2448,45 @@ describe("registerRookieUIBootstrapExtension", () => {
           break;
         }
       }
-      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
-      expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
-      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
-      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
-      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
-      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
-      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
-      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
-      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
-      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
-      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
-      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
-      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
-      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
-      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+      expectImg2ImgPreviewTransferFields("inpaint");
+      document.getElementById("rookieui-mask-asset").value = "stale-mask-before-action-target";
       if (staleMaskDataField) {
-        expect(staleMaskDataField.value).toBe("");
+        staleMaskDataField.value = "data:image/png;base64,c3RhbGUtYWN0aW9uLXRhcmdldC1tYXNr";
       }
       if (staleBatchImagesField) {
-        expect(staleBatchImagesField.value).toBe("[]");
+        staleBatchImagesField.value = '["data:image/png;base64,c3RhbGUtYWN0aW9uLXRhcmdldC1iYXRjaA=="]';
       }
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,YWN0aW9uLXRhcmdldA==" alt="preview">';
+      document.getElementById("rookieui-txt2img-action-target").value = "img2img";
+      document.getElementById("rookieui-txt2img-apply-action-target").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("img2img");
+      document.getElementById("rookieui-mask-asset").value = "stale-mask-before-action-target-inpaint";
+      if (staleMaskDataField) {
+        staleMaskDataField.value = "data:image/png;base64,c3RhbGUtaW5wYWludC1tYXNr";
+      }
+      if (staleBatchImagesField) {
+        staleBatchImagesField.value = '["data:image/png;base64,c3RhbGUtaW5wYWludC1iYXRjaA=="]';
+      }
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,YWN0aW9uLXRhcmdldC1pbnBhaW50" alt="preview">';
+      document.getElementById("rookieui-txt2img-action-target").value = "inpaint";
+      document.getElementById("rookieui-txt2img-apply-action-target").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "inpaint") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("inpaint");
     } finally {
       globalThis.fetch = originalFetchForPreviewActions;
     }
