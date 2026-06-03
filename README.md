@@ -25,7 +25,6 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<a id="generation-metadata-and-preview-action-parity-hotfix"></a>
 <summary><strong>Generation metadata and preview action parity hotfix (stability/parity)</strong></summary>
 
 - Generated outputs now embed raw A1111-style `parameters` PNG metadata while keeping RookieUI and ComfyUI workflow metadata separate through the normal host metadata path.
