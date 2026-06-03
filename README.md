@@ -13,7 +13,7 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 - **sampler / scheduler / seed / CFG mapping**
 - **img2img, inpaint, and extras postprocessing flows**
 - **integrated ControlNet and ADetailer behavior**
-- **PNG metadata round-trip and apply workflow**
+- **PNG metadata embedding, round-trip, and apply workflow**
 - **Prompt Workbench authoring tools and XYZ Plot sweep sessions**
 - **queue / progress / result UX and host-integrated workflow behavior**
 
@@ -22,6 +22,17 @@ ComfyUI-RookieUI is a ComfyUI custom node extension that reproduces an A1111-sty
 The core objective of this project is not merely to replicate the classic UI/UX, but to faithfully reproduce A1111's unique prompt parsing capabilities and image generation characteristics for the Stable Diffusion model family to the greatest extent possible. Even so, RookieUI supports more than just the Stable Diffusion family.
 
 <details><summary><h2>Last updates - Click to expand</h2></summary>
+
+<details>
+
+<a id="generation-metadata-and-preview-action-parity-hotfix"></a>
+<summary><strong>Generation metadata and preview action parity hotfix (stability/parity)</strong></summary>
+
+- Generated outputs now embed raw A1111-style `parameters` PNG metadata while keeping RookieUI and ComfyUI workflow metadata separate through the normal host metadata path.
+- Preview quick actions now prefer completed final output artifacts instead of stale live-preview frames, so output handoff uses the generated image and its available metadata.
+- `Send to Img2Img` and `Send to Inpaint` transfer image plus generation fields such as prompt, negative prompt, steps, sampler, scheduler, CFG, seed, size, and model; `PNG Info` remains an inspect action and `Extras` remains an image handoff.
+
+</details>
 
 <details>
 
@@ -419,6 +430,7 @@ Current extension seams:
 ## Table of Contents
 
 - [Last updates](#last-updates---click-to-expand)
+  - [Generation metadata and preview action parity hotfix](#generation-metadata-and-preview-action-parity-hotfix)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
@@ -479,6 +491,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Progress text and queue/history integration in sidebar flow
 - Live preview panel with runtime updates and flicker-mitigated rendering
 - Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
+- Preview quick actions for output handoff to `Img2Img`, `Inpaint`, `Extras`, and `PNG Info`, using completed output artifacts and metadata when available
 - Host-aware sidebar registration with stale-tab cleanup on current ComfyUI frontends and a legacy launcher fallback for older hosts
 
 ### Generation
@@ -491,7 +504,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - Official txt2img profiles include newer Flux lanes such as `Flux.1 Krea Dev` and `Flux.2 Dev`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
 - Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
-- ComfyUI-native prompt submission with RookieUI origin metadata
+- ComfyUI-native prompt submission with embedded A1111-style `parameters` metadata plus separate RookieUI origin metadata
 
 ### Image-Edit Workflows
 
@@ -528,15 +541,17 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### PNG Info
 
-- image-first metadata ingest
-- A1111 metadata parsing path
+- image-first metadata ingest from file upload, drag/drop, and preview quick actions
+- generated RookieUI PNG outputs embed A1111-style `parameters` metadata for later inspection and reuse
+- A1111 metadata parsing path, including RookieUI-generated infotext
 - automatic positive/negative prompt extraction
 - apply parsed parameters into `txt2img` or `img2img`
-- ComfyUI metadata remains inspect-only, while A1111 inpaint metadata surfaces explicit `missing_inputs` diagnostics until the required mask/source assets are selected manually
+- ComfyUI workflow metadata remains inspect-only, while A1111 inpaint metadata surfaces explicit `missing_inputs` diagnostics until the required mask/source assets are selected manually
 
 ### Extras
 
 - single-image/batch postprocessing surface with RookieUI-managed output assets and preview payloads
+- preview quick action handoff from completed generation outputs
 - scale-by and scale-to resizing through a dedicated extras contract and execution path
 - selected ComfyUI upscaler model execution when available, plus PIL Lanczos fallback with explicit warnings when the host runtime or model is unavailable
 - optional second-upscaler blending through `upscaler_2_visibility`
