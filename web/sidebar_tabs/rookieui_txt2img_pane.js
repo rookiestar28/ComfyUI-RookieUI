@@ -37,6 +37,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncFamilyAwareAdvancedParameterFields,
     syncClipSkipAvailability,
     transferPreviewToImg2Img,
+    transferPreviewToInpaint,
     transferPreviewToPngInfo,
     transferPreviewToExtras,
     activateShellTab,
@@ -500,6 +501,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       { value: "queue", label: "Queue / History" },
       { value: "pnginfo", label: "PNG Info" },
       { value: "img2img", label: "Send to Img2Img" },
+      { value: "inpaint", label: "Send to Inpaint" },
       { value: "extras", label: "Extras" },
     ],
     "queue",
@@ -518,10 +520,17 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       queue: "Opened queue view",
       pnginfo: "Opened PNG Info",
       img2img: "Sent preview image to Img2Img",
+      inpaint: "Sent preview image to Inpaint",
       extras: "Opened Extras",
     };
     if (actionTarget.value === "img2img") {
       void transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, txt2imgPreviewBox, {
+        inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
+      });
+      return;
+    }
+    if (actionTarget.value === "inpaint") {
+      void transferPreviewToInpaint(formRegistry, runtimeState, statusNode, txt2imgPreviewBox, {
         inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
       });
       return;
@@ -729,6 +738,14 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
             tone: "transfer",
           },
           {
+            id: "rookieui-txt2img-preview-inpaint",
+            iconClass: "pi-pencil",
+            label: "Send to Inpaint",
+            tabId: "img2img",
+            message: "Opened Inpaint",
+            tone: "transfer",
+          },
+          {
             id: "rookieui-txt2img-preview-extras",
             iconClass: "pi-star",
             label: "Extras",
@@ -759,6 +776,12 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           button.addEventListener("click", async () => {
             if (action.id === "rookieui-txt2img-preview-img2img") {
               await transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox, {
+                inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
+              });
+              return;
+            }
+            if (action.id === "rookieui-txt2img-preview-inpaint") {
+              await transferPreviewToInpaint(formRegistry, runtimeState, statusNode, previewBox, {
                 inspectPngInfoRequest: bootstrapState.inspectPngInfoRequest,
               });
               return;
