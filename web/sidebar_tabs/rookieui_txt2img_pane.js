@@ -499,10 +499,10 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     "rookieui-txt2img-action-target",
     [
       { value: "queue", label: "Queue / History" },
-      { value: "pnginfo", label: "PNG Info" },
+      { value: "pnginfo", label: "Inspect PNG Info" },
       { value: "img2img", label: "Send to Img2Img" },
       { value: "inpaint", label: "Send to Inpaint" },
-      { value: "extras", label: "Extras" },
+      { value: "extras", label: "Send to Extras" },
     ],
     "queue",
   );
@@ -518,10 +518,10 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   actionApplyButton.addEventListener("click", () => {
     const actionLabels = {
       queue: "Opened queue view",
-      pnginfo: "Opened PNG Info",
+      pnginfo: "Inspecting preview in PNG Info",
       img2img: "Sent preview image to Img2Img",
       inpaint: "Sent preview image to Inpaint",
-      extras: "Opened Extras",
+      extras: "Sent preview image to Extras",
     };
     if (actionTarget.value === "img2img") {
       void transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, txt2imgPreviewBox, {
@@ -724,9 +724,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           {
             id: "rookieui-txt2img-preview-pnginfo",
             iconClass: "pi-file",
-            label: "PNG Info",
+            label: "Inspect PNG Info",
             tabId: "pnginfo",
-            message: "Opened PNG Info",
+            message: "Inspecting PNG Info",
             tone: "metadata",
           },
           {
@@ -748,9 +748,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           {
             id: "rookieui-txt2img-preview-extras",
             iconClass: "pi-star",
-            label: "Extras",
+            label: "Send to Extras",
             tabId: "extras",
-            message: "Opened Extras",
+            message: "Sent to Extras",
             tone: "extras",
           },
           {
