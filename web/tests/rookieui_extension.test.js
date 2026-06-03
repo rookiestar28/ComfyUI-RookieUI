@@ -4,7 +4,11 @@ import { readFileSync } from "node:fs";
 import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
 import { createRookieUIHostFetch, registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
-import { createGenerationRuntimeHelpers, createGenerationRuntimeState } from "../rookieui_generation_runtime.js";
+import {
+  createGenerationRuntimeHelpers,
+  createGenerationRuntimeState,
+  resolvePreviewActionArtifact,
+} from "../rookieui_generation_runtime.js";
 
 const EXPECTED_DTYPE_PROFILE_IDS = [
   "automatic",
@@ -205,6 +209,105 @@ describe("registerRookieUIBootstrapExtension", () => {
       { activate: true },
     );
     expect(statusNode.textContent).toBe("Sent preview image to Extras");
+  });
+
+  test("runtime preview action artifact prefers selected final output over stale DOM preview", async () => {
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "final-output-b.png",
+      subfolder: "RookieUI",
+      type: "output",
+      selectedIndex: 1,
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+      promptId: "prompt-final",
+      metadata: { parameters: "final prompt\nSteps: 20, Seed: 123" },
+      infotext: "final prompt\nSteps: 20, Seed: 123",
+    };
+    runtimeState.finalImageUrl =
+      "/view?filename=final-output-b.png&subfolder=RookieUI&type=output";
+    runtimeState.finalOutputArtifact = {
+      sourceContext: {
+        promptId: "prompt-final",
+        nodeId: "save_image",
+        nodeImageIndex: 1,
+      },
+    };
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    const artifact = resolvePreviewActionArtifact(runtimeState, previewBox);
+
+    expect(artifact.previewUrl).toBe("/view?filename=final-output-b.png&subfolder=RookieUI&type=output");
+    expect(artifact.source).toBe("final-output");
+    expect(artifact.selectedIndex).toBe(1);
+    expect(artifact.finalImageDescriptor).toMatchObject({
+      filename: "final-output-b.png",
+      subfolder: "RookieUI",
+      type: "output",
+      selectedIndex: 1,
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+      promptId: "prompt-final",
+    });
+    expect(artifact.metadata).toEqual({ parameters: "final prompt\nSteps: 20, Seed: 123" });
+    expect(artifact.infotext).toBe("final prompt\nSteps: 20, Seed: 123");
+    expect(artifact.sourceContext).toEqual({
+      promptId: "prompt-final",
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+    });
+  });
+
+  test("runtime preview helper resolves final output image data before stale DOM image", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      async blob() {
+        expect(url).toBe("/view?filename=selected-final.png&subfolder=&type=output");
+        return new Blob(["final"], { type: "image/png" });
+      },
+    }));
+    globalThis.fetch = fetchSpy;
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "selected-final.png",
+      subfolder: "",
+      type: "output",
+      selectedIndex: 0,
+    };
+    runtimeState.finalImageUrl = "/view?filename=selected-final.png&subfolder=&type=output";
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    try {
+      await helpers.transferPreviewToPngInfo({}, runtimeState, statusNode, previewBox);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith("/view?filename=selected-final.png&subfolder=&type=output");
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "pnginfo",
+      {
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmluYWw=",
+      },
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent preview image to PNG Info");
   });
 
   test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
@@ -2071,28 +2174,34 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview").innerHTML =
       '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
-    document.getElementById("rookieui-txt2img-preview-extras").click();
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      if (document.getElementById("rookieui-extras-single-status").textContent.includes("preview-image.png")) {
-        break;
+    const originalFetchForPreviewActions = globalThis.fetch;
+    globalThis.fetch = fetchImpl;
+    try {
+      document.getElementById("rookieui-txt2img-preview-extras").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-extras-single-status").textContent.includes("preview-image.png")) {
+          break;
+        }
       }
-    }
-    expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
-    expect(document.getElementById("rookieui-extras-single-status").textContent).toContain("preview-image.png");
-    expect(document.querySelector("#rookieui-extras-preview img")?.getAttribute("src")).toContain("data:image/png");
-    document.getElementById("rookieui-tab-txt2img").click();
-    document.getElementById("rookieui-txt2img-preview-img2img").click();
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
-        break;
+      expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
+      expect(document.getElementById("rookieui-extras-single-status").textContent).toContain("preview-image.png");
+      expect(document.querySelector("#rookieui-extras-preview img")?.getAttribute("src")).toContain("data:image/png");
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview-img2img").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
+          break;
+        }
       }
+      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+      const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
+      expect(transferredPreviewImage).not.toBeNull();
+      expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+    } finally {
+      globalThis.fetch = originalFetchForPreviewActions;
     }
-    expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
-    const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
-    expect(transferredPreviewImage).not.toBeNull();
-    expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
     document.getElementById("rookieui-img2img-prompt").value = "settings handoff prompt";
     document.getElementById("rookieui-img2img-preview-txt2img").click();
     expect(document.getElementById("rookieui-pane-txt2img").classList.contains("is-active")).toBe(true);

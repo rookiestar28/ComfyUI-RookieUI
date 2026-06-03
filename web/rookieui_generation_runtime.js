@@ -47,6 +47,7 @@ export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
     progressSeen: false,
     previewFrameSeen: false,
     finalImageDescriptor: null,
+    finalOutputArtifact: null,
     finalImageUrl: "",
   };
 }
@@ -206,6 +207,67 @@ function extractPreviewBlob(payload) {
   return null;
 }
 
+function normalizeFinalImageDescriptor(imageDescriptor, { selectedIndex = 0, nodeId = "", nodeImageIndex = 0, promptId = "" } = {}) {
+  if (!imageDescriptor?.filename) {
+    return null;
+  }
+  const descriptorSelectedIndex = Number.isInteger(imageDescriptor.selectedIndex)
+    ? imageDescriptor.selectedIndex
+    : selectedIndex;
+  const descriptorNodeImageIndex = Number.isInteger(imageDescriptor.nodeImageIndex)
+    ? imageDescriptor.nodeImageIndex
+    : nodeImageIndex;
+  const normalizedSelectedIndex =
+    Number.isInteger(descriptorSelectedIndex) && descriptorSelectedIndex >= 0 ? descriptorSelectedIndex : 0;
+  const normalizedNodeImageIndex =
+    Number.isInteger(descriptorNodeImageIndex) && descriptorNodeImageIndex >= 0
+      ? descriptorNodeImageIndex
+      : normalizedSelectedIndex;
+  const metadata =
+    imageDescriptor.metadata && typeof imageDescriptor.metadata === "object"
+      ? { ...imageDescriptor.metadata }
+      : null;
+  const infotext =
+    typeof imageDescriptor.infotext === "string"
+      ? imageDescriptor.infotext
+      : typeof imageDescriptor.parameters === "string"
+        ? imageDescriptor.parameters
+        : "";
+  return {
+    filename: imageDescriptor.filename,
+    subfolder: typeof imageDescriptor.subfolder === "string" ? imageDescriptor.subfolder : "",
+    type: typeof imageDescriptor.type === "string" ? imageDescriptor.type : "output",
+    selectedIndex: normalizedSelectedIndex,
+    nodeId: typeof imageDescriptor.nodeId === "string" ? imageDescriptor.nodeId : nodeId,
+    nodeImageIndex: normalizedNodeImageIndex,
+    promptId: typeof imageDescriptor.promptId === "string" ? imageDescriptor.promptId : promptId,
+    metadata,
+    infotext,
+  };
+}
+
+function buildPreviewActionArtifact({
+  previewUrl = "",
+  finalImageDescriptor = null,
+  selectedIndex = 0,
+  source = "runtime-preview",
+  sourceContext = {},
+} = {}) {
+  const normalizedSelectedIndex = Number.isInteger(selectedIndex) && selectedIndex >= 0 ? selectedIndex : 0;
+  const descriptor = finalImageDescriptor ? normalizeFinalImageDescriptor(finalImageDescriptor) : null;
+  return {
+    previewUrl,
+    imageDataUrl: "",
+    fallbackAsset: previewUrl ? extractComfyViewFilename(previewUrl) : "",
+    finalImageDescriptor: descriptor,
+    selectedIndex: descriptor?.selectedIndex ?? normalizedSelectedIndex,
+    source,
+    sourceContext,
+    metadata: descriptor?.metadata ?? null,
+    infotext: descriptor?.infotext ?? "",
+  };
+}
+
 function extractPrimaryHistoryImage(historyPayload, promptId) {
   const promptHistory = historyPayload?.[promptId];
   if (!promptHistory || typeof promptHistory !== "object") {
@@ -215,24 +277,35 @@ function extractPrimaryHistoryImage(historyPayload, promptId) {
   if (!outputs || typeof outputs !== "object") {
     return null;
   }
-  for (const nodeOutput of Object.values(outputs)) {
+  let selectedIndex = 0;
+  for (const [nodeId, nodeOutput] of Object.entries(outputs)) {
     if (!nodeOutput || typeof nodeOutput !== "object") {
       continue;
     }
     const images = Array.isArray(nodeOutput.images) ? nodeOutput.images : [];
-    for (const image of images) {
+    for (let nodeImageIndex = 0; nodeImageIndex < images.length; nodeImageIndex += 1) {
+      const image = images[nodeImageIndex];
       if (!image || typeof image !== "object") {
+        selectedIndex += 1;
         continue;
       }
       const filename = typeof image.filename === "string" ? image.filename : "";
       if (!filename) {
+        selectedIndex += 1;
         continue;
       }
-      return {
-        filename,
-        subfolder: typeof image.subfolder === "string" ? image.subfolder : "",
-        type: typeof image.type === "string" ? image.type : "output",
-      };
+      return normalizeFinalImageDescriptor(
+        {
+          ...image,
+          filename,
+        },
+        {
+          selectedIndex,
+          nodeId,
+          nodeImageIndex,
+          promptId,
+        },
+      );
     }
   }
   return null;
@@ -259,16 +332,24 @@ function buildComfyViewUrl(imageDescriptor, bootstrapState = null) {
 }
 
 function setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, imageDescriptor, bootstrapState) {
-  const finalImageUrl = buildComfyViewUrl(imageDescriptor, bootstrapState);
+  const normalizedDescriptor = normalizeFinalImageDescriptor(imageDescriptor);
+  const finalImageUrl = buildComfyViewUrl(normalizedDescriptor, bootstrapState);
   if (!finalImageUrl) {
     return false;
   }
-  runtimeState.finalImageDescriptor = {
-    filename: imageDescriptor.filename,
-    subfolder: imageDescriptor.subfolder || "",
-    type: imageDescriptor.type || "output",
-  };
+  runtimeState.finalImageDescriptor = normalizedDescriptor;
   runtimeState.finalImageUrl = finalImageUrl;
+  runtimeState.finalOutputArtifact = buildPreviewActionArtifact({
+    previewUrl: finalImageUrl,
+    finalImageDescriptor: normalizedDescriptor,
+    selectedIndex: normalizedDescriptor.selectedIndex,
+    source: "final-output",
+    sourceContext: {
+      promptId: normalizedDescriptor.promptId,
+      nodeId: normalizedDescriptor.nodeId,
+      nodeImageIndex: normalizedDescriptor.nodeImageIndex,
+    },
+  });
   setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
   return true;
 }
@@ -329,35 +410,64 @@ function extractComfyViewFilename(previewUrl) {
   }
 }
 
-function resolveCurrentPreviewUrl(runtimeState, previewBox = null) {
+export function resolvePreviewActionArtifact(runtimeState, previewBox = null, { preferFinalOutput = true } = {}) {
+  if (preferFinalOutput && runtimeState?.finalImageUrl) {
+    // CRITICAL: output action buttons must prefer the completed final artifact; falling back to a stale DOM/live-preview frame drops embedded metadata and breaks A1111 send-to parity.
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.finalImageUrl,
+      finalImageDescriptor: runtimeState.finalImageDescriptor,
+      selectedIndex: runtimeState.finalImageDescriptor?.selectedIndex ?? 0,
+      source: "final-output",
+      sourceContext: runtimeState.finalOutputArtifact?.sourceContext ?? {},
+    });
+  }
   if (previewBox) {
     const previewImage = previewBox.querySelector?.("img");
-    // IMPORTANT: preview action buttons must operate on the image currently rendered in their pane; runtime state can lag or retain a prior final image URL after tab handoffs.
     if (previewImage?.src) {
-      return previewImage.src;
+      return buildPreviewActionArtifact({
+        previewUrl: previewImage.src,
+        selectedIndex: 0,
+        source: "preview-dom",
+        sourceContext: {},
+      });
     }
   }
   if (runtimeState?.finalImageUrl) {
-    return runtimeState.finalImageUrl;
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.finalImageUrl,
+      finalImageDescriptor: runtimeState.finalImageDescriptor,
+      selectedIndex: runtimeState.finalImageDescriptor?.selectedIndex ?? 0,
+      source: "final-output",
+      sourceContext: runtimeState.finalOutputArtifact?.sourceContext ?? {},
+    });
   }
   if (runtimeState?.previewUrl) {
-    return runtimeState.previewUrl;
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.previewUrl,
+      selectedIndex: 0,
+      source: "runtime-preview",
+      sourceContext: {},
+    });
   }
-  return "";
+  return buildPreviewActionArtifact();
 }
 
-async function resolvePreviewImagePayload(runtimeState, previewBox = null) {
-  const previewUrl = resolveCurrentPreviewUrl(runtimeState, previewBox);
+function resolveCurrentPreviewUrl(runtimeState, previewBox = null, options = {}) {
+  return resolvePreviewActionArtifact(runtimeState, previewBox, options).previewUrl;
+}
+
+async function resolvePreviewImagePayload(runtimeState, previewBox = null, options = {}) {
+  const artifact = resolvePreviewActionArtifact(runtimeState, previewBox, options);
+  const previewUrl = artifact.previewUrl;
   if (!previewUrl) {
-    return { previewUrl: "", imageDataUrl: "", fallbackAsset: "" };
+    return artifact;
   }
-  const fallbackAsset = extractComfyViewFilename(previewUrl);
   try {
     const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
-    return { previewUrl, imageDataUrl, fallbackAsset };
+    return { ...artifact, imageDataUrl };
   } catch (error) {
-    if (fallbackAsset) {
-      return { previewUrl, imageDataUrl: "", fallbackAsset, error };
+    if (artifact.fallbackAsset) {
+      return { ...artifact, imageDataUrl: "", error };
     }
     throw error;
   }
@@ -520,6 +630,7 @@ export function createGenerationRuntimeHelpers({
     runtimeState.progressSeen = false;
     runtimeState.previewFrameSeen = false;
     runtimeState.finalImageDescriptor = null;
+    runtimeState.finalOutputArtifact = null;
     runtimeState.finalImageUrl = "";
     runtimeState.lastPreviewRenderAt = 0;
 
