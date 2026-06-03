@@ -30,6 +30,7 @@ async def submit_prompt_workflow(
     origin: str = "rookieui",
     surface: str = "txt2img",
     profile: str | None = None,
+    extra_pnginfo: dict[str, object] | None = None,
     extra_metadata: dict[str, object] | None = None,
 ) -> dict[str, object]:
     _validate_prompt_server(prompt_server)
@@ -64,6 +65,9 @@ async def submit_prompt_workflow(
     if isinstance(extra_metadata, dict):
         # IMPORTANT: feature-specific queue metadata must merge here rather than piggybacking on prompt text; queue/history reconstruction depends on explicit internal tags.
         extra_data.update(extra_metadata)
+    if isinstance(extra_pnginfo, dict) and extra_pnginfo:
+        # CRITICAL: keep embeddable PNG metadata separate from queue-only tags; mixing them caused generated files to lose reproducible parameters.
+        extra_data["extra_pnginfo"] = extra_pnginfo
 
     outputs_to_execute = valid[2]
     node_errors = valid[3]

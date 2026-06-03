@@ -46,6 +46,8 @@ export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
     progressMax: null,
     progressSeen: false,
     previewFrameSeen: false,
+    finalImageDescriptor: null,
+    finalImageUrl: "",
   };
 }
 
@@ -236,7 +238,15 @@ function extractPrimaryHistoryImage(historyPayload, promptId) {
   return null;
 }
 
-function buildComfyViewUrl(imageDescriptor) {
+function resolveHostApiUrl(bootstrapState, path) {
+  const runtimeApi = resolveRuntimeApi(bootstrapState);
+  if (typeof runtimeApi?.apiURL === "function") {
+    return runtimeApi.apiURL(path);
+  }
+  return path;
+}
+
+function buildComfyViewUrl(imageDescriptor, bootstrapState = null) {
   if (!imageDescriptor?.filename) {
     return "";
   }
@@ -245,7 +255,38 @@ function buildComfyViewUrl(imageDescriptor) {
     subfolder: imageDescriptor.subfolder || "",
     type: imageDescriptor.type || "output",
   });
-  return `/view?${params.toString()}`;
+  return resolveHostApiUrl(bootstrapState, `/view?${params.toString()}`);
+}
+
+function setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, imageDescriptor, bootstrapState) {
+  const finalImageUrl = buildComfyViewUrl(imageDescriptor, bootstrapState);
+  if (!finalImageUrl) {
+    return false;
+  }
+  runtimeState.finalImageDescriptor = {
+    filename: imageDescriptor.filename,
+    subfolder: imageDescriptor.subfolder || "",
+    type: imageDescriptor.type || "output",
+  };
+  runtimeState.finalImageUrl = finalImageUrl;
+  setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
+  return true;
+}
+
+async function resolveFinalHistoryImage(bootstrapState, promptId, { attempts = 4, delayMs = 300 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
+    if (historyResult.ok) {
+      const outputImage = extractPrimaryHistoryImage(historyResult.data, promptId);
+      if (outputImage) {
+        return outputImage;
+      }
+    }
+    if (attempt + 1 < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
 }
 
 function readBlobAsDataUrl(blob) {
@@ -279,12 +320,46 @@ function extractComfyViewFilename(previewUrl) {
   }
   try {
     const parsed = new URL(raw, globalThis?.window?.location?.origin ?? "http://127.0.0.1");
-    if (parsed.pathname !== "/view") {
+    if (parsed.pathname !== "/view" && !parsed.pathname.endsWith("/view")) {
       return "";
     }
     return String(parsed.searchParams.get("filename") ?? "").trim();
   } catch (_error) {
     return "";
+  }
+}
+
+function resolveCurrentPreviewUrl(runtimeState, previewBox = null) {
+  if (previewBox) {
+    const previewImage = previewBox.querySelector?.("img");
+    // IMPORTANT: preview action buttons must operate on the image currently rendered in their pane; runtime state can lag or retain a prior final image URL after tab handoffs.
+    if (previewImage?.src) {
+      return previewImage.src;
+    }
+  }
+  if (runtimeState?.finalImageUrl) {
+    return runtimeState.finalImageUrl;
+  }
+  if (runtimeState?.previewUrl) {
+    return runtimeState.previewUrl;
+  }
+  return "";
+}
+
+async function resolvePreviewImagePayload(runtimeState, previewBox = null) {
+  const previewUrl = resolveCurrentPreviewUrl(runtimeState, previewBox);
+  if (!previewUrl) {
+    return { previewUrl: "", imageDataUrl: "", fallbackAsset: "" };
+  }
+  const fallbackAsset = extractComfyViewFilename(previewUrl);
+  try {
+    const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
+    return { previewUrl, imageDataUrl, fallbackAsset };
+  } catch (error) {
+    if (fallbackAsset) {
+      return { previewUrl, imageDataUrl: "", fallbackAsset, error };
+    }
+    throw error;
   }
 }
 
@@ -304,19 +379,7 @@ export function createGenerationRuntimeHelpers({
   }
 
   const transferPreviewToImg2Img = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
-    let previewUrl = runtimeState?.previewUrl ?? "";
-    if (!previewUrl && previewBox) {
-      const previewImage = previewBox.querySelector?.("img");
-      if (previewImage?.src) {
-        previewUrl = previewImage.src;
-      }
-    }
-    if (previewBox) {
-      const previewImage = previewBox.querySelector?.("img");
-      if (previewImage?.src?.startsWith("data:image/")) {
-        previewUrl = previewImage.src;
-      }
-    }
+    const { previewUrl, imageDataUrl, fallbackAsset } = await resolvePreviewImagePayload(runtimeState, previewBox);
     if (!previewUrl) {
       activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
       return;
@@ -328,12 +391,7 @@ export function createGenerationRuntimeHelpers({
       }
       return;
     }
-    const fallbackAsset = extractComfyViewFilename(previewUrl);
-    try {
-      const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
-      if (!imageDataUrl) {
-        throw new Error("Preview image is empty.");
-      }
+    if (imageDataUrl) {
       const applied = applyCrossPanePayload(formRegistry, "img2img", {
         mode: "img2img",
         image_asset: "",
@@ -345,28 +403,110 @@ export function createGenerationRuntimeHelpers({
       if (applied && statusNode) {
         statusNode.textContent = "Sent preview image to Img2Img";
       }
-    } catch (error) {
-      emitFrontendDebugWarning(
-        "shell.preview_transfer",
-        "Preview transfer image decode failed; attempting asset-based fallback.",
-        error,
-      );
-      if (fallbackAsset) {
-        const applied = applyCrossPanePayload(formRegistry, "img2img", {
-          mode: "img2img",
-          image_asset: fallbackAsset,
-          image_data: "",
-          mask_asset: "",
-          mask_data: "",
-          batch_images: [],
-        });
-        if (applied && statusNode) {
-          statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
-        }
-        return;
-      }
-      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+      return;
     }
+    if (fallbackAsset) {
+      const applied = applyCrossPanePayload(formRegistry, "img2img", {
+        mode: "img2img",
+        image_asset: fallbackAsset,
+        image_data: "",
+        mask_asset: "",
+        mask_data: "",
+        batch_images: [],
+      });
+      if (applied && statusNode) {
+        statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
+      }
+      return;
+    }
+    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+  };
+
+  const transferPreviewImageToPane = async (
+    formRegistry,
+    targetKey,
+    runtimeState,
+    statusNode,
+    previewBox = null,
+    { appliedMessage = "Sent preview image", requireDataUrl = false } = {},
+  ) => {
+    let payload;
+    try {
+      payload = await resolvePreviewImagePayload(runtimeState, previewBox);
+    } catch (error) {
+      emitFrontendDebugWarning("shell.preview_transfer", "Preview image handoff failed.", error);
+      if (statusNode) {
+        statusNode.textContent = "Preview image is unavailable.";
+      }
+      return false;
+    }
+    if (!payload.previewUrl) {
+      activateShellTab(formRegistry, targetKey, statusNode, `Opened ${targetKey}`);
+      return false;
+    }
+    if (requireDataUrl && !payload.imageDataUrl) {
+      if (statusNode) {
+        statusNode.textContent = "Preview image data is unavailable.";
+      }
+      activateShellTab(formRegistry, targetKey, statusNode, "Preview image data is unavailable.");
+      return false;
+    }
+    let applied = applyCrossPanePayload(
+      formRegistry,
+      targetKey,
+      {
+        image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
+        image_data: payload.imageDataUrl,
+      },
+      { activate: true },
+    );
+    if (!applied) {
+      // IMPORTANT: PNG Info/Extras panes may be lazily registered; activate once so the pane can install applyPayload, then retry the handoff.
+      activateShellTab(formRegistry, targetKey, statusNode, `Opened ${targetKey}`);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        applied = applyCrossPanePayload(
+          formRegistry,
+          targetKey,
+          {
+            image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
+            image_data: payload.imageDataUrl,
+          },
+          { activate: true },
+        );
+        if (applied) {
+          break;
+        }
+      }
+    }
+    if (!applied && ["pnginfo", "extras"].includes(targetKey) && typeof globalThis.document?.dispatchEvent === "function") {
+      const fallbackEvent = new CustomEvent(`rookieui:${targetKey}:preview-handoff`, {
+        cancelable: true,
+        detail: {
+          image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
+          image_data: payload.imageDataUrl,
+        },
+      });
+      applied = globalThis.document.dispatchEvent(fallbackEvent) === false;
+    }
+    if (statusNode) {
+      statusNode.textContent = applied ? appliedMessage : `${targetKey} form is unavailable.`;
+    }
+    return applied;
+  };
+
+  const transferPreviewToPngInfo = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
+    return transferPreviewImageToPane(formRegistry, "pnginfo", runtimeState, statusNode, previewBox, {
+      appliedMessage: "Sent preview image to PNG Info",
+      requireDataUrl: true,
+    });
+  };
+
+  const transferPreviewToExtras = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
+    return transferPreviewImageToPane(formRegistry, "extras", runtimeState, statusNode, previewBox, {
+      appliedMessage: "Sent preview image to Extras",
+      requireDataUrl: true,
+    });
   };
 
   const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "") => {
@@ -379,6 +519,8 @@ export function createGenerationRuntimeHelpers({
     runtimeState.progressMax = null;
     runtimeState.progressSeen = false;
     runtimeState.previewFrameSeen = false;
+    runtimeState.finalImageDescriptor = null;
+    runtimeState.finalImageUrl = "";
     runtimeState.lastPreviewRenderAt = 0;
 
     const runtimeApi = resolveRuntimeApi(bootstrapState);
@@ -478,10 +620,9 @@ export function createGenerationRuntimeHelpers({
         if (Date.now() - lastHistoryPollAt >= 1500) {
           const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
           const previewImage = extractPrimaryHistoryImage(historyResult.data, promptId);
-          const previewUrl = buildComfyViewUrl(previewImage);
-          if (previewUrl) {
+          if (previewImage) {
             runtimeState.previewFrameSeen = true;
-            setGenerationPreview(runtimeState, previewBox, setPreviewContent, previewUrl, runtimeState.previewPlaceholder);
+            setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, previewImage, bootstrapState);
           }
           lastHistoryPollAt = Date.now();
         }
@@ -496,15 +637,22 @@ export function createGenerationRuntimeHelpers({
     }
 
     if (finalStatus === "completed") {
-      const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
-      const outputImage = historyResult.ok ? extractPrimaryHistoryImage(historyResult.data, promptId) : null;
-      const finalImageUrl = buildComfyViewUrl(outputImage);
-      if (finalImageUrl) {
-        setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
+      const outputImage = await resolveFinalHistoryImage(bootstrapState, promptId, {
+        attempts: runtimeState.finalImageDescriptor ? 1 : 4,
+        delayMs: 300,
+      });
+      if (outputImage && setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, outputImage, bootstrapState)) {
         statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
         return;
       }
-      statusNode.textContent = appendStatusSuffix(`Completed: ${promptId} (no image output found)`, statusSuffix);
+      if (runtimeState.finalImageUrl) {
+        statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
+        return;
+      }
+      const fallbackDetail = runtimeState.previewUrl?.startsWith("blob:")
+        ? "final image unavailable; showing live preview"
+        : "no image output found";
+      statusNode.textContent = appendStatusSuffix(`Completed: ${promptId} (${fallbackDetail})`, statusSuffix);
       return;
     }
     if (finalStatus === "failed") {
@@ -520,6 +668,8 @@ export function createGenerationRuntimeHelpers({
 
   return {
     transferPreviewToImg2Img,
+    transferPreviewToPngInfo,
+    transferPreviewToExtras,
     trackGenerationRuntime,
   };
 }
