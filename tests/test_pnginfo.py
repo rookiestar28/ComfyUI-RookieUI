@@ -11,6 +11,7 @@ from PIL.PngImagePlugin import PngInfo
 from rookieui.api import routes
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.security.request_guard import MAX_INFOTEXT_LENGTH
+from rookieui.services.generation_metadata import build_a1111_parameters
 from rookieui.services.pnginfo import parse_pnginfo_payload
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_txt2img_request
@@ -57,6 +58,39 @@ class PNGInfoParsingTests(unittest.TestCase):
         self.assertEqual(result["payload"]["profile"], "sdxl")
         self.assertEqual(result["payload"]["sampler_name"], "euler_ancestral")
         self.assertEqual(result["payload"]["width"], 768)
+        self.assertEqual(result["payload"]["clip_skip"], 2)
+
+    def test_generated_a1111_parameters_round_trip_through_pnginfo_parser(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "harbor dusk",
+                "negative_prompt": "blurry",
+                "width": 768,
+                "height": 640,
+                "steps": 28,
+                "cfg_scale": 7.25,
+                "sampler_name": "Euler a",
+                "scheduler_name": "Karras",
+                "seed": 9,
+                "clip_skip": 2,
+            }
+        )
+        parameters = build_a1111_parameters(request.to_payload())
+
+        result = parse_pnginfo_payload(
+            {
+                "image_data": self._build_a1111_parameters_image_data(parameters),
+            }
+        ).to_payload()
+
+        self.assertEqual(result["target_form"], "txt2img")
+        self.assertEqual(result["payload"]["prompt"], "harbor dusk")
+        self.assertEqual(result["payload"]["negative_prompt"], "blurry")
+        self.assertEqual(result["payload"]["sampler_name"], "euler_ancestral")
+        self.assertEqual(result["payload"]["scheduler_name"], "karras")
+        self.assertEqual(result["payload"]["seed"], 9)
+        self.assertEqual(result["payload"]["width"], 768)
+        self.assertEqual(result["payload"]["height"], 640)
         self.assertEqual(result["payload"]["clip_skip"], 2)
 
     def test_parse_pnginfo_payload_keeps_a1111_hires_metadata_on_txt2img_sdxl_encoder_path(self) -> None:

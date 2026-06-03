@@ -61,7 +61,7 @@ function emitFrontendDebugWarning(scope, message, error = null, metadata = null)
 }
 
 // CRITICAL: keep runtime helper wiring centralized here; pane modules receive these stable wrappers through the explicit shell-context bridge.
-const { transferPreviewToImg2Img, trackGenerationRuntime } = createGenerationRuntimeHelpers({
+const runtimeHelpers = createGenerationRuntimeHelpers({
   emitFrontendDebugWarning,
   setPreviewContent,
   applyCrossPanePayload,
@@ -630,7 +630,7 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
   const submission = result.data.submission ?? {};
   if (submission.accepted) {
     statusNode.textContent = `Queued prompt ${submission.prompt_id}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
-    void trackGenerationRuntime(
+    void runtimeHelpers.trackGenerationRuntime(
       bootstrapState,
       String(submission.prompt_id ?? ""),
       statusNode,
@@ -882,7 +882,7 @@ async function submitImg2Img(
   const submission = result.data.submission ?? {};
   if (submission.accepted) {
     statusNode.textContent = `Queued prompt ${submission.prompt_id}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
-    void trackGenerationRuntime(
+    void runtimeHelpers.trackGenerationRuntime(
       bootstrapState,
       String(submission.prompt_id ?? ""),
       statusNode,
@@ -1193,7 +1193,7 @@ function buildPaneModuleContext() {
     createList,
     bindSliderPair,
     appendPromptToken,
-    transferPreviewToImg2Img,
+    ...runtimeHelpers,
     activateShellTab,
     updateFormFromPreset,
     syncFamilyAwareModuleQuicksetting,

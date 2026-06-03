@@ -329,4 +329,5 @@ def _append_decode_adetailer_and_save(
         workflow,
         image_ref=final_image_ref,
         save_id=save_id,
+        request=request,
     )

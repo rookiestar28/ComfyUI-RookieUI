@@ -70,6 +70,42 @@ class PromptSubmissionTests(unittest.TestCase):
         queued_item = prompt_server.prompt_queue.items[0]
         self.assertEqual(queued_item[3]["rookieui_xyz_session_id"], "xyz-1")
 
+    def test_submit_prompt_workflow_preserves_embeddable_extra_pnginfo(self) -> None:
+        prompt_server = _FakePromptServer()
+        execution_module = types.SimpleNamespace(
+            validate_prompt=mock.AsyncMock(return_value=(True, None, ["7"], {}))
+        )
+
+        with mock.patch(
+            "rookieui.services.prompt_submission._get_execution_module",
+            return_value=execution_module,
+        ):
+            asyncio.run(
+                submit_prompt_workflow(
+                    prompt_server,
+                    {"7": {"class_type": "RookieUISaveImageWithMetadata"}},
+                    extra_pnginfo={
+                        "rookieui": {
+                            "schema": "rookieui.generation_metadata.v1",
+                            "surface": "txt2img",
+                        }
+                    },
+                    extra_metadata={"extra_pnginfo": {"parameters": "must not override"}},
+                )
+            )
+
+        queued_item = prompt_server.prompt_queue.items[0]
+        self.assertEqual(
+            queued_item[3]["extra_pnginfo"],
+            {
+                "rookieui": {
+                    "schema": "rookieui.generation_metadata.v1",
+                    "surface": "txt2img",
+                }
+            },
+        )
+        self.assertNotIn("parameters", queued_item[3]["extra_pnginfo"])
+
     def test_submit_prompt_workflow_requires_host_prompt_queue(self) -> None:
         with self.assertRaises(RuntimeError):
             asyncio.run(submit_prompt_workflow(None, {}))

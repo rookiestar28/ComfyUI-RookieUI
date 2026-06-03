@@ -37,6 +37,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncFamilyAwareAdvancedParameterFields,
     syncClipSkipAvailability,
     transferPreviewToImg2Img,
+    transferPreviewToPngInfo,
+    transferPreviewToExtras,
     activateShellTab,
     submitTxt2Img,
     readFileAsDataUrl,
@@ -522,6 +524,14 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       void transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, txt2imgPreviewBox);
       return;
     }
+    if (actionTarget.value === "pnginfo") {
+      void transferPreviewToPngInfo(formRegistry, runtimeState, statusNode, txt2imgPreviewBox);
+      return;
+    }
+    if (actionTarget.value === "extras") {
+      void transferPreviewToExtras(formRegistry, runtimeState, statusNode, txt2imgPreviewBox);
+      return;
+    }
     activateShellTab(formRegistry, actionTarget.value, statusNode, actionLabels[actionTarget.value] ?? "Action applied");
   });
   actionTargetRow.appendChild(actionApplyButton);
@@ -747,6 +757,14 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           button.addEventListener("click", async () => {
             if (action.id === "rookieui-txt2img-preview-img2img") {
               await transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox);
+              return;
+            }
+            if (action.id === "rookieui-txt2img-preview-pnginfo") {
+              await transferPreviewToPngInfo(formRegistry, runtimeState, statusNode, previewBox);
+              return;
+            }
+            if (action.id === "rookieui-txt2img-preview-extras") {
+              await transferPreviewToExtras(formRegistry, runtimeState, statusNode, previewBox);
               return;
             }
             activateShellTab(formRegistry, action.tabId, statusNode, action.message);

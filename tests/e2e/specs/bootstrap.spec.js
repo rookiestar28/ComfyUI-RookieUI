@@ -15,6 +15,20 @@ const E2E_VAE_OPTIONS = [
   "full_encoder_small_decoder.safetensors",
   "qwen_image_vae.safetensors",
 ];
+const E2E_PREVIEW_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZrY4AAAAASUVORK5CYII=";
+
+async function setTxt2ImgPreviewImage(page, src = E2E_PREVIEW_DATA_URL) {
+  await page.evaluate((imageSrc) => {
+    const previewBox = document.getElementById("rookieui-txt2img-preview");
+    previewBox.innerHTML = "";
+    const image = document.createElement("img");
+    image.className = "rookieui-shell__preview-image";
+    image.src = imageSrc;
+    previewBox.appendChild(image);
+    previewBox.__previewFullscreenController?.syncImage?.();
+  }, src);
+}
 
 test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.goto("test-harness.html");
@@ -886,4 +900,28 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   expect(extrasRequests).toHaveLength(1);
   expect(extrasRequests[0].mode).toBe("single_image");
   await expect(page.locator(".rookieui-shell__footer")).toContainText("host: standalone-web");
+});
+
+test("routes txt2img preview toolbar image handoffs to target panes", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });
+
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-extras").click();
+  await expect(page.locator("#rookieui-pane-extras")).toBeVisible();
+  await expect(page.locator("#rookieui-extras-single-status")).toContainText("preview-image.png");
+  await expect(page.locator("#rookieui-extras-preview img")).toHaveAttribute("src", /data:image\/png/);
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-pnginfo").click();
+  await expect(page.locator("#rookieui-pane-pnginfo")).toBeVisible();
+  await expect(page.locator("#rookieui-pnginfo-preview img")).toHaveAttribute("src", /data:image\/png/);
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-img2img").click();
+  await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute("src", /data:image\/png/);
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
 });

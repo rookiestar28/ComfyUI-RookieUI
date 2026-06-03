@@ -1036,6 +1036,7 @@ async def _submit_translation_payload(
             origin="rookieui",
             surface=surface,
             profile=str(response_payload.get("profile", "")),
+            extra_pnginfo=response_payload.get("generation_metadata", {}).get("extra_pnginfo"),
         )
     except RuntimeError as exc:
         return _json_response(

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
 import { createRookieUIHostFetch, registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
+import { createGenerationRuntimeHelpers, createGenerationRuntimeState } from "../rookieui_generation_runtime.js";
 
 const EXPECTED_DTYPE_PROFILE_IDS = [
   "automatic",
@@ -150,6 +151,60 @@ describe("registerRookieUIBootstrapExtension", () => {
     const declarationText = readFileSync("web/types/rookieui_frontend.d.ts", "utf8");
 
     expect(declarationText).toContain("fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;");
+  });
+
+  test("runtime preview helper sends current image data to PNG Info", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+
+    await helpers.transferPreviewToPngInfo({}, runtimeState, statusNode, previewBox);
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "pnginfo",
+      {
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+      },
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent preview image to PNG Info");
+  });
+
+  test("runtime preview helper sends current image data to Extras", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+
+    await helpers.transferPreviewToExtras({}, runtimeState, statusNode, previewBox);
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "extras",
+      {
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+      },
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent preview image to Extras");
   });
 
   test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
@@ -1381,9 +1436,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-action-target").value = "extras";
     document.getElementById("rookieui-txt2img-apply-action-target").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview-img2img").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     expect(
       Array.from(document.getElementById("rookieui-img2img-low-bits").options).map((option) => option.value),
@@ -2014,6 +2071,17 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview").innerHTML =
       '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+    document.getElementById("rookieui-txt2img-preview-extras").click();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (document.getElementById("rookieui-extras-single-status").textContent.includes("preview-image.png")) {
+        break;
+      }
+    }
+    expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
+    expect(document.getElementById("rookieui-extras-single-status").textContent).toContain("preview-image.png");
+    expect(document.querySelector("#rookieui-extras-preview img")?.getAttribute("src")).toContain("data:image/png");
+    document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview-img2img").click();
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -2025,6 +2093,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
     expect(transferredPreviewImage).not.toBeNull();
     expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+    document.getElementById("rookieui-img2img-prompt").value = "settings handoff prompt";
+    document.getElementById("rookieui-img2img-preview-txt2img").click();
+    expect(document.getElementById("rookieui-pane-txt2img").classList.contains("is-active")).toBe(true);
+    expect(document.getElementById("rookieui-prompt").value).toBe("settings handoff prompt");
+    document.getElementById("rookieui-tab-img2img").click();
     expect(document.getElementById("rookieui-mask-asset").value).toBe("");
     if (staleMaskDataField) {
       expect(staleMaskDataField.value).toBe("");
@@ -2664,7 +2737,178 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("asset fallback");
   });
 
-  test("adapts nested host preview payload variants and filters foreign prompt frames", async () => {
+  test("replaces live preview blob with host-aware final history output after completion", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    const runtimeListeners = new Map();
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-preview-final",
+        apiURL(path) {
+          return `/api${path}`;
+        },
+        addEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          handlers.push(handler);
+          runtimeListeners.set(eventName, handlers);
+        },
+        removeEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          runtimeListeners.set(
+            eventName,
+            handlers.filter((entry) => entry !== handler),
+          );
+        },
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    const emitRuntimeEvent = (eventName, detail) => {
+      const handlers = runtimeListeners.get(eventName) || [];
+      handlers.forEach((handler) => handler({ detail }));
+    };
+
+    let resolveFirstQueuePoll;
+    const firstQueuePoll = new Promise((resolve) => {
+      resolveFirstQueuePoll = resolve;
+    });
+    let queueJobCallCount = 0;
+    const fetchImpl = async (url, options = {}) => {
+      if (url === "/rookieui/generate/txt2img") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              mode: "queued",
+              workflow_kind: "txt2img-sd15",
+              submission: { accepted: true, prompt_id: "prompt-preview-final" },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue/prompt-preview-final")) {
+        queueJobCallCount += 1;
+        if (queueJobCallCount === 1) {
+          await firstQueuePoll;
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              queue_remaining: 0,
+              job: {
+                id: "prompt-preview-final",
+                status: "completed",
+                output_filenames: ["final-output.png"],
+                reusable_outputs: ["final-output.png"],
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/history/prompt-preview-final")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              "prompt-preview-final": {
+                outputs: {
+                  "9": {
+                    images: [
+                      { filename: "final-output.png", subfolder: "", type: "output" },
+                    ],
+                  },
+                },
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { source: "host", queue_remaining: 0, jobs: [] };
+          },
+        };
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        },
+      };
+    };
+
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:preview-final");
+    URL.revokeObjectURL = vi.fn();
+
+    try {
+      await registerRookieUIBootstrapExtension({
+        app,
+        windowRef: window,
+        documentRef: document,
+        fetchImpl,
+      });
+
+      document.getElementById("rookieui-txt2img-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      emitRuntimeEvent("b_preview_with_metadata", {
+        metadata: { prompt_id: "prompt-preview-final" },
+        data: {
+          buffer: Uint8Array.from([137, 80, 78, 71]).buffer,
+          mime: "image/png",
+        },
+      });
+
+      resolveFirstQueuePoll();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const previewImage = document.querySelector("#rookieui-txt2img-preview img");
+        if (previewImage?.getAttribute("src")?.startsWith("/api/view?")) {
+          break;
+        }
+      }
+
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      const previewImage = document.querySelector("#rookieui-txt2img-preview img");
+      expect(previewImage).not.toBeNull();
+      expect(previewImage?.getAttribute("src")).toBe("/api/view?filename=final-output.png&subfolder=&type=output");
+      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("Completed: prompt-preview-final");
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
+  test("adapts nested host preview payload variants and reports degraded missing final output", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
         <div class="side-bar-panel">
@@ -2824,14 +3068,20 @@ describe("registerRookieUIBootstrapExtension", () => {
       });
 
       resolveFirstQueuePoll();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        if (document.getElementById("rookieui-txt2img-status").textContent.includes("final image unavailable")) {
+          break;
+        }
+      }
 
       expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
       const previewImage = document.querySelector("#rookieui-txt2img-preview img");
       expect(previewImage).not.toBeNull();
       expect(previewImage?.getAttribute("src")).toBe("blob:preview-variant-1");
-      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("Completed: prompt-preview-1");
+      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain(
+        "Completed: prompt-preview-1 (final image unavailable; showing live preview)",
+      );
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
