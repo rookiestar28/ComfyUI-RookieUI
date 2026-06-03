@@ -307,7 +307,7 @@
       }
       state.imageData = imageData;
       setPreviewContent(previewBox, state.imageData, "");
-      statusNode.textContent = "Loaded preview image; reading metadata...";
+      statusNode.textContent = "Imported preview image; inspecting PNG metadata...";
       void runAutoInspection().catch((error) => {
         emitFrontendDebugWarning("shell.pnginfo_preview_handoff", "PNG Info preview handoff inspection failed.", error);
         statusNode.textContent = "Failed to inspect the preview image.";

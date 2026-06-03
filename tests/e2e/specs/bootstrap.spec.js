@@ -124,8 +124,20 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-txt2img-open-queue-icon .rookieui-shell__mini-action-icon")).toHaveText("📂");
   await expect(page.locator("#rookieui-txt2img-open-pnginfo .rookieui-shell__mini-action-icon")).toHaveText("📋");
   await expect(page.locator("#rookieui-txt2img-apply-action-target .rookieui-shell__mini-action-icon")).toHaveText("🖌️");
+  await expect(page.locator("#rookieui-txt2img-preview-pnginfo")).toHaveAttribute("aria-label", "Inspect PNG Info");
   await expect(page.locator("#rookieui-txt2img-preview-inpaint .rookieui-shell__mini-action-icon")).toHaveText("🖌️");
+  await expect(page.locator("#rookieui-txt2img-preview-extras")).toHaveAttribute("aria-label", "Send to Extras");
   await expect(page.locator("#rookieui-txt2img-preview-extras .rookieui-shell__mini-action-icon")).toHaveText("📐");
+  const txt2imgActionTargetLabels = await page.locator("#rookieui-txt2img-action-target option").evaluateAll((options) =>
+    options.map((option) => option.textContent),
+  );
+  expect(txt2imgActionTargetLabels).toEqual([
+    "Queue / History",
+    "Inspect PNG Info",
+    "Send to Img2Img",
+    "Send to Inpaint",
+    "Send to Extras",
+  ]);
   await expect(
     page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon"),
   ).toHaveCount(7);
@@ -907,23 +919,36 @@ test("routes txt2img preview toolbar image handoffs to target panes", async ({ p
   await page.goto("test-harness.html");
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });
 
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123", { timeout: 10000 });
+
   await setTxt2ImgPreviewImage(page);
   await page.locator("#rookieui-txt2img-preview-extras").click();
   await expect(page.locator("#rookieui-pane-extras")).toBeVisible();
   await expect(page.locator("#rookieui-extras-single-status")).toContainText("preview-image.png");
-  await expect(page.locator("#rookieui-extras-preview img")).toHaveAttribute("src", /data:image\/png/);
+  await expect(page.locator("#rookieui-extras-preview img")).toHaveAttribute(
+    "src",
+    "data:image/png;base64,ZmluYWwtb3V0cHV0",
+  );
 
   await page.locator("#rookieui-tab-txt2img").click();
   await setTxt2ImgPreviewImage(page);
   await page.locator("#rookieui-txt2img-preview-pnginfo").click();
   await expect(page.locator("#rookieui-pane-pnginfo")).toBeVisible();
-  await expect(page.locator("#rookieui-pnginfo-preview img")).toHaveAttribute("src", /data:image\/png/);
+  await expect(page.locator("#rookieui-pnginfo-preview img")).toHaveAttribute(
+    "src",
+    "data:image/png;base64,ZmluYWwtb3V0cHV0",
+  );
+  await expect(page.locator("#rookieui-pnginfo-status")).toContainText("Ready to apply txt2img fields");
 
   await page.locator("#rookieui-tab-txt2img").click();
   await setTxt2ImgPreviewImage(page);
   await page.locator("#rookieui-txt2img-preview-img2img").click();
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
-  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute("src", /data:image\/png/);
+  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute(
+    "src",
+    "data:image/png;base64,ZmluYWwtb3V0cHV0",
+  );
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
   await expect(page.locator("#rookieui-img2img-prompt")).toHaveValue("e2e imported prompt");
   await expect(page.locator("#rookieui-img2img-negative-prompt")).toHaveValue("e2e imported negative");
@@ -942,7 +967,10 @@ test("routes txt2img preview toolbar image handoffs to target panes", async ({ p
   await setTxt2ImgPreviewImage(page);
   await page.locator("#rookieui-txt2img-preview-inpaint").click();
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
-  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute("src", /data:image\/png/);
+  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute(
+    "src",
+    "data:image/png;base64,ZmluYWwtb3V0cHV0",
+  );
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("inpaint");
   await expect(page.locator("#rookieui-img2img-prompt")).toHaveValue("e2e imported prompt");
   await expect(page.locator("#rookieui-img2img-negative-prompt")).toHaveValue("e2e imported negative");

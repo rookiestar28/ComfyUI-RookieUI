@@ -157,7 +157,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(declarationText).toContain("fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;");
   });
 
-  test("runtime preview helper sends current image data to PNG Info", async () => {
+  test("runtime preview helper imports current image data into PNG Info inspection", async () => {
     const applyCrossPanePayload = vi.fn(() => true);
     const helpers = createGenerationRuntimeHelpers({
       emitFrontendDebugWarning: vi.fn(),
@@ -175,13 +175,16 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(applyCrossPanePayload).toHaveBeenCalledWith(
       {},
       "pnginfo",
-      {
+      expect.objectContaining({
+        preview_action: "inspect-pnginfo",
+        preview_source: "preview-dom",
+        preview_selected_index: 0,
         image_asset: "",
         image_data: "data:image/png;base64,ZmFrZQ==",
-      },
+      }),
       { activate: true },
     );
-    expect(statusNode.textContent).toBe("Sent preview image to PNG Info");
+    expect(statusNode.textContent).toBe("Inspecting preview image in PNG Info");
   });
 
   test("runtime preview helper sends current image data to Extras", async () => {
@@ -202,13 +205,16 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(applyCrossPanePayload).toHaveBeenCalledWith(
       {},
       "extras",
-      {
+      expect.objectContaining({
+        preview_action: "send-to-extras",
+        preview_source: "preview-dom",
+        preview_selected_index: 0,
         image_asset: "",
         image_data: "data:image/png;base64,ZmFrZQ==",
-      },
+      }),
       { activate: true },
     );
-    expect(statusNode.textContent).toBe("Sent preview image to Extras");
+    expect(statusNode.textContent).toBe("Sent selected preview image to Extras");
   });
 
   test("runtime preview action artifact prefers selected final output over stale DOM preview", async () => {
@@ -301,13 +307,81 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(applyCrossPanePayload).toHaveBeenCalledWith(
       {},
       "pnginfo",
-      {
+      expect.objectContaining({
+        preview_action: "inspect-pnginfo",
+        preview_source: "final-output",
+        preview_selected_index: 0,
         image_asset: "",
         image_data: "data:image/png;base64,ZmluYWw=",
-      },
+      }),
       { activate: true },
     );
-    expect(statusNode.textContent).toBe("Sent preview image to PNG Info");
+    expect(statusNode.textContent).toBe("Inspecting preview image in PNG Info");
+  });
+
+  test("runtime preview helper sends selected final output image data to Extras before stale DOM image", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      async blob() {
+        expect(url).toBe("/view?filename=selected-extras-final.png&subfolder=&type=output");
+        return new Blob(["extras-final"], { type: "image/png" });
+      },
+    }));
+    globalThis.fetch = fetchSpy;
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "selected-extras-final.png",
+      subfolder: "",
+      type: "output",
+      selectedIndex: 2,
+      nodeId: "save_image",
+      nodeImageIndex: 2,
+      promptId: "prompt-extras-final",
+    };
+    runtimeState.finalImageUrl = "/view?filename=selected-extras-final.png&subfolder=&type=output";
+    runtimeState.finalOutputArtifact = {
+      sourceContext: {
+        promptId: "prompt-extras-final",
+        nodeId: "save_image",
+        nodeImageIndex: 2,
+      },
+    };
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    try {
+      await helpers.transferPreviewToExtras({}, runtimeState, statusNode, previewBox);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith("/view?filename=selected-extras-final.png&subfolder=&type=output");
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "extras",
+      expect.objectContaining({
+        preview_action: "send-to-extras",
+        preview_source: "final-output",
+        preview_selected_index: 2,
+        preview_prompt_id: "prompt-extras-final",
+        preview_node_id: "save_image",
+        image_asset: "",
+        image_data: "data:image/png;base64,ZXh0cmFzLWZpbmFs",
+      }),
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent selected preview image to Extras");
   });
 
   test("runtime preview helper applies inspected generation metadata to Img2Img", async () => {
@@ -1612,8 +1686,15 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-open-pnginfo").textContent).toContain("📋");
     expect(document.getElementById("rookieui-txt2img-action-target")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-apply-action-target")).not.toBeNull();
+    expect(
+      Array.from(document.getElementById("rookieui-txt2img-action-target").options).map((option) => option.textContent),
+    ).toEqual(["Queue / History", "Inspect PNG Info", "Send to Img2Img", "Send to Inpaint", "Send to Extras"]);
     expect(document.getElementById("rookieui-txt2img-apply-action-target").textContent).toContain("🖌️");
+    expect(document.getElementById("rookieui-txt2img-preview-pnginfo").getAttribute("aria-label")).toBe(
+      "Inspect PNG Info",
+    );
     expect(document.getElementById("rookieui-txt2img-preview-inpaint").textContent).toContain("🖌️");
+    expect(document.getElementById("rookieui-txt2img-preview-extras").getAttribute("aria-label")).toBe("Send to Extras");
     expect(document.getElementById("rookieui-txt2img-preview-extras").textContent).toContain("📐");
     expect(
       document.querySelectorAll(

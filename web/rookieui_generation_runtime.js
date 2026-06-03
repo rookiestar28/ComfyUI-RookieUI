@@ -354,6 +354,20 @@ function buildImg2ImgPreviewActionPayload({
   };
 }
 
+function buildPreviewPaneActionPayload(payload, previewAction) {
+  const sourceContext = payload?.sourceContext && typeof payload.sourceContext === "object" ? payload.sourceContext : {};
+  // IMPORTANT: keep preview action provenance on PNG Info/Extras handoffs; image-only assertions missed A1111 send-to parity regressions.
+  return {
+    preview_action: previewAction,
+    preview_source: String(payload?.source ?? ""),
+    preview_selected_index: Number.isInteger(payload?.selectedIndex) ? payload.selectedIndex : 0,
+    preview_prompt_id: String(sourceContext.promptId ?? payload?.finalImageDescriptor?.promptId ?? ""),
+    preview_node_id: String(sourceContext.nodeId ?? payload?.finalImageDescriptor?.nodeId ?? ""),
+    image_asset: payload?.imageDataUrl ? "" : payload?.fallbackAsset ?? "",
+    image_data: payload?.imageDataUrl ?? "",
+  };
+}
+
 function extractPrimaryHistoryImage(historyPayload, promptId) {
   const promptHistory = historyPayload?.[promptId];
   if (!promptHistory || typeof promptHistory !== "object") {
@@ -653,7 +667,7 @@ export function createGenerationRuntimeHelpers({
     runtimeState,
     statusNode,
     previewBox = null,
-    { appliedMessage = "Sent preview image", requireDataUrl = false } = {},
+    { appliedMessage = "Sent preview image", previewAction = "", requireDataUrl = false } = {},
   ) => {
     let payload;
     try {
@@ -679,10 +693,7 @@ export function createGenerationRuntimeHelpers({
     let applied = applyCrossPanePayload(
       formRegistry,
       targetKey,
-      {
-        image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
-        image_data: payload.imageDataUrl,
-      },
+      buildPreviewPaneActionPayload(payload, previewAction),
       { activate: true },
     );
     if (!applied) {
@@ -693,10 +704,7 @@ export function createGenerationRuntimeHelpers({
         applied = applyCrossPanePayload(
           formRegistry,
           targetKey,
-          {
-            image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
-            image_data: payload.imageDataUrl,
-          },
+          buildPreviewPaneActionPayload(payload, previewAction),
           { activate: true },
         );
         if (applied) {
@@ -707,10 +715,7 @@ export function createGenerationRuntimeHelpers({
     if (!applied && ["pnginfo", "extras"].includes(targetKey) && typeof globalThis.document?.dispatchEvent === "function") {
       const fallbackEvent = new CustomEvent(`rookieui:${targetKey}:preview-handoff`, {
         cancelable: true,
-        detail: {
-          image_asset: payload.imageDataUrl ? "" : payload.fallbackAsset,
-          image_data: payload.imageDataUrl,
-        },
+        detail: buildPreviewPaneActionPayload(payload, previewAction),
       });
       applied = globalThis.document.dispatchEvent(fallbackEvent) === false;
     }
@@ -722,14 +727,16 @@ export function createGenerationRuntimeHelpers({
 
   const transferPreviewToPngInfo = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
     return transferPreviewImageToPane(formRegistry, "pnginfo", runtimeState, statusNode, previewBox, {
-      appliedMessage: "Sent preview image to PNG Info",
+      appliedMessage: "Inspecting preview image in PNG Info",
+      previewAction: "inspect-pnginfo",
       requireDataUrl: true,
     });
   };
 
   const transferPreviewToExtras = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
     return transferPreviewImageToPane(formRegistry, "extras", runtimeState, statusNode, previewBox, {
-      appliedMessage: "Sent preview image to Extras",
+      appliedMessage: "Sent selected preview image to Extras",
+      previewAction: "send-to-extras",
       requireDataUrl: true,
     });
   };
