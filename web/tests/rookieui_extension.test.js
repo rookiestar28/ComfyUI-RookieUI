@@ -381,6 +381,63 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(statusNode.textContent).toBe("Sent preview image and metadata to Img2Img");
   });
 
+  test("runtime preview helper applies inspected generation metadata to Inpaint", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const inspectPngInfoRequest = vi.fn(async () => ({
+      ok: true,
+      data: {
+        source_type: "a1111",
+        payload: {
+          prompt: "inpaint prompt",
+          negative_prompt: "inpaint negative",
+          steps: 24,
+          sampler_name: "euler_ancestral",
+          scheduler_name: "normal",
+          cfg_scale: 5.5,
+          seed: 20260603,
+          width: 640,
+          height: 960,
+        },
+      },
+    }));
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,aW5wYWludA==" alt="preview">';
+    const formRegistry = { img2img: { applyPayload: vi.fn() } };
+
+    await helpers.transferPreviewToInpaint(formRegistry, runtimeState, statusNode, previewBox, { inspectPngInfoRequest });
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      formRegistry,
+      "img2img",
+      expect.objectContaining({
+        mode: "inpaint",
+        prompt: "inpaint prompt",
+        negative_prompt: "inpaint negative",
+        steps: 24,
+        sampler_name: "euler_ancestral",
+        scheduler_name: "normal",
+        cfg_scale: 5.5,
+        seed: 20260603,
+        width: 640,
+        height: 960,
+        image_asset: "",
+        image_data: "data:image/png;base64,aW5wYWludA==",
+        mask_asset: "",
+        mask_data: "",
+        batch_images: [],
+      }),
+    );
+    expect(statusNode.textContent).toBe("Sent preview image and metadata to Inpaint");
+  });
+
   test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
@@ -1556,12 +1613,13 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-action-target")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-apply-action-target")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-apply-action-target").textContent).toContain("🖌️");
+    expect(document.getElementById("rookieui-txt2img-preview-inpaint").textContent).toContain("🖌️");
     expect(document.getElementById("rookieui-txt2img-preview-extras").textContent).toContain("📐");
     expect(
       document.querySelectorAll(
         "#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon",
       ).length,
-    ).toBe(6);
+    ).toBe(7);
     expect(
       document.querySelector(
         "#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen",
@@ -2277,6 +2335,37 @@ describe("registerRookieUIBootstrapExtension", () => {
       const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
       expect(transferredPreviewImage).not.toBeNull();
       expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
+      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
+      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
+      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
+      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
+      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
+      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
+      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
+      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
+      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
+      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+      if (staleMaskDataField) {
+        expect(staleMaskDataField.value).toBe("");
+      }
+      if (staleBatchImagesField) {
+        expect(staleBatchImagesField.value).toBe("[]");
+      }
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,aW5wYWludA==" alt="preview">';
+      document.getElementById("rookieui-txt2img-preview-inpaint").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "inpaint") {
+          break;
+        }
+      }
+      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+      expect(document.getElementById("rookieui-img2img-mode").value).toBe("inpaint");
       expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
       expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
       expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");

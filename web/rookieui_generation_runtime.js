@@ -336,11 +336,16 @@ async function inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest
   }
 }
 
-function buildImg2ImgPreviewActionPayload({ imageDataUrl = "", fallbackAsset = "", metadataPayload = {} } = {}) {
+function buildImg2ImgPreviewActionPayload({
+  imageDataUrl = "",
+  fallbackAsset = "",
+  metadataPayload = {},
+  mode = "img2img",
+} = {}) {
   return {
     ...metadataPayload,
     // IMPORTANT: preview send-to must always overwrite image/mask/batch handoff fields; metadata parsers may expose source fields from the inspected PNG that must not revive stale inpaint or batch state.
-    mode: "img2img",
+    mode,
     image_asset: imageDataUrl ? "" : fallbackAsset,
     image_data: imageDataUrl,
     mask_asset: "",
@@ -569,22 +574,22 @@ export function createGenerationRuntimeHelpers({
     throw new Error("Generation runtime helpers require debug, preview, cross-pane apply, and tab-activation callbacks.");
   }
 
-  const transferPreviewToImg2Img = async (
+  const transferPreviewToImageMode = async (
     formRegistry,
     runtimeState,
     statusNode,
     previewBox = null,
-    { inspectPngInfoRequest = null } = {},
+    { inspectPngInfoRequest = null, mode = "img2img", label = "Img2Img" } = {},
   ) => {
     const { previewUrl, imageDataUrl, fallbackAsset } = await resolvePreviewImagePayload(runtimeState, previewBox);
     if (!previewUrl) {
-      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+      activateShellTab(formRegistry, "img2img", statusNode, `Opened ${label}`);
       return;
     }
     if (!formRegistry?.img2img?.applyPayload && !formRegistry?.__shellStateContract?.applyToForm) {
-      emitFrontendDebugWarning("shell.preview_transfer", "Img2Img applyPayload is unavailable; falling back to tab switch.");
+      emitFrontendDebugWarning("shell.preview_transfer", `${label} applyPayload is unavailable; falling back to tab switch.`);
       if (statusNode) {
-        statusNode.textContent = "Img2Img form is unavailable.";
+        statusNode.textContent = `${label} form is unavailable.`;
       }
       return;
     }
@@ -597,13 +602,14 @@ export function createGenerationRuntimeHelpers({
           imageDataUrl,
           fallbackAsset: "",
           metadataPayload: metadataResult.payload,
+          mode,
         }),
       );
       if (applied && statusNode) {
         statusNode.textContent =
           metadataResult.ok && Object.keys(metadataResult.payload).length
-            ? "Sent preview image and metadata to Img2Img"
-            : "Sent preview image to Img2Img (metadata unavailable)";
+            ? `Sent preview image and metadata to ${label}`
+            : `Sent preview image to ${label} (metadata unavailable)`;
       }
       return;
     }
@@ -614,14 +620,31 @@ export function createGenerationRuntimeHelpers({
         buildImg2ImgPreviewActionPayload({
           imageDataUrl: "",
           fallbackAsset,
+          mode,
         }),
       );
       if (applied && statusNode) {
-        statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
+        statusNode.textContent = `Sent preview image to ${label} (asset fallback)`;
       }
       return;
     }
-    activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+    activateShellTab(formRegistry, "img2img", statusNode, `Opened ${label}`);
+  };
+
+  const transferPreviewToImg2Img = async (formRegistry, runtimeState, statusNode, previewBox = null, options = {}) => {
+    return transferPreviewToImageMode(formRegistry, runtimeState, statusNode, previewBox, {
+      ...options,
+      mode: "img2img",
+      label: "Img2Img",
+    });
+  };
+
+  const transferPreviewToInpaint = async (formRegistry, runtimeState, statusNode, previewBox = null, options = {}) => {
+    return transferPreviewToImageMode(formRegistry, runtimeState, statusNode, previewBox, {
+      ...options,
+      mode: "inpaint",
+      label: "Inpaint",
+    });
   };
 
   const transferPreviewImageToPane = async (
@@ -871,6 +894,7 @@ export function createGenerationRuntimeHelpers({
 
   return {
     transferPreviewToImg2Img,
+    transferPreviewToInpaint,
     transferPreviewToPngInfo,
     transferPreviewToExtras,
     trackGenerationRuntime,
