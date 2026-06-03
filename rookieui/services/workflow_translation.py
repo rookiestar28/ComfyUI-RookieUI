@@ -6,6 +6,7 @@ from rookieui.contracts.generation import (
     WorkflowTranslationResult,
 )
 from rookieui.services import parity_matrix
+from rookieui.services.generation_metadata import build_generation_metadata_payload
 from rookieui.services.workflow_builders.non_sd_templates import (
     build_non_sd_edit_workflow,
     build_non_sd_txt2img_workflow,
@@ -74,6 +75,11 @@ def _build_translation_result(
         normalized_request=request_payload,
         parity_profile=parity_profile.to_payload(),
         sampler_aliases=parity_matrix.get_sampler_alias_payload(),
+        generation_metadata=build_generation_metadata_payload(
+            request_payload,
+            workflow_kind=workflow_kind,
+            profile=profile,
+        ),
         workflow=workflow,
     )
 

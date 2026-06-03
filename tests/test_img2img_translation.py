@@ -1494,6 +1494,50 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(len(encode_nodes), 1)
         self.assertEqual(encode_nodes[0]["inputs"]["grow_mask_by"], 24)
 
+    def test_translate_img2img_request_embeds_raw_a1111_generation_parameters(self) -> None:
+        normalized = normalize_img2img_request(
+            {
+                "prompt": "portrait cleanup",
+                "negative_prompt": "blur",
+                "image_asset": "portrait-input",
+                "mask_asset": "portrait-mask",
+                "mode": "inpaint",
+                "width": 704,
+                "height": 832,
+                "steps": 18,
+                "cfg_scale": 5.5,
+                "sampler_name": "Euler a",
+                "scheduler_name": "Karras",
+                "seed": 2468,
+                "denoise_strength": 0.44,
+                "mask_blur": 9,
+                "inpaint_padding": 32,
+            }
+        )
+
+        result = translate_img2img_request(normalized).to_payload()
+        save_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUISaveImageWithMetadata"
+        ]
+
+        self.assertEqual(len(save_nodes), 1)
+        parameters = save_nodes[0]["inputs"]["parameters"]
+        self.assertIn("portrait cleanup", parameters)
+        self.assertIn("Negative prompt: blur", parameters)
+        self.assertIn("Steps: 18", parameters)
+        self.assertIn("Sampler: Euler a", parameters)
+        self.assertIn("CFG scale: 5.5", parameters)
+        self.assertIn("Seed: 2468", parameters)
+        self.assertIn("Size: 704x832", parameters)
+        self.assertIn("Denoising strength: 0.44", parameters)
+        self.assertIn("Mask blur: 9", parameters)
+        self.assertIn("Masked area padding: 32", parameters)
+        self.assertNotIn("rookieui_surface", parameters)
+        self.assertNotIn("client_id", parameters)
+        self.assertEqual(result["generation_metadata"]["extra_pnginfo"]["rookieui"]["surface"], "img2img")
+
     def test_translate_img2img_request_applies_inpaint_masked_content_and_soft_inpainting(self) -> None:
         normalized = normalize_img2img_request(
             {
@@ -1596,7 +1640,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             node for node in workflow.values() if node["class_type"] == "RookieUIVAEEncodeForInpaint"
         ]
         sampler_nodes = [node for node in workflow.values() if node["class_type"] == "KSampler"]
-        save_node = [node for node in workflow.values() if node["class_type"] == "SaveImage"][0]
+        save_node = [node for node in workflow.values() if node["class_type"] == "RookieUISaveImageWithMetadata"][0]
         decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
 
         self.assertEqual(len(mask_nodes), 1)
@@ -1789,6 +1833,14 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["payload"]["status"], "invalid-request")
 
     def test_img2img_route_returns_queued_submission_payload(self) -> None:
+        submit_mock = mock.AsyncMock(
+            return_value={
+                "accepted": True,
+                "prompt_id": "prompt-456",
+                "number": 4,
+                "node_errors": {},
+            }
+        )
         with (
             mock.patch.object(
                 routes,
@@ -1798,14 +1850,7 @@ class Img2ImgTranslationTests(unittest.TestCase):
             mock.patch.object(
                 routes,
                 "submit_prompt_workflow",
-                new=mock.AsyncMock(
-                    return_value={
-                        "accepted": True,
-                        "prompt_id": "prompt-456",
-                        "number": 4,
-                        "node_errors": {},
-                    }
-                ),
+                new=submit_mock,
             ),
         ):
             response = asyncio.run(
@@ -1824,3 +1869,11 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["mode"], "queued")
         self.assertEqual(response["payload"]["submission"]["prompt_id"], "prompt-456")
+        submit_kwargs = submit_mock.await_args.kwargs
+        self.assertIn("extra_pnginfo", submit_kwargs)
+        self.assertEqual(
+            submit_kwargs["extra_pnginfo"]["rookieui"]["schema"],
+            "rookieui.generation_metadata.v1",
+        )
+        self.assertEqual(submit_kwargs["extra_pnginfo"]["rookieui"]["surface"], "img2img")
+        self.assertNotIn("parameters", submit_kwargs["extra_pnginfo"])

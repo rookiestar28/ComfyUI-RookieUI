@@ -326,6 +326,13 @@ window.__ROOKIEUI_E2E_XYZ__ = {
 
 async function handleE2EFetch(url, options = {}) {
   const route = normalizeE2EApiRoute(url);
+  const routeUrl = new URL(String(route), window.location.origin);
+  if (routeUrl.pathname.endsWith("/view")) {
+    return new Response(new Blob(["final-output"], { type: "image/png" }), {
+      status: 200,
+      headers: { "Content-Type": "image/png" },
+    });
+  }
   if (route === "/rookieui/generate/txt2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.txt2img.push(payload);
@@ -374,9 +381,16 @@ async function handleE2EFetch(url, options = {}) {
         payload: {
           prompt: "e2e imported prompt",
           negative_prompt: "e2e imported negative",
+          steps: 31,
+          cfg_scale: 6.5,
+          seed: 987654,
           width: 768,
           height: 768,
           sampler_name: "euler_ancestral",
+          scheduler_name: "normal",
+          checkpoint_name: "realvisxl.safetensors",
+          vae_name: "Automatic",
+          clip_skip: 2,
           image_asset: "pnginfo_asset.png",
         },
         metadata_items: {

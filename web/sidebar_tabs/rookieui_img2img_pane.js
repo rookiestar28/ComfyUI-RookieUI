@@ -56,9 +56,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     appendTextElement,
     populateList,
     applyPayloadToElements,
+    applyCrossPanePayload,
     createList,
     appendPromptToken,
-    transferPreviewToImg2Img,
+    transferPreviewToPngInfo,
+    transferPreviewToExtras,
     activateShellTab,
     updateFormFromPreset,
     syncFamilyAwareModuleQuicksetting,
@@ -672,6 +674,50 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     "Apply Action",
     "transfer",
   );
+  const buildTxt2ImgTransferPayload = () => {
+    const sourcePayload = buildImg2ImgPayloadFromElements(
+      elements,
+      buildImageEditReferencePayloadFromElements(elements),
+    );
+    return {
+      prompt: sourcePayload.prompt,
+      negative_prompt: sourcePayload.negative_prompt,
+      profile: sourcePayload.profile,
+      dtype_profile: sourcePayload.dtype_profile,
+      checkpoint_name: sourcePayload.checkpoint_name,
+      vae_name: sourcePayload.vae_name,
+      text_encoder_name: sourcePayload.text_encoder_name,
+      width: sourcePayload.width,
+      height: sourcePayload.height,
+      steps: sourcePayload.steps,
+      cfg_scale: sourcePayload.cfg_scale,
+      shift: sourcePayload.shift,
+      flux_guidance: sourcePayload.flux_guidance,
+      sampler_name: sourcePayload.sampler_name,
+      scheduler_name: sourcePayload.scheduler_name,
+      prompt_enhancement_enabled: sourcePayload.prompt_enhancement_enabled,
+      seed: sourcePayload.seed,
+      seed_extra: sourcePayload.seed_extra,
+      batch_size: sourcePayload.batch_size,
+      batch_count: 1,
+      clip_skip: sourcePayload.clip_skip,
+      hires_enabled: sourcePayload.hires_enabled,
+      hires_scale: sourcePayload.hires_scale,
+      hires_steps: sourcePayload.hires_steps,
+      hires_denoise: sourcePayload.hires_denoise,
+      hires_upscale_method: sourcePayload.hires_upscale_method,
+      template_lora_name: sourcePayload.template_lora_name,
+      lora_name: sourcePayload.lora_name,
+      lora_strength_model: sourcePayload.lora_strength_model,
+      lora_strength_clip: sourcePayload.lora_strength_clip,
+      adetailer: sourcePayload.adetailer,
+      controlnet_units: sourcePayload.controlnet_units,
+    };
+  };
+  const transferCurrentSettingsToTxt2Img = () => {
+    const applied = applyCrossPanePayload(formRegistry, "txt2img", buildTxt2ImgTransferPayload());
+    statusNode.textContent = applied ? "Sent current settings to Txt2Img" : "Txt2Img form is unavailable.";
+  };
   actionApplyButton.addEventListener("click", () => {
     const actionLabels = {
       queue: "Opened queue view",
@@ -679,6 +725,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       txt2img: "Opened Txt2Img",
       extras: "Opened Extras",
     };
+    if (actionTarget.value === "txt2img") {
+      transferCurrentSettingsToTxt2Img();
+      return;
+    }
+    if (actionTarget.value === "pnginfo") {
+      void transferPreviewToPngInfo(formRegistry, runtimeState, statusNode, img2imgPreviewBox);
+      return;
+    }
+    if (actionTarget.value === "extras") {
+      void transferPreviewToExtras(formRegistry, runtimeState, statusNode, img2imgPreviewBox);
+      return;
+    }
     activateShellTab(formRegistry, actionTarget.value, statusNode, actionLabels[actionTarget.value] ?? "Action applied");
   });
   actionTargetRow.appendChild(actionApplyButton);
@@ -1955,7 +2013,19 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
 
         previewActions.forEach((action) => {
           const button = createIconActionButton(action.id, action.iconClass, action.label, action.tone);
-          button.addEventListener("click", () => {
+          button.addEventListener("click", async () => {
+            if (action.id === "rookieui-img2img-preview-txt2img") {
+              transferCurrentSettingsToTxt2Img();
+              return;
+            }
+            if (action.id === "rookieui-img2img-preview-pnginfo") {
+              await transferPreviewToPngInfo(formRegistry, runtimeState, statusNode, assetPreview);
+              return;
+            }
+            if (action.id === "rookieui-img2img-preview-extras") {
+              await transferPreviewToExtras(formRegistry, runtimeState, statusNode, assetPreview);
+              return;
+            }
             activateShellTab(formRegistry, action.tabId, statusNode, action.message);
           });
           assetPreviewToolbar.appendChild(button);
@@ -2147,7 +2217,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
 
   formRegistry.img2img = {
     applyPayload(payload) {
-      applyPayloadToElements(elements, payload, {
+      const generationPayloadMap = {
         prompt: "prompt",
         negative_prompt: "negativePrompt",
         profile: "profileState",
@@ -2155,14 +2225,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         vae_name: "vae",
         text_encoder_name: "textEncoder",
         dtype_profile: "lowBits",
-        mode: "mode",
         width: "width",
         height: "height",
         resize_mode: "resizeMode",
-        image_asset: "imageAsset",
-        image_data: "imageData",
-        mask_asset: "maskAsset",
-        mask_data: "maskData",
         steps: "steps",
         cfg_scale: "cfgScale",
         shift: "shift",
@@ -2176,6 +2241,23 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         batch_size: "batchSize",
         clip_skip: "clipSkip",
         denoise_strength: "denoiseStrength",
+        hires_enabled: "hiresEnabled",
+        hires_scale: "hiresScale",
+        hires_steps: "hiresSteps",
+        hires_denoise: "hiresDenoise",
+        hires_upscale_method: "hiresUpscaleMethod",
+        template_lora_name: "templateLoraName",
+        lora_name: "loraName",
+        lora_strength_model: "loraStrengthModel",
+        lora_strength_clip: "loraStrengthClip",
+      };
+      applyPayloadToElements(elements, payload, {
+        ...generationPayloadMap,
+        mode: "mode",
+        image_asset: "imageAsset",
+        image_data: "imageData",
+        mask_asset: "maskAsset",
+        mask_data: "maskData",
         grow_mask_by: "growMaskBy",
         mask_blur: "maskBlur",
         inpaint_mask_mode: "inpaintMaskMode",
@@ -2189,15 +2271,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         soft_inpainting_mask_influence: "softInpaintingMaskInfluence",
         soft_inpainting_difference_threshold: "softInpaintingDifferenceThreshold",
         soft_inpainting_difference_contrast: "softInpaintingDifferenceContrast",
-        hires_enabled: "hiresEnabled",
-        hires_scale: "hiresScale",
-        hires_steps: "hiresSteps",
-        hires_denoise: "hiresDenoise",
-        hires_upscale_method: "hiresUpscaleMethod",
-        template_lora_name: "templateLoraName",
-        lora_name: "loraName",
-        lora_strength_model: "loraStrengthModel",
-        lora_strength_clip: "loraStrengthClip",
       });
       if (Array.isArray(payload.batch_images)) {
         elements.batchImagesData.value = JSON.stringify(payload.batch_images);
@@ -2252,6 +2325,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
       syncTemplateLoraControls();
       img2imgModeRouter.syncFromModeValue();
+      // CRITICAL: mode/profile synchronization can restore preset defaults after PNG Info/send-to imports; reapply only generation fields so imported parameters survive without reviving stale image, mask, or batch inputs.
+      applyPayloadToElements(elements, payload, generationPayloadMap);
+      syncClipSkipAvailability(profileLookup, elements.profileState.value, elements.clipSkip, elements.clipSkipSlider);
+      syncFamilyAwareModuleQuicksetting(
+        profileLookup,
+        elements.profileState.value,
+        modulesQuicksetting,
+        modulesQuicksettingLabel,
+        elements.textEncoder,
+      );
+      syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+      syncTemplateLoraControls();
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();
       img2imgModeUi.maskEditor?.refreshFromInputs();

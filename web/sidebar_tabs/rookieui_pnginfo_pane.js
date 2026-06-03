@@ -14,7 +14,8 @@
     emitFrontendDebugWarning,
     applyPngInfoResult,
     readFileAsDataUrl,
-  } = context;  const section = document.createElement("section");
+  } = context;
+  const section = document.createElement("section");
   section.className = "rookieui-shell__section";
   parent.appendChild(section);
 
@@ -295,6 +296,30 @@
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void runAutoInspection();
+  });
+
+  formRegistry.pnginfo = {
+    applyPayload(payload) {
+      const imageData = String(payload?.image_data ?? "").trim();
+      if (!imageData) {
+        statusNode.textContent = "PNG Info requires image data for preview handoff.";
+        return;
+      }
+      state.imageData = imageData;
+      setPreviewContent(previewBox, state.imageData, "");
+      statusNode.textContent = "Imported preview image; inspecting PNG metadata...";
+      void runAutoInspection().catch((error) => {
+        emitFrontendDebugWarning("shell.pnginfo_preview_handoff", "PNG Info preview handoff inspection failed.", error);
+        statusNode.textContent = "Failed to inspect the preview image.";
+      });
+    },
+  };
+  globalThis.document?.addEventListener?.("rookieui:pnginfo:preview-handoff", (event) => {
+    if (!section.isConnected) {
+      return;
+    }
+    event.preventDefault?.();
+    formRegistry.pnginfo.applyPayload(event.detail ?? {});
   });
 
   applyTxt2ImgButton.addEventListener("click", () => {

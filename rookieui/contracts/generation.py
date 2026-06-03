@@ -247,6 +247,7 @@ class WorkflowTranslationResult:
     normalized_request: dict[str, Any]
     parity_profile: dict[str, Any]
     sampler_aliases: dict[str, Any]
+    generation_metadata: dict[str, Any]
     workflow: dict[str, Any]
 
     def to_payload(self) -> dict[str, Any]:

@@ -947,6 +947,7 @@ def _build_anima_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1008,6 +1009,7 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1070,6 +1072,7 @@ def _build_hidream_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1154,6 +1157,7 @@ def _build_chroma_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, objec
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1230,6 +1234,7 @@ def _build_klein_workflow(request: NormalizedTxt2ImgRequest, *, distilled: bool)
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1312,6 +1317,7 @@ def _build_flux2_dev_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1377,6 +1383,7 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1472,6 +1479,7 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1546,6 +1554,7 @@ def _build_longcat_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1665,6 +1674,7 @@ def _build_ernie_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -> 
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1793,6 +1803,7 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1881,6 +1892,7 @@ def _build_flux_kontext_dev_image_edit_workflow(request: NormalizedImg2ImgReques
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -1957,6 +1969,7 @@ def _build_flux2_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -2040,6 +2053,7 @@ def _build_klein_9b_kv_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 
@@ -2129,6 +2143,7 @@ def _build_longcat_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dic
         decode_id=decode_id,
         save_id=save_id,
         vae_source=[vae_id, 0],
+        request=request,
     )
     return workflow
 

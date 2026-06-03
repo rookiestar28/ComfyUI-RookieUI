@@ -72,7 +72,7 @@ class ADetailerChainRegressionTests(unittest.TestCase):
             payload["normalized_request"]["adetailer"]["warning_codes"],
         )
         self.assertEqual(payload["normalized_request"]["adetailer"]["diagnostics"]["primary_controlnet_unit_count"], 1)
-        save_node = next(node for node in workflow.values() if node["class_type"] == "SaveImage")
+        save_node = next(node for node in workflow.values() if node["class_type"] == "RookieUISaveImageWithMetadata")
         final_decode_id = [node_id for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"][-1]
         self.assertEqual(save_node["inputs"]["images"], [final_decode_id, 0])
 

@@ -4,6 +4,11 @@ import { readFileSync } from "node:fs";
 import { ROOKIEUI_ASSET_REVISION } from "../rookieui_asset_revision.js";
 import { createDefaultCapabilities } from "../rookieui_api.js";
 import { createRookieUIHostFetch, registerRookieUIBootstrapExtension } from "../rookieui_extension.js";
+import {
+  createGenerationRuntimeHelpers,
+  createGenerationRuntimeState,
+  resolvePreviewActionArtifact,
+} from "../rookieui_generation_runtime.js";
 
 const EXPECTED_DTYPE_PROFILE_IDS = [
   "automatic",
@@ -152,6 +157,361 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(declarationText).toContain("fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;");
   });
 
+  test("runtime preview helper imports current image data into PNG Info inspection", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+
+    await helpers.transferPreviewToPngInfo({}, runtimeState, statusNode, previewBox);
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "pnginfo",
+      expect.objectContaining({
+        preview_action: "inspect-pnginfo",
+        preview_source: "preview-dom",
+        preview_selected_index: 0,
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+      }),
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Inspecting preview image in PNG Info");
+  });
+
+  test("runtime preview helper sends current image data to Extras", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+
+    await helpers.transferPreviewToExtras({}, runtimeState, statusNode, previewBox);
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "extras",
+      expect.objectContaining({
+        preview_action: "send-to-extras",
+        preview_source: "preview-dom",
+        preview_selected_index: 0,
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+      }),
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent selected preview image to Extras");
+  });
+
+  test("runtime preview action artifact prefers selected final output over stale DOM preview", async () => {
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "final-output-b.png",
+      subfolder: "RookieUI",
+      type: "output",
+      selectedIndex: 1,
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+      promptId: "prompt-final",
+      metadata: { parameters: "final prompt\nSteps: 20, Seed: 123" },
+      infotext: "final prompt\nSteps: 20, Seed: 123",
+    };
+    runtimeState.finalImageUrl =
+      "/view?filename=final-output-b.png&subfolder=RookieUI&type=output";
+    runtimeState.finalOutputArtifact = {
+      sourceContext: {
+        promptId: "prompt-final",
+        nodeId: "save_image",
+        nodeImageIndex: 1,
+      },
+    };
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    const artifact = resolvePreviewActionArtifact(runtimeState, previewBox);
+
+    expect(artifact.previewUrl).toBe("/view?filename=final-output-b.png&subfolder=RookieUI&type=output");
+    expect(artifact.source).toBe("final-output");
+    expect(artifact.selectedIndex).toBe(1);
+    expect(artifact.finalImageDescriptor).toMatchObject({
+      filename: "final-output-b.png",
+      subfolder: "RookieUI",
+      type: "output",
+      selectedIndex: 1,
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+      promptId: "prompt-final",
+    });
+    expect(artifact.metadata).toEqual({ parameters: "final prompt\nSteps: 20, Seed: 123" });
+    expect(artifact.infotext).toBe("final prompt\nSteps: 20, Seed: 123");
+    expect(artifact.sourceContext).toEqual({
+      promptId: "prompt-final",
+      nodeId: "save_image",
+      nodeImageIndex: 1,
+    });
+  });
+
+  test("runtime preview helper resolves final output image data before stale DOM image", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      async blob() {
+        expect(url).toBe("/view?filename=selected-final.png&subfolder=&type=output");
+        return new Blob(["final"], { type: "image/png" });
+      },
+    }));
+    globalThis.fetch = fetchSpy;
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "selected-final.png",
+      subfolder: "",
+      type: "output",
+      selectedIndex: 0,
+    };
+    runtimeState.finalImageUrl = "/view?filename=selected-final.png&subfolder=&type=output";
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    try {
+      await helpers.transferPreviewToPngInfo({}, runtimeState, statusNode, previewBox);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith("/view?filename=selected-final.png&subfolder=&type=output");
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "pnginfo",
+      expect.objectContaining({
+        preview_action: "inspect-pnginfo",
+        preview_source: "final-output",
+        preview_selected_index: 0,
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmluYWw=",
+      }),
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Inspecting preview image in PNG Info");
+  });
+
+  test("runtime preview helper sends selected final output image data to Extras before stale DOM image", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      async blob() {
+        expect(url).toBe("/view?filename=selected-extras-final.png&subfolder=&type=output");
+        return new Blob(["extras-final"], { type: "image/png" });
+      },
+    }));
+    globalThis.fetch = fetchSpy;
+    const applyCrossPanePayload = vi.fn(() => true);
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    runtimeState.previewUrl = "blob:stale-live-preview";
+    runtimeState.finalImageDescriptor = {
+      filename: "selected-extras-final.png",
+      subfolder: "",
+      type: "output",
+      selectedIndex: 2,
+      nodeId: "save_image",
+      nodeImageIndex: 2,
+      promptId: "prompt-extras-final",
+    };
+    runtimeState.finalImageUrl = "/view?filename=selected-extras-final.png&subfolder=&type=output";
+    runtimeState.finalOutputArtifact = {
+      sourceContext: {
+        promptId: "prompt-extras-final",
+        nodeId: "save_image",
+        nodeImageIndex: 2,
+      },
+    };
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,c3RhbGU=" alt="preview">';
+
+    try {
+      await helpers.transferPreviewToExtras({}, runtimeState, statusNode, previewBox);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchSpy).toHaveBeenCalledWith("/view?filename=selected-extras-final.png&subfolder=&type=output");
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      {},
+      "extras",
+      expect.objectContaining({
+        preview_action: "send-to-extras",
+        preview_source: "final-output",
+        preview_selected_index: 2,
+        preview_prompt_id: "prompt-extras-final",
+        preview_node_id: "save_image",
+        image_asset: "",
+        image_data: "data:image/png;base64,ZXh0cmFzLWZpbmFs",
+      }),
+      { activate: true },
+    );
+    expect(statusNode.textContent).toBe("Sent selected preview image to Extras");
+  });
+
+  test("runtime preview helper applies inspected generation metadata to Img2Img", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const inspectPngInfoRequest = vi.fn(async () => ({
+      ok: true,
+      data: {
+        source_type: "a1111",
+        payload: {
+          prompt: "metadata prompt",
+          negative_prompt: "metadata negative",
+          steps: 28,
+          sampler_name: "dpmpp_2m",
+          scheduler_name: "karras",
+          cfg_scale: 6.75,
+          seed: 424242,
+          width: 832,
+          height: 1216,
+          checkpoint_name: "dreamshaper.safetensors",
+          vae_name: "vae-ft-mse.safetensors",
+          clip_skip: 2,
+          hires_enabled: true,
+          hires_scale: 1.5,
+          image_asset: "metadata-should-not-win.png",
+          mask_asset: "metadata-mask-should-not-win.png",
+          batch_images: ["metadata-batch-should-not-win"],
+        },
+      },
+    }));
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+    const formRegistry = { img2img: { applyPayload: vi.fn() } };
+
+    await helpers.transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox, { inspectPngInfoRequest });
+
+    expect(inspectPngInfoRequest).toHaveBeenCalledWith({ image_data: "data:image/png;base64,ZmFrZQ==" });
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      formRegistry,
+      "img2img",
+      {
+        prompt: "metadata prompt",
+        negative_prompt: "metadata negative",
+        steps: 28,
+        sampler_name: "dpmpp_2m",
+        scheduler_name: "karras",
+        cfg_scale: 6.75,
+        seed: 424242,
+        width: 832,
+        height: 1216,
+        checkpoint_name: "dreamshaper.safetensors",
+        vae_name: "vae-ft-mse.safetensors",
+        clip_skip: 2,
+        hires_enabled: true,
+        hires_scale: 1.5,
+        mode: "img2img",
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+        mask_asset: "",
+        mask_data: "",
+        batch_images: [],
+      },
+    );
+    expect(statusNode.textContent).toBe("Sent preview image and metadata to Img2Img");
+  });
+
+  test("runtime preview helper applies inspected generation metadata to Inpaint", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const inspectPngInfoRequest = vi.fn(async () => ({
+      ok: true,
+      data: {
+        source_type: "a1111",
+        payload: {
+          prompt: "inpaint prompt",
+          negative_prompt: "inpaint negative",
+          steps: 24,
+          sampler_name: "euler_ancestral",
+          scheduler_name: "normal",
+          cfg_scale: 5.5,
+          seed: 20260603,
+          width: 640,
+          height: 960,
+        },
+      },
+    }));
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,aW5wYWludA==" alt="preview">';
+    const formRegistry = { img2img: { applyPayload: vi.fn() } };
+
+    await helpers.transferPreviewToInpaint(formRegistry, runtimeState, statusNode, previewBox, { inspectPngInfoRequest });
+
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      formRegistry,
+      "img2img",
+      expect.objectContaining({
+        mode: "inpaint",
+        prompt: "inpaint prompt",
+        negative_prompt: "inpaint negative",
+        steps: 24,
+        sampler_name: "euler_ancestral",
+        scheduler_name: "normal",
+        cfg_scale: 5.5,
+        seed: 20260603,
+        width: 640,
+        height: 960,
+        image_asset: "",
+        image_data: "data:image/png;base64,aW5wYWludA==",
+        mask_asset: "",
+        mask_data: "",
+        batch_images: [],
+      }),
+    );
+    expect(statusNode.textContent).toBe("Sent preview image and metadata to Inpaint");
+  });
+
   test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
@@ -286,9 +646,16 @@ describe("registerRookieUIBootstrapExtension", () => {
               payload: {
                 prompt: "parsed prompt",
                 negative_prompt: "parsed negative",
+                steps: 31,
+                cfg_scale: 6.5,
+                seed: 987654,
                 width: 768,
                 height: 768,
                 sampler_name: "euler_ancestral",
+                scheduler_name: "normal",
+                checkpoint_name: "dreamshaper.safetensors",
+                vae_name: "Automatic",
+                clip_skip: 2,
                 image_asset: "pnginfo_asset.png",
               },
               metadata_items: {
@@ -1319,13 +1686,21 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-open-pnginfo").textContent).toContain("📋");
     expect(document.getElementById("rookieui-txt2img-action-target")).not.toBeNull();
     expect(document.getElementById("rookieui-txt2img-apply-action-target")).not.toBeNull();
+    expect(
+      Array.from(document.getElementById("rookieui-txt2img-action-target").options).map((option) => option.textContent),
+    ).toEqual(["Queue / History", "Inspect PNG Info", "Send to Img2Img", "Send to Inpaint", "Send to Extras"]);
     expect(document.getElementById("rookieui-txt2img-apply-action-target").textContent).toContain("🖌️");
+    expect(document.getElementById("rookieui-txt2img-preview-pnginfo").getAttribute("aria-label")).toBe(
+      "Inspect PNG Info",
+    );
+    expect(document.getElementById("rookieui-txt2img-preview-inpaint").textContent).toContain("🖌️");
+    expect(document.getElementById("rookieui-txt2img-preview-extras").getAttribute("aria-label")).toBe("Send to Extras");
     expect(document.getElementById("rookieui-txt2img-preview-extras").textContent).toContain("📐");
     expect(
       document.querySelectorAll(
         "#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon",
       ).length,
-    ).toBe(6);
+    ).toBe(7);
     expect(
       document.querySelector(
         "#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen",
@@ -1381,9 +1756,11 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-action-target").value = "extras";
     document.getElementById("rookieui-txt2img-apply-action-target").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview-img2img").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
     expect(
       Array.from(document.getElementById("rookieui-img2img-low-bits").options).map((option) => option.value),
@@ -2014,17 +2391,110 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-tab-txt2img").click();
     document.getElementById("rookieui-txt2img-preview").innerHTML =
       '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
-    document.getElementById("rookieui-txt2img-preview-img2img").click();
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
-        break;
+    const originalFetchForPreviewActions = globalThis.fetch;
+    globalThis.fetch = fetchImpl;
+    const expectImg2ImgPreviewTransferFields = (mode) => {
+      // IMPORTANT: Issue 3 action-target parity depends on field transfer, not just active pane/image handoff.
+      expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
+      expect(document.querySelector("#rookieui-img2img-preview img")).not.toBeNull();
+      expect(document.getElementById("rookieui-img2img-mode").value).toBe(mode);
+      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
+      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
+      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
+      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
+      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
+      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
+      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
+      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
+      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
+      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
+      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+      if (staleMaskDataField) {
+        expect(staleMaskDataField.value).toBe("");
       }
+      if (staleBatchImagesField) {
+        expect(staleBatchImagesField.value).toBe("[]");
+      }
+    };
+    try {
+      document.getElementById("rookieui-txt2img-preview-extras").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-extras-single-status").textContent.includes("preview-image.png")) {
+          break;
+        }
+      }
+      expect(document.getElementById("rookieui-pane-extras").classList.contains("is-active")).toBe(true);
+      expect(document.getElementById("rookieui-extras-single-status").textContent).toContain("preview-image.png");
+      expect(document.querySelector("#rookieui-extras-preview img")?.getAttribute("src")).toContain("data:image/png");
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview-img2img").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("img2img");
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,aW5wYWludA==" alt="preview">';
+      document.getElementById("rookieui-txt2img-preview-inpaint").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "inpaint") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("inpaint");
+      document.getElementById("rookieui-mask-asset").value = "stale-mask-before-action-target";
+      if (staleMaskDataField) {
+        staleMaskDataField.value = "data:image/png;base64,c3RhbGUtYWN0aW9uLXRhcmdldC1tYXNr";
+      }
+      if (staleBatchImagesField) {
+        staleBatchImagesField.value = '["data:image/png;base64,c3RhbGUtYWN0aW9uLXRhcmdldC1iYXRjaA=="]';
+      }
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,YWN0aW9uLXRhcmdldA==" alt="preview">';
+      document.getElementById("rookieui-txt2img-action-target").value = "img2img";
+      document.getElementById("rookieui-txt2img-apply-action-target").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "img2img") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("img2img");
+      document.getElementById("rookieui-mask-asset").value = "stale-mask-before-action-target-inpaint";
+      if (staleMaskDataField) {
+        staleMaskDataField.value = "data:image/png;base64,c3RhbGUtaW5wYWludC1tYXNr";
+      }
+      if (staleBatchImagesField) {
+        staleBatchImagesField.value = '["data:image/png;base64,c3RhbGUtaW5wYWludC1iYXRjaA=="]';
+      }
+      document.getElementById("rookieui-tab-txt2img").click();
+      document.getElementById("rookieui-txt2img-preview").innerHTML =
+        '<img class="rookieui-shell__preview-image" src="data:image/png;base64,YWN0aW9uLXRhcmdldC1pbnBhaW50" alt="preview">';
+      document.getElementById("rookieui-txt2img-action-target").value = "inpaint";
+      document.getElementById("rookieui-txt2img-apply-action-target").click();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (document.getElementById("rookieui-img2img-mode").value === "inpaint") {
+          break;
+        }
+      }
+      expectImg2ImgPreviewTransferFields("inpaint");
+    } finally {
+      globalThis.fetch = originalFetchForPreviewActions;
     }
-    expect(document.getElementById("rookieui-pane-img2img").classList.contains("is-active")).toBe(true);
-    const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
-    expect(transferredPreviewImage).not.toBeNull();
-    expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+    document.getElementById("rookieui-img2img-prompt").value = "settings handoff prompt";
+    document.getElementById("rookieui-img2img-preview-txt2img").click();
+    expect(document.getElementById("rookieui-pane-txt2img").classList.contains("is-active")).toBe(true);
+    expect(document.getElementById("rookieui-prompt").value).toBe("settings handoff prompt");
+    document.getElementById("rookieui-tab-img2img").click();
     expect(document.getElementById("rookieui-mask-asset").value).toBe("");
     if (staleMaskDataField) {
       expect(staleMaskDataField.value).toBe("");
@@ -2664,7 +3134,178 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("asset fallback");
   });
 
-  test("adapts nested host preview payload variants and filters foreign prompt frames", async () => {
+  test("replaces live preview blob with host-aware final history output after completion", async () => {
+    document.body.innerHTML = `
+      <div class="sidebar-content-container">
+        <div class="side-bar-panel">
+          <div id="mock-sidebar-tabs"></div>
+        </div>
+      </div>
+    `;
+
+    const runtimeListeners = new Map();
+    const app = {
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "socket-client-preview-final",
+        apiURL(path) {
+          return `/api${path}`;
+        },
+        addEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          handlers.push(handler);
+          runtimeListeners.set(eventName, handlers);
+        },
+        removeEventListener(eventName, handler) {
+          const handlers = runtimeListeners.get(eventName) || [];
+          runtimeListeners.set(
+            eventName,
+            handlers.filter((entry) => entry !== handler),
+          );
+        },
+      },
+      extensionManager: {
+        registerSidebarTab(tab) {
+          const host = document.getElementById("mock-sidebar-tabs");
+          tab.render(host);
+        },
+      },
+    };
+
+    const emitRuntimeEvent = (eventName, detail) => {
+      const handlers = runtimeListeners.get(eventName) || [];
+      handlers.forEach((handler) => handler({ detail }));
+    };
+
+    let resolveFirstQueuePoll;
+    const firstQueuePoll = new Promise((resolve) => {
+      resolveFirstQueuePoll = resolve;
+    });
+    let queueJobCallCount = 0;
+    const fetchImpl = async (url, options = {}) => {
+      if (url === "/rookieui/generate/txt2img") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              mode: "queued",
+              workflow_kind: "txt2img-sd15",
+              submission: { accepted: true, prompt_id: "prompt-preview-final" },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue/prompt-preview-final")) {
+        queueJobCallCount += 1;
+        if (queueJobCallCount === 1) {
+          await firstQueuePoll;
+        }
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              source: "host",
+              queue_remaining: 0,
+              job: {
+                id: "prompt-preview-final",
+                status: "completed",
+                output_filenames: ["final-output.png"],
+                reusable_outputs: ["final-output.png"],
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/history/prompt-preview-final")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              "prompt-preview-final": {
+                outputs: {
+                  "9": {
+                    images: [
+                      { filename: "final-output.png", subfolder: "", type: "output" },
+                    ],
+                  },
+                },
+              },
+            };
+          },
+        };
+      }
+
+      if (typeof url === "string" && url.startsWith("/rookieui/queue")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return { source: "host", queue_remaining: 0, jobs: [] };
+          },
+        };
+      }
+
+      return {
+        ok: false,
+        status: 404,
+        async json() {
+          return {};
+        },
+      };
+    };
+
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:preview-final");
+    URL.revokeObjectURL = vi.fn();
+
+    try {
+      await registerRookieUIBootstrapExtension({
+        app,
+        windowRef: window,
+        documentRef: document,
+        fetchImpl,
+      });
+
+      document.getElementById("rookieui-txt2img-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      emitRuntimeEvent("b_preview_with_metadata", {
+        metadata: { prompt_id: "prompt-preview-final" },
+        data: {
+          buffer: Uint8Array.from([137, 80, 78, 71]).buffer,
+          mime: "image/png",
+        },
+      });
+
+      resolveFirstQueuePoll();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const previewImage = document.querySelector("#rookieui-txt2img-preview img");
+        if (previewImage?.getAttribute("src")?.startsWith("/api/view?")) {
+          break;
+        }
+      }
+
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      const previewImage = document.querySelector("#rookieui-txt2img-preview img");
+      expect(previewImage).not.toBeNull();
+      expect(previewImage?.getAttribute("src")).toBe("/api/view?filename=final-output.png&subfolder=&type=output");
+      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("Completed: prompt-preview-final");
+    } finally {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
+  test("adapts nested host preview payload variants and reports degraded missing final output", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
         <div class="side-bar-panel">
@@ -2824,14 +3465,20 @@ describe("registerRookieUIBootstrapExtension", () => {
       });
 
       resolveFirstQueuePoll();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      for (let attempt = 0; attempt < 80; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        if (document.getElementById("rookieui-txt2img-status").textContent.includes("final image unavailable")) {
+          break;
+        }
+      }
 
       expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
       const previewImage = document.querySelector("#rookieui-txt2img-preview img");
       expect(previewImage).not.toBeNull();
       expect(previewImage?.getAttribute("src")).toBe("blob:preview-variant-1");
-      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("Completed: prompt-preview-1");
+      expect(document.getElementById("rookieui-txt2img-status").textContent).toContain(
+        "Completed: prompt-preview-1 (final image unavailable; showing live preview)",
+      );
     } finally {
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;

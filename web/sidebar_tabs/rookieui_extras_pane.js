@@ -418,6 +418,32 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
     syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
   };
 
+  formRegistry.extras = {
+    applyPayload(payload) {
+      const imageData = String(payload?.image_data ?? "").trim();
+      if (!imageData) {
+        statusNode.textContent = "Extras requires image data for preview handoff.";
+        return;
+      }
+      state.mode = "single_image";
+      state.singleImage = {
+        name: String(payload?.image_asset ?? "").trim() || "preview-image.png",
+        dataUrl: imageData,
+      };
+      singleStatus.textContent = `Loaded ${state.singleImage.name}`;
+      updateExtrasPreview(previewBox, imageData, "Extras preview will appear here after processing.");
+      syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
+      captureExtrasState();
+    },
+  };
+  globalThis.document?.addEventListener?.("rookieui:extras:preview-handoff", (event) => {
+    if (!section.isConnected) {
+      return;
+    }
+    event.preventDefault?.();
+    formRegistry.extras.applyPayload(event.detail ?? {});
+  });
+
   submitButton.addEventListener("click", async () => {
     await submitExtras(bootstrapState, state, elements, statusNode, previewBox);
     captureExtrasState();

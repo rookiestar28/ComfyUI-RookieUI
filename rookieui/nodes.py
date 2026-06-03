@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import math
+import os
 
 try:
     import numpy as np
@@ -17,11 +18,13 @@ except Exception:  # pragma: no cover - import guard for thin entrypoint
 
 try:
     from PIL import Image, ImageFilter, ImageOps, ImageSequence
+    from PIL.PngImagePlugin import PngInfo
 except Exception:  # pragma: no cover - import guard for thin entrypoint
     Image = None
     ImageFilter = None
     ImageOps = None
     ImageSequence = None
+    PngInfo = None
 
 from rookieui.services.asset_store import resolve_asset_path
 from rookieui.services.adetailer_runtime import detect_adetailer_mask
@@ -51,6 +54,16 @@ try:
     from comfy import model_management
 except Exception:  # pragma: no cover - host-only import path
     model_management = None
+
+try:
+    import folder_paths
+except Exception:  # pragma: no cover - host-only import path
+    folder_paths = None
+
+try:
+    from comfy.cli_args import args as comfy_args
+except Exception:  # pragma: no cover - host-only import path
+    comfy_args = None
 
 try:
     from comfy.controlnet import ControlBase
@@ -84,6 +97,24 @@ def _require_runtime_dependencies() -> None:
         raise RuntimeError(
             f"RookieUI asset nodes require {', '.join(missing)} to be installed in the active environment."
         )
+
+
+def _require_save_image_dependencies() -> None:
+    missing = []
+    if np is None:
+        missing.append("numpy")
+    if Image is None or PngInfo is None:
+        missing.append("Pillow")
+    if folder_paths is None:
+        missing.append("ComfyUI folder_paths")
+    if missing:
+        raise RuntimeError(
+            f"RookieUI save node requires {', '.join(missing)} to be installed in the active ComfyUI environment."
+        )
+
+
+def _metadata_disabled() -> bool:
+    return bool(getattr(comfy_args, "disable_metadata", False))
 
 
 def _require_tensor_dependency() -> None:
@@ -1040,6 +1071,86 @@ class RookieUIVAEEncodeForInpaint:
         return ({"samples": latent, "noise_mask": noise_mask[:, :, :x, :y]},)
 
 
+class RookieUISaveImageWithMetadata:
+    def __init__(self) -> None:
+        self.output_dir = folder_paths.get_output_directory() if folder_paths is not None else ""
+        self.type = "output"
+        self.prefix_append = ""
+        self.compress_level = 4
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "images": ("IMAGE",),
+                "filename_prefix": ("STRING", {"default": "RookieUI"}),
+                "parameters": ("STRING", {"default": "", "multiline": True}),
+            },
+            "hidden": {
+                "prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            },
+        }
+
+    RETURN_TYPES = ()
+    FUNCTION = "save_images"
+    OUTPUT_NODE = True
+    CATEGORY = "RookieUI/output"
+
+    def save_images(
+        self,
+        images,
+        filename_prefix="RookieUI",
+        parameters="",
+        prompt=None,
+        extra_pnginfo=None,
+    ):
+        _require_save_image_dependencies()
+        filename_prefix = str(filename_prefix or "RookieUI") + self.prefix_append
+        full_output_folder, filename, counter, subfolder, _filename_prefix = folder_paths.get_save_image_path(
+            filename_prefix,
+            self.output_dir,
+            images[0].shape[1],
+            images[0].shape[0],
+        )
+        results = []
+        for batch_number, image in enumerate(images):
+            array = 255.0 * image.cpu().numpy()
+            img = Image.fromarray(np.clip(array, 0, 255).astype(np.uint8))
+            metadata = None
+            if not _metadata_disabled():
+                metadata = PngInfo()
+                infotext = str(parameters or "").replace("\x00", "").strip()
+                if infotext:
+                    # CRITICAL: A1111 expects `parameters` as raw infotext; ComfyUI SaveImage JSON-quotes all extra_pnginfo values.
+                    metadata.add_text("parameters", infotext)
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if isinstance(extra_pnginfo, dict):
+                    for key, value in extra_pnginfo.items():
+                        metadata_key = str(key or "").strip()
+                        if not metadata_key or metadata_key == "parameters":
+                            continue
+                        metadata.add_text(metadata_key, json.dumps(value))
+
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            img.save(
+                os.path.join(full_output_folder, file),
+                pnginfo=metadata,
+                compress_level=self.compress_level,
+            )
+            results.append(
+                {
+                    "filename": file,
+                    "subfolder": subfolder,
+                    "type": self.type,
+                }
+            )
+            counter += 1
+        return {"ui": {"images": results}}
+
+
 NODE_CLASS_MAPPINGS = {
     "RookieUIA1111CLIPTextEncode": RookieUIA1111CLIPTextEncode,
     "RookieUIA1111CLIPTextEncodeSDXL": RookieUIA1111CLIPTextEncodeSDXL,
@@ -1049,6 +1160,7 @@ NODE_CLASS_MAPPINGS = {
     "RookieUIControlNetApplyNativeAdvanced": RookieUIControlNetApplyNativeAdvanced,
     "RookieUIADetailerDetectMask": RookieUIADetailerDetectMask,
     "RookieUIVAEEncodeForInpaint": RookieUIVAEEncodeForInpaint,
+    "RookieUISaveImageWithMetadata": RookieUISaveImageWithMetadata,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1060,4 +1172,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RookieUIControlNetApplyNativeAdvanced": "RookieUI ControlNet Apply (Advanced)",
     "RookieUIADetailerDetectMask": "RookieUI ADetailer Detect Mask",
     "RookieUIVAEEncodeForInpaint": "RookieUI VAE Encode (A1111 Inpaint)",
+    "RookieUISaveImageWithMetadata": "RookieUI Save Image With Metadata",
 }

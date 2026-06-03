@@ -46,6 +46,9 @@ export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
     progressMax: null,
     progressSeen: false,
     previewFrameSeen: false,
+    finalImageDescriptor: null,
+    finalOutputArtifact: null,
+    finalImageUrl: "",
   };
 }
 
@@ -204,6 +207,167 @@ function extractPreviewBlob(payload) {
   return null;
 }
 
+function normalizeFinalImageDescriptor(imageDescriptor, { selectedIndex = 0, nodeId = "", nodeImageIndex = 0, promptId = "" } = {}) {
+  if (!imageDescriptor?.filename) {
+    return null;
+  }
+  const descriptorSelectedIndex = Number.isInteger(imageDescriptor.selectedIndex)
+    ? imageDescriptor.selectedIndex
+    : selectedIndex;
+  const descriptorNodeImageIndex = Number.isInteger(imageDescriptor.nodeImageIndex)
+    ? imageDescriptor.nodeImageIndex
+    : nodeImageIndex;
+  const normalizedSelectedIndex =
+    Number.isInteger(descriptorSelectedIndex) && descriptorSelectedIndex >= 0 ? descriptorSelectedIndex : 0;
+  const normalizedNodeImageIndex =
+    Number.isInteger(descriptorNodeImageIndex) && descriptorNodeImageIndex >= 0
+      ? descriptorNodeImageIndex
+      : normalizedSelectedIndex;
+  const metadata =
+    imageDescriptor.metadata && typeof imageDescriptor.metadata === "object"
+      ? { ...imageDescriptor.metadata }
+      : null;
+  const infotext =
+    typeof imageDescriptor.infotext === "string"
+      ? imageDescriptor.infotext
+      : typeof imageDescriptor.parameters === "string"
+        ? imageDescriptor.parameters
+        : "";
+  return {
+    filename: imageDescriptor.filename,
+    subfolder: typeof imageDescriptor.subfolder === "string" ? imageDescriptor.subfolder : "",
+    type: typeof imageDescriptor.type === "string" ? imageDescriptor.type : "output",
+    selectedIndex: normalizedSelectedIndex,
+    nodeId: typeof imageDescriptor.nodeId === "string" ? imageDescriptor.nodeId : nodeId,
+    nodeImageIndex: normalizedNodeImageIndex,
+    promptId: typeof imageDescriptor.promptId === "string" ? imageDescriptor.promptId : promptId,
+    metadata,
+    infotext,
+  };
+}
+
+function buildPreviewActionArtifact({
+  previewUrl = "",
+  finalImageDescriptor = null,
+  selectedIndex = 0,
+  source = "runtime-preview",
+  sourceContext = {},
+} = {}) {
+  const normalizedSelectedIndex = Number.isInteger(selectedIndex) && selectedIndex >= 0 ? selectedIndex : 0;
+  const descriptor = finalImageDescriptor ? normalizeFinalImageDescriptor(finalImageDescriptor) : null;
+  return {
+    previewUrl,
+    imageDataUrl: "",
+    fallbackAsset: previewUrl ? extractComfyViewFilename(previewUrl) : "",
+    finalImageDescriptor: descriptor,
+    selectedIndex: descriptor?.selectedIndex ?? normalizedSelectedIndex,
+    source,
+    sourceContext,
+    metadata: descriptor?.metadata ?? null,
+    infotext: descriptor?.infotext ?? "",
+  };
+}
+
+const IMG2IMG_METADATA_PAYLOAD_KEYS = Object.freeze([
+  "prompt",
+  "negative_prompt",
+  "profile",
+  "checkpoint_name",
+  "vae_name",
+  "text_encoder_name",
+  "dtype_profile",
+  "width",
+  "height",
+  "resize_mode",
+  "steps",
+  "cfg_scale",
+  "shift",
+  "flux_guidance",
+  "edit_megapixels",
+  "sampler_name",
+  "scheduler_name",
+  "prompt_enhancement_enabled",
+  "seed",
+  "seed_extra",
+  "batch_size",
+  "clip_skip",
+  "denoise_strength",
+  "hires_enabled",
+  "hires_scale",
+  "hires_steps",
+  "hires_denoise",
+  "hires_upscale_method",
+  "template_lora_name",
+  "lora_name",
+  "lora_strength_model",
+  "lora_strength_clip",
+]);
+
+function sanitizeImg2ImgMetadataPayload(rawPayload) {
+  if (!rawPayload || typeof rawPayload !== "object") {
+    return {};
+  }
+  const payload = {};
+  for (const key of IMG2IMG_METADATA_PAYLOAD_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(rawPayload, key)) {
+      payload[key] = rawPayload[key];
+    }
+  }
+  return payload;
+}
+
+async function inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest) {
+  if (!imageDataUrl || typeof inspectPngInfoRequest !== "function") {
+    return { ok: false, payload: {}, sourceType: "", error: null };
+  }
+  try {
+    const result = await inspectPngInfoRequest({ image_data: imageDataUrl });
+    if (!result?.ok) {
+      return { ok: false, payload: {}, sourceType: "", error: result?.data ?? null };
+    }
+    return {
+      ok: true,
+      payload: sanitizeImg2ImgMetadataPayload(result.data?.payload),
+      sourceType: String(result.data?.source_type ?? ""),
+      error: null,
+    };
+  } catch (error) {
+    return { ok: false, payload: {}, sourceType: "", error };
+  }
+}
+
+function buildImg2ImgPreviewActionPayload({
+  imageDataUrl = "",
+  fallbackAsset = "",
+  metadataPayload = {},
+  mode = "img2img",
+} = {}) {
+  return {
+    ...metadataPayload,
+    // IMPORTANT: preview send-to must always overwrite image/mask/batch handoff fields; metadata parsers may expose source fields from the inspected PNG that must not revive stale inpaint or batch state.
+    mode,
+    image_asset: imageDataUrl ? "" : fallbackAsset,
+    image_data: imageDataUrl,
+    mask_asset: "",
+    mask_data: "",
+    batch_images: [],
+  };
+}
+
+function buildPreviewPaneActionPayload(payload, previewAction) {
+  const sourceContext = payload?.sourceContext && typeof payload.sourceContext === "object" ? payload.sourceContext : {};
+  // IMPORTANT: keep preview action provenance on PNG Info/Extras handoffs; image-only assertions missed A1111 send-to parity regressions.
+  return {
+    preview_action: previewAction,
+    preview_source: String(payload?.source ?? ""),
+    preview_selected_index: Number.isInteger(payload?.selectedIndex) ? payload.selectedIndex : 0,
+    preview_prompt_id: String(sourceContext.promptId ?? payload?.finalImageDescriptor?.promptId ?? ""),
+    preview_node_id: String(sourceContext.nodeId ?? payload?.finalImageDescriptor?.nodeId ?? ""),
+    image_asset: payload?.imageDataUrl ? "" : payload?.fallbackAsset ?? "",
+    image_data: payload?.imageDataUrl ?? "",
+  };
+}
+
 function extractPrimaryHistoryImage(historyPayload, promptId) {
   const promptHistory = historyPayload?.[promptId];
   if (!promptHistory || typeof promptHistory !== "object") {
@@ -213,30 +377,49 @@ function extractPrimaryHistoryImage(historyPayload, promptId) {
   if (!outputs || typeof outputs !== "object") {
     return null;
   }
-  for (const nodeOutput of Object.values(outputs)) {
+  let selectedIndex = 0;
+  for (const [nodeId, nodeOutput] of Object.entries(outputs)) {
     if (!nodeOutput || typeof nodeOutput !== "object") {
       continue;
     }
     const images = Array.isArray(nodeOutput.images) ? nodeOutput.images : [];
-    for (const image of images) {
+    for (let nodeImageIndex = 0; nodeImageIndex < images.length; nodeImageIndex += 1) {
+      const image = images[nodeImageIndex];
       if (!image || typeof image !== "object") {
+        selectedIndex += 1;
         continue;
       }
       const filename = typeof image.filename === "string" ? image.filename : "";
       if (!filename) {
+        selectedIndex += 1;
         continue;
       }
-      return {
-        filename,
-        subfolder: typeof image.subfolder === "string" ? image.subfolder : "",
-        type: typeof image.type === "string" ? image.type : "output",
-      };
+      return normalizeFinalImageDescriptor(
+        {
+          ...image,
+          filename,
+        },
+        {
+          selectedIndex,
+          nodeId,
+          nodeImageIndex,
+          promptId,
+        },
+      );
     }
   }
   return null;
 }
 
-function buildComfyViewUrl(imageDescriptor) {
+function resolveHostApiUrl(bootstrapState, path) {
+  const runtimeApi = resolveRuntimeApi(bootstrapState);
+  if (typeof runtimeApi?.apiURL === "function") {
+    return runtimeApi.apiURL(path);
+  }
+  return path;
+}
+
+function buildComfyViewUrl(imageDescriptor, bootstrapState = null) {
   if (!imageDescriptor?.filename) {
     return "";
   }
@@ -245,7 +428,46 @@ function buildComfyViewUrl(imageDescriptor) {
     subfolder: imageDescriptor.subfolder || "",
     type: imageDescriptor.type || "output",
   });
-  return `/view?${params.toString()}`;
+  return resolveHostApiUrl(bootstrapState, `/view?${params.toString()}`);
+}
+
+function setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, imageDescriptor, bootstrapState) {
+  const normalizedDescriptor = normalizeFinalImageDescriptor(imageDescriptor);
+  const finalImageUrl = buildComfyViewUrl(normalizedDescriptor, bootstrapState);
+  if (!finalImageUrl) {
+    return false;
+  }
+  runtimeState.finalImageDescriptor = normalizedDescriptor;
+  runtimeState.finalImageUrl = finalImageUrl;
+  runtimeState.finalOutputArtifact = buildPreviewActionArtifact({
+    previewUrl: finalImageUrl,
+    finalImageDescriptor: normalizedDescriptor,
+    selectedIndex: normalizedDescriptor.selectedIndex,
+    source: "final-output",
+    sourceContext: {
+      promptId: normalizedDescriptor.promptId,
+      nodeId: normalizedDescriptor.nodeId,
+      nodeImageIndex: normalizedDescriptor.nodeImageIndex,
+    },
+  });
+  setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
+  return true;
+}
+
+async function resolveFinalHistoryImage(bootstrapState, promptId, { attempts = 4, delayMs = 300 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
+    if (historyResult.ok) {
+      const outputImage = extractPrimaryHistoryImage(historyResult.data, promptId);
+      if (outputImage) {
+        return outputImage;
+      }
+    }
+    if (attempt + 1 < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
 }
 
 function readBlobAsDataUrl(blob) {
@@ -279,12 +501,75 @@ function extractComfyViewFilename(previewUrl) {
   }
   try {
     const parsed = new URL(raw, globalThis?.window?.location?.origin ?? "http://127.0.0.1");
-    if (parsed.pathname !== "/view") {
+    if (parsed.pathname !== "/view" && !parsed.pathname.endsWith("/view")) {
       return "";
     }
     return String(parsed.searchParams.get("filename") ?? "").trim();
   } catch (_error) {
     return "";
+  }
+}
+
+export function resolvePreviewActionArtifact(runtimeState, previewBox = null, { preferFinalOutput = true } = {}) {
+  if (preferFinalOutput && runtimeState?.finalImageUrl) {
+    // CRITICAL: output action buttons must prefer the completed final artifact; falling back to a stale DOM/live-preview frame drops embedded metadata and breaks A1111 send-to parity.
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.finalImageUrl,
+      finalImageDescriptor: runtimeState.finalImageDescriptor,
+      selectedIndex: runtimeState.finalImageDescriptor?.selectedIndex ?? 0,
+      source: "final-output",
+      sourceContext: runtimeState.finalOutputArtifact?.sourceContext ?? {},
+    });
+  }
+  if (previewBox) {
+    const previewImage = previewBox.querySelector?.("img");
+    if (previewImage?.src) {
+      return buildPreviewActionArtifact({
+        previewUrl: previewImage.src,
+        selectedIndex: 0,
+        source: "preview-dom",
+        sourceContext: {},
+      });
+    }
+  }
+  if (runtimeState?.finalImageUrl) {
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.finalImageUrl,
+      finalImageDescriptor: runtimeState.finalImageDescriptor,
+      selectedIndex: runtimeState.finalImageDescriptor?.selectedIndex ?? 0,
+      source: "final-output",
+      sourceContext: runtimeState.finalOutputArtifact?.sourceContext ?? {},
+    });
+  }
+  if (runtimeState?.previewUrl) {
+    return buildPreviewActionArtifact({
+      previewUrl: runtimeState.previewUrl,
+      selectedIndex: 0,
+      source: "runtime-preview",
+      sourceContext: {},
+    });
+  }
+  return buildPreviewActionArtifact();
+}
+
+function resolveCurrentPreviewUrl(runtimeState, previewBox = null, options = {}) {
+  return resolvePreviewActionArtifact(runtimeState, previewBox, options).previewUrl;
+}
+
+async function resolvePreviewImagePayload(runtimeState, previewBox = null, options = {}) {
+  const artifact = resolvePreviewActionArtifact(runtimeState, previewBox, options);
+  const previewUrl = artifact.previewUrl;
+  if (!previewUrl) {
+    return artifact;
+  }
+  try {
+    const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
+    return { ...artifact, imageDataUrl };
+  } catch (error) {
+    if (artifact.fallbackAsset) {
+      return { ...artifact, imageDataUrl: "", error };
+    }
+    throw error;
   }
 }
 
@@ -303,70 +588,157 @@ export function createGenerationRuntimeHelpers({
     throw new Error("Generation runtime helpers require debug, preview, cross-pane apply, and tab-activation callbacks.");
   }
 
-  const transferPreviewToImg2Img = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
-    let previewUrl = runtimeState?.previewUrl ?? "";
-    if (!previewUrl && previewBox) {
-      const previewImage = previewBox.querySelector?.("img");
-      if (previewImage?.src) {
-        previewUrl = previewImage.src;
-      }
-    }
-    if (previewBox) {
-      const previewImage = previewBox.querySelector?.("img");
-      if (previewImage?.src?.startsWith("data:image/")) {
-        previewUrl = previewImage.src;
-      }
-    }
+  const transferPreviewToImageMode = async (
+    formRegistry,
+    runtimeState,
+    statusNode,
+    previewBox = null,
+    { inspectPngInfoRequest = null, mode = "img2img", label = "Img2Img" } = {},
+  ) => {
+    const { previewUrl, imageDataUrl, fallbackAsset } = await resolvePreviewImagePayload(runtimeState, previewBox);
     if (!previewUrl) {
-      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+      activateShellTab(formRegistry, "img2img", statusNode, `Opened ${label}`);
       return;
     }
     if (!formRegistry?.img2img?.applyPayload && !formRegistry?.__shellStateContract?.applyToForm) {
-      emitFrontendDebugWarning("shell.preview_transfer", "Img2Img applyPayload is unavailable; falling back to tab switch.");
+      emitFrontendDebugWarning("shell.preview_transfer", `${label} applyPayload is unavailable; falling back to tab switch.`);
       if (statusNode) {
-        statusNode.textContent = "Img2Img form is unavailable.";
+        statusNode.textContent = `${label} form is unavailable.`;
       }
       return;
     }
-    const fallbackAsset = extractComfyViewFilename(previewUrl);
-    try {
-      const imageDataUrl = await resolvePreviewUrlAsDataUrl(previewUrl);
-      if (!imageDataUrl) {
-        throw new Error("Preview image is empty.");
-      }
-      const applied = applyCrossPanePayload(formRegistry, "img2img", {
-        mode: "img2img",
-        image_asset: "",
-        image_data: imageDataUrl,
-        mask_asset: "",
-        mask_data: "",
-        batch_images: [],
-      });
-      if (applied && statusNode) {
-        statusNode.textContent = "Sent preview image to Img2Img";
-      }
-    } catch (error) {
-      emitFrontendDebugWarning(
-        "shell.preview_transfer",
-        "Preview transfer image decode failed; attempting asset-based fallback.",
-        error,
+    if (imageDataUrl) {
+      const metadataResult = await inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest);
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        buildImg2ImgPreviewActionPayload({
+          imageDataUrl,
+          fallbackAsset: "",
+          metadataPayload: metadataResult.payload,
+          mode,
+        }),
       );
-      if (fallbackAsset) {
-        const applied = applyCrossPanePayload(formRegistry, "img2img", {
-          mode: "img2img",
-          image_asset: fallbackAsset,
-          image_data: "",
-          mask_asset: "",
-          mask_data: "",
-          batch_images: [],
-        });
-        if (applied && statusNode) {
-          statusNode.textContent = "Sent preview image to Img2Img (asset fallback)";
-        }
-        return;
+      if (applied && statusNode) {
+        statusNode.textContent =
+          metadataResult.ok && Object.keys(metadataResult.payload).length
+            ? `Sent preview image and metadata to ${label}`
+            : `Sent preview image to ${label} (metadata unavailable)`;
       }
-      activateShellTab(formRegistry, "img2img", statusNode, "Opened Img2Img");
+      return;
     }
+    if (fallbackAsset) {
+      const applied = applyCrossPanePayload(
+        formRegistry,
+        "img2img",
+        buildImg2ImgPreviewActionPayload({
+          imageDataUrl: "",
+          fallbackAsset,
+          mode,
+        }),
+      );
+      if (applied && statusNode) {
+        statusNode.textContent = `Sent preview image to ${label} (asset fallback)`;
+      }
+      return;
+    }
+    activateShellTab(formRegistry, "img2img", statusNode, `Opened ${label}`);
+  };
+
+  const transferPreviewToImg2Img = async (formRegistry, runtimeState, statusNode, previewBox = null, options = {}) => {
+    return transferPreviewToImageMode(formRegistry, runtimeState, statusNode, previewBox, {
+      ...options,
+      mode: "img2img",
+      label: "Img2Img",
+    });
+  };
+
+  const transferPreviewToInpaint = async (formRegistry, runtimeState, statusNode, previewBox = null, options = {}) => {
+    return transferPreviewToImageMode(formRegistry, runtimeState, statusNode, previewBox, {
+      ...options,
+      mode: "inpaint",
+      label: "Inpaint",
+    });
+  };
+
+  const transferPreviewImageToPane = async (
+    formRegistry,
+    targetKey,
+    runtimeState,
+    statusNode,
+    previewBox = null,
+    { appliedMessage = "Sent preview image", previewAction = "", requireDataUrl = false } = {},
+  ) => {
+    let payload;
+    try {
+      payload = await resolvePreviewImagePayload(runtimeState, previewBox);
+    } catch (error) {
+      emitFrontendDebugWarning("shell.preview_transfer", "Preview image handoff failed.", error);
+      if (statusNode) {
+        statusNode.textContent = "Preview image is unavailable.";
+      }
+      return false;
+    }
+    if (!payload.previewUrl) {
+      activateShellTab(formRegistry, targetKey, statusNode, `Opened ${targetKey}`);
+      return false;
+    }
+    if (requireDataUrl && !payload.imageDataUrl) {
+      if (statusNode) {
+        statusNode.textContent = "Preview image data is unavailable.";
+      }
+      activateShellTab(formRegistry, targetKey, statusNode, "Preview image data is unavailable.");
+      return false;
+    }
+    let applied = applyCrossPanePayload(
+      formRegistry,
+      targetKey,
+      buildPreviewPaneActionPayload(payload, previewAction),
+      { activate: true },
+    );
+    if (!applied) {
+      // IMPORTANT: PNG Info/Extras panes may be lazily registered; activate once so the pane can install applyPayload, then retry the handoff.
+      activateShellTab(formRegistry, targetKey, statusNode, `Opened ${targetKey}`);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        applied = applyCrossPanePayload(
+          formRegistry,
+          targetKey,
+          buildPreviewPaneActionPayload(payload, previewAction),
+          { activate: true },
+        );
+        if (applied) {
+          break;
+        }
+      }
+    }
+    if (!applied && ["pnginfo", "extras"].includes(targetKey) && typeof globalThis.document?.dispatchEvent === "function") {
+      const fallbackEvent = new CustomEvent(`rookieui:${targetKey}:preview-handoff`, {
+        cancelable: true,
+        detail: buildPreviewPaneActionPayload(payload, previewAction),
+      });
+      applied = globalThis.document.dispatchEvent(fallbackEvent) === false;
+    }
+    if (statusNode) {
+      statusNode.textContent = applied ? appliedMessage : `${targetKey} form is unavailable.`;
+    }
+    return applied;
+  };
+
+  const transferPreviewToPngInfo = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
+    return transferPreviewImageToPane(formRegistry, "pnginfo", runtimeState, statusNode, previewBox, {
+      appliedMessage: "Inspecting preview image in PNG Info",
+      previewAction: "inspect-pnginfo",
+      requireDataUrl: true,
+    });
+  };
+
+  const transferPreviewToExtras = async (formRegistry, runtimeState, statusNode, previewBox = null) => {
+    return transferPreviewImageToPane(formRegistry, "extras", runtimeState, statusNode, previewBox, {
+      appliedMessage: "Sent selected preview image to Extras",
+      previewAction: "send-to-extras",
+      requireDataUrl: true,
+    });
   };
 
   const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "") => {
@@ -379,6 +751,9 @@ export function createGenerationRuntimeHelpers({
     runtimeState.progressMax = null;
     runtimeState.progressSeen = false;
     runtimeState.previewFrameSeen = false;
+    runtimeState.finalImageDescriptor = null;
+    runtimeState.finalOutputArtifact = null;
+    runtimeState.finalImageUrl = "";
     runtimeState.lastPreviewRenderAt = 0;
 
     const runtimeApi = resolveRuntimeApi(bootstrapState);
@@ -478,10 +853,9 @@ export function createGenerationRuntimeHelpers({
         if (Date.now() - lastHistoryPollAt >= 1500) {
           const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
           const previewImage = extractPrimaryHistoryImage(historyResult.data, promptId);
-          const previewUrl = buildComfyViewUrl(previewImage);
-          if (previewUrl) {
+          if (previewImage) {
             runtimeState.previewFrameSeen = true;
-            setGenerationPreview(runtimeState, previewBox, setPreviewContent, previewUrl, runtimeState.previewPlaceholder);
+            setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, previewImage, bootstrapState);
           }
           lastHistoryPollAt = Date.now();
         }
@@ -496,15 +870,22 @@ export function createGenerationRuntimeHelpers({
     }
 
     if (finalStatus === "completed") {
-      const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
-      const outputImage = historyResult.ok ? extractPrimaryHistoryImage(historyResult.data, promptId) : null;
-      const finalImageUrl = buildComfyViewUrl(outputImage);
-      if (finalImageUrl) {
-        setGenerationPreview(runtimeState, previewBox, setPreviewContent, finalImageUrl, runtimeState.previewPlaceholder);
+      const outputImage = await resolveFinalHistoryImage(bootstrapState, promptId, {
+        attempts: runtimeState.finalImageDescriptor ? 1 : 4,
+        delayMs: 300,
+      });
+      if (outputImage && setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, outputImage, bootstrapState)) {
         statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
         return;
       }
-      statusNode.textContent = appendStatusSuffix(`Completed: ${promptId} (no image output found)`, statusSuffix);
+      if (runtimeState.finalImageUrl) {
+        statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
+        return;
+      }
+      const fallbackDetail = runtimeState.previewUrl?.startsWith("blob:")
+        ? "final image unavailable; showing live preview"
+        : "no image output found";
+      statusNode.textContent = appendStatusSuffix(`Completed: ${promptId} (${fallbackDetail})`, statusSuffix);
       return;
     }
     if (finalStatus === "failed") {
@@ -520,6 +901,9 @@ export function createGenerationRuntimeHelpers({
 
   return {
     transferPreviewToImg2Img,
+    transferPreviewToInpaint,
+    transferPreviewToPngInfo,
+    transferPreviewToExtras,
     trackGenerationRuntime,
   };
 }

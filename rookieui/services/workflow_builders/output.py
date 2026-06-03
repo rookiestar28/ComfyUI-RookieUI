@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import Any
+
+from rookieui.services.generation_metadata import build_a1111_parameters
 from rookieui.services.workflow_builders.core import _to_node_ref
 
 
@@ -24,12 +27,17 @@ def _append_save_node(
     *,
     image_ref: list[object],
     save_id: str,
+    request: Any | None = None,
 ) -> None:
+    parameters = ""
+    if request is not None and hasattr(request, "to_payload"):
+        parameters = build_a1111_parameters(request.to_payload())
     workflow[save_id] = {
-        "class_type": "SaveImage",
+        "class_type": "RookieUISaveImageWithMetadata",
         "inputs": {
             "images": image_ref,
             "filename_prefix": "RookieUI",
+            "parameters": parameters,
         },
     }
 
@@ -41,6 +49,7 @@ def _build_decode_and_save(
     decode_id: str,
     save_id: str,
     vae_source: list[object],
+    request: Any | None = None,
 ) -> None:
     _append_decode_node(
         workflow,
@@ -52,4 +61,5 @@ def _build_decode_and_save(
         workflow,
         image_ref=[decode_id, 0],
         save_id=save_id,
+        request=request,
     )

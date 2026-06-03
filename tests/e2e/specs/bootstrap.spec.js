@@ -15,6 +15,40 @@ const E2E_VAE_OPTIONS = [
   "full_encoder_small_decoder.safetensors",
   "qwen_image_vae.safetensors",
 ];
+const E2E_PREVIEW_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZrY4AAAAASUVORK5CYII=";
+const E2E_FINAL_OUTPUT_DATA_URL = "data:image/png;base64,ZmluYWwtb3V0cHV0";
+
+async function setTxt2ImgPreviewImage(page, src = E2E_PREVIEW_DATA_URL) {
+  await page.evaluate((imageSrc) => {
+    const previewBox = document.getElementById("rookieui-txt2img-preview");
+    previewBox.innerHTML = "";
+    const image = document.createElement("img");
+    image.className = "rookieui-shell__preview-image";
+    image.src = imageSrc;
+    previewBox.appendChild(image);
+    previewBox.__previewFullscreenController?.syncImage?.();
+  }, src);
+}
+
+async function expectImg2ImgPreviewImportFields(page, { mode = "img2img" } = {}) {
+  // IMPORTANT: Issue 3 regressions passed when tests checked only pane/image state; keep exact field assertions here.
+  await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute("src", E2E_FINAL_OUTPUT_DATA_URL);
+  await expect(page.locator("#rookieui-img2img-mode")).toHaveValue(mode);
+  await expect(page.locator("#rookieui-img2img-prompt")).toHaveValue("e2e imported prompt");
+  await expect(page.locator("#rookieui-img2img-negative-prompt")).toHaveValue("e2e imported negative");
+  await expect(page.locator("#rookieui-img2img-steps")).toHaveValue("31");
+  await expect(page.locator("#rookieui-img2img-sampler")).toHaveValue("euler_ancestral");
+  await expect(page.locator("#rookieui-img2img-scheduler")).toHaveValue("normal");
+  await expect(page.locator("#rookieui-img2img-cfg-scale")).toHaveValue("6.5");
+  await expect(page.locator("#rookieui-img2img-seed")).toHaveValue("987654");
+  await expect(page.locator("#rookieui-img2img-width")).toHaveValue("768");
+  await expect(page.locator("#rookieui-img2img-height")).toHaveValue("768");
+  await expect(page.locator("#rookieui-img2img-checkpoint")).toHaveValue("realvisxl.safetensors");
+  await expect(page.locator("#rookieui-img2img-vae")).toHaveValue("Automatic");
+  await expect(page.locator("#rookieui-img2img-clip-skip")).toHaveValue("2");
+}
 
 test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await page.goto("test-harness.html");
@@ -110,10 +144,23 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   await expect(page.locator("#rookieui-txt2img-open-queue-icon .rookieui-shell__mini-action-icon")).toHaveText("📂");
   await expect(page.locator("#rookieui-txt2img-open-pnginfo .rookieui-shell__mini-action-icon")).toHaveText("📋");
   await expect(page.locator("#rookieui-txt2img-apply-action-target .rookieui-shell__mini-action-icon")).toHaveText("🖌️");
+  await expect(page.locator("#rookieui-txt2img-preview-pnginfo")).toHaveAttribute("aria-label", "Inspect PNG Info");
+  await expect(page.locator("#rookieui-txt2img-preview-inpaint .rookieui-shell__mini-action-icon")).toHaveText("🖌️");
+  await expect(page.locator("#rookieui-txt2img-preview-extras")).toHaveAttribute("aria-label", "Send to Extras");
   await expect(page.locator("#rookieui-txt2img-preview-extras .rookieui-shell__mini-action-icon")).toHaveText("📐");
+  const txt2imgActionTargetLabels = await page.locator("#rookieui-txt2img-action-target option").evaluateAll((options) =>
+    options.map((option) => option.textContent),
+  );
+  expect(txt2imgActionTargetLabels).toEqual([
+    "Queue / History",
+    "Inspect PNG Info",
+    "Send to Img2Img",
+    "Send to Inpaint",
+    "Send to Extras",
+  ]);
   await expect(
     page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-toolbar .rookieui-shell__mini-action--icon"),
-  ).toHaveCount(6);
+  ).toHaveCount(7);
   await expect(
     page.locator("#rookieui-pane-txt2img .rookieui-shell__preview-overlay-toolbar #rookieui-txt2img-preview-fullscreen"),
   ).toBeVisible();
@@ -886,4 +933,60 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   expect(extrasRequests).toHaveLength(1);
   expect(extrasRequests[0].mode).toBe("single_image");
   await expect(page.locator(".rookieui-shell__footer")).toContainText("host: standalone-web");
+});
+
+test("routes txt2img preview toolbar image handoffs to target panes", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });
+
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123", { timeout: 10000 });
+
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-extras").click();
+  await expect(page.locator("#rookieui-pane-extras")).toBeVisible();
+  await expect(page.locator("#rookieui-extras-single-status")).toContainText("preview-image.png");
+  await expect(page.locator("#rookieui-extras-preview img")).toHaveAttribute(
+    "src",
+    E2E_FINAL_OUTPUT_DATA_URL,
+  );
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-pnginfo").click();
+  await expect(page.locator("#rookieui-pane-pnginfo")).toBeVisible();
+  await expect(page.locator("#rookieui-pnginfo-preview img")).toHaveAttribute(
+    "src",
+    E2E_FINAL_OUTPUT_DATA_URL,
+  );
+  await expect(page.locator("#rookieui-pnginfo-status")).toContainText("Ready to apply txt2img fields");
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-img2img").click();
+  await expectImg2ImgPreviewImportFields(page, { mode: "img2img" });
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-preview-inpaint").click();
+  await expectImg2ImgPreviewImportFields(page, { mode: "inpaint" });
+});
+
+test("applies txt2img preview action-target handoffs with generation fields", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });
+
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123", { timeout: 10000 });
+
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-action-target").selectOption("img2img");
+  await page.locator("#rookieui-txt2img-apply-action-target").click();
+  await expectImg2ImgPreviewImportFields(page, { mode: "img2img" });
+
+  await page.locator("#rookieui-tab-txt2img").click();
+  await setTxt2ImgPreviewImage(page);
+  await page.locator("#rookieui-txt2img-action-target").selectOption("inpaint");
+  await page.locator("#rookieui-txt2img-apply-action-target").click();
+  await expectImg2ImgPreviewImportFields(page, { mode: "inpaint" });
 });

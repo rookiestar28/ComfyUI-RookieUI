@@ -70,6 +70,49 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertIsNone(request.edit_megapixels)
 
+    def test_translate_txt2img_request_embeds_raw_a1111_generation_parameters(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "forest shrine",
+                "negative_prompt": "low detail",
+                "profile": "sd15",
+                "width": 640,
+                "height": 768,
+                "steps": 22,
+                "cfg_scale": 6.5,
+                "sampler_name": "Euler a",
+                "scheduler_name": "Karras",
+                "seed": 1234,
+                "clip_skip": 2,
+            }
+        )
+
+        result = translate_txt2img_request(request).to_payload()
+        save_nodes = [
+            node
+            for node in result["workflow"].values()
+            if node["class_type"] == "RookieUISaveImageWithMetadata"
+        ]
+
+        self.assertEqual(len(save_nodes), 1)
+        parameters = save_nodes[0]["inputs"]["parameters"]
+        self.assertIn("forest shrine", parameters)
+        self.assertIn("Negative prompt: low detail", parameters)
+        self.assertIn("Steps: 22", parameters)
+        self.assertIn("Sampler: Euler a", parameters)
+        self.assertIn("Schedule type: Karras", parameters)
+        self.assertIn("CFG scale: 6.5", parameters)
+        self.assertIn("Seed: 1234", parameters)
+        self.assertIn("Size: 640x768", parameters)
+        self.assertIn("Clip skip: 2", parameters)
+        self.assertNotIn("rookieui_origin", parameters)
+        self.assertNotIn("client_id", parameters)
+        self.assertEqual(
+            result["generation_metadata"]["extra_pnginfo"]["rookieui"]["schema"],
+            "rookieui.generation_metadata.v1",
+        )
+        self.assertNotIn("parameters", result["generation_metadata"]["extra_pnginfo"])
+
     def test_normalize_txt2img_request_normalizes_adetailer_block(self) -> None:
         request = normalize_txt2img_request(
             {
@@ -1583,7 +1626,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         mask_nodes = [node for node in workflow.values() if node["class_type"] == "RookieUIADetailerDetectMask"]
         sampler_nodes = [node for node in workflow.values() if node["class_type"] == "KSampler"]
         decode_nodes = [(node_id, node) for node_id, node in workflow.items() if node["class_type"] == "VAEDecode"]
-        save_nodes = [node for node in workflow.values() if node["class_type"] == "SaveImage"]
+        save_nodes = [node for node in workflow.values() if node["class_type"] == "RookieUISaveImageWithMetadata"]
         encode_texts = [
             node["inputs"]["text"]
             for node in workflow.values()
@@ -1750,6 +1793,14 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["payload"]["status"], "host-unavailable")
 
     def test_txt2img_route_returns_queued_submission_payload(self) -> None:
+        submit_mock = mock.AsyncMock(
+            return_value={
+                "accepted": True,
+                "prompt_id": "prompt-123",
+                "number": 3,
+                "node_errors": {},
+            }
+        )
         with (
             mock.patch.object(
                 routes,
@@ -1759,14 +1810,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             mock.patch.object(
                 routes,
                 "submit_prompt_workflow",
-                new=mock.AsyncMock(
-                    return_value={
-                        "accepted": True,
-                        "prompt_id": "prompt-123",
-                        "number": 3,
-                        "node_errors": {},
-                    }
-                ),
+                new=submit_mock,
             ),
         ):
             response = asyncio.run(
@@ -1784,6 +1828,14 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(response["status"], 200)
         self.assertEqual(response["payload"]["mode"], "queued")
         self.assertEqual(response["payload"]["submission"]["prompt_id"], "prompt-123")
+        submit_kwargs = submit_mock.await_args.kwargs
+        self.assertIn("extra_pnginfo", submit_kwargs)
+        self.assertEqual(
+            submit_kwargs["extra_pnginfo"]["rookieui"]["schema"],
+            "rookieui.generation_metadata.v1",
+        )
+        self.assertEqual(submit_kwargs["extra_pnginfo"]["rookieui"]["surface"], "txt2img")
+        self.assertNotIn("parameters", submit_kwargs["extra_pnginfo"])
 
     def test_txt2img_route_supports_hires_dry_run_payload(self) -> None:
         response = asyncio.run(
