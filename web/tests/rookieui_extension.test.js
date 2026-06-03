@@ -310,6 +310,77 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(statusNode.textContent).toBe("Sent preview image to PNG Info");
   });
 
+  test("runtime preview helper applies inspected generation metadata to Img2Img", async () => {
+    const applyCrossPanePayload = vi.fn(() => true);
+    const inspectPngInfoRequest = vi.fn(async () => ({
+      ok: true,
+      data: {
+        source_type: "a1111",
+        payload: {
+          prompt: "metadata prompt",
+          negative_prompt: "metadata negative",
+          steps: 28,
+          sampler_name: "dpmpp_2m",
+          scheduler_name: "karras",
+          cfg_scale: 6.75,
+          seed: 424242,
+          width: 832,
+          height: 1216,
+          checkpoint_name: "dreamshaper.safetensors",
+          vae_name: "vae-ft-mse.safetensors",
+          clip_skip: 2,
+          hires_enabled: true,
+          hires_scale: 1.5,
+          image_asset: "metadata-should-not-win.png",
+          mask_asset: "metadata-mask-should-not-win.png",
+          batch_images: ["metadata-batch-should-not-win"],
+        },
+      },
+    }));
+    const helpers = createGenerationRuntimeHelpers({
+      emitFrontendDebugWarning: vi.fn(),
+      setPreviewContent: vi.fn(),
+      applyCrossPanePayload,
+      activateShellTab: vi.fn(),
+    });
+    const runtimeState = createGenerationRuntimeState();
+    const statusNode = document.createElement("p");
+    const previewBox = document.createElement("div");
+    previewBox.innerHTML = '<img class="rookieui-shell__preview-image" src="data:image/png;base64,ZmFrZQ==" alt="preview">';
+    const formRegistry = { img2img: { applyPayload: vi.fn() } };
+
+    await helpers.transferPreviewToImg2Img(formRegistry, runtimeState, statusNode, previewBox, { inspectPngInfoRequest });
+
+    expect(inspectPngInfoRequest).toHaveBeenCalledWith({ image_data: "data:image/png;base64,ZmFrZQ==" });
+    expect(applyCrossPanePayload).toHaveBeenCalledWith(
+      formRegistry,
+      "img2img",
+      {
+        prompt: "metadata prompt",
+        negative_prompt: "metadata negative",
+        steps: 28,
+        sampler_name: "dpmpp_2m",
+        scheduler_name: "karras",
+        cfg_scale: 6.75,
+        seed: 424242,
+        width: 832,
+        height: 1216,
+        checkpoint_name: "dreamshaper.safetensors",
+        vae_name: "vae-ft-mse.safetensors",
+        clip_skip: 2,
+        hires_enabled: true,
+        hires_scale: 1.5,
+        mode: "img2img",
+        image_asset: "",
+        image_data: "data:image/png;base64,ZmFrZQ==",
+        mask_asset: "",
+        mask_data: "",
+        batch_images: [],
+      },
+    );
+    expect(statusNode.textContent).toBe("Sent preview image and metadata to Img2Img");
+  });
+
   test("unregisters stale sidebar tabs and exposes custom destroy cleanup", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
@@ -444,9 +515,16 @@ describe("registerRookieUIBootstrapExtension", () => {
               payload: {
                 prompt: "parsed prompt",
                 negative_prompt: "parsed negative",
+                steps: 31,
+                cfg_scale: 6.5,
+                seed: 987654,
                 width: 768,
                 height: 768,
                 sampler_name: "euler_ancestral",
+                scheduler_name: "normal",
+                checkpoint_name: "dreamshaper.safetensors",
+                vae_name: "Automatic",
+                clip_skip: 2,
                 image_asset: "pnginfo_asset.png",
               },
               metadata_items: {
@@ -2199,6 +2277,25 @@ describe("registerRookieUIBootstrapExtension", () => {
       const transferredPreviewImage = document.querySelector("#rookieui-img2img-preview img");
       expect(transferredPreviewImage).not.toBeNull();
       expect(document.getElementById("rookieui-img2img-mode").value).toBe("img2img");
+      expect(document.getElementById("rookieui-img2img-prompt").value).toBe("parsed prompt");
+      expect(document.getElementById("rookieui-img2img-negative-prompt").value).toBe("parsed negative");
+      expect(document.getElementById("rookieui-img2img-steps").value).toBe("31");
+      expect(document.getElementById("rookieui-img2img-sampler").value).toBe("euler_ancestral");
+      expect(document.getElementById("rookieui-img2img-scheduler").value).toBe("normal");
+      expect(document.getElementById("rookieui-img2img-cfg-scale").value).toBe("6.5");
+      expect(document.getElementById("rookieui-img2img-seed").value).toBe("987654");
+      expect(document.getElementById("rookieui-img2img-width").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-height").value).toBe("768");
+      expect(document.getElementById("rookieui-img2img-checkpoint").value).toBe("dreamshaper.safetensors");
+      expect(document.getElementById("rookieui-img2img-vae").value).toBe("Automatic");
+      expect(document.getElementById("rookieui-img2img-clip-skip").value).toBe("2");
+      expect(document.getElementById("rookieui-mask-asset").value).toBe("");
+      if (staleMaskDataField) {
+        expect(staleMaskDataField.value).toBe("");
+      }
+      if (staleBatchImagesField) {
+        expect(staleBatchImagesField.value).toBe("[]");
+      }
     } finally {
       globalThis.fetch = originalFetchForPreviewActions;
     }

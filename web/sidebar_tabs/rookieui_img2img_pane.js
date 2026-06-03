@@ -2217,7 +2217,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
 
   formRegistry.img2img = {
     applyPayload(payload) {
-      applyPayloadToElements(elements, payload, {
+      const generationPayloadMap = {
         prompt: "prompt",
         negative_prompt: "negativePrompt",
         profile: "profileState",
@@ -2225,14 +2225,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         vae_name: "vae",
         text_encoder_name: "textEncoder",
         dtype_profile: "lowBits",
-        mode: "mode",
         width: "width",
         height: "height",
         resize_mode: "resizeMode",
-        image_asset: "imageAsset",
-        image_data: "imageData",
-        mask_asset: "maskAsset",
-        mask_data: "maskData",
         steps: "steps",
         cfg_scale: "cfgScale",
         shift: "shift",
@@ -2246,6 +2241,23 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         batch_size: "batchSize",
         clip_skip: "clipSkip",
         denoise_strength: "denoiseStrength",
+        hires_enabled: "hiresEnabled",
+        hires_scale: "hiresScale",
+        hires_steps: "hiresSteps",
+        hires_denoise: "hiresDenoise",
+        hires_upscale_method: "hiresUpscaleMethod",
+        template_lora_name: "templateLoraName",
+        lora_name: "loraName",
+        lora_strength_model: "loraStrengthModel",
+        lora_strength_clip: "loraStrengthClip",
+      };
+      applyPayloadToElements(elements, payload, {
+        ...generationPayloadMap,
+        mode: "mode",
+        image_asset: "imageAsset",
+        image_data: "imageData",
+        mask_asset: "maskAsset",
+        mask_data: "maskData",
         grow_mask_by: "growMaskBy",
         mask_blur: "maskBlur",
         inpaint_mask_mode: "inpaintMaskMode",
@@ -2259,15 +2271,6 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         soft_inpainting_mask_influence: "softInpaintingMaskInfluence",
         soft_inpainting_difference_threshold: "softInpaintingDifferenceThreshold",
         soft_inpainting_difference_contrast: "softInpaintingDifferenceContrast",
-        hires_enabled: "hiresEnabled",
-        hires_scale: "hiresScale",
-        hires_steps: "hiresSteps",
-        hires_denoise: "hiresDenoise",
-        hires_upscale_method: "hiresUpscaleMethod",
-        template_lora_name: "templateLoraName",
-        lora_name: "loraName",
-        lora_strength_model: "loraStrengthModel",
-        lora_strength_clip: "loraStrengthClip",
       });
       if (Array.isArray(payload.batch_images)) {
         elements.batchImagesData.value = JSON.stringify(payload.batch_images);
@@ -2322,6 +2325,18 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
       syncTemplateLoraControls();
       img2imgModeRouter.syncFromModeValue();
+      // CRITICAL: mode/profile synchronization can restore preset defaults after PNG Info/send-to imports; reapply only generation fields so imported parameters survive without reviving stale image, mask, or batch inputs.
+      applyPayloadToElements(elements, payload, generationPayloadMap);
+      syncClipSkipAvailability(profileLookup, elements.profileState.value, elements.clipSkip, elements.clipSkipSlider);
+      syncFamilyAwareModuleQuicksetting(
+        profileLookup,
+        elements.profileState.value,
+        modulesQuicksetting,
+        modulesQuicksettingLabel,
+        elements.textEncoder,
+      );
+      syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+      syncTemplateLoraControls();
       img2imgMaskCanvasContract.refreshSourceBinding();
       img2imgMaskCanvasContract.handleExternalMaskMutation();
       img2imgModeUi.maskEditor?.refreshFromInputs();

@@ -924,4 +924,16 @@ test("routes txt2img preview toolbar image handoffs to target panes", async ({ p
   await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
   await expect(page.locator("#rookieui-img2img-preview img")).toHaveAttribute("src", /data:image\/png/);
   await expect(page.locator("#rookieui-img2img-mode")).toHaveValue("img2img");
+  await expect(page.locator("#rookieui-img2img-prompt")).toHaveValue("e2e imported prompt");
+  await expect(page.locator("#rookieui-img2img-negative-prompt")).toHaveValue("e2e imported negative");
+  await expect(page.locator("#rookieui-img2img-steps")).toHaveValue("31");
+  await expect(page.locator("#rookieui-img2img-sampler")).toHaveValue("euler_ancestral");
+  await expect(page.locator("#rookieui-img2img-scheduler")).toHaveValue("normal");
+  await expect(page.locator("#rookieui-img2img-cfg-scale")).toHaveValue("6.5");
+  await expect(page.locator("#rookieui-img2img-seed")).toHaveValue("987654");
+  await expect(page.locator("#rookieui-img2img-width")).toHaveValue("768");
+  await expect(page.locator("#rookieui-img2img-height")).toHaveValue("768");
+  await expect(page.locator("#rookieui-img2img-checkpoint")).toHaveValue("realvisxl.safetensors");
+  await expect(page.locator("#rookieui-img2img-vae")).toHaveValue("Automatic");
+  await expect(page.locator("#rookieui-img2img-clip-skip")).toHaveValue("2");
 });
