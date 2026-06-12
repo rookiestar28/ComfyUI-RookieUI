@@ -51,6 +51,44 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
         )
 
+    def test_product_surface_candidates_are_not_exposed_as_current_profiles(self) -> None:
+        manifest_text = "\n".join(
+            " ".join(
+                (
+                    entry.id,
+                    entry.title,
+                    entry.compatibility_summary,
+                    entry.official_template_path,
+                    *entry.aliases,
+                    *entry.notes,
+                )
+            )
+            for entry in list_model_family_registry_entries()
+        )
+
+        for deferred_marker in (
+            "Image Inpainting (Qwen-image)",
+            "Image Outpainting (Qwen-Image)",
+            "Image to Layers(Qwen-Image-Layered)",
+            "Image Upscale(Z-image-Turbo)",
+            "Remove Background (BiRefNet)",
+            "SAM3",
+            "MoGe",
+            "Mediapipe",
+            "Lotus Depth",
+            "Hunyuan3d",
+            "Stable Audio",
+            "ACE-Step",
+            "Wan 2.2",
+            "LTX-2.3",
+            "Wan2.1 VACE",
+            "VOID",
+            "SDPose",
+            "Gemini",
+        ):
+            with self.subTest(deferred_marker=deferred_marker):
+                self.assertNotIn(deferred_marker, manifest_text)
+
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
         flux_entry = get_model_family_registry_entry("flux")
         z_turbo_entry = get_model_family_registry_entry("zit")
