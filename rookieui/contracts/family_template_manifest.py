@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423"
+OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
+OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.9.98"
 
 
 @dataclass(frozen=True)
@@ -392,7 +394,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_06b pairing.",
         ),
         runtime_adapter_id="anima",
-        official_template_path="reference/workflow_templates/Anima.json",
+        official_template_path="reference/ComfyUI/blueprints/Text to Image (Anima).json",
         diffusion_model_hints=("anima",),
         diffusion_model_priority_hints=(("anima",),),
         text_encoder_hints=("anima",),
@@ -507,7 +509,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_override_allowed=True,
         official_template_lora_label="Flux_2-Turbo-LoRA_comfyui.safetensors",
         runtime_adapter_id="flux",
-        official_template_path="reference/workflow_templates/Flux.1 Dev FP8.json",
+        official_template_path="reference/ComfyUI/blueprints/Text to Image (Flux.1 Dev).json",
         diffusion_model_hints=("flux",),
         diffusion_model_priority_hints=(("flux1", "dev"), ("flux1",), ("flux", "dev"), ("flux",)),
         text_encoder_hints=("clip_l", "t5"),
@@ -869,7 +871,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         notes=(
             "Retains the pre-2511 Qwen-Image Edit compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
-            "Current 0.9.91 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current 0.9.98 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
             "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
         ),
         image_edit_profile=True,
@@ -937,7 +939,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the pre-2511 Qwen-Image Edit multi-LoRA compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
             "Template-owned lightning LoRA is stacked three times before any inline LoRA overrides.",
-            "Current 0.9.91 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current 0.9.98 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",
@@ -1185,7 +1187,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         compatibility_summary="Official ComfyUI Flux.2 image-edit template preset on the current non-SD translation seam.",
         aliases=("flux.2 image edit", "flux2 image edit"),
         notes=(
-            "Matches the locked 0.9.91 Flux.2 image-edit template dimensions and core assets.",
+            "Matches the 0.9.98 Flux.2 image-edit template dimensions and core assets.",
             "Edit flow requires one ordered source image and does not require a mask.",
             "The optional turbo-LoRA branch remains out of scope until a dedicated profile is planned.",
         ),
@@ -1227,7 +1229,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the older Flux.2 Klein 9B KV image-edit template defaults.",
             "Edit flow supports ordered multi-reference images and does not require a mask.",
             "The first-wave adapter keeps a bounded three-reference cap even though the shared latent chain can extend further.",
-            "Locked 0.9.91 exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
+            "The 0.9.98 blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",

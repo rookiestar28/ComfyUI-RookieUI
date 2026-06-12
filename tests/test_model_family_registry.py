@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import unittest
 
+from rookieui.contracts.family_template_manifest import OFFICIAL_TEMPLATE_SOURCE_VERSION
 from rookieui.contracts.model_family_registry import (
     MODEL_FAMILY_REGISTRY_CONTRACT_VERSION,
     build_model_family_registry_payload,
     build_primary_model_category_by_family,
     get_model_family_registry_entry,
+    list_model_family_registry_entries,
     model_family_supports_surface_flow,
 )
 from rookieui.services.compatibility import build_compatibility_payload
@@ -30,6 +32,24 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("klein_9b_kv_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("longcat_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
+
+    def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.9.98")
+        entries = list_model_family_registry_entries()
+        stale_entries = [
+            entry.id
+            for entry in entries
+            if "0.9.91" in " ".join((entry.compatibility_summary, *entry.notes, entry.official_template_path))
+        ]
+
+        self.assertEqual(stale_entries, [])
+        source_paths = {entry.id: entry.official_template_path for entry in entries}
+        self.assertEqual(source_paths["anima"], "reference/ComfyUI/blueprints/Text to Image (Anima).json")
+        self.assertEqual(source_paths["flux"], "reference/ComfyUI/blueprints/Text to Image (Flux.1 Dev).json")
+        self.assertEqual(
+            source_paths["flux2_image_edit"],
+            "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
+        )
 
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
         flux_entry = get_model_family_registry_entry("flux")
