@@ -3134,7 +3134,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(document.getElementById("rookieui-txt2img-status").textContent).toContain("asset fallback");
   });
 
-  test("replaces live preview blob with host-aware final history output after completion", async () => {
+  test("replaces live preview blob with host-aware final history output after completion and ignores additive asset ids", async () => {
     document.body.innerHTML = `
       <div class="sidebar-content-container">
         <div class="side-bar-panel">
@@ -3232,7 +3232,7 @@ describe("registerRookieUIBootstrapExtension", () => {
                 outputs: {
                   "9": {
                     images: [
-                      { filename: "final-output.png", subfolder: "", type: "output" },
+                      { filename: "final-output.png", subfolder: "", type: "output", id: "asset-final-output" },
                     ],
                   },
                 },

@@ -75,7 +75,12 @@ class _FakePromptQueue:
                 "outputs": {
                     "7": {
                         "images": [
-                            {"filename": "history-image.png", "type": "output", "subfolder": ""},
+                            {
+                                "filename": "history-image.png",
+                                "type": "output",
+                                "subfolder": "",
+                                "id": "asset-history-1",
+                            },
                         ]
                     }
                 },
@@ -155,6 +160,7 @@ class QueueSnapshotTests(unittest.TestCase):
         self.assertEqual(payload["jobs"][1]["status"], "pending")
         self.assertEqual(payload["jobs"][2]["id"], "other-client-pending")
         history_job = next(job for job in payload["jobs"] if job["id"] == "prompt-history")
+        self.assertEqual(history_job["output_filenames"], ["history-image.png"])
         self.assertEqual(history_job["reusable_outputs"], ["history-image.png"])
         job_ids = [job["id"] for job in payload["jobs"]]
         self.assertNotIn("host-canvas-running", job_ids)
