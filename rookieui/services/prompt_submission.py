@@ -5,6 +5,9 @@ import uuid
 from typing import Any
 
 
+ROOKIEUI_COMFY_USAGE_SOURCE = "comfyui-rookieui"
+
+
 def _get_execution_module() -> Any:
     try:
         import execution
@@ -65,6 +68,8 @@ async def submit_prompt_workflow(
     if isinstance(extra_metadata, dict):
         # IMPORTANT: feature-specific queue metadata must merge here rather than piggybacking on prompt text; queue/history reconstruction depends on explicit internal tags.
         extra_data.update(extra_metadata)
+    # IMPORTANT: direct queue submissions bypass ComfyUI's /prompt header fallback; keep host API-node usage attribution stable.
+    extra_data["comfy_usage_source"] = ROOKIEUI_COMFY_USAGE_SOURCE
     if isinstance(extra_pnginfo, dict) and extra_pnginfo:
         # CRITICAL: keep embeddable PNG metadata separate from queue-only tags; mixing them caused generated files to lose reproducible parameters.
         extra_data["extra_pnginfo"] = extra_pnginfo

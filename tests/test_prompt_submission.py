@@ -5,7 +5,10 @@ import types
 import unittest
 from unittest import mock
 
-from rookieui.services.prompt_submission import submit_prompt_workflow
+from rookieui.services.prompt_submission import (
+    ROOKIEUI_COMFY_USAGE_SOURCE,
+    submit_prompt_workflow,
+)
 
 
 class _FakePromptQueue:
@@ -47,6 +50,7 @@ class PromptSubmissionTests(unittest.TestCase):
         self.assertEqual(queued_item[3]["rookieui_origin"], "rookieui")
         self.assertEqual(queued_item[3]["rookieui_surface"], "txt2img")
         self.assertEqual(queued_item[3]["preview_method"], "auto")
+        self.assertEqual(queued_item[3]["comfy_usage_source"], ROOKIEUI_COMFY_USAGE_SOURCE)
 
     def test_submit_prompt_workflow_merges_extra_metadata(self) -> None:
         prompt_server = _FakePromptServer()
@@ -69,6 +73,27 @@ class PromptSubmissionTests(unittest.TestCase):
 
         queued_item = prompt_server.prompt_queue.items[0]
         self.assertEqual(queued_item[3]["rookieui_xyz_session_id"], "xyz-1")
+
+    def test_submit_prompt_workflow_protects_comfy_usage_source(self) -> None:
+        prompt_server = _FakePromptServer()
+        execution_module = types.SimpleNamespace(
+            validate_prompt=mock.AsyncMock(return_value=(True, None, ["7"], {}))
+        )
+
+        with mock.patch(
+            "rookieui.services.prompt_submission._get_execution_module",
+            return_value=execution_module,
+        ):
+            asyncio.run(
+                submit_prompt_workflow(
+                    prompt_server,
+                    {"7": {"class_type": "SaveImage"}},
+                    extra_metadata={"comfy_usage_source": "comfyui-api"},
+                )
+            )
+
+        queued_item = prompt_server.prompt_queue.items[0]
+        self.assertEqual(queued_item[3]["comfy_usage_source"], ROOKIEUI_COMFY_USAGE_SOURCE)
 
     def test_submit_prompt_workflow_preserves_embeddable_extra_pnginfo(self) -> None:
         prompt_server = _FakePromptServer()
