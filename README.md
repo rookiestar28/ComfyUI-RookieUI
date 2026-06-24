@@ -29,7 +29,8 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
 - The official template manifest is aligned to `comfyui-workflow-templates` 0.10.3; shipped support remains limited to the RookieUI profiles listed below.
-- Newly observed 0.10.3 blueprint product surfaces, including Qwen inpaint/outpaint/layered, Z-Image upscale, BiRefNet background removal, SAM3, MoGe, Mediapipe, Lotus depth, video, audio, 3D, and Gemini captioning workflows, are deferred until a dedicated RookieUI UI/runtime surface exists.
+- Newly observed 0.10.3 blueprint additions, including SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, and Ideogram v4 workflows, are deferred or follow-up candidates until dedicated RookieUI UI/runtime scope exists.
+- Existing deferred blueprint product surfaces, including Qwen inpaint/outpaint/layered, Z-Image upscale, BiRefNet background removal, SAM3, MoGe, Mediapipe, Lotus depth, video, audio, 3D, and Gemini captioning workflows, remain outside the shipped profile list.
 
 </details>
 
@@ -594,7 +595,7 @@ If your host or Manager install path does not automatically install custom-node 
   - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
 - Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
-- Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as future product-surface candidates, not current RookieUI runtime surfaces.
+- SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Ideogram v4, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 

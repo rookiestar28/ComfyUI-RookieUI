@@ -6,6 +6,35 @@ from typing import Any
 MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
 OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.10.3"
+OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
+    "Image Inpainting (Qwen-image)",
+    "Image Outpainting (Qwen-Image)",
+    "Image to Layers(Qwen-Image-Layered)",
+    "Image Upscale(Z-image-Turbo)",
+    "Remove Background (BiRefNet)",
+    "SAM3",
+    "MoGe",
+    "Mediapipe",
+    "Lotus Depth",
+    "Hunyuan3d",
+    "Stable Audio",
+    "ACE-Step",
+    "Wan 2.2",
+    "LTX-2.3",
+    "Wan2.1 VACE",
+    "VOID",
+    "SDPose",
+    "Gemini",
+    "Character Replacement (SCAIL-2 Base)",
+    "Character Replacement (SCAIL-2 Extend)",
+    "Image Depth Estimation (Depth Anything 3)",
+    "Video Depth Estimation (Depth Anything 3)",
+    "Image Edit (Bernini-R)",
+    "Video Edit (Bernini-R)",
+    "Image to Gaussian Splat (TripoSplat)",
+    "Text to Image (Anima Base 1.0)",
+    "Text to Image (Ideogram v4)",
+)
 
 
 @dataclass(frozen=True)

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from rookieui.contracts.family_template_manifest import OFFICIAL_TEMPLATE_SOURCE_VERSION
+from rookieui.contracts.family_template_manifest import (
+    OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
+    OFFICIAL_TEMPLATE_SOURCE_VERSION,
+)
 from rookieui.contracts.model_family_registry import (
     MODEL_FAMILY_REGISTRY_CONTRACT_VERSION,
     build_model_family_registry_payload,
@@ -55,7 +58,24 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
         )
 
-    def test_product_surface_candidates_are_not_exposed_as_current_profiles(self) -> None:
+    def test_host_0_10_3_product_surface_delta_is_tracked_as_deferred_or_follow_up(self) -> None:
+        observed_host_0_10_3_markers = (
+            "Character Replacement (SCAIL-2 Base)",
+            "Character Replacement (SCAIL-2 Extend)",
+            "Image Depth Estimation (Depth Anything 3)",
+            "Video Depth Estimation (Depth Anything 3)",
+            "Image Edit (Bernini-R)",
+            "Video Edit (Bernini-R)",
+            "Image to Gaussian Splat (TripoSplat)",
+            "Text to Image (Anima Base 1.0)",
+            "Text to Image (Ideogram v4)",
+        )
+
+        for observed_marker in observed_host_0_10_3_markers:
+            with self.subTest(observed_marker=observed_marker):
+                self.assertIn(observed_marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
+
+    def test_deferred_product_surface_candidates_are_not_exposed_as_current_profiles(self) -> None:
         manifest_text = "\n".join(
             " ".join(
                 (
@@ -70,26 +90,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             for entry in list_model_family_registry_entries()
         )
 
-        for deferred_marker in (
-            "Image Inpainting (Qwen-image)",
-            "Image Outpainting (Qwen-Image)",
-            "Image to Layers(Qwen-Image-Layered)",
-            "Image Upscale(Z-image-Turbo)",
-            "Remove Background (BiRefNet)",
-            "SAM3",
-            "MoGe",
-            "Mediapipe",
-            "Lotus Depth",
-            "Hunyuan3d",
-            "Stable Audio",
-            "ACE-Step",
-            "Wan 2.2",
-            "LTX-2.3",
-            "Wan2.1 VACE",
-            "VOID",
-            "SDPose",
-            "Gemini",
-        ):
+        for deferred_marker in OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS:
             with self.subTest(deferred_marker=deferred_marker):
                 self.assertNotIn(deferred_marker, manifest_text)
 
