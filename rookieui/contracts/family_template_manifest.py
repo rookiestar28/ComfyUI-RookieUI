@@ -5,7 +5,7 @@ from typing import Any
 
 MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
-OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.9.98"
+OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.10.3"
 
 
 @dataclass(frozen=True)
@@ -871,7 +871,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         notes=(
             "Retains the pre-2511 Qwen-Image Edit compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
-            "Current 0.9.98 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current 0.10.3 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
             "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
         ),
         image_edit_profile=True,
@@ -939,7 +939,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the pre-2511 Qwen-Image Edit multi-LoRA compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
             "Template-owned lightning LoRA is stacked three times before any inline LoRA overrides.",
-            "Current 0.9.98 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current 0.10.3 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",
@@ -1187,7 +1187,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         compatibility_summary="Official ComfyUI Flux.2 image-edit template preset on the current non-SD translation seam.",
         aliases=("flux.2 image edit", "flux2 image edit"),
         notes=(
-            "Matches the 0.9.98 Flux.2 image-edit template dimensions and core assets.",
+            "Matches the 0.10.3 Flux.2 image-edit template dimensions and core assets.",
             "Edit flow requires one ordered source image and does not require a mask.",
             "The optional turbo-LoRA branch remains out of scope until a dedicated profile is planned.",
         ),
@@ -1229,7 +1229,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the older Flux.2 Klein 9B KV image-edit template defaults.",
             "Edit flow supports ordered multi-reference images and does not require a mask.",
             "The first-wave adapter keeps a bounded three-reference cap even though the shared latent chain can extend further.",
-            "The 0.9.98 blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
+            "The 0.10.3 blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",

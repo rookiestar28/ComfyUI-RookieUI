@@ -257,7 +257,7 @@ def _append_z_image_controlnet_image_adapter(
         canny_ref = [canny_id, 0]
         return canny_ref, canny_ref, mask_ref
     if module == "depth":
-        # IMPORTANT: the 0.9.98 blueprint set includes Lotus depth workflows, but this Z-Image
+        # IMPORTANT: the 0.10.3 blueprint set includes Lotus depth workflows, but this Z-Image
         # ControlNet image edge is still the scaled input image; do not invent a Lotus runtime branch here.
         scale_id = _append_image_scale_to_total_pixels_node(
             workflow,

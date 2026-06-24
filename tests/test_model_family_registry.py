@@ -34,12 +34,16 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.9.98")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.10.3")
         entries = list_model_family_registry_entries()
+        stale_source_markers = ("0.9.91", "0.9.98")
         stale_entries = [
             entry.id
             for entry in entries
-            if "0.9.91" in " ".join((entry.compatibility_summary, *entry.notes, entry.official_template_path))
+            if any(
+                marker in " ".join((entry.compatibility_summary, *entry.notes, entry.official_template_path))
+                for marker in stale_source_markers
+            )
         ]
 
         self.assertEqual(stale_entries, [])
