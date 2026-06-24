@@ -1092,7 +1092,9 @@ class RookieUISaveImageWithMetadata:
             },
         }
 
-    RETURN_TYPES = ()
+    # IMPORTANT: keep aligned with host SaveImage so output-node pass-through chains keep working.
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("images",)
     FUNCTION = "save_images"
     OUTPUT_NODE = True
     CATEGORY = "RookieUI/output"
@@ -1148,7 +1150,7 @@ class RookieUISaveImageWithMetadata:
                 }
             )
             counter += 1
-        return {"ui": {"images": results}}
+        return {"ui": {"images": results}, "result": (images,)}
 
 
 NODE_CLASS_MAPPINGS = {

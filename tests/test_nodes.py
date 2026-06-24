@@ -44,6 +44,92 @@ class RookieUINodesTests(unittest.TestCase):
             "RookieUI ControlNet Apply (Advanced)",
         )
 
+    def test_save_image_with_metadata_exposes_host_aligned_output_contract(self) -> None:
+        self.assertEqual(nodes.RookieUISaveImageWithMetadata.RETURN_TYPES, ("IMAGE",))
+        self.assertEqual(nodes.RookieUISaveImageWithMetadata.RETURN_NAMES, ("images",))
+        self.assertEqual(nodes.RookieUISaveImageWithMetadata.FUNCTION, "save_images")
+        self.assertTrue(nodes.RookieUISaveImageWithMetadata.OUTPUT_NODE)
+
+    def test_save_image_with_metadata_returns_ui_and_passthrough_result(self) -> None:
+        if nodes.np is None:
+            self.skipTest("numpy is unavailable in this environment")
+
+        saved_calls = []
+
+        class _FakeTensor:
+            shape = (2, 3, 3)
+
+            def cpu(self):
+                return self
+
+            def numpy(self):
+                return nodes.np.ones((2, 3, 3), dtype=nodes.np.float32)
+
+        class _FakePngInfo:
+            def __init__(self) -> None:
+                self.entries = []
+
+            def add_text(self, key, value) -> None:
+                self.entries.append((key, value))
+
+        class _FakeSavedImage:
+            def save(self, path, pnginfo=None, compress_level=None) -> None:
+                saved_calls.append(
+                    {
+                        "path": str(path),
+                        "pnginfo": pnginfo,
+                        "compress_level": compress_level,
+                    }
+                )
+
+        class _FakeImageModule:
+            @staticmethod
+            def fromarray(_array):
+                return _FakeSavedImage()
+
+        class _FakeFolderPaths:
+            @staticmethod
+            def get_output_directory():
+                return "C:/tmp/rookieui-output"
+
+            @staticmethod
+            def get_save_image_path(filename_prefix, output_dir, width, height):
+                self.assertEqual(output_dir, "C:/tmp/rookieui-output")
+                self.assertEqual((width, height), (3, 2))
+                return "C:/tmp/rookieui-output", filename_prefix, 1, "", filename_prefix
+
+        images = [_FakeTensor()]
+        with (
+            mock.patch.object(nodes, "folder_paths", _FakeFolderPaths),
+            mock.patch.object(nodes, "Image", _FakeImageModule),
+            mock.patch.object(nodes, "PngInfo", _FakePngInfo),
+            mock.patch.object(nodes, "_metadata_disabled", return_value=False),
+        ):
+            save_node = nodes.RookieUISaveImageWithMetadata()
+            result = save_node.save_images(
+                images=images,
+                filename_prefix="RookieUI",
+                parameters="forest shrine\x00\nSteps: 2",
+                prompt={"1": "node"},
+                extra_pnginfo={
+                    "parameters": "must not override",
+                    "rookieui_origin": {"source": "unit"},
+                },
+            )
+
+        self.assertEqual(
+            result["ui"]["images"],
+            [{"filename": "RookieUI_00001_.png", "subfolder": "", "type": "output"}],
+        )
+        self.assertEqual(result["result"], (images,))
+        self.assertEqual(len(saved_calls), 1)
+        self.assertEqual(saved_calls[0]["compress_level"], 4)
+        metadata_entries = saved_calls[0]["pnginfo"].entries
+        self.assertIn(("parameters", "forest shrine\nSteps: 2"), metadata_entries)
+        self.assertIn(("prompt", '{"1": "node"}'), metadata_entries)
+        self.assertIn(("rookieui_origin", '{"source": "unit"}'), metadata_entries)
+        self.assertNotIn(("parameters", "must not override"), metadata_entries)
+
     def test_a1111_clip_text_encode_rewrites_square_bracket_deemphasis(self) -> None:
         class _FakeClip:
             def __init__(self) -> None:
