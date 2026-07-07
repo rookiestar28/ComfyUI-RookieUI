@@ -29,8 +29,10 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
 - The official template manifest is aligned to `comfyui-workflow-templates` 0.11.2; shipped support remains limited to the RookieUI profiles listed below.
+- Local `Ideogram v4` and `Krea-2 Turbo` txt2img workflows are now exposed as official template-backed profiles with host-specific model, encoder, VAE, sampler, and template LoRA prerequisites surfaced through the normal model selector contract.
 - `RookieUISaveImageWithMetadata` now mirrors the current host `SaveImage` pass-through `IMAGE` output socket while preserving raw A1111 `parameters` PNG metadata.
-- Newly observed host blueprint/gallery additions, including SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Ideogram v4, Krea-2 Turbo, Gemini Omni Flash, HappyHorse, Nano Banana, and Seedance workflows, are deferred or follow-up candidates until dedicated RookieUI UI/runtime scope exists.
+- API-provider Ideogram/Krea workflows and Krea style-reference workflow remain unsupported until dedicated provider, credential, and image-reference runtime scope exists.
+- Newly observed host blueprint/gallery additions, including SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Gemini Omni Flash, HappyHorse, Nano Banana, and Seedance workflows, are deferred or follow-up candidates until dedicated RookieUI UI/runtime scope exists.
 - Existing deferred blueprint product surfaces, including Qwen inpaint/outpaint/layered, Z-Image upscale, BiRefNet background removal, SAM3, MoGe, Mediapipe, Lotus depth, video, audio, 3D, and Gemini captioning workflows, remain outside the shipped profile list.
 
 </details>
@@ -210,7 +212,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>Official non-SD template preset expansion, inline LoRA chaining, and truthful host gating (new functionality/stability)</strong></summary>
 
 - Expanded RookieUI's non-SD preset matrix to official ComfyUI text-to-image template families, including `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.2 Klein` variants, `HiDream i1` variants, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
-- Recent official template refreshes also add `Flux.1 Krea Dev` and `Flux.2 Dev` as txt2img profiles, and `Qwen-Image Edit 2511` as an image-edit profile on the `img2img` surface.
+- Recent official template refreshes also add `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo` as txt2img profiles, and `Qwen-Image Edit 2511` as an image-edit profile on the `img2img` surface.
 - Aligned runtime translation to official non-SD topology and parameter semantics instead of generic fallback graphs, including family-specific `Shift`, `Flux Guidance`, `Prompt Enhancement`, and template-owned hidden encoder bundles where the official workflows require them.
 - Shipped official non-SD template paths now also support prompt-inline `<lora:model_name:weight>` chaining, preserving any template-owned LoRA first and then appending user inline LoRAs through model-only `Load LoRA` nodes before host submission.
 - Tightened catalog validation so official non-SD presets only pass when the active ComfyUI host exposes the required family-aligned models and template assets; missing host assets are now reported as external prerequisites instead of silently accepted fallback matches.
@@ -513,7 +515,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
 - Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including parser modes, `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, old-emphasis compatibility, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
-- Official txt2img profiles include newer Flux lanes such as `Flux.1 Krea Dev` and `Flux.2 Dev`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
+- Official txt2img profiles include newer lanes such as `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
 - Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
 - ComfyUI-native prompt submission with host API-node usage-source attribution, embedded A1111-style `parameters` metadata, and separate RookieUI origin metadata
 
@@ -588,7 +590,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Official Non-SD Template Presets
 
-- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Distilled Klein`, `Flux.2 4B Klein`, `Flux.2 9B Distilled Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - Current official-template alignment uses `comfyui-workflow-templates` 0.11.2 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
 - These presets follow official template defaults for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
@@ -596,7 +598,7 @@ If your host or Manager install path does not automatically install custom-node 
   - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
 - Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
-- SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Ideogram v4, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces.
+- API-provider Ideogram/Krea workflows, Krea style-reference workflow, SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
@@ -611,6 +613,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Template-owned LoRA controls are exposed for visible profiles:
   - `Flux.1 Dev FP8`
   - `Flux.2 Dev`
+  - `Krea-2 Turbo`
   - `Qwen-Image 2512`
   - `Qwen-Image Edit`
   - `FireRed Image Edit Lightning`
@@ -649,7 +652,7 @@ Behavior and limits:
 ### Model Support
 
 - Stable Diffusion family
-- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1`, `Flux.2`, `HiDream i1`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
+- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1`, `Flux.2`, `HiDream i1`, `Ideogram`, `Krea-2`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
 - `Z-Image` also covers the Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
 
 Prompt semantics note:
