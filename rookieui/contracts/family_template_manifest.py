@@ -5,8 +5,8 @@ from typing import Any
 
 MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
-OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.10.3"
-OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
+OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.11.2"
+OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     "Image Inpainting (Qwen-image)",
     "Image Outpainting (Qwen-Image)",
     "Image to Layers(Qwen-Image-Layered)",
@@ -34,6 +34,41 @@ OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     "Image to Gaussian Splat (TripoSplat)",
     "Text to Image (Anima Base 1.0)",
     "Text to Image (Ideogram v4)",
+)
+OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
+    "image_ideogram4_t2i",
+    "image_krea2_turbo_t2i",
+    "api_ideogram_v4_t2i",
+    "api_krea2_t2i",
+    "api_krea2_style_reference",
+    "api_google_gemini_omni_flash_i2v",
+    "api_google_gemini_omni_flash_t2v",
+    "api_google_gemini_omni_flash_video_edit",
+    "api_happyhorse1_1_i2v",
+    "api_happyhorse1_1_r2v",
+    "api_happyhorse1_1_t2v",
+    "api_nano_banana_2_lite_image_edit",
+    "api_nano_banana_2_lite_t2i",
+    "api_seedance2_0_mini_r2v",
+    "api_seedance2_0_mini_t2v",
+    "api_seedance2_0_r2v_4k",
+)
+OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS: tuple[str, ...] = (
+    "api_ideogram_v3_t2i",
+    "api_openai_sora_video",
+    "api_stability_ai_audio_inpaint",
+    "api_stability_ai_audio_to_audio",
+    "api_stability_ai_i2i",
+    "api_stability_ai_sd3.5_i2i",
+    "api_stability_ai_sd3.5_t2i",
+    "api_stability_ai_stable_image_ultra_t2i",
+    "api_stability_ai_text_to_audio",
+    "api_stability_upscale_fast",
+)
+OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
+    *OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS,
+    *OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
+    *OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
 )
 
 
@@ -900,7 +935,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         notes=(
             "Retains the pre-2511 Qwen-Image Edit compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
-            "Current 0.10.3 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
             "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
         ),
         image_edit_profile=True,
@@ -968,7 +1003,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the pre-2511 Qwen-Image Edit multi-LoRA compatibility defaults.",
             "Edit flow requires a source image but does not require a mask.",
             "Template-owned lightning LoRA is stacked three times before any inline LoRA overrides.",
-            "Current 0.10.3 Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+            "Current Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",
@@ -1216,7 +1251,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         compatibility_summary="Official ComfyUI Flux.2 image-edit template preset on the current non-SD translation seam.",
         aliases=("flux.2 image edit", "flux2 image edit"),
         notes=(
-            "Matches the 0.10.3 Flux.2 image-edit template dimensions and core assets.",
+            "Matches the current Flux.2 image-edit template dimensions and core assets.",
             "Edit flow requires one ordered source image and does not require a mask.",
             "The optional turbo-LoRA branch remains out of scope until a dedicated profile is planned.",
         ),
@@ -1258,7 +1293,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Retains the older Flux.2 Klein 9B KV image-edit template defaults.",
             "Edit flow supports ordered multi-reference images and does not require a mask.",
             "The first-wave adapter keeps a bounded three-reference cap even though the shared latent chain can extend further.",
-            "The 0.10.3 blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
+            "The current blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
         ),
         image_edit_profile=True,
         request_contract_surface="img2img",

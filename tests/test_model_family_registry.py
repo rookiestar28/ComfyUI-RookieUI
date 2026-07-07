@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 
 from rookieui.contracts.family_template_manifest import (
+    OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS,
     OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
+    OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
+    OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
     OFFICIAL_TEMPLATE_SOURCE_VERSION,
 )
 from rookieui.contracts.model_family_registry import (
@@ -37,9 +40,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.10.3")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.2")
         entries = list_model_family_registry_entries()
-        stale_source_markers = ("0.9.91", "0.9.98")
+        stale_source_markers = ("0.9.91", "0.9.98", "0.10.3")
         stale_entries = [
             entry.id
             for entry in entries
@@ -58,8 +61,8 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
         )
 
-    def test_host_0_10_3_product_surface_delta_is_tracked_as_deferred_or_follow_up(self) -> None:
-        observed_host_0_10_3_markers = (
+    def test_host_0_11_2_blueprint_product_surface_delta_is_tracked_as_deferred_or_follow_up(self) -> None:
+        observed_host_blueprint_markers = (
             "Character Replacement (SCAIL-2 Base)",
             "Character Replacement (SCAIL-2 Extend)",
             "Image Depth Estimation (Depth Anything 3)",
@@ -71,9 +74,58 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             "Text to Image (Ideogram v4)",
         )
 
-        for observed_marker in observed_host_0_10_3_markers:
+        for observed_marker in observed_host_blueprint_markers:
             with self.subTest(observed_marker=observed_marker):
-                self.assertIn(observed_marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
+                self.assertIn(observed_marker, OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
+
+    def test_host_0_11_2_gallery_json_delta_is_tracked_separately(self) -> None:
+        expected_deferred_gallery_markers = (
+            "image_ideogram4_t2i",
+            "image_krea2_turbo_t2i",
+            "api_ideogram_v4_t2i",
+            "api_krea2_t2i",
+            "api_krea2_style_reference",
+            "api_google_gemini_omni_flash_i2v",
+            "api_google_gemini_omni_flash_t2v",
+            "api_google_gemini_omni_flash_video_edit",
+            "api_happyhorse1_1_i2v",
+            "api_happyhorse1_1_r2v",
+            "api_happyhorse1_1_t2v",
+            "api_nano_banana_2_lite_image_edit",
+            "api_nano_banana_2_lite_t2i",
+            "api_seedance2_0_mini_r2v",
+            "api_seedance2_0_mini_t2v",
+            "api_seedance2_0_r2v_4k",
+        )
+        expected_removed_gallery_markers = (
+            "api_ideogram_v3_t2i",
+            "api_openai_sora_video",
+            "api_stability_ai_audio_inpaint",
+            "api_stability_ai_audio_to_audio",
+            "api_stability_ai_i2i",
+            "api_stability_ai_sd3.5_i2i",
+            "api_stability_ai_sd3.5_t2i",
+            "api_stability_ai_stable_image_ultra_t2i",
+            "api_stability_ai_text_to_audio",
+            "api_stability_upscale_fast",
+        )
+
+        self.assertGreater(len(OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS), 0)
+        self.assertGreater(len(OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS), 0)
+        self.assertGreater(len(OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS), 0)
+        self.assertFalse(
+            set(OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
+            & set(OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS)
+        )
+
+        for marker in expected_deferred_gallery_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS)
+                self.assertIn(marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
+        for marker in expected_removed_gallery_markers:
+            with self.subTest(marker=marker):
+                self.assertIn(marker, OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS)
+                self.assertIn(marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
 
     def test_deferred_product_surface_candidates_are_not_exposed_as_current_profiles(self) -> None:
         manifest_text = "\n".join(
