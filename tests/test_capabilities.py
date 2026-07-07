@@ -194,11 +194,12 @@ class CapabilitySnapshotTests(unittest.TestCase):
     def test_capabilities_snapshot_exposes_model_family_registry(self) -> None:
         payload = build_capabilities_snapshot()
 
-        self.assertEqual(payload["model_families"]["contract_version"], "f168-20260423")
+        self.assertEqual(payload["model_families"]["contract_version"], "model-family-20260707")
         family_ids = [entry["id"] for entry in payload["model_families"]["entries"]]
         self.assertIn("sd15", family_ids)
         self.assertIn("chroma", family_ids)
         self.assertIn("flux", family_ids)
+        self.assertIn("ideogram4", family_ids)
         self.assertIn("flux_krea_dev", family_ids)
         self.assertIn("flux2_dev", family_ids)
         self.assertIn("ernie_image", family_ids)
@@ -215,6 +216,7 @@ class CapabilitySnapshotTests(unittest.TestCase):
         flux_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux")
         flux_krea_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux_krea_dev")
         flux2_dev_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "flux2_dev")
+        ideogram_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ideogram4")
         ernie_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "ernie_image")
         qwen_image_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image")
         z_turbo_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "z_image_turbo")
@@ -235,6 +237,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertTrue(flux2_dev_entry["template_lora_visible"])
         self.assertEqual(flux2_dev_entry["official_template_lora_label"], "Flux_2-Turbo-LoRA_comfyui.safetensors")
         self.assertEqual(flux2_dev_entry["available_surface_flows"], ["txt2img"])
+        self.assertEqual(ideogram_entry["public_base_family"], "ideogram4")
+        self.assertEqual(ideogram_entry["default_steps"], 20)
+        self.assertEqual(ideogram_entry["default_cfg_scale"], 7.0)
+        self.assertFalse(ideogram_entry["text_encoder_visible"])
         self.assertEqual(ernie_entry["translation_base_family"], "sdxl")
         self.assertEqual(ernie_entry["public_base_family"], "ernie_image")
         self.assertEqual(ernie_entry["default_steps"], 20)

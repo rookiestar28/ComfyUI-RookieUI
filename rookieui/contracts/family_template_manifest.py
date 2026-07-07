@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
 OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.11.2"
 OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
@@ -33,10 +33,8 @@ OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     "Video Edit (Bernini-R)",
     "Image to Gaussian Splat (TripoSplat)",
     "Text to Image (Anima Base 1.0)",
-    "Text to Image (Ideogram v4)",
 )
 OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
-    "image_ideogram4_t2i",
     "image_krea2_turbo_t2i",
     "api_ideogram_v4_t2i",
     "api_krea2_t2i",
@@ -652,6 +650,35 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         ),
         vae_hints=("encoder", "decoder", "flux2"),
         vae_priority_hints=(("full", "encoder", "small", "decoder"), ("flux2", "vae"), ("encoder", "decoder")),
+    ),
+    _template_entry(
+        id="ideogram4",
+        title="Ideogram v4",
+        public_base_family="ideogram4",
+        default_width=1024,
+        default_height=1024,
+        default_steps=20,
+        default_cfg_scale=7.0,
+        default_sampler="euler",
+        default_scheduler="simple",
+        compatibility_summary="Official ComfyUI Ideogram v4 local text-to-image template preset on the current non-SD translation seam.",
+        aliases=("ideogram", "ideogram v4", "ideogram4"),
+        notes=(
+            "Matches the official local Ideogram v4 text-to-image template defaults.",
+            "Text Encoder selector stays hidden because the official template owns the fixed qwen3vl_8b pairing.",
+            "The required unconditional Ideogram model is a hidden official graph asset, not a separate RookieUI selector.",
+            "API-provider Ideogram remains unsupported.",
+        ),
+        runtime_adapter_id="ideogram4",
+        official_template_path="reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json",
+        diffusion_model_hints=("ideogram4", "ideogram"),
+        diffusion_model_priority_hints=(("ideogram4", "fp8", "scaled"), ("ideogram4",), ("ideogram",)),
+        diffusion_model_deny_hints=("unconditional",),
+        text_encoder_hints=("qwen3vl", "qwen", "ideogram4"),
+        text_encoder_priority_hints=(("qwen3vl", "8b"), ("qwen3vl_8b",), ("qwen", "3", "vl", "8b")),
+        vae_hints=("flux2", "vae"),
+        vae_priority_hints=(("flux2", "vae"), ("flux", "2", "vae")),
+        vae_deny_hints=("qwen",),
     ),
     _template_entry(
         id="klein_4b_distilled",

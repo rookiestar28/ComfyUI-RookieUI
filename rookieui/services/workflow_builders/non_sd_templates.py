@@ -42,6 +42,12 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     "请据此扩写为一段内容丰富、细节充分的视觉描述，以帮助文生图模型生成高质量的图片。仅输出增强后的描述，"
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
+_IDEOGRAM4_UNCONDITIONAL_UNET_NAME = "ideogram4_unconditional_fp8_scaled.safetensors"
+_IDEOGRAM4_DEFAULT_MU = 0.0
+_IDEOGRAM4_DEFAULT_STD = 1.75
+_IDEOGRAM4_CFG_OVERRIDE = 3.0
+_IDEOGRAM4_CFG_OVERRIDE_START_PERCENT = 0.7
+_IDEOGRAM4_CFG_OVERRIDE_END_PERCENT = 1.0
 _OFFICIAL_NON_SD_TXT2IMG_PROFILES = frozenset(build_non_sd_txt2img_profile_ids())
 _OFFICIAL_NON_SD_EDIT_PROFILES = frozenset(entry.id for entry in list_non_sd_edit_manifest_entries())
 _NON_SD_RUNTIME_ADAPTER_BY_PROFILE = build_non_sd_runtime_adapter_map()
@@ -418,6 +424,30 @@ def _append_flux2_scheduler_node(
     return node_id
 
 
+def _append_ideogram4_scheduler_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    steps: int,
+    width: int,
+    height: int,
+    mu: float,
+    std: float,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "Ideogram4Scheduler",
+        "inputs": {
+            "steps": steps,
+            "width": width,
+            "height": height,
+            "mu": mu,
+            "std": std,
+        },
+    }
+    return node_id
+
+
 def _append_sampler_custom_advanced_node(
     workflow: dict[str, object],
     *,
@@ -437,6 +467,52 @@ def _append_sampler_custom_advanced_node(
             "sampler": _to_node_ref(sampler_id),
             "sigmas": _to_node_ref(sigmas_id),
             "latent_image": _to_node_ref(latent_id),
+        },
+    }
+    return node_id
+
+
+def _append_cfg_override_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    model_source: list[object],
+    cfg: float,
+    start_percent: float,
+    end_percent: float,
+) -> list[object]:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "CFGOverride",
+        "inputs": {
+            "model": model_source,
+            "cfg": cfg,
+            "start_percent": start_percent,
+            "end_percent": end_percent,
+        },
+    }
+    return [node_id, 0]
+
+
+def _append_dual_model_guider_node(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    model_source: list[object],
+    positive_id: str | list[object],
+    negative_model_source: list[object],
+    negative_id: str | list[object],
+    cfg_scale: float,
+) -> str:
+    node_id = allocator.next()
+    workflow[node_id] = {
+        "class_type": "DualModelGuider",
+        "inputs": {
+            "model": model_source,
+            "positive": _to_node_ref(positive_id),
+            "model_negative": negative_model_source,
+            "negative": _to_node_ref(negative_id),
+            "cfg": cfg_scale,
         },
     }
     return node_id
@@ -1322,6 +1398,97 @@ def _build_flux2_dev_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
     return workflow
 
 
+def _build_ideogram4_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    main_unet_id = allocator.next()
+    workflow[main_unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    unconditional_unet_id = allocator.next()
+    # IMPORTANT: the official local Ideogram graph requires a second unconditional UNET,
+    # but RookieUI exposes only the main model selector in the current txt2img contract.
+    workflow[unconditional_unet_id] = _build_unet_loader_node(_IDEOGRAM4_UNCONDITIONAL_UNET_NAME)
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="ideogram4",
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    positive_id = prompt_conditioning._append_prompt_encode_node(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        text=request.prompt,
+        prompt_encoder="sd15",
+    )
+    negative_id = _append_conditioning_zero_out_node(
+        workflow,
+        allocator=allocator,
+        conditioning_id=positive_id,
+    )
+    latent_id = _append_empty_latent_node(
+        workflow,
+        allocator=allocator,
+        class_type="EmptyFlux2LatentImage",
+        width=request.width,
+        height=request.height,
+        batch_size=request.batch_size,
+    )
+    noise_id = _append_random_noise_node(workflow, allocator=allocator, noise_seed=request.execution_seed)
+    sampler_select_id = _append_ksampler_select_node(
+        workflow,
+        allocator=allocator,
+        sampler_name=request.sampler_name,
+    )
+    scheduler_id = _append_ideogram4_scheduler_node(
+        workflow,
+        allocator=allocator,
+        steps=request.steps,
+        width=request.width,
+        height=request.height,
+        mu=_IDEOGRAM4_DEFAULT_MU,
+        std=_IDEOGRAM4_DEFAULT_STD,
+    )
+    guided_model_source = _append_cfg_override_node(
+        workflow,
+        allocator=allocator,
+        model_source=[main_unet_id, 0],
+        cfg=_IDEOGRAM4_CFG_OVERRIDE,
+        start_percent=_IDEOGRAM4_CFG_OVERRIDE_START_PERCENT,
+        end_percent=_IDEOGRAM4_CFG_OVERRIDE_END_PERCENT,
+    )
+    guider_id = _append_dual_model_guider_node(
+        workflow,
+        allocator=allocator,
+        model_source=guided_model_source,
+        positive_id=positive_id,
+        negative_model_source=[unconditional_unet_id, 0],
+        negative_id=negative_id,
+        cfg_scale=request.cfg_scale,
+    )
+    sampler_id = _append_sampler_custom_advanced_node(
+        workflow,
+        allocator=allocator,
+        noise_id=noise_id,
+        guider_id=guider_id,
+        sampler_id=sampler_select_id,
+        sigmas_id=scheduler_id,
+        latent_id=latent_id,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+        request=request,
+    )
+    return workflow
+
+
 def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
@@ -1696,6 +1863,7 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
     "hidream": _build_hidream_workflow,
     "chroma": _build_chroma_workflow,
     "flux2_dev": _build_flux2_dev_workflow,
+    "ideogram4": _build_ideogram4_workflow,
     "klein": lambda request: _build_klein_workflow(request, distilled=False),
     "klein_distilled": lambda request: _build_klein_workflow(request, distilled=True),
     "qwen_image": _build_qwen_image_workflow,

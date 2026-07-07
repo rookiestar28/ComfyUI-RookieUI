@@ -29,6 +29,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(payload["entries"][0]["id"], "sd15")
         self.assertIn("chroma", [entry["id"] for entry in payload["entries"]])
         self.assertIn("flux", [entry["id"] for entry in payload["entries"]])
+        self.assertIn("ideogram4", [entry["id"] for entry in payload["entries"]])
         self.assertIn("ernie_image", [entry["id"] for entry in payload["entries"]])
         self.assertIn("qwen_image_edit_multi_lora", [entry["id"] for entry in payload["entries"]])
         self.assertIn("firered_image_edit", [entry["id"] for entry in payload["entries"]])
@@ -56,6 +57,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         source_paths = {entry.id: entry.official_template_path for entry in entries}
         self.assertEqual(source_paths["anima"], "reference/ComfyUI/blueprints/Text to Image (Anima).json")
         self.assertEqual(source_paths["flux"], "reference/ComfyUI/blueprints/Text to Image (Flux.1 Dev).json")
+        self.assertEqual(source_paths["ideogram4"], "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json")
         self.assertEqual(
             source_paths["flux2_image_edit"],
             "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
@@ -71,16 +73,15 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             "Video Edit (Bernini-R)",
             "Image to Gaussian Splat (TripoSplat)",
             "Text to Image (Anima Base 1.0)",
-            "Text to Image (Ideogram v4)",
         )
 
         for observed_marker in observed_host_blueprint_markers:
             with self.subTest(observed_marker=observed_marker):
                 self.assertIn(observed_marker, OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
+        self.assertNotIn("Text to Image (Ideogram v4)", OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
 
     def test_host_0_11_2_gallery_json_delta_is_tracked_separately(self) -> None:
         expected_deferred_gallery_markers = (
-            "image_ideogram4_t2i",
             "image_krea2_turbo_t2i",
             "api_ideogram_v4_t2i",
             "api_krea2_t2i",
@@ -126,6 +127,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS)
                 self.assertIn(marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
+        self.assertNotIn("image_ideogram4_t2i", OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS)
 
     def test_deferred_product_surface_candidates_are_not_exposed_as_current_profiles(self) -> None:
         manifest_text = "\n".join(
@@ -151,6 +153,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         z_turbo_entry = get_model_family_registry_entry("zit")
         chroma_entry = get_model_family_registry_entry("chroma")
         ernie_entry = get_model_family_registry_entry("ernie_image")
+        ideogram_entry = get_model_family_registry_entry("ideogram v4")
         longcat_entry = get_model_family_registry_entry("longcat_image")
 
         self.assertEqual(flux_entry.translation_base_family, "sdxl")
@@ -164,6 +167,11 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(chroma_entry.default_shift, 1.0)
         self.assertTrue(ernie_entry.prompt_enhancement_visible)
         self.assertTrue(ernie_entry.default_prompt_enhancement_enabled)
+        self.assertEqual(ideogram_entry.id, "ideogram4")
+        self.assertEqual(ideogram_entry.public_base_family, "ideogram4")
+        self.assertEqual(ideogram_entry.default_cfg_scale, 7.0)
+        self.assertFalse(ideogram_entry.text_encoder_visible)
+        self.assertEqual(ideogram_entry.official_template_path, "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json")
         self.assertTrue(longcat_entry.flux_guidance_visible)
         self.assertEqual(longcat_entry.default_flux_guidance, 4.0)
         self.assertEqual(z_turbo_entry.id, "z_image_turbo")
@@ -241,6 +249,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(category_map["pony"], "checkpoints")
         self.assertEqual(category_map["klein"], "diffusion_models")
         self.assertEqual(category_map["hidream"], "diffusion_models")
+        self.assertEqual(category_map["ideogram4"], "diffusion_models")
         self.assertEqual(category_map["lumina"], "diffusion_models")
         self.assertEqual(category_map["ernie_image"], "diffusion_models")
 
@@ -270,6 +279,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         )
         kontext_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "flux_kontext_dev_edit")
         flux2_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "flux2_image_edit")
+        ideogram_preset = next(preset for preset in payload["presets"] if preset["id"] == "ideogram4")
         klein_kv_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "klein_9b_kv_image_edit")
         longcat_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "longcat_image_edit")
         z_turbo_preset = next(preset for preset in payload["presets"] if preset["id"] == "z_image_turbo")
@@ -296,6 +306,10 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(kontext_edit_preset["max_direct_references"], 3)
         self.assertEqual(flux2_edit_preset["reference_input_mode"], "single")
         self.assertEqual(flux2_edit_preset["edit_megapixels"], 1.0)
+        self.assertEqual(ideogram_preset["profile"], "ideogram4")
+        self.assertEqual(ideogram_preset["base_family"], "ideogram4")
+        self.assertEqual(ideogram_preset["steps"], 20)
+        self.assertEqual(ideogram_preset["cfg_scale"], 7.0)
         self.assertEqual(klein_kv_edit_preset["reference_input_mode"], "multi")
         self.assertEqual(klein_kv_edit_preset["max_direct_references"], 3)
         self.assertEqual(longcat_edit_preset["flux_guidance"], 4.5)

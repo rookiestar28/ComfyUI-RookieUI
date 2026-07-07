@@ -70,11 +70,12 @@ describe("fetchRookieUICapabilities", () => {
     expect(result.source).toBe("fallback");
     expect(result.data.tabs[0].title).toBe("Txt2Img");
     expect(result.data.parity.profiles[0].id).toBe("sd15");
-    expect(result.data.model_families.contract_version).toBe("f168-20260423");
+    expect(result.data.model_families.contract_version).toBe("model-family-20260707");
     expect(result.data.model_families.entries[0].id).toBe("sd15");
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
     const fluxEntry = result.data.model_families.entries.find((entry) => entry.id === "flux");
+    const ideogramEntry = result.data.model_families.entries.find((entry) => entry.id === "ideogram4");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
     const qwenEditEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit");
     const qwenEditMultiEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit_multi_lora");
@@ -95,6 +96,10 @@ describe("fetchRookieUICapabilities", () => {
     expect(fluxEntry.template_lora_visible).toBe(true);
     expect(fluxEntry.template_lora_override_allowed).toBe(true);
     expect(fluxEntry.official_template_lora_label).toBe("Flux_2-Turbo-LoRA_comfyui.safetensors");
+    expect(ideogramEntry.public_base_family).toBe("ideogram4");
+    expect(ideogramEntry.default_steps).toBe(20);
+    expect(ideogramEntry.default_cfg_scale).toBe(7);
+    expect(ideogramEntry.text_encoder_visible).toBe(false);
     expect(longcatEntry.flux_guidance_visible).toBe(true);
     expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(qwenEntry.template_lora_visible).toBe(true);
@@ -267,6 +272,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(models.data.default_checkpoint).toBe("__host_default__");
     expect(models.data.catalog.primary_model_category_by_family.pony).toBe("checkpoints");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.ideogram4).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.ernie_image).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.zit).toBe("diffusion_models");
@@ -287,6 +293,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "ideogram4",
       "klein_4b_distilled",
       "klein_4b",
       "klein_9b_distilled",
@@ -319,6 +326,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "ideogram4",
       "klein_4b_distilled",
       "klein_4b",
       "klein_9b_distilled",
@@ -343,6 +351,8 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "chroma")?.shift).toBe(1);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.base_family).toBe("ideogram4");
+    expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.cfg_scale).toBe(7);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");

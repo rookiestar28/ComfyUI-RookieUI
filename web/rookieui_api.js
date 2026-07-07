@@ -9,7 +9,7 @@ export {
 } from "./api/rookieui_generation_api.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
-const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "f168-20260423";
+const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707";
 export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
   {
     id: "sd15",
@@ -251,6 +251,34 @@ export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
       "Matches the official Flux.1 Dev FP8 template defaults.",
       "Text Encoder selector stays hidden because the official template owns the dual-encoder bundle.",
       "Template LoRA stays explicit and defaults to the official turbo LoRA, but may be overridden with truthful drift messaging.",
+    ],
+  },
+  {
+    id: "ideogram4",
+    title: "Ideogram v4",
+    translation_base_family: "sdxl",
+    public_base_family: "ideogram4",
+    prompt_encoder: "clip_text_encode_sdxl",
+    default_width: 1024,
+    default_height: 1024,
+    default_steps: 20,
+    default_cfg_scale: 7.0,
+    default_sampler: "euler",
+    default_scheduler: "simple",
+    default_clip_skip: 1,
+    supports_clip_skip: false,
+    primary_model_category: "diffusion_models",
+    text_encoder_visible: false,
+    support_tier: "family-adapted",
+    compatibility_summary:
+      "Official ComfyUI Ideogram v4 local text-to-image template preset on the current non-SD translation seam.",
+    experimental: true,
+    aliases: ["ideogram", "ideogram v4", "ideogram4"],
+    notes: [
+      "Matches the official local Ideogram v4 text-to-image template defaults.",
+      "Text Encoder selector stays hidden because the official template owns the fixed qwen3vl_8b pairing.",
+      "The required unconditional Ideogram model is a hidden official graph asset, not a separate RookieUI selector.",
+      "API-provider Ideogram remains unsupported.",
     ],
   },
   {
