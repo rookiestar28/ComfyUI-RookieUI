@@ -163,7 +163,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             live_smoke._default_profiles_for_mode("catalog"),
             (
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,flux_krea_dev,flux2_dev,"
-                "ideogram4,klein_4b_distilled,klein_4b,klein_9b_distilled,klein_9b,"
+                "ideogram4,krea2_turbo,klein_4b_distilled,klein_4b,klein_9b_distilled,klein_9b,"
                 "hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
                 "longcat_image,qwen_image,z_image,z_image_turbo,qwen_image_edit,"
                 "qwen_image_edit_multi_lora,qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"

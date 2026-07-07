@@ -76,6 +76,7 @@ describe("fetchRookieUICapabilities", () => {
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
     const fluxEntry = result.data.model_families.entries.find((entry) => entry.id === "flux");
     const ideogramEntry = result.data.model_families.entries.find((entry) => entry.id === "ideogram4");
+    const kreaEntry = result.data.model_families.entries.find((entry) => entry.id === "krea2_turbo");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
     const qwenEditEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit");
     const qwenEditMultiEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit_multi_lora");
@@ -100,6 +101,11 @@ describe("fetchRookieUICapabilities", () => {
     expect(ideogramEntry.default_steps).toBe(20);
     expect(ideogramEntry.default_cfg_scale).toBe(7);
     expect(ideogramEntry.text_encoder_visible).toBe(false);
+    expect(kreaEntry.public_base_family).toBe("krea2");
+    expect(kreaEntry.default_steps).toBe(8);
+    expect(kreaEntry.default_cfg_scale).toBe(1);
+    expect(kreaEntry.template_lora_visible).toBe(true);
+    expect(kreaEntry.official_template_lora_label).toBe("krea2_darkbrush.safetensors");
     expect(longcatEntry.flux_guidance_visible).toBe(true);
     expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(qwenEntry.template_lora_visible).toBe(true);
@@ -273,6 +279,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(models.data.catalog.primary_model_category_by_family.pony).toBe("checkpoints");
     expect(models.data.catalog.primary_model_category_by_family.flux).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.ideogram4).toBe("diffusion_models");
+    expect(models.data.catalog.primary_model_category_by_family.krea2).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.anima).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.ernie_image).toBe("diffusion_models");
     expect(models.data.catalog.primary_model_category_by_family.zit).toBe("diffusion_models");
@@ -294,6 +301,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image_turbo",
       "flux",
       "ideogram4",
+      "krea2_turbo",
       "klein_4b_distilled",
       "klein_4b",
       "klein_9b_distilled",
@@ -327,6 +335,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image_turbo",
       "flux",
       "ideogram4",
+      "krea2_turbo",
       "klein_4b_distilled",
       "klein_4b",
       "klein_9b_distilled",
@@ -353,6 +362,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.base_family).toBe("ideogram4");
     expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.cfg_scale).toBe(7);
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.base_family).toBe("krea2");
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.steps).toBe(8);
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");

@@ -1489,6 +1489,65 @@ def _build_ideogram4_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
     return workflow
 
 
+def _build_krea2_turbo_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    model_source = _append_model_only_lora_chain(
+        workflow,
+        allocator=allocator,
+        model_source=[unet_id, 0],
+        template_lora_name=request.template_lora_name,
+        inline_lora_activations=request.lora_activations,
+    )
+    clip_source = _build_single_clip_source(
+        workflow,
+        allocator=allocator,
+        clip_name=request.text_encoder_name,
+        clip_type="krea2",
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    positive_id, negative_id = _build_basic_positive_negative(
+        workflow,
+        allocator=allocator,
+        clip_source=clip_source,
+        request=request,
+        negative_mode="zero_out",
+    )
+    latent_id = _append_empty_latent_node(
+        workflow,
+        allocator=allocator,
+        class_type="EmptyLatentImage",
+        width=request.width,
+        height=request.height,
+        batch_size=request.batch_size,
+    )
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow,
+        node_id=sampler_id,
+        positive_id=positive_id,
+        negative_id=negative_id,
+        latent_id=latent_id,
+        request=request,
+        denoise=1.0,
+        model_source=model_source,
+    )
+    decode_id = allocator.next()
+    save_id = allocator.next()
+    _build_decode_and_save(
+        workflow,
+        sampler_id=sampler_id,
+        decode_id=decode_id,
+        save_id=save_id,
+        vae_source=[vae_id, 0],
+        request=request,
+    )
+    return workflow
+
+
 def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
@@ -1864,6 +1923,7 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
     "chroma": _build_chroma_workflow,
     "flux2_dev": _build_flux2_dev_workflow,
     "ideogram4": _build_ideogram4_workflow,
+    "krea2_turbo": _build_krea2_turbo_workflow,
     "klein": lambda request: _build_klein_workflow(request, distilled=False),
     "klein_distilled": lambda request: _build_klein_workflow(request, distilled=True),
     "qwen_image": _build_qwen_image_workflow,
