@@ -29,7 +29,9 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
 - The official template manifest is aligned to `comfyui-workflow-templates` 0.11.2; shipped support remains limited to the RookieUI profiles listed below.
+- Host template tracking now separates core blueprints, packaged gallery JSON assets, and removed gallery entries so newly observed workflows are not treated as supported profiles until RookieUI has an explicit runtime surface for them.
 - Local `Ideogram v4` and `Krea-2 Turbo` txt2img workflows are now exposed as official template-backed profiles with host-specific model, encoder, VAE, sampler, and template LoRA prerequisites surfaced through the normal model selector contract.
+- The local Ideogram path follows the host dual-model scheduler workflow, while the local Krea path keeps the Krea2 text encoder, Qwen Image VAE, sampler defaults, and template-owned LoRA behavior on the existing `txt2img` surface.
 - `RookieUISaveImageWithMetadata` now mirrors the current host `SaveImage` pass-through `IMAGE` output socket while preserving raw A1111 `parameters` PNG metadata.
 - API-provider Ideogram/Krea workflows and Krea style-reference workflow remain unsupported until dedicated provider, credential, and image-reference runtime scope exists.
 - Newly observed host blueprint/gallery additions, including SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Gemini Omni Flash, HappyHorse, Nano Banana, and Seedance workflows, are deferred or follow-up candidates until dedicated RookieUI UI/runtime scope exists.
