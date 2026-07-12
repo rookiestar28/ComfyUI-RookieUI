@@ -11,6 +11,7 @@ from rookieui.contracts.family_template_manifest import (
 from rookieui.contracts.generation import NormalizedImg2ImgRequest, NormalizedTxt2ImgRequest
 from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
+from rookieui.services.ideogram4 import IDEOGRAM4_MODE_CONTRACTS
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
     _build_clip_loader_node,
@@ -42,9 +43,6 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     "请据此扩写为一段内容丰富、细节充分的视觉描述，以帮助文生图模型生成高质量的图片。仅输出增强后的描述，"
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
-_IDEOGRAM4_UNCONDITIONAL_UNET_NAME = "ideogram4_unconditional_fp8_scaled.safetensors"
-_IDEOGRAM4_DEFAULT_MU = 0.0
-_IDEOGRAM4_DEFAULT_STD = 1.75
 _IDEOGRAM4_CFG_OVERRIDE = 3.0
 _IDEOGRAM4_CFG_OVERRIDE_START_PERCENT = 0.7
 _IDEOGRAM4_CFG_OVERRIDE_END_PERCENT = 1.0
@@ -1404,9 +1402,9 @@ def _build_ideogram4_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
     main_unet_id = allocator.next()
     workflow[main_unet_id] = _build_unet_loader_node(request.checkpoint_name)
     unconditional_unet_id = allocator.next()
-    # IMPORTANT: the official local Ideogram graph requires a second unconditional UNET,
-    # but RookieUI exposes only the main model selector in the current txt2img contract.
-    workflow[unconditional_unet_id] = _build_unet_loader_node(_IDEOGRAM4_UNCONDITIONAL_UNET_NAME)
+    # CRITICAL: use the exact inventory-relative selector resolved before translation;
+    # replacing it with a basename breaks ComfyUI hosts that group models in subdirectories.
+    workflow[unconditional_unet_id] = _build_unet_loader_node(request.ideogram_unconditional_model_name)
     clip_source = _build_single_clip_source(
         workflow,
         allocator=allocator,
@@ -1441,14 +1439,15 @@ def _build_ideogram4_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         sampler_name=request.sampler_name,
     )
+    mode_contract = IDEOGRAM4_MODE_CONTRACTS[request.ideogram_mode]
     scheduler_id = _append_ideogram4_scheduler_node(
         workflow,
         allocator=allocator,
         steps=request.steps,
         width=request.width,
         height=request.height,
-        mu=_IDEOGRAM4_DEFAULT_MU,
-        std=_IDEOGRAM4_DEFAULT_STD,
+        mu=mode_contract.mu,
+        std=mode_contract.std,
     )
     guided_model_source = _append_cfg_override_node(
         workflow,

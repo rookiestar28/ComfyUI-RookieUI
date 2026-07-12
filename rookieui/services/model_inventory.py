@@ -589,6 +589,17 @@ def resolve_template_lora_selector_context(
     )
 
 
+def resolve_ideogram4_unconditional_selector_context(inventory: ModelInventorySnapshot) -> str:
+    selectors = [
+        value
+        for value in (inventory.diffusion_models or [])
+        if isinstance(value, str) and value.strip()
+    ]
+    # CRITICAL: return the exact host selector, including its relative subdirectory;
+    # UNETLoader resolves only values enumerated by ComfyUI's diffusion_models inventory.
+    return _find_selector_by_priority(selectors, (("ideogram4", "unconditional"),))
+
+
 def resolve_primary_model_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,

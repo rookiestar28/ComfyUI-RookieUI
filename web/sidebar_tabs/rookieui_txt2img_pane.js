@@ -5,6 +5,8 @@ import {
   createXYZPlotShell,
 } from "./rookieui_pane_deps.js";
 import { buildTxt2ImgPayloadFromElements } from "./rookieui_generation_payload_state.js";
+import * as ideogramControls from "./rookieui_ideogram_mode_controls.js";
+import { createTemplateLoraController } from "./rookieui_template_lora_controls.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -242,6 +244,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       schedulerCatalog.map((entry) => ({ value: entry.id, label: entry.title })),
       initialScheduler,
     ),
+    ideogramMode: ideogramControls.createIdeogramModeSelect(createSelect),
     promptEnhancementEnabled: createCheckbox("rookieui-prompt-enhancement-enabled", false),
     seed: createInput("number", "rookieui-seed", "-1", { step: 1 }),
     seedExtra: createCheckbox("rookieui-seed-extra", false),
@@ -316,62 +319,12 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     libraryHeading: null,
     libraryHost: null,
   };
-  const setFieldVisibility = (fieldNode, visible) => {
-    if (!fieldNode) {
-      return;
-    }
-    fieldNode.hidden = !visible;
-    fieldNode.querySelectorAll("input, select, textarea, button").forEach((control) => {
-      control.disabled = !visible;
-    });
-  };
-  const resolvePresetTemplateLoraDefault = () =>
-    String(presetLookup.get(elements.preset.value)?.template_lora_name ?? "").trim();
-  const resolveTemplateLoraOfficialLabel = () =>
-    String(profileLookup.get(elements.profileState.value)?.official_template_lora_label ?? "").trim();
-  const syncTemplateLoraControls = () => {
-    const profile = profileLookup.get(String(elements.profileState.value ?? "").trim().toLowerCase()) ?? null;
-    const visible = Boolean(profile?.template_lora_visible);
-    const overrideAllowed = Boolean(profile?.template_lora_override_allowed);
-    const currentValue = String(elements.templateLoraName.value ?? "").trim();
-    const presetDefault = resolvePresetTemplateLoraDefault();
-    const officialLabel = resolveTemplateLoraOfficialLabel();
-    const officialResolved = presetDefault || officialLabel;
-    setFieldVisibility(templateLoraControls.field, visible);
-    if (templateLoraControls.libraryHeading) {
-      templateLoraControls.libraryHeading.hidden = !visible;
-    }
-    if (templateLoraControls.libraryHost) {
-      templateLoraControls.libraryHost.hidden = !visible;
-      templateLoraControls.libraryHost.querySelectorAll("button").forEach((button) => {
-        button.disabled = !visible || !overrideAllowed;
-      });
-    }
-    if (templateLoraControls.statusNode) {
-      templateLoraControls.statusNode.hidden = !visible;
-    }
-    if (templateLoraControls.resetButton) {
-      templateLoraControls.resetButton.hidden = !visible;
-      templateLoraControls.resetButton.disabled = !visible || !overrideAllowed;
-    }
-    elements.templateLoraName.disabled = !visible || !overrideAllowed;
-    if (!visible || !templateLoraControls.statusNode) {
-      return;
-    }
-    if (!currentValue && !officialResolved) {
-      templateLoraControls.statusNode.textContent = "No template-owned LoRA is required for this preset.";
-      return;
-    }
-    if (!officialResolved) {
-      templateLoraControls.statusNode.textContent = `Official template LoRA '${officialLabel || "template-owned LoRA"}' is not available on the current host. Generation can continue; to add a LoRA manually, use <lora:model_name:1> in the prompt.`;
-      return;
-    }
-    if (!currentValue || currentValue === presetDefault) {
-      templateLoraControls.statusNode.textContent = `Official default active: ${officialResolved}`;
-      return;
-    }
-    templateLoraControls.statusNode.textContent = `Custom override active: ${currentValue}. Official default is ${officialResolved}; exact official template parity no longer applies.`;
-  };
+  const ideogramModeController = ideogramControls.createIdeogramModeController(
+    elements.ideogramMode, elements.profileState, profileLookup, setElementValue,
+  );
+  const templateLoraController = createTemplateLoraController({
+    profileLookup, presetLookup, elements, controls: templateLoraControls,
+  });
 
   const buildXYZBaseRequest = () => buildTxt2ImgPayloadFromElements(elements);
 
@@ -570,7 +523,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     elements.textEncoder,
   );
   syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
-  syncTemplateLoraControls();
+  ideogramModeController.sync();
+  templateLoraController.sync();
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
@@ -581,7 +535,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       elements.textEncoder,
     );
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
-    syncTemplateLoraControls();
+    ideogramModeController.sync();
+    templateLoraController.sync();
   });
 
   const subtabHost = document.createElement("div");
@@ -612,6 +567,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         samplingSection.appendChild(samplingGrid);
         createField(samplingGrid, "Sampling Method", elements.sampler);
         createField(samplingGrid, "Schedule Type", elements.scheduler);
+        ideogramModeController.attach(createField(samplingGrid, "Ideogram Mode", elements.ideogramMode));
         createSliderField(samplingGrid, "Sampling Steps", elements.steps, elements.stepsSlider, "rookieui-steps-field");
         createSliderField(samplingGrid, "CFG Scale", elements.cfgScale, elements.cfgScaleSlider, "rookieui-cfg-scale-field");
         advancedParameterControls.shiftField = createField(samplingGrid, "Shift", elements.shift);
@@ -632,6 +588,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         );
         createSeedControlField(samplingGrid, "Seed", elements.seed, elements.seedExtra, "rookieui-seed-field");
         syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
+        ideogramModeController.sync();
 
         const advancedGrid = createHiresFixSection(
           samplingSection,
@@ -880,8 +837,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           "Reset Template LoRA",
         );
         templateLoraControls.resetButton.addEventListener("click", () => {
-          elements.templateLoraName.value = resolvePresetTemplateLoraDefault();
-          syncTemplateLoraControls();
+          elements.templateLoraName.value = templateLoraController.resolvePresetDefault();
+          templateLoraController.sync();
         });
         loraSection.appendChild(templateLoraControls.resetButton);
 
@@ -900,7 +857,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
           () => elements.templateLoraName.value,
           (value) => {
             elements.templateLoraName.value = value;
-            syncTemplateLoraControls();
+            templateLoraController.sync();
           },
           "rookieui-txt2img-template-lora-item",
         );
@@ -936,9 +893,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
             }
           }
         });
-        elements.templateLoraName.addEventListener("input", syncTemplateLoraControls);
-        elements.templateLoraName.addEventListener("change", syncTemplateLoraControls);
-        syncTemplateLoraControls();
+        elements.templateLoraName.addEventListener("input", templateLoraController.sync);
+        elements.templateLoraName.addEventListener("change", templateLoraController.sync);
+        templateLoraController.sync();
       },
     },
   ]);
@@ -979,7 +936,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       elements.textEncoder,
     );
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
-    syncTemplateLoraControls();
+    ideogramModeController.sync();
+    templateLoraController.sync();
   });
 
   formRegistry.txt2img = {
@@ -1000,6 +958,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         flux_guidance: "fluxGuidance",
         sampler_name: "sampler",
         scheduler_name: "scheduler",
+        ideogram_mode: "ideogramMode",
         prompt_enhancement_enabled: "promptEnhancementEnabled",
         seed: "seed",
         seed_extra: "seedExtra",
@@ -1038,7 +997,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         elements.textEncoder,
       );
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
-      syncTemplateLoraControls();
+      ideogramModeController.sync();
+      templateLoraController.sync();
       syncBoundControls(Object.values(elements));
       txt2imgStateLock.capture();
     },

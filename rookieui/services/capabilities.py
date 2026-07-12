@@ -130,6 +130,8 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "max_direct_references": int(entry.get("max_direct_references", 0) or 0),
                 "encoder_family": normalize_metadata_text(entry.get("encoder_family", "")),
                 "template_lora_chain_mode": normalize_metadata_text(entry.get("template_lora_chain_mode", "")),
+                "ideogram_modes": _normalize_metadata_list(entry.get("ideogram_modes", [])),
+                "default_ideogram_mode": normalize_metadata_text(entry.get("default_ideogram_mode", "")),
                 "available_surface_flows": _normalize_metadata_list(
                     entry.get("available_surface_flows", [])
                 ),

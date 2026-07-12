@@ -50,6 +50,10 @@ export function buildProfileLookup(capabilities) {
       max_direct_references: Number(entry.max_direct_references ?? 0) || 0,
       encoder_family: String(entry.encoder_family || "").trim().toLowerCase(),
       template_lora_chain_mode: String(entry.template_lora_chain_mode || "").trim().toLowerCase(),
+      ideogram_modes: Array.isArray(entry.ideogram_modes)
+        ? entry.ideogram_modes.map((mode) => String(mode ?? "").trim().toLowerCase()).filter(Boolean)
+        : [],
+      default_ideogram_mode: String(entry.default_ideogram_mode || "").trim().toLowerCase(),
       aliases: Array.isArray(entry.aliases) ? entry.aliases : [],
       available_surface_flows: Array.isArray(entry.available_surface_flows)
         ? entry.available_surface_flows.map((flow) => String(flow ?? "").trim().toLowerCase()).filter(Boolean)

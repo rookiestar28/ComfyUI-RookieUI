@@ -132,6 +132,8 @@ class FamilyTemplateManifestEntry:
     vae_hints: tuple[str, ...] = ()
     vae_priority_hints: tuple[tuple[str, ...], ...] = ()
     vae_deny_hints: tuple[str, ...] = ()
+    ideogram_modes: tuple[str, ...] = ()
+    default_ideogram_mode: str = ""
 
     def to_registry_payload(self) -> dict[str, Any]:
         return {
@@ -173,6 +175,8 @@ class FamilyTemplateManifestEntry:
             "encoder_family": self.encoder_family,
             "template_lora_chain_mode": self.template_lora_chain_mode,
             "available_surface_flows": list(self.available_surface_flows),
+            "ideogram_modes": list(self.ideogram_modes),
+            "default_ideogram_mode": self.default_ideogram_mode,
         }
 
     def to_preset_payload(
@@ -209,6 +213,7 @@ class FamilyTemplateManifestEntry:
             "max_direct_references": self.max_direct_references,
             "encoder_family": self.encoder_family,
             "template_lora_chain_mode": self.template_lora_chain_mode,
+            "ideogram_mode": self.default_ideogram_mode,
         }
 
 
@@ -308,6 +313,8 @@ def _template_entry(
     vae_hints: tuple[str, ...] = (),
     vae_priority_hints: tuple[tuple[str, ...], ...] = (),
     vae_deny_hints: tuple[str, ...] = (),
+    ideogram_modes: tuple[str, ...] = (),
+    default_ideogram_mode: str = "",
 ) -> FamilyTemplateManifestEntry:
     return FamilyTemplateManifestEntry(
         id=id,
@@ -362,6 +369,8 @@ def _template_entry(
         vae_hints=vae_hints,
         vae_priority_hints=vae_priority_hints,
         vae_deny_hints=vae_deny_hints,
+        ideogram_modes=ideogram_modes,
+        default_ideogram_mode=default_ideogram_mode,
     )
 
 
@@ -687,6 +696,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         vae_hints=("flux2", "vae"),
         vae_priority_hints=(("flux2", "vae"), ("flux", "2", "vae")),
         vae_deny_hints=("qwen",),
+        ideogram_modes=("quality", "default", "turbo"),
+        default_ideogram_mode="default",
     ),
     _template_entry(
         id="krea2_turbo",

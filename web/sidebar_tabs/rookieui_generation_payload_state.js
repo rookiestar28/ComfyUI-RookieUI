@@ -56,6 +56,7 @@ export function buildTxt2ImgPayloadFromElements(elements) {
     flux_guidance: readOptionalNumericValue(elements.fluxGuidance),
     sampler_name: elements.sampler.value,
     scheduler_name: elements.scheduler.value,
+    ideogram_mode: elements.ideogramMode?.value ?? "default",
     prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,

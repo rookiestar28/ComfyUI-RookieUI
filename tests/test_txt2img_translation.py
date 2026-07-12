@@ -34,14 +34,14 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             default_text_encoder="qwen_3_4b.safetensors",
         )
 
-    def _ideogram4_inventory(self) -> ModelInventorySnapshot:
+    def _ideogram4_inventory(self, *, include_unconditional: bool = True) -> ModelInventorySnapshot:
+        diffusion_models = ["ideogram\\ideogram4_fp8_scaled.safetensors"]
+        if include_unconditional:
+            diffusion_models.insert(0, "ideogram\\ideogram4_unconditional_fp8_scaled.safetensors")
         return ModelInventorySnapshot(
             source="host",
             checkpoints=["SDXL\\realvisxl.safetensors"],
-            diffusion_models=[
-                "ideogram\\ideogram4_unconditional_fp8_scaled.safetensors",
-                "ideogram\\ideogram4_fp8_scaled.safetensors",
-            ],
+            diffusion_models=diffusion_models,
             vae=["flux2-vae.safetensors", "qwen_image_vae.safetensors"],
             text_encoders=["qwen3vl_8b_fp8_scaled.safetensors", "qwen_3_4b.safetensors"],
             default_checkpoint="SDXL\\realvisxl.safetensors",
@@ -1401,6 +1401,11 @@ class Txt2ImgTranslationTests(unittest.TestCase):
 
         self.assertEqual(result["workflow_kind"], "txt2img-ideogram4")
         self.assertEqual(normalized.checkpoint_name, "ideogram\\ideogram4_fp8_scaled.safetensors")
+        self.assertEqual(
+            normalized.ideogram_unconditional_model_name,
+            "ideogram\\ideogram4_unconditional_fp8_scaled.safetensors",
+        )
+        self.assertEqual(normalized.ideogram_mode, "default")
         self.assertEqual(normalized.text_encoder_name, "qwen3vl_8b_fp8_scaled.safetensors")
         self.assertEqual(normalized.vae_name, "flux2-vae.safetensors")
         self.assertEqual(len(unet_nodes), 2)
@@ -1408,14 +1413,14 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             {node["inputs"]["unet_name"] for node in unet_nodes},
             {
                 "ideogram\\ideogram4_fp8_scaled.safetensors",
-                "ideogram4_unconditional_fp8_scaled.safetensors",
+                "ideogram\\ideogram4_unconditional_fp8_scaled.safetensors",
             },
         )
         unconditional_unet_id = next(
             node_id
             for node_id, node in workflow.items()
             if node["class_type"] == "UNETLoader"
-            and node["inputs"]["unet_name"] == "ideogram4_unconditional_fp8_scaled.safetensors"
+            and node["inputs"]["unet_name"] == "ideogram\\ideogram4_unconditional_fp8_scaled.safetensors"
         )
         self.assertEqual(clip_node["inputs"]["type"], "ideogram4")
         self.assertIn("RandomNoise", class_types)
@@ -1438,6 +1443,75 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(latent_node["inputs"]["height"], 1024)
         self.assertEqual(sampler_node["inputs"]["guider"], [guider_id, 0])
         self.assertEqual(zero_node["inputs"]["conditioning"], guider_node["inputs"]["positive"])
+
+    def test_normalize_ideogram4_rejects_missing_unconditional_model_before_translation(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._ideogram4_inventory(include_unconditional=False),
+        ):
+            with self.assertRaisesRegex(
+                ValueError,
+                "Ideogram v4 unconditional model is missing from the host diffusion_models inventory",
+            ):
+                normalize_txt2img_request(
+                    {
+                        "prompt": "precise product poster",
+                        "profile": "ideogram4",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                    }
+                )
+
+    def test_translate_ideogram4_modes_own_exact_scheduler_tuple(self) -> None:
+        cases = {
+            "quality": (48, 0.0, 1.5),
+            "default": (20, 0.0, 1.75),
+            "turbo": (12, 0.5, 1.75),
+        }
+        for mode, expected in cases.items():
+            with self.subTest(mode=mode), mock.patch(
+                "rookieui.services.txt2img.discover_model_inventory",
+                return_value=self._ideogram4_inventory(),
+            ):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "precise product poster",
+                        "profile": "ideogram4",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                        "steps": 99,
+                        "ideogram_mode": mode,
+                    }
+                )
+                workflow = translate_txt2img_request(normalized).workflow
+                scheduler = next(
+                    node for node in workflow.values() if node["class_type"] == "Ideogram4Scheduler"
+                )
+                self.assertEqual(normalized.ideogram_mode, mode)
+                self.assertEqual(normalized.steps, expected[0])
+                self.assertEqual(
+                    (scheduler["inputs"]["steps"], scheduler["inputs"]["mu"], scheduler["inputs"]["std"]),
+                    expected,
+                )
+
+    def test_normalize_ideogram4_rejects_unsupported_mode(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._ideogram4_inventory(),
+        ):
+            with self.assertRaisesRegex(ValueError, "ideogram_mode must be one of"):
+                normalize_txt2img_request(
+                    {
+                        "prompt": "precise product poster",
+                        "profile": "ideogram4",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                        "ideogram_mode": "custom",
+                    }
+                )
 
     def test_translate_txt2img_request_builds_krea2_turbo_ksampler_graph_without_synthetic_lora(self) -> None:
         with mock.patch(

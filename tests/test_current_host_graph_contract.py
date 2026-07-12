@@ -11,7 +11,7 @@ from rookieui.contracts.family_template_manifest import (
     list_non_sd_manifest_entries,
 )
 from rookieui.contracts.host_source_basis import HOST_SOURCE_BASIS
-from rookieui.services.workflow_builders import non_sd_templates
+from rookieui.services.ideogram4 import IDEOGRAM4_MODE_CONTRACTS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,8 +134,9 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         self.assertEqual(scheduler_inputs["steps"]["default"], 20)
         self.assertEqual(scheduler_inputs["width"]["default"], 1024)
         self.assertEqual(scheduler_inputs["height"]["default"], 1024)
-        self.assertEqual(non_sd_templates._IDEOGRAM4_DEFAULT_MU, scheduler_inputs["mu"]["default"])
-        self.assertEqual(non_sd_templates._IDEOGRAM4_DEFAULT_STD, scheduler_inputs["std"]["default"])
+        default_contract = IDEOGRAM4_MODE_CONTRACTS["default"]
+        self.assertEqual(default_contract.mu, scheduler_inputs["mu"]["default"])
+        self.assertEqual(default_contract.std, scheduler_inputs["std"]["default"])
 
 
 if __name__ == "__main__":

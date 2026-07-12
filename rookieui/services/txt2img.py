@@ -13,8 +13,10 @@ from rookieui.security.request_guard import (
     resolve_inventory_selector,
     validate_seed_range,
 )
+from rookieui.services.ideogram4 import IDEOGRAM4_MODE_CONTRACTS, normalize_ideogram4_mode
 from rookieui.services.model_inventory import (
     discover_model_inventory,
+    resolve_ideogram4_unconditional_selector_context,
     resolve_aux_text_encoder_selector_context,
     resolve_primary_model_selector_context,
     resolve_template_lora_selector_context,
@@ -278,7 +280,15 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     )
     lora_strength_model = _coerce_lora_strength(request.lora_strength_model, "lora_strength_model")
     lora_strength_clip = _coerce_lora_strength(request.lora_strength_clip, "lora_strength_clip")
-    steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
+    ideogram_mode = normalize_ideogram4_mode(request.ideogram_mode) if profile.id == "ideogram4" else ""
+    if profile.id == "ideogram4":
+        if request.ideogram_mode is None or not str(request.ideogram_mode).strip():
+            applied_defaults.append("ideogram_mode")
+        steps = IDEOGRAM4_MODE_CONTRACTS[ideogram_mode].steps
+        if request.steps != steps:
+            applied_defaults.append("steps")
+    else:
+        steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
     prompt_preprocess = preprocess_prompt_bundle(
         prompt,
         negative_prompt,
@@ -411,6 +421,14 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         inventory_selectors=primary_model_selectors,
         strict_match=inventory_is_host,
     )
+    ideogram_unconditional_model_name = ""
+    if profile.id == "ideogram4":
+        ideogram_unconditional_model_name = resolve_ideogram4_unconditional_selector_context(inventory)
+        if not ideogram_unconditional_model_name:
+            raise ValueError(
+                "Ideogram v4 unconditional model is missing from the host diffusion_models inventory. "
+                "Install the official unconditional model and refresh the ComfyUI model inventory."
+            )
     vae_name = resolve_inventory_selector(
         raw_vae_selector,
         "vae_name",
@@ -544,6 +562,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         edit_megapixels=edit_megapixels,
         sampler_name=sampler_name,
         scheduler_name=scheduler_name,
+        ideogram_mode=ideogram_mode,
+        ideogram_unconditional_model_name=ideogram_unconditional_model_name,
         prompt_enhancement_enabled=prompt_enhancement_enabled,
         seed=seed,
         execution_seed=execution_seed,

@@ -279,6 +279,8 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
       "Official ComfyUI Ideogram v4 local text-to-image template preset on the current non-SD translation seam.",
     experimental: true,
     aliases: ["ideogram", "ideogram v4", "ideogram4"],
+    ideogram_modes: ["quality", "default", "turbo"],
+    default_ideogram_mode: "default",
     notes: [
       "Matches the official local Ideogram v4 text-to-image template defaults.",
       "Text Encoder selector stays hidden because the official template owns the fixed qwen3vl_8b pairing.",
@@ -1003,6 +1005,8 @@ export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
     max_direct_references: 0,
     encoder_family: "",
     template_lora_chain_mode: "none",
+    ideogram_modes: [],
+    default_ideogram_mode: "",
     available_surface_flows: entry.support_tier === "parity" ? ["txt2img", "img2img"] : ["txt2img"],
     ...entry,
     ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
@@ -1048,6 +1052,7 @@ const DEFAULT_PRESETS = Object.freeze(
     max_direct_references: entry.max_direct_references ?? 0,
     encoder_family: entry.encoder_family ?? "",
     template_lora_chain_mode: entry.template_lora_chain_mode ?? "none",
+    ideogram_mode: entry.default_ideogram_mode ?? "",
   })),
 );
 

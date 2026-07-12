@@ -10,6 +10,7 @@ from rookieui.services.model_inventory import (
     _reset_inventory_cache_for_tests,
     discover_model_inventory,
     ensure_native_ultralytics_model_paths,
+    resolve_ideogram4_unconditional_selector_context,
     resolve_aux_text_encoder_selector_context,
     resolve_primary_model_selector_context,
     resolve_template_lora_selector_context,
@@ -22,6 +23,25 @@ from rookieui.services.presets import build_preset_payload
 class ModelInventoryTests(unittest.TestCase):
     def setUp(self) -> None:
         _reset_inventory_cache_for_tests()
+
+    def test_resolve_ideogram4_unconditional_selector_preserves_exact_relative_path(self) -> None:
+        module = types.SimpleNamespace(
+            get_filename_list=lambda folder_name: {
+                "checkpoints": ["realvisxl.safetensors"],
+                "diffusion_models": [
+                    "ideogram/ideogram4_fp8_scaled.safetensors",
+                    "nested/ideogram/ideogram4_unconditional_fp8_scaled.safetensors",
+                ],
+                "vae": ["flux2-vae.safetensors"],
+                "text_encoders": ["qwen3vl_8b_fp8_scaled.safetensors"],
+            }.get(folder_name, [])
+        )
+        snapshot = discover_model_inventory(folder_paths_module=module)
+
+        self.assertEqual(
+            resolve_ideogram4_unconditional_selector_context(snapshot),
+            "nested/ideogram/ideogram4_unconditional_fp8_scaled.safetensors",
+        )
 
     def test_discover_model_inventory_uses_host_folder_paths_when_available(self) -> None:
         module = types.SimpleNamespace(

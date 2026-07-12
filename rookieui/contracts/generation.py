@@ -30,6 +30,7 @@ class Txt2ImgRequest:
     edit_megapixels: float | None = None
     sampler_name: str | None = None
     scheduler_name: str | None = None
+    ideogram_mode: str | None = None
     prompt_enhancement_enabled: bool | None = None
     seed: int = -1
     seed_extra: bool = False
@@ -138,6 +139,8 @@ class NormalizedTxt2ImgRequest:
     edit_megapixels: float | None
     sampler_name: str
     scheduler_name: str
+    ideogram_mode: str
+    ideogram_unconditional_model_name: str
     prompt_enhancement_enabled: bool
     seed: int
     execution_seed: int

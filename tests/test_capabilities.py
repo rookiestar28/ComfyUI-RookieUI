@@ -244,6 +244,8 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(ideogram_entry["public_base_family"], "ideogram4")
         self.assertEqual(ideogram_entry["default_steps"], 20)
         self.assertEqual(ideogram_entry["default_cfg_scale"], 7.0)
+        self.assertEqual(ideogram_entry["default_ideogram_mode"], "default")
+        self.assertEqual(ideogram_entry["ideogram_modes"], ["quality", "default", "turbo"])
         self.assertFalse(ideogram_entry["text_encoder_visible"])
         self.assertEqual(krea_entry["public_base_family"], "krea2")
         self.assertEqual(krea_entry["default_steps"], 8)
