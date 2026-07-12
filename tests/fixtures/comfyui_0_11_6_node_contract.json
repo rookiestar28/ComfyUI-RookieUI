@@ -1,0 +1,885 @@
+{
+  "classes": {
+    "BasicGuider": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        }
+      }
+    },
+    "BasicScheduler": {
+      "inputs": {
+        "denoise": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "scheduler": {
+          "optional": false,
+          "type": "COMBO"
+        },
+        "steps": {
+          "default": 20,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "CFGGuider": {
+      "inputs": {
+        "cfg": {
+          "default": 8.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "negative": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      }
+    },
+    "CFGNorm": {
+      "inputs": {
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "pre_cfg": {
+          "default": false,
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "strength": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "CFGOverride": {
+      "inputs": {
+        "cfg": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "end_percent": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "start_percent": {
+          "default": 0.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "CLIPLoader": {
+      "inputs": {
+        "clip_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "device": {
+          "optional": true,
+          "type": "UNKNOWN"
+        },
+        "type": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    },
+    "Canny": {
+      "inputs": {
+        "high_threshold": {
+          "default": 0.8,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "low_threshold": {
+          "default": 0.4,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "CheckpointLoaderSimple": {
+      "inputs": {
+        "ckpt_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    },
+    "ComfySwitchNode": {
+      "inputs": {
+        "on_false": {
+          "optional": false,
+          "type": "MATCHTYPE"
+        },
+        "on_true": {
+          "optional": false,
+          "type": "MATCHTYPE"
+        },
+        "switch": {
+          "optional": false,
+          "type": "BOOLEAN"
+        }
+      }
+    },
+    "ConditioningZeroOut": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      }
+    },
+    "DualCLIPLoader": {
+      "inputs": {
+        "clip_name1": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "clip_name2": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "device": {
+          "optional": true,
+          "type": "UNKNOWN"
+        },
+        "type": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    },
+    "DualModelGuider": {
+      "inputs": {
+        "cfg": {
+          "default": 4.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "model_negative": {
+          "optional": true,
+          "type": "MODEL"
+        },
+        "negative": {
+          "optional": true,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      }
+    },
+    "EmptyFlux2LatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "EmptyLatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "EmptySD3LatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "Flux2Scheduler": {
+      "inputs": {
+        "height": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        },
+        "steps": {
+          "default": 20,
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "FluxGuidance": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "guidance": {
+          "default": 3.5,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "FluxKVCache": {
+      "inputs": {
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        }
+      }
+    },
+    "FluxKontextImageScale": {
+      "inputs": {
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        }
+      }
+    },
+    "FluxKontextMultiReferenceLatentMethod": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "reference_latents_method": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      }
+    },
+    "GetImageSize": {
+      "inputs": {
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        }
+      }
+    },
+    "Ideogram4Scheduler": {
+      "inputs": {
+        "height": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        },
+        "mu": {
+          "default": 0.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "std": {
+          "default": 1.75,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "steps": {
+          "default": 20,
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "ImageScale": {
+      "inputs": {
+        "crop": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "height": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        },
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "upscale_method": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "width": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "ImageScaleToTotalPixels": {
+      "inputs": {
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "megapixels": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "resolution_steps": {
+          "default": 1,
+          "optional": false,
+          "type": "INT"
+        },
+        "upscale_method": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      }
+    },
+    "ImageStitch": {
+      "inputs": {
+        "direction": {
+          "default": "right",
+          "optional": false,
+          "type": "COMBO"
+        },
+        "image1": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "image2": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "match_image_size": {
+          "default": true,
+          "optional": false,
+          "type": "BOOLEAN"
+        },
+        "spacing_color": {
+          "default": "white",
+          "optional": false,
+          "type": "COMBO"
+        },
+        "spacing_width": {
+          "default": 0,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "KSampler": {
+      "inputs": {
+        "cfg": {
+          "default": 8.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "denoise": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "latent_image": {
+          "optional": false,
+          "type": "LATENT"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "negative": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "sampler_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "scheduler": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "seed": {
+          "default": 0,
+          "optional": false,
+          "type": "INT"
+        },
+        "steps": {
+          "default": 20,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "KSamplerSelect": {
+      "inputs": {
+        "sampler_name": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      }
+    },
+    "LatentUpscale": {
+      "inputs": {
+        "crop": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "height": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        },
+        "samples": {
+          "optional": false,
+          "type": "LATENT"
+        },
+        "upscale_method": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "width": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "LoraLoader": {
+      "inputs": {
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "lora_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "strength_clip": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "strength_model": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "LoraLoaderModelOnly": {
+      "inputs": {
+        "lora_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "strength_model": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "ModelPatchLoader": {
+      "inputs": {
+        "name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    },
+    "ModelSamplingAuraFlow": {
+      "inputs": {
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "shift": {
+          "default": 1.73,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "ModelSamplingSD3": {
+      "inputs": {
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "shift": {
+          "default": 3.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      }
+    },
+    "PrimitiveBoolean": {
+      "inputs": {
+        "value": {
+          "optional": false,
+          "type": "BOOLEAN"
+        }
+      }
+    },
+    "PrimitiveStringMultiline": {
+      "inputs": {
+        "value": {
+          "optional": false,
+          "type": "STRING"
+        }
+      }
+    },
+    "QuadrupleCLIPLoader": {
+      "inputs": {
+        "clip_name1": {
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name2": {
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name3": {
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name4": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      }
+    },
+    "QwenImageDiffsynthControlnet": {
+      "inputs": {
+        "image": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "mask": {
+          "optional": true,
+          "type": "MASK"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        },
+        "model_patch": {
+          "optional": false,
+          "type": "MODEL_PATCH"
+        },
+        "strength": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "vae": {
+          "optional": false,
+          "type": "VAE"
+        }
+      }
+    },
+    "RandomNoise": {
+      "inputs": {
+        "noise_seed": {
+          "default": 0,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "ReferenceLatent": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "latent": {
+          "optional": true,
+          "type": "LATENT"
+        }
+      }
+    },
+    "SamplerCustomAdvanced": {
+      "inputs": {
+        "guider": {
+          "optional": false,
+          "type": "GUIDER"
+        },
+        "latent_image": {
+          "optional": false,
+          "type": "LATENT"
+        },
+        "noise": {
+          "optional": false,
+          "type": "NOISE"
+        },
+        "sampler": {
+          "optional": false,
+          "type": "SAMPLER"
+        },
+        "sigmas": {
+          "optional": false,
+          "type": "SIGMAS"
+        }
+      }
+    },
+    "StringReplace": {
+      "inputs": {
+        "find": {
+          "optional": false,
+          "type": "STRING"
+        },
+        "replace": {
+          "optional": false,
+          "type": "STRING"
+        },
+        "string": {
+          "optional": false,
+          "type": "STRING"
+        }
+      }
+    },
+    "T5TokenizerOptions": {
+      "inputs": {
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "min_length": {
+          "default": 0,
+          "optional": false,
+          "type": "INT"
+        },
+        "min_padding": {
+          "default": 0,
+          "optional": false,
+          "type": "INT"
+        }
+      }
+    },
+    "TextEncodeQwenImageEdit": {
+      "inputs": {
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "prompt": {
+          "optional": false,
+          "type": "STRING"
+        },
+        "vae": {
+          "optional": true,
+          "type": "VAE"
+        }
+      }
+    },
+    "TextEncodeQwenImageEditPlus": {
+      "inputs": {
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image1": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "image2": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "image3": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "prompt": {
+          "optional": false,
+          "type": "STRING"
+        },
+        "vae": {
+          "optional": true,
+          "type": "VAE"
+        }
+      }
+    },
+    "TextGenerate": {
+      "inputs": {
+        "audio": {
+          "optional": true,
+          "type": "AUDIO"
+        },
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image": {
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "max_length": {
+          "default": 512,
+          "optional": false,
+          "type": "INT"
+        },
+        "prompt": {
+          "default": "",
+          "optional": false,
+          "type": "STRING"
+        },
+        "sampling_mode": {
+          "optional": false,
+          "type": "DYNAMICCOMBO"
+        },
+        "thinking": {
+          "default": false,
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "use_default_template": {
+          "default": true,
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "video": {
+          "optional": true,
+          "type": "IMAGE"
+        }
+      }
+    },
+    "UNETLoader": {
+      "inputs": {
+        "unet_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        },
+        "weight_dtype": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    },
+    "VAEDecode": {
+      "inputs": {
+        "samples": {
+          "optional": false,
+          "type": "LATENT"
+        },
+        "vae": {
+          "optional": false,
+          "type": "VAE"
+        }
+      }
+    },
+    "VAEEncode": {
+      "inputs": {
+        "pixels": {
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "vae": {
+          "optional": false,
+          "type": "VAE"
+        }
+      }
+    },
+    "VAELoader": {
+      "inputs": {
+        "vae_name": {
+          "optional": false,
+          "type": "UNKNOWN"
+        }
+      }
+    }
+  },
+  "source_revision": "69ea58697bb2f05124f5dc7e00ad111f7cfff645"
+}

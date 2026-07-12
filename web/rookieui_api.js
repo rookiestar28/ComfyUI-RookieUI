@@ -10,7 +10,12 @@ export {
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
 const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707";
-export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
+const CURRENT_HOST_DEFERRED_PROFILE_IDS = new Set([
+  "klein_4b_distilled",
+  "klein_9b_distilled",
+  "qwen_image_edit_multi_lora",
+]);
+const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
   {
     id: "sd15",
     title: "Stable Diffusion 1.5",
@@ -811,7 +816,11 @@ export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze([
       "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
     ],
   },
-]);
+];
+// IMPORTANT: keep fallback exposure fail-closed when the backend is unavailable.
+export const DEFAULT_MODEL_FAMILY_ENTRIES = Object.freeze(
+  DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES.filter((entry) => !CURRENT_HOST_DEFERRED_PROFILE_IDS.has(entry.id)),
+);
 
 const DEFAULT_PARITY_PROFILES = Object.freeze(
   DEFAULT_MODEL_FAMILY_ENTRIES.map((entry) => ({

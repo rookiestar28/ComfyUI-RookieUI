@@ -32,7 +32,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("ideogram4", [entry["id"] for entry in payload["entries"]])
         self.assertIn("krea2_turbo", [entry["id"] for entry in payload["entries"]])
         self.assertIn("ernie_image", [entry["id"] for entry in payload["entries"]])
-        self.assertIn("qwen_image_edit_multi_lora", [entry["id"] for entry in payload["entries"]])
+        self.assertNotIn("qwen_image_edit_multi_lora", [entry["id"] for entry in payload["entries"]])
+        self.assertNotIn("klein_4b_distilled", [entry["id"] for entry in payload["entries"]])
+        self.assertNotIn("klein_9b_distilled", [entry["id"] for entry in payload["entries"]])
         self.assertIn("firered_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("firered_image_edit_lightning", [entry["id"] for entry in payload["entries"]])
         self.assertIn("flux_kontext_dev_edit", [entry["id"] for entry in payload["entries"]])
@@ -61,7 +63,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(source_paths["ideogram4"], "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json")
         self.assertEqual(
             source_paths["krea2_turbo"],
-            "comfyui-workflow-templates-json==0.1.2:image_krea2_turbo_t2i.json",
+            "comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
         )
         self.assertEqual(
             source_paths["flux2_image_edit"],
@@ -193,7 +195,6 @@ class ModelFamilyRegistryTests(unittest.TestCase):
 
     def test_edit_profile_uses_img2img_surface_contract(self) -> None:
         qwen_edit_entry = get_model_family_registry_entry("qwen_image_edit")
-        qwen_edit_multi_entry = get_model_family_registry_entry("qwen_image_edit_multi_lora")
         firered_entry = get_model_family_registry_entry("firered image edit")
         firered_lightning_entry = get_model_family_registry_entry("firered image edit lightning")
         kontext_edit_entry = get_model_family_registry_entry("flux kontext edit")
@@ -213,8 +214,6 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertFalse(model_family_supports_surface_flow("qwen_image_edit", "txt2img"))
         self.assertTrue(model_family_supports_surface_flow("qwen_image_edit", "img2img"))
         self.assertFalse(model_family_supports_surface_flow("qwen_image_edit", "edit"))
-        self.assertEqual(qwen_edit_multi_entry.public_base_family, "qwen_image_edit")
-        self.assertEqual(qwen_edit_multi_entry.template_lora_chain_mode, "triple")
         self.assertEqual(firered_entry.reference_input_mode, "multi")
         self.assertEqual(firered_entry.max_direct_references, 3)
         self.assertEqual(firered_entry.encoder_family, "qwen_image_edit_plus")
@@ -283,9 +282,6 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         ernie_preset = next(preset for preset in payload["presets"] if preset["id"] == "ernie_image")
         qwen_preset = next(preset for preset in payload["presets"] if preset["id"] == "qwen_image")
         qwen_edit_preset = next(preset for preset in payload["presets"] if preset["id"] == "qwen_image_edit")
-        qwen_edit_multi_preset = next(
-            preset for preset in payload["presets"] if preset["id"] == "qwen_image_edit_multi_lora"
-        )
         firered_preset = next(preset for preset in payload["presets"] if preset["id"] == "firered_image_edit")
         firered_lightning_preset = next(
             preset for preset in payload["presets"] if preset["id"] == "firered_image_edit_lightning"
@@ -311,7 +307,6 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(qwen_edit_preset["request_contract_surface"], "img2img")
         self.assertEqual(qwen_edit_preset["reference_input_mode"], "single")
         self.assertEqual(qwen_edit_preset["max_direct_references"], 1)
-        self.assertEqual(qwen_edit_multi_preset["template_lora_chain_mode"], "triple")
         self.assertEqual(firered_preset["base_family"], "firered_image_edit")
         self.assertEqual(firered_preset["reference_input_mode"], "multi")
         self.assertEqual(firered_preset["max_direct_references"], 3)

@@ -335,14 +335,7 @@ class ModelInventoryTests(unittest.TestCase):
             preset_lookup["qwen_image_edit"]["template_lora_name"],
             "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
         )
-        self.assertEqual(
-            preset_lookup["qwen_image_edit_multi_lora"]["checkpoint_name"],
-            "qwen_image_edit_fp8_e4m3fn.safetensors",
-        )
-        self.assertEqual(
-            preset_lookup["qwen_image_edit_multi_lora"]["template_lora_name"],
-            "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
-        )
+        self.assertNotIn("qwen_image_edit_multi_lora", preset_lookup)
         self.assertEqual(
             preset_lookup["firered_image_edit"]["checkpoint_name"],
             "FireRed-Image-Edit-1.1-transformer.safetensors",
@@ -729,10 +722,7 @@ class ModelInventoryTests(unittest.TestCase):
             resolve_template_lora_selector_context("qwen_image_edit", snapshot),
             "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
         )
-        self.assertEqual(
-            resolve_template_lora_selector_context("qwen_image_edit_multi_lora", snapshot),
-            "Qwen-image\\Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
-        )
+        self.assertEqual(resolve_template_lora_selector_context("qwen_image_edit_multi_lora", snapshot), "")
         self.assertEqual(resolve_template_lora_selector_context("firered_image_edit", snapshot), "")
         self.assertEqual(
             resolve_template_lora_selector_context("firered_image_edit_lightning", snapshot),

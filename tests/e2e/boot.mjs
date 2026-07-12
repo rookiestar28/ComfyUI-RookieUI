@@ -33,11 +33,6 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     vae_name: "qwen_image_vae.safetensors",
     text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
   },
-  qwen_image_edit_multi_lora: {
-    checkpoint_name: "qwen_image_edit_fp8_e4m3fn.safetensors",
-    vae_name: "qwen_image_vae.safetensors",
-    text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-  },
   firered_image_edit: {
     checkpoint_name: "FireRed-Image-Edit-1.1-transformer.safetensors",
     vae_name: "qwen_image_vae.safetensors",
@@ -68,19 +63,9 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     vae_name: "ae.safetensors",
     text_encoder_name: "qwen_2.5_vl_7b_fp8_scaled.safetensors",
   },
-  klein_4b_distilled: {
-    checkpoint_name: "flux-2-klein-4b.safetensors",
-    vae_name: "flux2-vae.safetensors",
-    text_encoder_name: "Automatic",
-  },
   klein_4b: {
     checkpoint_name: "flux-2-klein-base-4b.safetensors",
     vae_name: "flux2-vae.safetensors",
-    text_encoder_name: "Automatic",
-  },
-  klein_9b_distilled: {
-    checkpoint_name: "flux-2-klein-9b-fp8.safetensors",
-    vae_name: "full_encoder_small_decoder.safetensors",
     text_encoder_name: "Automatic",
   },
   klein_9b: {
@@ -198,9 +183,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "qwen_image",
   "qwen_image_edit",
   "firered_image_edit",
-  "klein_4b_distilled",
   "klein_4b",
-  "klein_9b_distilled",
   "klein_9b",
   "klein_9b_kv_image_edit",
   "anima",

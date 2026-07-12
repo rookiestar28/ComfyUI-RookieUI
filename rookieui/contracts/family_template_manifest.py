@@ -72,6 +72,9 @@ OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     *OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
     *OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
     *WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6.deferred,
+    "klein_4b_distilled",
+    "klein_9b_distilled",
+    "qwen_image_edit_multi_lora",
 )
 
 
@@ -362,7 +365,7 @@ def _template_entry(
     )
 
 
-_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
+_ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
     _parity_entry(
         id="sd15",
         title="Stable Diffusion 1.5",
@@ -488,7 +491,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         shift_visible=True,
         default_shift=1.0,
         runtime_adapter_id="chroma",
-        official_template_path="reference/workflow_templates/Chroma.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_chroma_text_to_image.json",
         diffusion_model_hints=("chroma",),
         diffusion_model_priority_hints=(("chroma1",), ("chroma",)),
         text_encoder_hints=("t5", "chroma"),
@@ -707,7 +710,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_override_allowed=True,
         official_template_lora_label="krea2_darkbrush.safetensors",
         runtime_adapter_id="krea2_turbo",
-        official_template_path="comfyui-workflow-templates-json==0.1.2:image_krea2_turbo_t2i.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
         diffusion_model_hints=("krea2", "krea", "turbo"),
         diffusion_model_priority_hints=(("krea2", "turbo", "fp8", "scaled"), ("krea2", "turbo"), ("krea2",)),
         text_encoder_hints=("qwen3vl", "qwen", "krea2"),
@@ -759,7 +762,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
         ),
         runtime_adapter_id="klein",
-        official_template_path="reference/workflow_templates/Flux.2 4B Klein.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_flux2_klein_text_to_image.json",
         diffusion_model_hints=("klein", "4b"),
         diffusion_model_priority_hints=(("klein", "base", "4b"), ("flux", "2", "klein", "base", "4b"), ("klein", "4b")),
         diffusion_model_deny_hints=("distill", "distilled", "9b"),
@@ -811,7 +814,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_8b pairing.",
         ),
         runtime_adapter_id="klein",
-        official_template_path="reference/workflow_templates/Flux.2 9B Klein.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_flux2_text_to_image_9b.json",
         diffusion_model_hints=("klein", "9b"),
         diffusion_model_priority_hints=(("klein", "base", "9b"), ("flux", "2", "klein", "base", "9b"), ("klein", "9b")),
         diffusion_model_deny_hints=("distill", "distilled", "4b"),
@@ -839,7 +842,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         shift_visible=True,
         default_shift=6.0,
         runtime_adapter_id="hidream",
-        official_template_path="reference/workflow_templates/Hidream i1 Dev FP8.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:hidream_i1_dev.json",
         diffusion_model_hints=("hidream", "dev"),
         diffusion_model_priority_hints=(("hidream", "dev", "fp8"), ("hidream", "i1", "dev"), ("hidream", "dev")),
         text_encoder_hints=("hidream", "clip"),
@@ -870,7 +873,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         shift_visible=True,
         default_shift=3.0,
         runtime_adapter_id="hidream",
-        official_template_path="reference/workflow_templates/Hidream i1 fast.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:hidream_i1_fast.json",
         diffusion_model_hints=("hidream", "fast"),
         diffusion_model_priority_hints=(("hidream", "fast"), ("hidream", "i1", "fast")),
         text_encoder_hints=("hidream", "clip"),
@@ -901,7 +904,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         shift_visible=True,
         default_shift=3.0,
         runtime_adapter_id="hidream",
-        official_template_path="reference/workflow_templates/Hidream i1 full.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:hidream_i1_full.json",
         diffusion_model_hints=("hidream", "full"),
         diffusion_model_priority_hints=(("hidream", "full"), ("hidream", "i1", "full"), ("hidream", "i1")),
         text_encoder_hints=("hidream", "clip"),
@@ -932,7 +935,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         flux_guidance_visible=True,
         default_flux_guidance=4.0,
         runtime_adapter_id="longcat",
-        official_template_path="reference/workflow_templates/Longcat BF16.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_longcat_text_to_image.json",
         diffusion_model_hints=("longcat",),
         diffusion_model_priority_hints=(("longcat",),),
         text_encoder_hints=("longcat", "qwen", "2.5", "vl"),
@@ -1017,7 +1020,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="qwen_image_edit",
-        official_template_path="reference/workflow_templates/imageEdit/Qwen-image edit.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_qwen_image_edit.json",
         diffusion_model_hints=("qwen", "image", "edit"),
         diffusion_model_priority_hints=(
             ("qwen", "image", "edit", "fp8", "e4m3fn"),
@@ -1283,7 +1286,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="flux_kontext_dev_edit",
-        official_template_path="reference/workflow_templates/imageEdit/Flux.1 Kontext Dev .json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:flux_kontext_dev_basic.json",
         diffusion_model_hints=("kontext", "flux1"),
         diffusion_model_priority_hints=(
             ("flux1", "kontext", "dev"),
@@ -1369,7 +1372,7 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="klein_9b_kv_image_edit",
-        official_template_path="reference/workflow_templates/imageEdit/Flux.2 Klein 9b KV image edit.json",
+        official_template_path="comfyui-workflow-templates-json==0.1.3:image_flux2_klein_9b_kv_image_edit.json",
         diffusion_model_hints=("klein", "9b", "kv"),
         diffusion_model_priority_hints=(("flux", "2", "klein", "9b", "kv"), ("klein", "9b", "kv"), ("klein", "kv")),
         diffusion_model_deny_hints=("4b", "distill", "distilled", "base"),
@@ -1473,6 +1476,19 @@ _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         vae_priority_hints=(("ae",), ("z-image", "turbo"), ("z_image", "turbo"), ("z-image",), ("z_image",)),
         vae_deny_hints=("qwen",),
     ),
+)
+
+_CURRENT_HOST_DEFERRED_PROFILE_IDS = frozenset(
+    {
+        "klein_4b_distilled",
+        "klein_9b_distilled",
+        "qwen_image_edit_multi_lora",
+    }
+)
+# IMPORTANT: profiles without an accepted current source graph must fail closed
+# before registry, preset, selector, or runtime-adapter exposure.
+_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = tuple(
+    entry for entry in _ALL_MANIFEST_ENTRIES if entry.id not in _CURRENT_HOST_DEFERRED_PROFILE_IDS
 )
 
 

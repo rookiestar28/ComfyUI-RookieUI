@@ -79,7 +79,6 @@ describe("fetchRookieUICapabilities", () => {
     const kreaEntry = result.data.model_families.entries.find((entry) => entry.id === "krea2_turbo");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
     const qwenEditEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit");
-    const qwenEditMultiEntry = result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit_multi_lora");
     const fireredEntry = result.data.model_families.entries.find((entry) => entry.id === "firered_image_edit");
     const fireredLightningEntry = result.data.model_families.entries.find(
       (entry) => entry.id === "firered_image_edit_lightning",
@@ -125,10 +124,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(qwenEditEntry.max_direct_references).toBe(1);
     expect(qwenEditEntry.encoder_family).toBe("qwen_image_edit");
     expect(qwenEditEntry.template_lora_chain_mode).toBe("single");
-    expect(qwenEditMultiEntry.image_edit_profile).toBe(true);
-    expect(qwenEditMultiEntry.reference_input_mode).toBe("single");
-    expect(qwenEditMultiEntry.max_direct_references).toBe(1);
-    expect(qwenEditMultiEntry.template_lora_chain_mode).toBe("triple");
+    expect(result.data.model_families.entries.find((entry) => entry.id === "qwen_image_edit_multi_lora")).toBeUndefined();
     expect(fireredEntry.reference_input_mode).toBe("multi");
     expect(fireredEntry.max_direct_references).toBe(3);
     expect(fireredEntry.encoder_family).toBe("qwen_image_edit_plus");
@@ -302,9 +298,7 @@ describe("fetchRookieUICapabilities", () => {
       "flux",
       "ideogram4",
       "krea2_turbo",
-      "klein_4b_distilled",
       "klein_4b",
-      "klein_9b_distilled",
       "klein_9b",
       "hidream_i1_dev_fp8",
       "hidream_i1_fast",
@@ -312,7 +306,6 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
-      "qwen_image_edit_multi_lora",
       "firered_image_edit",
       "firered_image_edit_lightning",
       "flux_kontext_dev_edit",
@@ -336,9 +329,7 @@ describe("fetchRookieUICapabilities", () => {
       "flux",
       "ideogram4",
       "krea2_turbo",
-      "klein_4b_distilled",
       "klein_4b",
-      "klein_9b_distilled",
       "klein_9b",
       "hidream_i1_dev_fp8",
       "hidream_i1_fast",
@@ -346,7 +337,6 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
-      "qwen_image_edit_multi_lora",
       "firered_image_edit",
       "firered_image_edit_lightning",
       "flux_kontext_dev_edit",
@@ -382,9 +372,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_chain_mode).toBe(
       "single",
     );
-    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit_multi_lora")?.template_lora_chain_mode).toBe(
-      "triple",
-    );
+    expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit_multi_lora")).toBeUndefined();
     expect(presets.data.presets.find((preset) => preset.id === "firered_image_edit")?.reference_input_mode).toBe(
       "multi",
     );

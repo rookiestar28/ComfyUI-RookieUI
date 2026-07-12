@@ -1,0 +1,136 @@
+{
+  "core_revision": "69ea58697bb2f05124f5dc7e00ad111f7cfff645",
+  "profiles": {
+    "anima": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Anima).json",
+      "sha256": "faed4db4e059b427d958e13e81886cb8ea5a3215f520c22a492226cd95e108b9",
+      "source_kind": "core-blueprint"
+    },
+    "chroma": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_chroma_text_to_image.json",
+      "sha256": "7fd2bbee72b1d32aa437433ed95d69d8676b41177d3db6880f8ece6f5421ccbc",
+      "source_kind": "workflow-template-package"
+    },
+    "ernie_image": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Ernie Image).json",
+      "sha256": "d1345365a467949fa0343359dc85207c603b11c868c2b6c19f56419c429f9164",
+      "source_kind": "core-blueprint"
+    },
+    "ernie_image_turbo": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Ernie Image Turbo).json",
+      "sha256": "9a0f5fd620f7d2345d268efc3598ded10d8ba50d5dcd4de5a7b58b6a3ec64f54",
+      "source_kind": "core-blueprint"
+    },
+    "firered_image_edit": {
+      "locator": "reference/ComfyUI/blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "sha256": "47a00d7a9b4c632d8bf4f9964bdd96c4c6cb73e698813ee53ed69ddc1415a85f",
+      "source_kind": "core-blueprint"
+    },
+    "firered_image_edit_lightning": {
+      "locator": "reference/ComfyUI/blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "sha256": "47a00d7a9b4c632d8bf4f9964bdd96c4c6cb73e698813ee53ed69ddc1415a85f",
+      "source_kind": "core-blueprint"
+    },
+    "flux": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Flux.1 Dev).json",
+      "sha256": "2b5bf2013cce0f35698cc1c0c33519939f9cce1a1fa86447404a493956c09d97",
+      "source_kind": "core-blueprint"
+    },
+    "flux2_dev": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Flux.2 Dev).json",
+      "sha256": "4f617884f5267865d06c9a75d49bcb9f1c4434aec520cc6816470fe6ffdfffe4",
+      "source_kind": "core-blueprint"
+    },
+    "flux2_image_edit": {
+      "locator": "reference/ComfyUI/blueprints/Image Edit (Flux.2 Dev).json",
+      "sha256": "e77d90bcb77f3ae0f50df6b3b1ebd6ab7d591688794be9f477a8a76151309453",
+      "source_kind": "core-blueprint"
+    },
+    "flux_kontext_dev_edit": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:flux_kontext_dev_basic.json",
+      "sha256": "9fe3687dae2e2427e894e9e05d41dd3354bac377962588254dfa3a1c0717ee5e",
+      "source_kind": "workflow-template-package"
+    },
+    "flux_krea_dev": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Flux.1 Krea Dev).json",
+      "sha256": "761bdbe35d73a73cf7225e348e7a3d5c8e744adbd1323df63c045fce72014829",
+      "source_kind": "core-blueprint"
+    },
+    "hidream_i1_dev_fp8": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_dev.json",
+      "sha256": "3e929f0cb81a126c36436a7e07d5a2d7b7a55e656f6392edfd4749e365cf87ea",
+      "source_kind": "workflow-template-package"
+    },
+    "hidream_i1_fast": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_fast.json",
+      "sha256": "345400d918e9645f5328a329377cc7de3799fa102d696ed97ee897bdd2a9b7ee",
+      "source_kind": "workflow-template-package"
+    },
+    "hidream_i1_full": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_full.json",
+      "sha256": "af698df59699a8ec0659d2e5e60fe17b0b9a7d7cd70cd81fb007126f0a8d6a06",
+      "source_kind": "workflow-template-package"
+    },
+    "ideogram4": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json",
+      "sha256": "678339dee269399d3d7dd250feed084e19ec4f62fced7c7f915820085b1c372c",
+      "source_kind": "core-blueprint"
+    },
+    "klein_4b": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_klein_text_to_image.json",
+      "sha256": "237b436e577cdd2a97527766637e87af162b4c14fb293c9c269b470b7a2d0166",
+      "source_kind": "workflow-template-package"
+    },
+    "klein_9b": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_text_to_image_9b.json",
+      "sha256": "01d26f79edf66714ae2280afa5117edb71d11865423307ab15303192657ef69b",
+      "source_kind": "workflow-template-package"
+    },
+    "klein_9b_kv_image_edit": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_klein_9b_kv_image_edit.json",
+      "sha256": "8971a174ac2387a4cdda19ee1102ebc560e4cac75783f6162467c38eb07a499f",
+      "source_kind": "workflow-template-package"
+    },
+    "krea2_turbo": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
+      "sha256": "06f0b86b19d057c02b5a528c1df17fce121581bb742f5bf6e71fe9fcc8066869",
+      "source_kind": "workflow-template-package"
+    },
+    "longcat_image": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_longcat_text_to_image.json",
+      "sha256": "b070f72c798fba15545c64716d5dc166f3eb5d0e65b2d99d4a28d3cbbc7e3504",
+      "source_kind": "workflow-template-package"
+    },
+    "longcat_image_edit": {
+      "locator": "reference/ComfyUI/blueprints/Image Edit (LongCat Image Edit).json",
+      "sha256": "3ca7b848a5a2612448a4821ef2b99fb8af4ee89658e34107926c5d72a9e113f7",
+      "source_kind": "core-blueprint"
+    },
+    "qwen_image": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Qwen-Image 2512).json",
+      "sha256": "91e6b10aa9cc6aa4e5749ea7ad1075e416f25945f02e45bb07507ffc5cb61ebf",
+      "source_kind": "core-blueprint"
+    },
+    "qwen_image_edit": {
+      "locator": "comfyui-workflow-templates-json==0.1.3:image_qwen_image_edit.json",
+      "sha256": "2c8a46d0f89dd0956d4422a92aab15363fbdec51a7cc4d1350f4a9d3ef268d48",
+      "source_kind": "workflow-template-package"
+    },
+    "qwen_image_edit_2511": {
+      "locator": "reference/ComfyUI/blueprints/Image Edit (Qwen 2511).json",
+      "sha256": "f4a0476d2274087b1b66ed82e0270f3958597ce08c01bf0a39d145174ec6cd83",
+      "source_kind": "core-blueprint"
+    },
+    "z_image": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Z-Image-Base).json",
+      "sha256": "da9c03bcd8282aaf1e5a44ab13805886268bdb67c2907cc7e5ed6c4bc169c252",
+      "source_kind": "core-blueprint"
+    },
+    "z_image_turbo": {
+      "locator": "reference/ComfyUI/blueprints/Text to Image (Z-Image-Turbo).json",
+      "sha256": "75ffbb281d213694cde74d994e1fbdbcd3c747d0cb73971bf3c571f810465a4b",
+      "source_kind": "core-blueprint"
+    }
+  },
+  "workflow_templates_json_version": "0.1.3"
+}

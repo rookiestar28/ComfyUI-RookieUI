@@ -205,7 +205,9 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertIn("flux2_dev", family_ids)
         self.assertIn("ernie_image", family_ids)
         self.assertIn("qwen_image_edit", family_ids)
-        self.assertIn("qwen_image_edit_multi_lora", family_ids)
+        self.assertNotIn("qwen_image_edit_multi_lora", family_ids)
+        self.assertNotIn("klein_4b_distilled", family_ids)
+        self.assertNotIn("klein_9b_distilled", family_ids)
         self.assertIn("qwen_image_edit_2511", family_ids)
         self.assertIn("firered_image_edit", family_ids)
         self.assertIn("firered_image_edit_lightning", family_ids)
@@ -262,9 +264,6 @@ class CapabilitySnapshotTests(unittest.TestCase):
         )
         chroma_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "chroma")
         qwen_edit_entry = next(entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit")
-        qwen_edit_multi_entry = next(
-            entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit_multi_lora"
-        )
         qwen_edit_2511_entry = next(
             entry for entry in payload["model_families"]["entries"] if entry["id"] == "qwen_image_edit_2511"
         )
@@ -300,10 +299,6 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(qwen_edit_entry["template_lora_chain_mode"], "single")
         self.assertEqual(qwen_edit_entry["available_surface_flows"], ["img2img"])
         self.assertIn("Legacy Qwen-Image Edit", qwen_edit_entry["compatibility_summary"])
-        self.assertTrue(qwen_edit_multi_entry["image_edit_profile"])
-        self.assertEqual(qwen_edit_multi_entry["reference_input_mode"], "single")
-        self.assertEqual(qwen_edit_multi_entry["max_direct_references"], 1)
-        self.assertEqual(qwen_edit_multi_entry["template_lora_chain_mode"], "triple")
         self.assertTrue(qwen_edit_2511_entry["image_edit_profile"])
         self.assertEqual(qwen_edit_2511_entry["request_contract_surface"], "img2img")
         self.assertEqual(qwen_edit_2511_entry["reference_input_mode"], "multi")

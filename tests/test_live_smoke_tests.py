@@ -137,7 +137,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
         self.assertEqual(
             live_smoke._default_profiles_for_mode("image-edit"),
             (
-                "qwen_image_edit,qwen_image_edit_multi_lora,qwen_image_edit_2511,"
+                "qwen_image_edit,qwen_image_edit_2511,"
                 "firered_image_edit,firered_image_edit_lightning,flux_kontext_dev_edit,flux2_image_edit,"
                 "klein_9b_kv_image_edit,longcat_image_edit"
             ),
@@ -163,10 +163,10 @@ class LiveSmokePromptParityTests(unittest.TestCase):
             live_smoke._default_profiles_for_mode("catalog"),
             (
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,flux_krea_dev,flux2_dev,"
-                "ideogram4,krea2_turbo,klein_4b_distilled,klein_4b,klein_9b_distilled,klein_9b,"
+                "ideogram4,krea2_turbo,klein_4b,klein_9b,"
                 "hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
                 "longcat_image,qwen_image,z_image,z_image_turbo,qwen_image_edit,"
-                "qwen_image_edit_multi_lora,qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"
+                "qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"
                 "flux_kontext_dev_edit,flux2_image_edit,klein_9b_kv_image_edit,longcat_image_edit"
             ),
         )
@@ -753,75 +753,25 @@ class LiveSmokeCatalogTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
-    def test_validate_catalog_contract_accepts_qwen_image_edit_multi_lora_with_official_lora(self) -> None:
+    def test_validate_catalog_contract_rejects_deferred_qwen_image_edit_multi_lora(self) -> None:
         errors, _ = live_smoke._validate_catalog_contract(
             {
                 "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
-                "vae": ["qwen_image_vae.safetensors"],
-                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
-                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
-                "catalog": {"primary_model_category_by_family": {"qwen_image_edit_multi_lora": "diffusion_models"}},
+                "catalog": {"primary_model_category_by_family": {}},
             },
-            {
-                "presets": [
-                    {
-                        "id": "qwen_image_edit_multi_lora",
-                        "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
-                        "vae_name": "qwen_image_vae.safetensors",
-                        "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-                        "shift": 3.0,
-                        "edit_megapixels": 1.5,
-                    }
-                ]
-            },
+            {"presets": []},
             ["qwen_image_edit_multi_lora"],
         )
 
-        self.assertEqual(errors, [])
+        self.assertEqual(errors, ["profile 'qwen_image_edit_multi_lora' missing in /rookieui/presets payload."])
 
-    def test_validate_image_edit_dry_run_response_pins_triple_template_lora_depth(self) -> None:
-        case = live_smoke._build_image_edit_dry_run_case(
-            "qwen_image_edit_multi_lora",
-            {
-                "checkpoint_name": "Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors",
-                "vae_name": "qwen_image_vae.safetensors",
-                "text_encoder_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-                "edit_megapixels": 1.5,
-            },
-            models_payload={
-                "source": "host",
-                "checkpoints": ["realvisxl.safetensors"],
-                "diffusion_models": ["Qwen\\qwen_image_edit_fp8_e4m3fn.safetensors"],
-                "vae": ["qwen_image_vae.safetensors"],
-                "text_encoders": ["qwen_2.5_vl_7b_fp8_scaled.safetensors"],
-                "loras": ["Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors"],
-                "default_checkpoint": "realvisxl.safetensors",
-                "default_vae": "qwen_image_vae.safetensors",
-                "default_text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
-            },
-        )
-
-        errors = live_smoke._validate_image_edit_dry_run_response(
-            case,
-            {
-                "workflow_kind": "img2img-qwen_image_edit_multi_lora",
-                "normalized_request": {
-                    "mode": "img2img",
-                    "execution_mode": "edit",
-                    "reference_image_assets": ["uploaded-reference"],
-                    "main_reference_index": 0,
-                    "mask_asset": "",
-                },
-                "workflow": {
-                    "1": {"class_type": "RookieUILoadAssetImage"},
-                    "2": {"class_type": "LoraLoaderModelOnly"},
-                    "3": {"class_type": "LoraLoaderModelOnly"},
-                    "4": {"class_type": "LoraLoaderModelOnly"},
-                },
-            },
-        )
-
-        self.assertEqual(errors, [])
+    def test_build_image_edit_dry_run_case_rejects_deferred_multi_lora_profile(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported RookieUI model family"):
+            live_smoke._build_image_edit_dry_run_case(
+                "qwen_image_edit_multi_lora",
+                {},
+                models_payload={},
+            )
 
     def test_run_execute_smoke_routes_qwen_image_edit_through_img2img_without_mask(self) -> None:
         submit_calls: list[tuple[str, dict[str, object]]] = []

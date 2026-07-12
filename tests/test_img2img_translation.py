@@ -1059,31 +1059,18 @@ class Img2ImgTranslationTests(unittest.TestCase):
         model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
         self.assertEqual(model_sampling_node["inputs"]["model"], [inline_node_id, 0])
 
-    def test_translate_img2img_request_builds_qwen_image_edit_multi_lora_workflow(self) -> None:
+    def test_normalize_img2img_request_rejects_deferred_qwen_image_edit_multi_lora(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_edit_inventory()):
-            normalized = normalize_img2img_request(
-                {
-                    "prompt": "refresh the storefront signage",
-                    "negative_prompt": "blurry",
-                    "image_asset": "portrait-input",
-                    "profile": "qwen_image_edit_multi_lora",
-                    "mode": "img2img",
-                }
-            )
-
-        result = translate_img2img_request(normalized).to_payload()
-        workflow = result["workflow"]
-        self.assertEqual(result["workflow_kind"], "img2img-qwen_image_edit_multi_lora")
-        model_sampling_node = next(node for node in workflow.values() if node["class_type"] == "ModelSamplingAuraFlow")
-        chained_model_ref = model_sampling_node["inputs"]["model"]
-        chain_depth = 0
-        while workflow[chained_model_ref[0]]["class_type"] == "LoraLoaderModelOnly":
-            node = workflow[chained_model_ref[0]]
-            self.assertEqual(node["inputs"]["lora_name"], "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors")
-            chain_depth += 1
-            chained_model_ref = node["inputs"]["model"]
-        self.assertEqual(chain_depth, 3)
-        self.assertEqual(workflow[chained_model_ref[0]]["class_type"], "UNETLoader")
+            with self.assertRaisesRegex(ValueError, "Unsupported RookieUI model family"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "refresh the storefront signage",
+                        "negative_prompt": "blurry",
+                        "image_asset": "portrait-input",
+                        "profile": "qwen_image_edit_multi_lora",
+                        "mode": "img2img",
+                    }
+                )
 
     def test_translate_img2img_request_builds_firered_image_edit_workflow_with_three_references(self) -> None:
         with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._build_qwen_plus_inventory()):

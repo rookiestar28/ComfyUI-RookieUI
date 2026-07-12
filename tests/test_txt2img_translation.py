@@ -846,13 +846,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "qwen3vl_4b_fp8_scaled.safetensors",
                 "qwen_image_vae.safetensors",
             ),
-            "klein_4b_distilled": ("klein\\flux-2-klein-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
             "klein_4b": ("klein\\flux-2-klein-base-4b.safetensors", "qwen_3_4b.safetensors", "flux2-vae.safetensors"),
-            "klein_9b_distilled": (
-                "klein\\flux-2-klein-9b-fp8.safetensors",
-                "qwen_3_8b_fp8mixed.safetensors",
-                "full_encoder_small_decoder.safetensors",
-            ),
             "klein_9b": (
                 "klein\\flux-2-klein-base-9b-fp8.safetensors",
                 "qwen_3_8b_fp8mixed.safetensors",
