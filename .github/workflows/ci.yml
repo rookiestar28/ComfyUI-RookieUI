@@ -39,3 +39,28 @@ jobs:
 
       - name: Run full test gate
         run: bash scripts/run_full_tests_linux.sh
+
+  publish-node:
+    name: Publish Custom Node to registry
+    # SECURITY: keep publishing in this workflow and gated by successful needs; see https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds
+    needs: full-test-gate
+    if: >-
+      ${{
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        github.repository == 'rookiestar28/ComfyUI-RookieUI'
+      }}
+    permissions:
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out validated code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          submodules: true
+
+      - name: Publish validated custom node
+        uses: Comfy-Org/publish-node-action@0eb6cd742945443bee7f79eeddd4f732780029a1
+        with:
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
