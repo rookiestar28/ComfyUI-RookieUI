@@ -1960,9 +1960,11 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
             allocator=allocator,
             image_id=references.main_image_node_id,
         )
-        reference_image_node_ids = tuple(
-            scaled_main_image_id if index == references.main_reference_index else image_node_id
+        # IMPORTANT: Qwen 2511 defines the scaled selected main as image1; external request order stays unchanged.
+        reference_image_node_ids = (scaled_main_image_id,) + tuple(
+            image_node_id
             for index, image_node_id in enumerate(references.image_node_ids)
+            if index != references.main_reference_index
         )
         latent_image_node_id = scaled_main_image_id
     else:

@@ -1170,6 +1170,52 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(workflow[sampler_node["inputs"]["positive"][0]]["class_type"], "FluxKontextMultiReferenceLatentMethod")
         self.assertEqual(workflow[sampler_node["inputs"]["negative"][0]]["class_type"], "FluxKontextMultiReferenceLatentMethod")
 
+    def test_translate_qwen_2511_keeps_selected_main_first_for_every_valid_index(self) -> None:
+        reference_assets = ["reference-a", "reference-b", "reference-c"]
+        for main_index in range(3):
+            with self.subTest(main_reference_index=main_index), mock.patch(
+                "rookieui.services.img2img.discover_model_inventory",
+                return_value=self._build_qwen_2511_edit_inventory(),
+            ):
+                normalized = normalize_img2img_request(
+                    {
+                        "prompt": "preserve the selected subject",
+                        "profile": "qwen_image_edit_2511",
+                        "mode": "img2img",
+                        "reference_images": [
+                            {"image_asset": asset_handle} for asset_handle in reference_assets
+                        ],
+                        "main_reference_index": main_index,
+                    }
+                )
+                workflow = translate_img2img_request(normalized).to_payload()["workflow"]
+
+            load_ids = {
+                node["inputs"]["asset_handle"]: node_id
+                for node_id, node in workflow.items()
+                if node["class_type"] == "RookieUILoadAssetImage"
+            }
+            scale_id = next(
+                node_id for node_id, node in workflow.items() if node["class_type"] == "FluxKontextImageScale"
+            )
+            encoder_nodes = [
+                node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEditPlus"
+            ]
+            remaining_assets = [
+                asset_handle for index, asset_handle in enumerate(reference_assets) if index != main_index
+            ]
+            expected_images = ([scale_id, 0],) + tuple([load_ids[asset_handle], 0] for asset_handle in remaining_assets)
+
+            self.assertEqual(normalized.reference_image_assets, reference_assets)
+            self.assertEqual(normalized.main_reference_index, main_index)
+            self.assertEqual(len(encoder_nodes), 2)
+            for encoder_node in encoder_nodes:
+                self.assertEqual(encoder_node["inputs"]["image1"], expected_images[0])
+                self.assertEqual(encoder_node["inputs"]["image2"], expected_images[1])
+                self.assertEqual(encoder_node["inputs"]["image3"], expected_images[2])
+            vae_encode_node = next(node for node in workflow.values() if node["class_type"] == "VAEEncode")
+            self.assertEqual(vae_encode_node["inputs"]["pixels"], [scale_id, 0])
+
     def test_translate_img2img_request_builds_qwen_2511_workflow_with_single_reference(self) -> None:
         with mock.patch(
             "rookieui.services.img2img.discover_model_inventory",
