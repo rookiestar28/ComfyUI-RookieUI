@@ -22,7 +22,16 @@ class RoutePayloadTests(unittest.TestCase):
     def test_health_payload_shape(self) -> None:
         self.assertEqual(
             routes.build_health_payload(),
-            {"service": "rookieui", "status": "ok"},
+            {
+                "service": "rookieui",
+                "status": "ok",
+                "deployment": {
+                    "supported": True,
+                    "mode": "single-user",
+                    "detail": "RookieUI local single-user deployment boundary is active.",
+                },
+                "optional_aliases": {},
+            },
         )
 
     def test_bootstrap_payload_lists_internal_routes(self) -> None:

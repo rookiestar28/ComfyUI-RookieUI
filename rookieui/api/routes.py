@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Any
 
 from rookieui.contracts.extras import build_extras_contract_meta
@@ -108,12 +109,66 @@ INTERNAL_ROUTE_PATHS = [
     f"{INTERNAL_ROUTE_PREFIX}/extras/run",
 ]
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
+_SAFE_DIAGNOSTIC_SUFFIXES = frozenset({"/health", "/bootstrap", "/capabilities", "/parity", "/compatibility"})
+_multi_user_mode_active = False
+_optional_alias_route_status: dict[str, dict[str, str]] = {}
+
+
+def _detect_multi_user_mode() -> bool:
+    cli_args_module = sys.modules.get("comfy.cli_args")
+    cli_args = getattr(cli_args_module, "args", None)
+    return bool(getattr(cli_args, "multi_user", False))
+
+
+def _deployment_payload() -> dict[str, object]:
+    if _multi_user_mode_active:
+        return {
+            "supported": False,
+            "mode": "multi-user",
+            "detail": "RookieUI supports local single-user ComfyUI hosts; stateful capabilities are disabled.",
+        }
+    return {
+        "supported": True,
+        "mode": "single-user",
+        "detail": "RookieUI local single-user deployment boundary is active.",
+    }
+
+
+def get_optional_alias_route_status() -> dict[str, dict[str, str]]:
+    return {key: dict(value) for key, value in _optional_alias_route_status.items()}
+
+
+async def _unsupported_multi_user_handler(request: Any) -> Any:
+    return _json_response(
+        {
+            "service": "rookieui",
+            "status": "unsupported-host-mode",
+            "detail": "RookieUI stateful routes require a local single-user ComfyUI host.",
+            "deployment": _deployment_payload(),
+        },
+        status=409,
+        request=request,
+    )
+
+
+def _deployment_guard(handler: Any, *, diagnostic: bool) -> Any:
+    if not _multi_user_mode_active or diagnostic:
+        return handler
+    return _unsupported_multi_user_handler
+
+
+def _reset_route_runtime_state_for_tests() -> None:
+    global _multi_user_mode_active
+    _multi_user_mode_active = False
+    _optional_alias_route_status.clear()
 
 
 def build_health_payload() -> dict[str, Any]:
     return {
         "service": normalize_metadata_text("rookieui"),
-        "status": normalize_metadata_text("ok"),
+        "status": normalize_metadata_text("unsupported-host-mode" if _multi_user_mode_active else "ok"),
+        "deployment": _deployment_payload(),
+        "optional_aliases": get_optional_alias_route_status(),
     }
 
 
@@ -127,11 +182,16 @@ def build_bootstrap_payload() -> dict[str, Any]:
             "build_fingerprint": normalize_metadata_text(build_runtime_metadata_payload()["build_fingerprint"]),
         },
         "routes": list(INTERNAL_ROUTE_PATHS),
+        "deployment": _deployment_payload(),
+        "optional_aliases": get_optional_alias_route_status(),
     }
 
 
 def build_capabilities_snapshot() -> dict[str, object]:
-    return build_capabilities_payload(routes=list(INTERNAL_ROUTE_PATHS))
+    payload = build_capabilities_payload(routes=list(INTERNAL_ROUTE_PATHS))
+    payload["deployment"] = _deployment_payload()
+    payload["optional_aliases"] = get_optional_alias_route_status()
+    return payload
 
 
 def build_parity_snapshot() -> dict[str, object]:
@@ -1159,19 +1219,48 @@ def _register_controlnet_alias_routes(prompt_server: Any) -> None:
         prompt_server.app.router,
         allowed_prefixes=("/controlnet",),
     )
-    alias_registrar.add_get("/controlnet/model_list", controlnet_model_list)
-    alias_registrar.add_get("/controlnet/module_list", controlnet_module_list)
-    alias_registrar.add_get("/controlnet/control_types", controlnet_control_types)
-    alias_registrar.add_post("/controlnet/detect", controlnet_detect)
+    aliases = (
+        ("GET", "/controlnet/model_list", controlnet_model_list),
+        ("GET", "/controlnet/module_list", controlnet_module_list),
+        ("GET", "/controlnet/control_types", controlnet_control_types),
+        ("POST", "/controlnet/detect", controlnet_detect),
+    )
+    for method, path, handler in aliases:
+        status_key = f"{method} {path}"
+        if _multi_user_mode_active:
+            _optional_alias_route_status[status_key] = {
+                "status": "disabled",
+                "reason": "unsupported-multi-user-mode",
+            }
+            continue
+        try:
+            if method == "GET":
+                alias_registrar.add_get(path, handler)
+            else:
+                alias_registrar.add_post(path, handler)
+        except Exception:
+            # IMPORTANT: compatibility aliases never own host-global paths and
+            # must not abort or roll back authoritative RookieUI routes.
+            _optional_alias_route_status[status_key] = {
+                "status": "collision",
+                "reason": "foreign-or-preexisting-route",
+            }
+            _LOGGER.warning("Optional RookieUI compatibility alias unavailable: %s", status_key)
+        else:
+            _optional_alias_route_status[status_key] = {
+                "status": "registered",
+                "reason": "rookieui-owned",
+            }
 
 
 def _register_rookieui_route_pair(registrar: SafeRouteRegistrar, method: str, suffix: str, handler: Any) -> None:
+    registered_handler = _deployment_guard(handler, diagnostic=suffix in _SAFE_DIAGNOSTIC_SUFFIXES)
     for prefix in (INTERNAL_ROUTE_PREFIX, API_INTERNAL_ROUTE_PREFIX):
         path = f"{prefix}{suffix}"
         if method == "GET":
-            registrar.add_get(path, handler)
+            registrar.add_get(path, registered_handler)
         elif method == "POST":
-            registrar.add_post(path, handler)
+            registrar.add_post(path, registered_handler)
         else:
             raise ValueError(f"Unsupported RookieUI route method: {method}")
 
@@ -1185,6 +1274,8 @@ def _register_rookieui_post(registrar: SafeRouteRegistrar, suffix: str, handler:
 
 
 def register_routes(prompt_server: Any) -> None:
+    global _multi_user_mode_active
+    _multi_user_mode_active = _detect_multi_user_mode()
     registrar = SafeRouteRegistrar(prompt_server.app.router, allowed_prefixes=(INTERNAL_ROUTE_PREFIX, API_INTERNAL_ROUTE_PREFIX))
     # CRITICAL: ComfyUI app.api.fetchApi('/rookieui/...') resolves to '/api/rookieui/...'.
     # Direct custom-node app.router registration does not get ComfyUI's automatic /api route clone.

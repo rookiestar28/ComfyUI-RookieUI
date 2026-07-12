@@ -30,10 +30,17 @@ class RouteGuardTests(unittest.TestCase):
         registrar = SafeRouteRegistrar(router)
 
         registrar.add_get("/rookieui/health", object())
-        with self.assertRaises(ValueError):
-            registrar.add_get("/rookieui/health", object())
+        registrar.add_get("/rookieui/health", object())
 
         self.assertEqual(len(router.routes), 1)
+
+    def test_registration_state_is_scoped_per_router(self) -> None:
+        first = FakeRouter()
+        second = FakeRouter()
+        SafeRouteRegistrar(first).add_get("/rookieui/health", object())
+        SafeRouteRegistrar(second).add_get("/rookieui/health", object())
+        self.assertEqual(len(first.routes), 1)
+        self.assertEqual(len(second.routes), 1)
 
     def test_registers_internal_post_route(self) -> None:
         router = FakeRouter()

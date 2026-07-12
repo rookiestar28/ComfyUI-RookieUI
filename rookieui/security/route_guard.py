@@ -4,7 +4,19 @@ from typing import Any
 
 INTERNAL_ROUTE_PREFIX = "/rookieui"
 API_INTERNAL_ROUTE_PREFIX = f"/api{INTERNAL_ROUTE_PREFIX}"
-_registered_route_keys: set[tuple[str, str]] = set()
+_registered_routes_by_router: dict[int, tuple[Any, set[tuple[str, str]]]] = {}
+
+
+def _registered_route_keys(router: Any) -> set[tuple[str, str]]:
+    router_id = id(router)
+    entry = _registered_routes_by_router.get(router_id)
+    if entry is None or entry[0] is not router:
+        route_keys: set[tuple[str, str]] = set()
+        # IMPORTANT: retain the router identity with its keys so Python object-id
+        # reuse cannot suppress registration on a later host router.
+        _registered_routes_by_router[router_id] = (router, route_keys)
+        return route_keys
+    return entry[1]
 
 
 def validate_route_path(path: str, *, allowed_prefixes: tuple[str, ...]) -> str:
@@ -46,16 +58,17 @@ class SafeRouteRegistrar:
     def _register(self, method: str, registrar_name: str, path: str, handler: Any) -> None:
         normalized_path = validate_route_path(path, allowed_prefixes=self._allowed_prefixes)
         route_key = (method, normalized_path)
-        if route_key in _registered_route_keys:
-            raise ValueError(f"RookieUI route already registered: {method} {normalized_path}")
+        registered_route_keys = _registered_route_keys(self._router)
+        if route_key in registered_route_keys:
+            return
 
         registrar = getattr(self._router, registrar_name, None)
         if registrar is None:
             raise AttributeError(f"Router does not support {registrar_name}.")
 
         registrar(normalized_path, handler)
-        _registered_route_keys.add(route_key)
+        registered_route_keys.add(route_key)
 
 
 def reset_registered_routes_for_tests() -> None:
-    _registered_route_keys.clear()
+    _registered_routes_by_router.clear()
