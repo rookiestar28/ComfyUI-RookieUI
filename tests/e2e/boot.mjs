@@ -1184,6 +1184,18 @@ const app = createMockComfyUIApp({
       }
     : null,
 });
+window.__ROOKIEUI_E2E_APP__ = app;
+if (params.get("lifecycleSentinel") === "1") {
+  Object.assign(document.querySelector(".sidebar-content-container").style, {
+    minWidth: "211px", width: "377px", flexBasis: "13px",
+  });
+  Object.assign(document.querySelector(".side-bar-panel").style, {
+    minWidth: "233px", width: "355px", flexBasis: "17px",
+  });
+  Object.assign(document.getElementById("mock-sidebar-tabs").style, {
+    minWidth: "19px", width: "29px", flexBasis: "31px",
+  });
+}
 await registerRookieUIBootstrapExtension({
   app,
   windowRef: window,

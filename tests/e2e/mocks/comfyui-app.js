@@ -11,10 +11,17 @@ export function createMockComfyUIApp({ sidebar = true, api = null } = {}) {
 
   if (sidebar) {
     app.extensionManager = {
-      registerSidebarTab({ id, render }) {
+      activeSidebarTab: null,
+      registerSidebarTab(tab) {
+        this.activeSidebarTab = tab;
         const host = document.getElementById("mock-sidebar-tabs");
-        host.dataset.sidebarId = id;
-        render(host);
+        host.dataset.sidebarId = tab.id;
+        tab.render(host);
+      },
+      unregisterSidebarTab(id) {
+        if (this.activeSidebarTab?.id !== id) return;
+        this.activeSidebarTab.destroy?.();
+        this.activeSidebarTab = null;
       },
     };
   }
