@@ -78,7 +78,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 - Z-Image Turbo ControlNet now uses the official model-patch workflow path with `ModelPatchLoader` and `QwenImageDiffsynthControlnet` instead of the generic SD ControlNet loader/apply chain.
 - RookieUI recognizes Z-Image ControlNet artifacts from the host `model_patches` inventory, classifies Union/Tile, Turbo/non-Turbo, lite, release-tag, and condition support metadata, and reports missing model-patch or node prerequisites explicitly.
-- The shipped Z-Image Turbo path supports one enabled ControlNet unit at a time, with dedicated Canny, Depth, and Pose/control-image adapter behavior while keeping generic ControlNet behavior unchanged for SD-family workflows.
+- The shipped Z-Image Turbo path supports one enabled ControlNet unit at a time. Canny preprocessing is built in; Depth and Pose require an explicitly acknowledged, already-preprocessed control-map upload. Generic SD-family ControlNet behavior remains unchanged.
 
 </details>
 

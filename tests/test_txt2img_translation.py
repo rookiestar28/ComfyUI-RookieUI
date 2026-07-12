@@ -412,21 +412,23 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                             "module": "depth",
                             "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
                             "image_asset": "source-image",
+                            "preprocessed_control_map": True,
                         }
                     ],
                 }
             )
         workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
         class_types = {node["class_type"] for node in workflow.values()}
-        scale_id, scale_node = next(
-            (node_id, node) for node_id, node in workflow.items() if node["class_type"] == "ImageScaleToTotalPixels"
+        image_id, image_node = next(
+            (node_id, node) for node_id, node in workflow.items() if node["class_type"] == "RookieUILoadAssetImage"
         )
         qwen_control = next(node for node in workflow.values() if node["class_type"] == "QwenImageDiffsynthControlnet")
         get_size_node = next(node for node in workflow.values() if node["class_type"] == "GetImageSize")
 
-        self.assertEqual(scale_node["inputs"]["upscale_method"], "lanczos")
-        self.assertEqual(qwen_control["inputs"]["image"], [scale_id, 0])
-        self.assertEqual(get_size_node["inputs"]["image"], [scale_id, 0])
+        self.assertEqual(image_node["inputs"]["asset_handle"], "source-image")
+        self.assertEqual(qwen_control["inputs"]["image"], [image_id, 0])
+        self.assertEqual(get_size_node["inputs"]["image"], [image_id, 0])
+        self.assertNotIn("ImageScaleToTotalPixels", class_types)
         self.assertNotIn("RookieUIControlNetPreprocess", class_types)
         self.assertNotIn("LotusConditioning", class_types)
 
@@ -445,6 +447,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                             "module": "openpose",
                             "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
                             "image_asset": "source-image",
+                            "preprocessed_control_map": True,
                         }
                     ],
                 }
@@ -463,6 +466,77 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertNotIn("RookieUIControlNetPreprocess", class_types)
         self.assertNotIn("ImageScaleToTotalPixels", class_types)
         self.assertNotIn("Canny", class_types)
+
+    def test_translate_z_image_turbo_rejects_raw_depth_and_pose_inputs(self) -> None:
+        for module in ("depth", "openpose"):
+            with (
+                self.subTest(module=module),
+                mock.patch(
+                    "rookieui.services.txt2img.discover_model_inventory",
+                    return_value=self._z_image_turbo_inventory(),
+                ),
+                mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+            ):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "profile": "z_image_turbo",
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": module,
+                                "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                                "image_asset": "raw-source-image",
+                            }
+                        ],
+                    }
+                )
+                with self.assertRaisesRegex(ValueError, "preprocessed_control_map=true"):
+                    translate_txt2img_request(normalized)
+
+    def test_translate_z_image_turbo_accepts_explicit_preprocessed_depth_and_pose_maps_unchanged(self) -> None:
+        for module in ("depth", "openpose"):
+            with (
+                self.subTest(module=module),
+                mock.patch(
+                    "rookieui.services.txt2img.discover_model_inventory",
+                    return_value=self._z_image_turbo_inventory(),
+                ),
+                mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+            ):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "profile": "z_image_turbo",
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": module,
+                                "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                                "image_asset": "prepared-control-map",
+                                "preprocessed_control_map": True,
+                            }
+                        ],
+                    }
+                )
+
+                workflow = translate_txt2img_request(normalized).workflow
+                class_types = {node["class_type"] for node in workflow.values()}
+                image_id = next(
+                    node_id
+                    for node_id, node in workflow.items()
+                    if node["class_type"] == "RookieUILoadAssetImage"
+                )
+                qwen_control = next(
+                    node for node in workflow.values() if node["class_type"] == "QwenImageDiffsynthControlnet"
+                )
+                get_size = next(node for node in workflow.values() if node["class_type"] == "GetImageSize")
+
+                self.assertTrue(normalized.controlnet_units[0].preprocessed_control_map)
+                self.assertEqual(qwen_control["inputs"]["image"], [image_id, 0])
+                self.assertEqual(get_size["inputs"]["image"], [image_id, 0])
+                self.assertNotIn("Canny", class_types)
+                self.assertNotIn("ImageScaleToTotalPixels", class_types)
 
     def test_translate_txt2img_request_rejects_unsupported_z_image_turbo_controlnet_module(self) -> None:
         with (

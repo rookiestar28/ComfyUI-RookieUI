@@ -91,10 +91,16 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   };
   const controlnetCatalog = bootstrapState.controlnetCatalog ?? {};
   const adetailerCatalog = bootstrapState.adetailerCatalog ?? {};
-  const controlnetModelValues =
+  const baseControlnetModels =
     Array.isArray(controlnetCatalog.model_list) && controlnetCatalog.model_list.length > 0
       ? controlnetCatalog.model_list
       : inventory.controlnet ?? [];
+  const zControl = bootstrapState.capabilities?.z_image_controlnet;
+  const zControlnetModels = Array.isArray(zControl?.model_patches)
+    ? zControl.model_patches
+        .flatMap((patch) => patch?.rookieui_support === "turbo_union_single_control" ? [String(patch.selector).trim()] : [])
+    : [];
+  const controlnetModelValues = Array.from(new Set([...baseControlnetModels, ...zControlnetModels]));
   const adetailerCheckpointChoices = Array.from(
     new Set(
       [

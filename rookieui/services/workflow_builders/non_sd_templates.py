@@ -256,6 +256,7 @@ def _append_z_image_controlnet_image_adapter(
         mask_ref = [mask_id, 0]
 
     module = _classify_z_image_controlnet_module(unit)
+    preprocessed_control_map = bool(_read_controlnet_unit_value(unit, "preprocessed_control_map"))
     if module == "canny":
         scale_id = _append_image_scale_to_total_pixels_node(
             workflow,
@@ -271,17 +272,14 @@ def _append_z_image_controlnet_image_adapter(
         )
         canny_ref = [canny_id, 0]
         return canny_ref, canny_ref, mask_ref
-    if module == "depth":
-        # IMPORTANT: the current blueprint set includes Lotus depth workflows, but this Z-Image
-        # ControlNet image edge is still the scaled input image; do not invent a Lotus runtime branch here.
-        scale_id = _append_image_scale_to_total_pixels_node(
-            workflow,
-            allocator=allocator,
-            image_source=image_ref,
-            upscale_method="lanczos",
-        )
-        scale_ref = [scale_id, 0]
-        return scale_ref, scale_ref, mask_ref
+    if module in {"depth", "pose"}:
+        if not preprocessed_control_map:
+            # CRITICAL: current official Z-Image artifacts do not provide automatic Depth/Pose preprocessing.
+            raise ValueError(
+                f"Z-Image Turbo '{module}' requires an already-preprocessed control map; "
+                "set preprocessed_control_map=true after uploading the prepared map, or use built-in canny."
+            )
+        return image_ref, image_ref, mask_ref
     return image_ref, image_ref, mask_ref
 
 

@@ -381,6 +381,12 @@ def normalize_controlnet_units(
             default=False,
             strict=False,
         )
+        preprocessed_control_map = _coerce_bool(
+            _extract_unit_field(raw_unit, "preprocessed_control_map"),
+            f"controlnet_units[{index}].preprocessed_control_map",
+            default=False,
+            strict=False,
+        )
         advanced = _normalize_controlnet_advanced_block(
             _extract_unit_field(raw_unit, "advanced"),
             field_prefix=f"controlnet_units[{index}].advanced",
@@ -455,6 +461,7 @@ def normalize_controlnet_units(
                 image_asset=image_asset,
                 mask_asset=mask_asset,
                 source=source,
+                preprocessed_control_map=preprocessed_control_map,
                 control_type=control_type,
                 use_mask=use_mask,
                 allow_preview=allow_preview,

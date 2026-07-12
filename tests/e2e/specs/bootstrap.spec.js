@@ -988,6 +988,45 @@ test("clears unsupported scheduler and negative prompt across specialized profil
   await expect(page.locator("#rookieui-scheduler")).toHaveValue("normal");
 });
 
+test("requires explicit preprocessed-map acknowledgement for Z-Image depth input", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await page.locator("#rookieui-preset").selectOption("z_image_turbo");
+  await page.locator("#rookieui-prompt").fill("prepared depth control map");
+  await page.locator("#rookieui-txt2img-controlnet-section").evaluate((details) => {
+    details.open = true;
+  });
+
+  const modelSelect = page.locator("#rookieui-txt2img-controlnet-model-0");
+  await expect(modelSelect.locator('option[value="Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors"]')).toHaveCount(1);
+  await modelSelect.selectOption("Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors");
+  await page.locator("#rookieui-txt2img-controlnet-module-0").selectOption("depth");
+
+  const acknowledgement = page.locator("#rookieui-txt2img-controlnet-preprocessed-control-map-0");
+  await expect(acknowledgement).toBeVisible();
+  await expect(acknowledgement).toBeEnabled();
+  await expect(acknowledgement).not.toBeChecked();
+  await expect(page.locator("#rookieui-txt2img-controlnet-run-preprocessor-0")).toBeHidden();
+  await acknowledgement.check();
+  await page.locator("#rookieui-txt2img-controlnet-enabled-0").check();
+  await page.locator("#rookieui-txt2img-controlnet-image-asset-0").fill("prepared-depth-map");
+
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123");
+  const request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request.controlnet_units[0]).toMatchObject({
+    enabled: true,
+    module: "depth",
+    preprocessed_control_map: true,
+    image_asset: "prepared-depth-map",
+  });
+
+  await page.locator("#rookieui-txt2img-controlnet-module-0").selectOption("canny");
+  await expect(acknowledgement).toBeHidden();
+  await expect(acknowledgement).not.toBeChecked();
+  const state = JSON.parse(await page.locator("#rookieui-controlnet-units").inputValue());
+  expect(state[0].preprocessed_control_map).toBe(false);
+});
+
 test("routes txt2img preview toolbar image handoffs to target panes", async ({ page }) => {
   await page.goto("test-harness.html");
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });

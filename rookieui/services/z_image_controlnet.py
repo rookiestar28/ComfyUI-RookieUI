@@ -6,7 +6,7 @@ from typing import Mapping
 from rookieui.contracts.models import ModelInventorySnapshot
 from rookieui.services.model_inventory import discover_model_inventory
 
-Z_IMAGE_CONTROLNET_CONTRACT_VERSION = "f260-20260531"
+Z_IMAGE_CONTROLNET_CONTRACT_VERSION = "z-image-control-map-20260713"
 Z_IMAGE_CONTROLNET_REQUIRED_NODES: tuple[str, ...] = (
     "ModelPatchLoader",
     "QwenImageDiffsynthControlnet",
@@ -210,6 +210,13 @@ def build_z_image_controlnet_capability_payload(
         "missing_nodes": missing_nodes,
         "model_patches": patch_entries,
         "diagnostics": diagnostics,
+        "control_map_contract": {
+            "explicit_preprocessed_field": "preprocessed_control_map",
+            "default_preprocessed": False,
+            "built_in_preprocessors": ["canny"],
+            "explicit_preprocessed_conditions": ["depth", "pose"],
+            "raw_rejected_conditions": ["depth", "pose"],
+        },
         "graph_contract": {
             "loader_node": "ModelPatchLoader",
             "patch_apply_node": "QwenImageDiffsynthControlnet",

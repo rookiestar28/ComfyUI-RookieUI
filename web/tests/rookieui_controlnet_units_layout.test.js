@@ -103,7 +103,13 @@ function buildEditor(idPrefix, overrides = {}) {
     idPrefix,
     parent: host,
     hiddenInput,
-    modelOptions: [{ value: "control_v11p_sd15_canny.safetensors", label: "control_v11p_sd15_canny.safetensors" }],
+    modelOptions: [
+      { value: "control_v11p_sd15_canny.safetensors", label: "control_v11p_sd15_canny.safetensors" },
+      {
+        value: "Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+        label: "Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+      },
+    ],
     createInput,
     createRangeInput,
     createSelect,
@@ -171,7 +177,7 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
       },
       Depth: {
         module_list: ["none", "depth_anything_v2", "depth_midas"],
-        model_list: [],
+        model_list: ["generic-depth.safetensors"],
         default_option: "depth_anything_v2",
       },
     });
@@ -195,6 +201,37 @@ describe("createControlNetUnitEditor layout and rollback contract", () => {
     moduleOptions = Array.from(moduleSelect.options).map((entry) => entry.value);
     expect(moduleOptions).toEqual(["none", "depth_anything_v2", "depth_midas"]);
     expect(moduleSelect.value).toBe("depth_anything_v2");
+    expect(
+      Array.from(host.querySelector("#rookieui-img2img-controlnet-model-0").options).map((entry) => entry.value),
+    ).toContain("Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors");
+  });
+
+  test("requires and clears explicit preprocessed-map acknowledgement for Z-Image depth and pose", () => {
+    const { host, hiddenInput } = buildEditor("rookieui-txt2img-controlnet");
+    document.body.appendChild(host);
+    const moduleSelect = host.querySelector("#rookieui-txt2img-controlnet-module-0");
+    const modelSelect = host.querySelector("#rookieui-txt2img-controlnet-model-0");
+    const acknowledgement = host.querySelector("#rookieui-txt2img-controlnet-preprocessed-control-map-0");
+    const acknowledgementField = host.querySelector("#rookieui-txt2img-controlnet-preprocessed-control-map-field-0");
+
+    expect(acknowledgement).not.toBeNull();
+    expect(acknowledgementField?.hidden).toBe(true);
+    modelSelect.value = "Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors";
+    modelSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    moduleSelect.value = "depth";
+    moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(acknowledgementField?.hidden).toBe(false);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0")?.hidden).toBe(true);
+
+    acknowledgement.click();
+    expect(JSON.parse(hiddenInput.value)[0].preprocessed_control_map).toBe(true);
+
+    moduleSelect.value = "canny";
+    moduleSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(acknowledgementField?.hidden).toBe(true);
+    expect(acknowledgement.checked).toBe(false);
+    expect(host.querySelector("#rookieui-txt2img-controlnet-run-preprocessor-0")?.hidden).toBe(false);
+    expect(JSON.parse(hiddenInput.value)[0].preprocessed_control_map).toBe(false);
   });
 
   test("applies preprocessor profile labels, field visibility, and detect request flags", async () => {

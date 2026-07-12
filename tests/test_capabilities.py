@@ -76,6 +76,17 @@ class CapabilitySnapshotTests(unittest.TestCase):
         self.assertEqual(capability["model_patches"][0]["rookieui_support"], "turbo_union_single_control")
         self.assertEqual(capability["model_patches"][0]["recommendation"], "candidate")
         self.assertNotIn("sdxl-controlnet-depth.safetensors", str(capability["model_patches"]))
+        self.assertEqual(capability["contract_version"], "z-image-control-map-20260713")
+        self.assertEqual(
+            capability["control_map_contract"],
+            {
+                "explicit_preprocessed_field": "preprocessed_control_map",
+                "default_preprocessed": False,
+                "built_in_preprocessors": ["canny"],
+                "explicit_preprocessed_conditions": ["depth", "pose"],
+                "raw_rejected_conditions": ["depth", "pose"],
+            },
+        )
 
     def test_capabilities_snapshot_classifies_z_image_controlnet_21_variant_matrix(self) -> None:
         inventory = ModelInventorySnapshot(

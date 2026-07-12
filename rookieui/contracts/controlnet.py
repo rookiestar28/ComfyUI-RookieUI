@@ -36,6 +36,7 @@ class NormalizedControlNetUnit:
     image_asset: str
     mask_asset: str
     source: str
+    preprocessed_control_map: bool = False
     control_type: str = "All"
     use_mask: bool = False
     allow_preview: bool = False

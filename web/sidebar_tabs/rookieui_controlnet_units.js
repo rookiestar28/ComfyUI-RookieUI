@@ -162,6 +162,11 @@ function normalizeNumber(value, fallbackValue) {
   return Number.isFinite(numeric) ? numeric : fallbackValue;
 }
 
+function isZImageControlnetPatch(value) {
+  const selector = String(value ?? "").toLowerCase().replace(/[\\/_\s]+/g, "-");
+  return (selector.includes("z-image") || selector.includes("zimage")) && selector.includes("controlnet");
+}
+
 function normalizeControlTypeOrder(rawControlTypeOrder = []) {
   const normalized = Array.isArray(rawControlTypeOrder)
     ? rawControlTypeOrder.map((value) => String(value ?? "").trim()).filter(Boolean)
@@ -524,6 +529,7 @@ function normalizeUnitPayload(rawUnit = {}) {
     enabled: Boolean(rawUnit.enabled),
     allow_preview: Boolean(rawUnit.allow_preview),
     use_mask: Boolean(rawUnit.use_mask),
+    preprocessed_control_map: Boolean(rawUnit.preprocessed_control_map),
     control_type: normalizedType || DEFAULT_CONTROL_TYPE,
     module: String(rawUnit.module ?? "none") || "none",
     model: String(rawUnit.model ?? "").trim(),
@@ -549,6 +555,7 @@ function shouldEmitUnit(unit) {
     unit.enabled ||
     unit.allow_preview ||
     unit.use_mask ||
+    unit.preprocessed_control_map ||
     unit.control_type !== DEFAULT_CONTROL_TYPE ||
     unit.module !== "none" ||
     Boolean(unit.model) ||
@@ -773,12 +780,36 @@ export function createControlNetUnitEditor({
   const tabButtons = [];
   const unitPanels = [];
 
+  const syncPreprocessedControlMapState = (row) => {
+    if (!row?.preprocessedControlMap || !row?.preprocessedControlMapField) return;
+    const moduleName = String(row.module?.value ?? "").toLowerCase();
+    const zImagePatch = isZImageControlnetPatch(row.model?.value);
+    const requiresPreparedMap = zImagePatch && (moduleName.includes("depth") || moduleName.includes("pose"));
+    row.preprocessedControlMapField.hidden = !requiresPreparedMap;
+    row.preprocessedControlMap.hidden = !requiresPreparedMap;
+    row.preprocessedControlMap.style.display = requiresPreparedMap ? "" : "none";
+    row.preprocessedControlMap.disabled = !requiresPreparedMap;
+    if (row.runPreprocessorButton) {
+      if (requiresPreparedMap) {
+        row.runPreprocessorButton.hidden = true;
+        row.runPreprocessorButton.style.display = "none";
+        row.runPreprocessorButton.disabled = true;
+      } else {
+        row.runPreprocessorButton.style.display = "";
+        syncRunPreprocessorVisibility(row, isImg2ImgEditor);
+      }
+    }
+    if (!requiresPreparedMap) row.preprocessedControlMap.checked = false;
+  };
+
   const syncHiddenField = () => {
+    unitRows.forEach(syncPreprocessedControlMapState);
     const units = unitRows
       .map((row) => ({
         enabled: row.enabled.checked,
         allow_preview: row.allowPreview.checked,
         use_mask: row.useMask.checked,
+        preprocessed_control_map: row.preprocessedControlMap.checked,
         control_type: row.controlType.getValue(),
         module: row.module.value,
         model: row.model.value,
@@ -832,9 +863,13 @@ export function createControlNetUnitEditor({
     const preferredModule = preserveSelection ? row.module.value : typeConfig?.default_option ?? "none";
     setSelectOptions(row.module, normalizedModuleEntries, preferredModule);
 
-    const modelValues = Array.isArray(typeConfig?.model_list) && typeConfig.model_list.length > 0
+    const typeModelValues = Array.isArray(typeConfig?.model_list) && typeConfig.model_list.length > 0
       ? typeConfig.model_list.map((value) => String(value ?? "").trim()).filter(Boolean)
       : currentModelValues;
+    const zModelValues = ["All", "Canny", "Depth", "OpenPose"].includes(controlType)
+      ? currentModelValues.filter(isZImageControlnetPatch)
+      : [];
+    const modelValues = Array.from(new Set([...typeModelValues, ...zModelValues]));
 
     const modelEntries = [{ value: "", label: "(Select ControlNet Model)" }, ...toOptionEntries(modelValues)];
     setSelectOptions(row.model, modelEntries, preserveSelection ? row.model.value : "");
@@ -1191,6 +1226,16 @@ export function createControlNetUnitEditor({
     const useMask = createCheckbox(`${idPrefix}-use-mask-${index}`, false);
     createCompactCheckboxField(primaryGrid, "Use Mask", useMask, `${idPrefix}-use-mask-field-${index}`);
 
+    const preprocessedControlMap = createCheckbox(`${idPrefix}-preprocessed-control-map-${index}`, false);
+    const preprocessedControlMapField = createCompactCheckboxField(
+      primaryGrid,
+      "Uploaded image is an already-preprocessed Depth/Pose control map",
+      preprocessedControlMap,
+      `${idPrefix}-preprocessed-control-map-field-${index}`,
+    );
+    preprocessedControlMapField.hidden = true;
+    preprocessedControlMap.disabled = true;
+
     let rowElements = null;
     const controlType = createControlTypeSelector({
       idPrefix,
@@ -1443,6 +1488,8 @@ export function createControlNetUnitEditor({
       pixelPerfectField,
       allowPreview,
       useMask,
+      preprocessedControlMap,
+      preprocessedControlMapField,
       preview,
       controlType,
       controlTypeRadios: controlType.radios,
@@ -1609,6 +1656,7 @@ export function createControlNetUnitEditor({
 
     unitRows.push(rowElements);
     applyCatalogToRow(rowElements, false);
+    syncPreprocessedControlMapState(rowElements);
     bindSyncHandlers(rowElements);
     setControlNetPreview(preview, { imageData: "", imageAsset: "" });
     setControlNetGeneratedPreview(preview, { imageData: "", visible: false });
@@ -1616,9 +1664,13 @@ export function createControlNetUnitEditor({
 
     moduleSelect.addEventListener("change", () => {
       applyPreprocessorProfileToRow(rowElements);
+      syncPreprocessedControlMapState(rowElements);
       syncHiddenField();
     });
-    modelSelect.addEventListener("change", syncHiddenField);
+    modelSelect.addEventListener("change", () => {
+      syncPreprocessedControlMapState(rowElements);
+      syncHiddenField();
+    });
 
     attachUploadHandler(maskUploadControl.fileInput, {
       dataField: maskData,
@@ -1838,12 +1890,14 @@ export function createControlNetUnitEditor({
       row.pixelPerfect.checked = unit.pixel_perfect;
       row.allowPreview.checked = unit.allow_preview;
       row.useMask.checked = unit.use_mask;
+      row.preprocessedControlMap.checked = unit.preprocessed_control_map;
       row.controlType.setValue(unit.control_type);
       applyCatalogToRow(row, false);
 
       row.module.value = unit.module;
       applyPreprocessorProfileToRow(row);
       row.model.value = unit.model;
+      syncPreprocessedControlMapState(row);
       row.weight.value = String(unit.weight);
       row.weightSlider.value = String(unit.weight);
       row.guidanceStart.value = String(unit.guidance_start);

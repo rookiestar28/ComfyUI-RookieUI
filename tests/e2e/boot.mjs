@@ -1157,6 +1157,23 @@ async function handleE2EFetch(url, options = {}) {
           ({ checkpoint_name: _checkpointName, vae_name: _vaeName, text_encoder_name: _textEncoderName, ...entry }) => entry,
         ),
       },
+      z_image_controlnet: {
+        contract_version: "z-image-control-map-20260713",
+        available: true,
+        model_patches: [
+          {
+            selector: "Z-Image/Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+            rookieui_support: "turbo_union_single_control",
+          },
+        ],
+        control_map_contract: {
+          explicit_preprocessed_field: "preprocessed_control_map",
+          default_preprocessed: false,
+          built_in_preprocessors: ["canny"],
+          explicit_preprocessed_conditions: ["depth", "pose"],
+          raw_rejected_conditions: ["depth", "pose"],
+        },
+      },
       routes: [
         "/rookieui/health",
         "/rookieui/bootstrap",

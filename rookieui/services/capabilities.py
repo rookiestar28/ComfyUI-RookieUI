@@ -239,6 +239,7 @@ def _normalize_z_image_controlnet_payload(payload: dict[str, object]) -> dict[st
         "missing_nodes": _normalize_metadata_list(payload.get("missing_nodes", [])),
         "model_patches": [],
         "diagnostics": _normalize_metadata_list(payload.get("diagnostics", [])),
+        "control_map_contract": {},
         "graph_contract": {},
     }
 
@@ -284,6 +285,23 @@ def _normalize_z_image_controlnet_payload(payload: dict[str, object]) -> dict[st
         normalized["model_patches"] = normalized_patches
 
     graph_contract = payload.get("graph_contract", {})
+    control_map_contract = payload.get("control_map_contract", {})
+    if isinstance(control_map_contract, dict):
+        normalized["control_map_contract"] = {
+            "explicit_preprocessed_field": normalize_metadata_text(
+                control_map_contract.get("explicit_preprocessed_field", "")
+            ),
+            "default_preprocessed": bool(control_map_contract.get("default_preprocessed", False)),
+            "built_in_preprocessors": _normalize_metadata_list(
+                control_map_contract.get("built_in_preprocessors", [])
+            ),
+            "explicit_preprocessed_conditions": _normalize_metadata_list(
+                control_map_contract.get("explicit_preprocessed_conditions", [])
+            ),
+            "raw_rejected_conditions": _normalize_metadata_list(
+                control_map_contract.get("raw_rejected_conditions", [])
+            ),
+        }
     if isinstance(graph_contract, dict):
         normalized["graph_contract"] = {
             "loader_node": normalize_metadata_text(graph_contract.get("loader_node", "")),
