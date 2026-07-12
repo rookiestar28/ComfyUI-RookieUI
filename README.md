@@ -69,6 +69,8 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Added Qwen-Image Edit 2511 as an official `img2img` image-edit profile, including the plus edit encoder path, multi-reference request handling, Flux reference-method latent setup, and official default model-hint behavior.
 - Added official txt2img profile coverage for `Flux.1 Krea Dev` and `Flux.2 Dev`, including family-specific defaults, hidden official encoder bundles, Flux guidance where applicable, and source-backed model/text-encoder/VAE/LoRA selector hints.
 - Rechecked existing Qwen, Z-Image, ERNIE, FireRed, Flux.2 edit/Klein, and Longcat official profile hints so visible selectors describe real host prerequisites instead of accepting broad fallback matches.
+- Template-owned LoRAs that are optional now require explicit activation, and explicit numeric zero values remain zero through request normalization, workflow inputs, and generation metadata instead of falling back to defaults.
+- Qwen-Image Edit 2511 keeps the selected main reference as the primary encoder and VAE source, while specialized scheduler and negative-prompt controls now expose and record only parameters the emitted graph actually consumes.
 
 </details>
 
