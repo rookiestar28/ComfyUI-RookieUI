@@ -5,6 +5,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
+    "audit:ci": "npm audit --audit-level=high",
     "spike:vite": "node scripts/run_vite_spike.mjs",
     "spike:vue": "node scripts/run_vue_spike.mjs",
     "test": "npm run test:unit && npm run test:e2e",

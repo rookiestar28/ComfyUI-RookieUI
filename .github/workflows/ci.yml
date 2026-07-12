@@ -38,6 +38,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run full test gate
+        # SECURITY: the repository wrapper includes the mandatory complete-graph advisory gate.
         run: bash scripts/run_full_tests_linux.sh
 
   publish-node:
