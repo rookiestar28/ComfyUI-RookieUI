@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 import sys
-import tomllib
 import unittest
 
 
@@ -30,7 +30,12 @@ class EntryPointTests(unittest.TestCase):
 
     def test_pyproject_declares_current_comfy_web_metadata_without_dropping_legacy_web_directory(self) -> None:
         root_dir = pathlib.Path(__file__).resolve().parents[1]
-        pyproject = tomllib.loads((root_dir / "pyproject.toml").read_text(encoding="utf-8"))
-        comfy_metadata = pyproject["tool"]["comfy"]
+        pyproject_text = (root_dir / "pyproject.toml").read_text(encoding="utf-8")
+        # IMPORTANT: keep this test dependency-free on the supported Python 3.10 floor.
+        comfy_section = re.search(
+            r"(?ms)^\[tool\.comfy\]\s*$\n(?P<body>.*?)(?=^\[|\Z)",
+            pyproject_text,
+        )
 
-        self.assertEqual(comfy_metadata["web"], "web")
+        self.assertIsNotNone(comfy_section)
+        self.assertRegex(comfy_section.group("body"), r'(?m)^web\s*=\s*"web"\s*$')
