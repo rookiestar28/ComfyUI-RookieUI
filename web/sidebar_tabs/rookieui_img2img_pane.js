@@ -32,6 +32,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     buildProfileLookup,
     buildPresetLookup,
     createGenerationRuntimeState,
+    destroyGenerationRuntimeState,
     createSelect,
     createInput,
     createRangeInput,
@@ -186,6 +187,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const runtimeState = createGenerationRuntimeState({
     previewPlaceholder: "Generation preview will update while the job is running.",
   });
+  const ownedControllers = [];
+  const own = (controller) => {
+    if (controller && typeof controller === "object") {
+      ownedControllers.push(controller);
+    }
+    return controller;
+  };
   let img2imgPreviewBox = null;
   const img2imgModeUi = {
     modeHintNode: null,
@@ -569,7 +577,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   promptStack.className = "rookieui-shell__prompt-stack";
   promptBand.appendChild(promptStack);
   createPromptField(promptStack, "Prompt", elements.prompt, "rookieui-img2img-prompt-counter");
-  createPromptWorkbenchShell({
+  own(createPromptWorkbenchShell({
     idPrefix: "rookieui-img2img-workbench",
     parent: promptStack,
     bootstrapState,
@@ -585,14 +593,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },
-  });
+  }));
   createPromptField(
     promptStack,
     "Negative Prompt",
     elements.negativePrompt,
     "rookieui-img2img-negative-prompt-counter",
   );
-  createPromptWorkbenchShell({
+  own(createPromptWorkbenchShell({
     idPrefix: "rookieui-img2img-negative-workbench",
     parent: promptStack,
     bootstrapState,
@@ -608,7 +616,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },
-  });
+  }));
 
   const actionRail = document.createElement("div");
   actionRail.className = "rookieui-shell__action-rail";
@@ -1649,7 +1657,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           }
         };
 
-        sourceBrushController = createSourceCanvasBrushController({
+        sourceBrushController = own(createSourceCanvasBrushController({
           idPrefix: "rookieui-img2img-source",
           stage: imageCanvasStage,
           toolbar: imageCanvasToolbar,
@@ -1669,7 +1677,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           onStatusMessage: (message) => {
             statusNode.textContent = message;
           },
-        });
+        }));
 
         const openSourceFilePicker = () => {
           imageFileInput.click();
@@ -1692,6 +1700,12 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
           globalThis.document.addEventListener("fullscreenchange", syncSourceFullscreenButton);
           globalThis.document.addEventListener("webkitfullscreenchange", syncSourceFullscreenButton);
+          own({
+            destroy() {
+              globalThis.document?.removeEventListener?.("fullscreenchange", syncSourceFullscreenButton);
+              globalThis.document?.removeEventListener?.("webkitfullscreenchange", syncSourceFullscreenButton);
+            },
+          });
         }
 
         const loadSourceFile = async (file, options = {}) => {
@@ -1806,6 +1820,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           syncBoundControls,
         });
         img2imgModeUi.maskEditor = maskEditor;
+        own(maskEditor);
         maskEditor.setMode(elements.mode.value);
         maskEditor.refreshFromInputs();
         renderSourceCanvasSurface();
@@ -1967,14 +1982,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         assetPreviewToolbar.className = "rookieui-shell__preview-toolbar";
         assetSection.appendChild(assetPreviewToolbar);
 
-        createPreviewFullscreenViewer({
+        own(createPreviewFullscreenViewer({
           idPrefix: "rookieui-img2img",
           previewBox: assetPreview,
           previewToolbar: assetPreviewToolbar,
           createIconActionButton,
           statusNode,
           labelText: "Preview",
-        });
+        }));
 
         const previewActions = [
           {
@@ -2168,7 +2183,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     },
   ]);
 
-  createXYZPlotShell({
+  own(createXYZPlotShell({
     idPrefix: "rookieui-img2img-xyz-plot",
     parent: form,
     mode: "img2img",
@@ -2186,7 +2201,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     onStatusMessage: (message) => {
       statusNode.textContent = message;
     },
-  });
+  }));
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2375,5 +2390,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   return {
     onActivate: img2imgStateLock.restore,
     onDeactivate: img2imgStateLock.capture,
+    destroy: () => {
+      destroyGenerationRuntimeState(runtimeState);
+      img2imgControlNetEditor?.destroy?.();
+      ownedControllers.splice(0).reverse().forEach((controller) => {
+        controller.destroy?.();
+        controller.unmount?.();
+      });
+    },
   };
 }

@@ -262,6 +262,7 @@ export function createXYZPlotShell({
   );
   const axisLookup = new Map(axisCatalog.map((entry) => [String(entry.axis_id ?? ""), entry]));
   const state = {
+    disposed: false,
     activeSessionId: "",
     pollTimer: null,
     axesLoaded: axisCatalog.length > 0,
@@ -636,7 +637,7 @@ export function createXYZPlotShell({
 
   function schedulePoll() {
     stopPolling();
-    if (!state.activeSessionId) {
+    if (state.disposed || !state.activeSessionId) {
       return;
     }
     state.pollTimer = setTimeout(() => {
@@ -645,6 +646,9 @@ export function createXYZPlotShell({
   }
 
   function syncSessionPayload(session) {
+    if (state.disposed) {
+      return;
+    }
     const normalizedSession = session && typeof session === "object" ? session : {};
     const summary = normalizedSession.summary ?? {};
     state.activeSessionId = String(normalizedSession.session_id ?? state.activeSessionId ?? "").trim();
@@ -751,7 +755,7 @@ export function createXYZPlotShell({
   });
 
   // IMPORTANT: native details/summary does not auto-collapse on outside click here; keep explicit document-level close handling.
-  document.addEventListener("pointerdown", (event) => {
+  const handleDocumentPointerDown = (event) => {
     if (!(event.target instanceof Node)) {
       return;
     }
@@ -762,13 +766,15 @@ export function createXYZPlotShell({
     if (!activeRow.choiceRoot.contains(event.target)) {
       closeChoiceDropdowns();
     }
-  });
+  };
+  document.addEventListener("pointerdown", handleDocumentPointerDown);
 
-  document.addEventListener("keydown", (event) => {
+  const handleDocumentKeyDown = (event) => {
     if (event.key === "Escape") {
       closeChoiceDropdowns();
     }
-  });
+  };
+  document.addEventListener("keydown", handleDocumentKeyDown);
 
   swapButtons.forEach((entry) => {
     entry.button.addEventListener("click", () => {
@@ -841,5 +847,15 @@ export function createXYZPlotShell({
   return {
     element: shell,
     stopPolling,
+    destroy() {
+      if (state.disposed) {
+        return;
+      }
+      state.disposed = true;
+      stopPolling();
+      previewViewer?.destroy?.();
+      document.removeEventListener("pointerdown", handleDocumentPointerDown);
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+    },
   };
 }

@@ -92,5 +92,6 @@ export const {
   resolveActiveClientId,
   createGenerationRuntimeState,
   createGenerationRuntimeHelpers,
+  destroyGenerationRuntimeState,
 } = generationRuntimeModule;
 export const { createPreviewFullscreenViewer } = previewFullscreenModule;

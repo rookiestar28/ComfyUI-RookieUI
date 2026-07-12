@@ -314,13 +314,14 @@
       });
     },
   };
-  globalThis.document?.addEventListener?.("rookieui:pnginfo:preview-handoff", (event) => {
+  const handlePreviewHandoff = (event) => {
     if (!section.isConnected) {
       return;
     }
     event.preventDefault?.();
     formRegistry.pnginfo.applyPayload(event.detail ?? {});
-  });
+  };
+  globalThis.document?.addEventListener?.("rookieui:pnginfo:preview-handoff", handlePreviewHandoff);
 
   applyTxt2ImgButton.addEventListener("click", () => {
     applyPngInfoResult(formRegistry, "txt2img", state, statusNode);
@@ -328,4 +329,9 @@
   applyImg2ImgButton.addEventListener("click", () => {
     applyPngInfoResult(formRegistry, "img2img", state, statusNode);
   });
+  return {
+    destroy: () => {
+      globalThis.document?.removeEventListener?.("rookieui:pnginfo:preview-handoff", handlePreviewHandoff);
+    },
+  };
 }

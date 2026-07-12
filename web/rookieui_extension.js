@@ -22,9 +22,9 @@ import {
 import { applyRevisionToUrl } from "./rookieui_asset_revision.js";
 import { loadRookieUIBootstrapData } from "./rookieui_feature_registry.js";
 import { installRookieUISidebarTab } from "./rookieui_sidebar_registration.js";
+import { enforceSidebarMinWidth } from "./rookieui_sidebar_layout.js";
 /** @typedef {import("./types/rookieui_frontend").RookieUIRegisterExtensionOptions} RookieUIRegisterExtensionOptions */
-
-const ROOKIEUI_SIDEBAR_MIN_WIDTH_PX = 980;
+export { enforceSidebarMinWidth };
 
 function normalizeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
@@ -60,44 +60,6 @@ export function createRookieUIHostFetch(fetchImpl = globalThis.fetch, runtimeApi
     return (path, options = {}) => runtimeApi.fetchApi(path, options);
   }
   return fetchImpl;
-}
-
-function enforceSidebarMinWidth(container) {
-  if (!container?.style) {
-    return;
-  }
-
-  const applyMinWidth = () => {
-    // CRITICAL: SplitterPanel controls the actual sidebar width; inner content min-width alone still clips.
-    const sidePanel = container.closest(".side-bar-panel");
-    const closestSplitterPanel = container.closest(".p-splitterpanel");
-    const splitterPanel = sidePanel instanceof HTMLElement ? sidePanel : closestSplitterPanel;
-    if (splitterPanel instanceof HTMLElement) {
-      splitterPanel.style.minWidth = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-      if (splitterPanel.getBoundingClientRect?.().width < ROOKIEUI_SIDEBAR_MIN_WIDTH_PX) {
-        // IMPORTANT: Min-width alone does not reliably expand an already-mounted ComfyUI Splitter panel.
-        splitterPanel.style.width = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-        splitterPanel.style.flexBasis = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-      }
-    }
-
-    const sidebarContent = container.closest(".sidebar-content-container");
-    if (sidebarContent instanceof HTMLElement) {
-      sidebarContent.style.minWidth = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-      if (sidebarContent.getBoundingClientRect?.().width < ROOKIEUI_SIDEBAR_MIN_WIDTH_PX) {
-        sidebarContent.style.width = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-      }
-    }
-
-    container.style.minWidth = `${ROOKIEUI_SIDEBAR_MIN_WIDTH_PX}px`;
-  };
-
-  applyMinWidth();
-  if (typeof requestAnimationFrame === "function") {
-    requestAnimationFrame(applyMinWidth);
-  } else {
-    setTimeout(applyMinWidth, 0);
-  }
 }
 
 const ROOKIEUI_STYLESHEETS = [

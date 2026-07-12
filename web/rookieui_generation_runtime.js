@@ -39,6 +39,8 @@ export function resolveActiveClientId(bootstrapState) {
 export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
   return {
     runToken: 0,
+    disposed: false,
+    activeDisposers: new Set(),
     previewUrl: "",
     previewPlaceholder,
     lastPreviewRenderAt: 0,
@@ -50,6 +52,22 @@ export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
     finalOutputArtifact: null,
     finalImageUrl: "",
   };
+}
+
+export function destroyGenerationRuntimeState(runtimeState) {
+  if (!runtimeState || runtimeState.disposed) {
+    return;
+  }
+  runtimeState.disposed = true;
+  runtimeState.runToken += 1;
+  for (const dispose of runtimeState.activeDisposers ?? []) {
+    dispose();
+  }
+  runtimeState.activeDisposers?.clear?.();
+  if (String(runtimeState.previewUrl ?? "").startsWith("blob:")) {
+    URL.revokeObjectURL(runtimeState.previewUrl);
+  }
+  runtimeState.previewUrl = "";
 }
 
 function setGenerationPreview(runtimeState, previewBox, setPreviewContent, imageUrl, fallbackText) {
@@ -65,7 +83,20 @@ function setGenerationPreview(runtimeState, previewBox, setPreviewContent, image
     previousPreviewUrl.startsWith("blob:")
   ) {
     // CRITICAL: delay blob URL revoke until after DOM source swap; immediate revoke can trigger visible sidebar-wide flicker on rapid preview frames.
-    requestAnimationFrame(() => URL.revokeObjectURL(previousPreviewUrl));
+    let frameHandle = null;
+    const cancelRevoke = () => {
+      if (frameHandle !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(frameHandle);
+      }
+      frameHandle = null;
+      URL.revokeObjectURL(previousPreviewUrl);
+    };
+    frameHandle = requestAnimationFrame(() => {
+      frameHandle = null;
+      runtimeState.activeDisposers?.delete?.(cancelRevoke);
+      URL.revokeObjectURL(previousPreviewUrl);
+    });
+    runtimeState.activeDisposers?.add?.(cancelRevoke);
   }
 }
 
@@ -742,7 +773,7 @@ export function createGenerationRuntimeHelpers({
   };
 
   const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "") => {
-    if (!runtimeState || !promptId) {
+    if (!runtimeState || !promptId || runtimeState.disposed) {
       return;
     }
     const runToken = runtimeState.runToken + 1;
@@ -770,7 +801,22 @@ export function createGenerationRuntimeHelpers({
         return;
       }
       listeners.forEach(([eventName, handler]) => runtimeApi.removeEventListener(eventName, handler));
+      listeners.length = 0;
     };
+    runtimeState.activeDisposers?.add?.(unregisterRuntimeListeners);
+    const waitForRuntimeDelay = (delayMs) =>
+      new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutHandle);
+          runtimeState.activeDisposers?.delete?.(finish);
+          resolve();
+        };
+        const timeoutHandle = setTimeout(finish, delayMs);
+        runtimeState.activeDisposers?.add?.(finish);
+      });
 
     registerRuntimeListener("progress", (event) => {
       if (runtimeState.runToken !== runToken) {
@@ -819,18 +865,21 @@ export function createGenerationRuntimeHelpers({
     let lastHistoryPollAt = 0;
     let finalStatus = "pending";
     try {
-      while (runtimeState.runToken === runToken && Date.now() - startTime < maxDurationMs) {
+      while (!runtimeState.disposed && runtimeState.runToken === runToken && Date.now() - startTime < maxDurationMs) {
         const scopedClientId = resolveActiveClientId(bootstrapState);
         const jobResult = await bootstrapState.fetchQueueJobRequest(promptId, scopedClientId);
+        if (runtimeState.disposed || runtimeState.runToken !== runToken) {
+          return;
+        }
         if (!jobResult.ok) {
           statusNode.textContent = appendStatusSuffix("Waiting for queue sync...", statusSuffix);
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          await waitForRuntimeDelay(800);
           continue;
         }
         const queueJob = jobResult.data?.job ?? null;
         if (!queueJob) {
           statusNode.textContent = appendStatusSuffix("Waiting for queue registration...", statusSuffix);
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          await waitForRuntimeDelay(800);
           continue;
         }
 
@@ -859,10 +908,11 @@ export function createGenerationRuntimeHelpers({
           }
           lastHistoryPollAt = Date.now();
         }
-        await new Promise((resolve) => setTimeout(resolve, 800));
+        await waitForRuntimeDelay(800);
       }
     } finally {
       unregisterRuntimeListeners();
+      runtimeState.activeDisposers?.delete?.(unregisterRuntimeListeners);
     }
 
     if (runtimeState.runToken !== runToken) {

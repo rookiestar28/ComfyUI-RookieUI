@@ -202,5 +202,16 @@ export function createPreviewFullscreenViewer(
     fullscreenButton,
     zoomSlider,
     syncImage,
+    destroy() {
+      if (boundImage) {
+        boundImage.removeEventListener("load", applyZoom);
+        boundImage = null;
+      }
+      globalThis.document?.removeEventListener?.("fullscreenchange", syncFullscreenUi);
+      globalThis.document?.removeEventListener?.("webkitfullscreenchange", syncFullscreenUi);
+      if (previewBox.__previewFullscreenController?.syncImage === syncImage) {
+        delete previewBox.__previewFullscreenController;
+      }
+    },
   };
 }

@@ -716,6 +716,10 @@ export function createControlNetUnitEditor({
   unitCount = DEFAULT_UNIT_COUNT,
   controlTypeOrder = DEFAULT_CONTROL_TYPE_OPTIONS,
 }) {
+  let disposed = false;
+  const activeAbortControllers = new Set();
+  const activeTimeoutHandles = new Set();
+  const documentFullscreenListeners = [];
   const isImg2ImgEditor = String(idPrefix ?? "").startsWith("rookieui-img2img-controlnet");
   const integratedDetails = document.createElement("details");
   integratedDetails.className =
@@ -947,7 +951,7 @@ export function createControlNetUnitEditor({
   };
 
   const runPreprocessorForRow = async (row, unitIndex) => {
-    if (row.preprocessorBusy) {
+    if (disposed || row.preprocessorBusy) {
       return;
     }
     const sourceImage = row.imageData.value.trim();
@@ -983,11 +987,15 @@ export function createControlNetUnitEditor({
     const selectedControlModel = String(row.model?.value ?? "").trim();
 
     const abortController = typeof globalThis.AbortController === "function" ? new globalThis.AbortController() : null;
+    if (abortController) {
+      activeAbortControllers.add(abortController);
+    }
     let timeoutHandle = null;
     if (abortController && typeof globalThis.setTimeout === "function") {
       timeoutHandle = globalThis.setTimeout(() => {
         abortController.abort();
       }, RUN_PREPROCESSOR_TIMEOUT_MS);
+      activeTimeoutHandles.add(timeoutHandle);
     }
     try {
       const detectPayload = {
@@ -1020,6 +1028,9 @@ export function createControlNetUnitEditor({
             signal: abortController?.signal,
           });
       const data = await response.json().catch(() => ({}));
+      if (disposed) {
+        return;
+      }
       if (!response.ok) {
         const detail = String(data?.detail ?? "").trim();
         const statusDetail = Number.isFinite(Number(response.status)) ? ` (HTTP ${response.status})` : "";
@@ -1091,9 +1102,15 @@ export function createControlNetUnitEditor({
     } finally {
       if (timeoutHandle !== null && typeof globalThis.clearTimeout === "function") {
         globalThis.clearTimeout(timeoutHandle);
+        activeTimeoutHandles.delete(timeoutHandle);
+      }
+      if (abortController) {
+        activeAbortControllers.delete(abortController);
       }
       row.preprocessorBusy = false;
-      syncRunPreprocessorVisibility(row, isImg2ImgEditor);
+      if (!disposed) {
+        syncRunPreprocessorVisibility(row, isImg2ImgEditor);
+      }
     }
   };
 
@@ -1690,6 +1707,7 @@ export function createControlNetUnitEditor({
     if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
       globalThis.document.addEventListener("fullscreenchange", syncPreviewFullscreenButton);
       globalThis.document.addEventListener("webkitfullscreenchange", syncPreviewFullscreenButton);
+      documentFullscreenListeners.push(syncPreviewFullscreenButton);
     }
 
     preview.stage.addEventListener("dragover", (event) => {
@@ -1893,5 +1911,25 @@ export function createControlNetUnitEditor({
     refreshFromHidden,
     setModelOptions,
     setControlTypeCatalog,
+    destroy() {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      for (const controller of activeAbortControllers) {
+        controller.abort();
+      }
+      activeAbortControllers.clear();
+      for (const timeoutHandle of activeTimeoutHandles) {
+        globalThis.clearTimeout?.(timeoutHandle);
+      }
+      activeTimeoutHandles.clear();
+      for (const listener of documentFullscreenListeners) {
+        globalThis.document?.removeEventListener?.("fullscreenchange", listener);
+        globalThis.document?.removeEventListener?.("webkitfullscreenchange", listener);
+      }
+      documentFullscreenListeners.length = 0;
+      unitRows.forEach((row) => row.sourceBrush?.destroy?.());
+    },
   };
 }

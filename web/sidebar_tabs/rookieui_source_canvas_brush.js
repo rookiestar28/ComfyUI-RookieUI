@@ -551,5 +551,10 @@ export function createSourceCanvasBrushController({
     isEnabled() {
       return state.enabled;
     },
+    destroy() {
+      state.sourceToken += 1;
+      globalThis.document?.removeEventListener?.("fullscreenchange", syncFullscreenZoomVisibility);
+      globalThis.document?.removeEventListener?.("webkitfullscreenchange", syncFullscreenZoomVisibility);
+    },
   };
 }

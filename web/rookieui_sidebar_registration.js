@@ -17,6 +17,15 @@ export function installRookieUISidebarTab({
   }
 
   let mountedSidebarContainer = null;
+  let destroyMountedSidebar = null;
+  const destroyCurrentMount = () => {
+    if (!destroyMountedSidebar) {
+      return;
+    }
+    const destroy = destroyMountedSidebar;
+    destroyMountedSidebar = null;
+    destroy();
+  };
   const sidebarTab = {
     id: ROOKIEUI_SIDEBAR_TAB_ID,
     icon: "pi pi-compass",
@@ -24,15 +33,33 @@ export function installRookieUISidebarTab({
     tooltip: "Rookie-friendly generation shell",
     type: "custom",
     render: (container) => {
+      destroyCurrentMount();
       mountedSidebarContainer = container;
-      enforceSidebarMinWidth(container);
-      renderRookieUISidebar(container, bootstrapState);
+      const restoreLayout = enforceSidebarMinWidth(container);
+      let destroyShell = null;
+      try {
+        destroyShell = renderRookieUISidebar(container, bootstrapState);
+      } catch (error) {
+        restoreLayout?.();
+        mountedSidebarContainer = null;
+        throw error;
+      }
+      let destroyed = false;
+      destroyMountedSidebar = () => {
+        if (destroyed) {
+          return;
+        }
+        destroyed = true;
+        destroyShell?.();
+        if (mountedSidebarContainer === container && container?.replaceChildren) {
+          container.replaceChildren();
+          mountedSidebarContainer = null;
+        }
+        restoreLayout?.();
+      };
     },
     destroy: () => {
-      if (mountedSidebarContainer?.replaceChildren) {
-        mountedSidebarContainer.replaceChildren();
-      }
-      mountedSidebarContainer = null;
+      destroyCurrentMount();
     },
   };
 

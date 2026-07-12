@@ -392,8 +392,9 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
   syncExtrasMode([singleButton, batchButton], [singlePane, batchPane], state.mode);
   queueExtrasActionRailAlignment();
 
+  let extrasAlignObserver = null;
   if (typeof ResizeObserver === "function") {
-    const extrasAlignObserver = new ResizeObserver(() => {
+    extrasAlignObserver = new ResizeObserver(() => {
       queueExtrasActionRailAlignment();
     });
     extrasAlignObserver.observe(modeTabs);
@@ -436,13 +437,14 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
       captureExtrasState();
     },
   };
-  globalThis.document?.addEventListener?.("rookieui:extras:preview-handoff", (event) => {
+  const handlePreviewHandoff = (event) => {
     if (!section.isConnected) {
       return;
     }
     event.preventDefault?.();
     formRegistry.extras.applyPayload(event.detail ?? {});
-  });
+  };
+  globalThis.document?.addEventListener?.("rookieui:extras:preview-handoff", handlePreviewHandoff);
 
   submitButton.addEventListener("click", async () => {
     await submitExtras(bootstrapState, state, elements, statusNode, previewBox);
@@ -456,5 +458,14 @@ export function buildExtrasPane(parent, bootstrapState, formRegistry, context) {
       queueExtrasActionRailAlignment();
     },
     onDeactivate: captureExtrasState,
+    destroy: () => {
+      if (extrasRailAlignRafToken !== null && typeof globalThis.cancelAnimationFrame === "function") {
+        globalThis.cancelAnimationFrame(extrasRailAlignRafToken);
+        extrasRailAlignRafToken = null;
+      }
+      extrasAlignObserver?.disconnect?.();
+      globalThis.removeEventListener?.("resize", queueExtrasActionRailAlignment);
+      globalThis.document?.removeEventListener?.("rookieui:extras:preview-handoff", handlePreviewHandoff);
+    },
   };
 }

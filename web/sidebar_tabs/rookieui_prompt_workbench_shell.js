@@ -30,9 +30,8 @@ import {
   renderPromptWorkbenchCatalogPane,
 } from "./prompt_workbench/rookieui_prompt_workbench_catalog.js";
 import { createProviderConfigInput } from "./prompt_workbench/rookieui_prompt_workbench_provider_fields.js";
+import { createPromptWorkbenchLifecycle } from "./prompt_workbench/rookieui_prompt_workbench_lifecycle.js";
 let promptWorkbenchInstanceSequence = 0;
-
-
 
 export function createPromptWorkbenchShell({
   idPrefix,
@@ -103,6 +102,7 @@ export function createPromptWorkbenchShell({
   let activeSecondaryPopover = "";
   let languageSelectorOpen = false;
   let resourcesLoaded = false;
+  const lifecycle = createPromptWorkbenchLifecycle();
   let dragTokenId = "";
   const assistState = {
     imageDescription: "",
@@ -722,7 +722,7 @@ export function createPromptWorkbenchShell({
       void refreshCatalogForLanguage(normalizedLanguage);
     }
     if (broadcast) {
-      // IMPORTANT: prompt and negative inline shells own separate state; broadcast language changes so their chips cannot drift apart.
+      // IMPORTANT: keep paired inline shells synchronized.
       document.dispatchEvent(
         new CustomEvent(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, {
           detail: {
@@ -743,7 +743,6 @@ export function createPromptWorkbenchShell({
       return;
     }
     if (!shell.isConnected) {
-      document.removeEventListener(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, handlePromptWorkbenchLanguageSync);
       return;
     }
     const normalizedLanguage = normalizeLanguageCode(detail.language);
@@ -756,7 +755,7 @@ export function createPromptWorkbenchShell({
     }
   }
 
-  document.addEventListener(PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, handlePromptWorkbenchLanguageSync);
+  lifecycle.listen(document, PROMPT_WORKBENCH_LANGUAGE_SYNC_EVENT, handlePromptWorkbenchLanguageSync);
 
   async function refreshCatalogForLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
@@ -881,6 +880,7 @@ export function createPromptWorkbenchShell({
   }
 
   function updateStatus(message) {
+    if (lifecycle.destroyed) return;
     setText(detailNodes.status, message);
   }
 
@@ -2627,6 +2627,7 @@ export function createPromptWorkbenchShell({
   }
 
   function syncUi() {
+    if (lifecycle.destroyed) return;
     const state = getActiveState();
     state.active_panel = resolveVisiblePanel(state.active_panel);
     if ((activeSecondaryPopover === "history" && !isPanelVisible("history")) || (activeSecondaryPopover === "favorites" && !isPanelVisible("favorites"))) {
@@ -2911,7 +2912,7 @@ export function createPromptWorkbenchShell({
     }
   });
 
-  document.addEventListener("pointerdown", (event) => {
+  const handleDocumentPointerDown = (event) => {
     if (!languageSelectorOpen) {
       return;
     }
@@ -2920,15 +2921,16 @@ export function createPromptWorkbenchShell({
       return;
     }
     closeLanguageSelector({ focusTrigger: true });
-  });
+  };
+  lifecycle.listen(document, "pointerdown", handleDocumentPointerDown);
 
   const repositionLanguageSelector = () => {
     if (languageSelectorOpen) {
       placeLanguageSelector();
     }
   };
-  globalThis?.addEventListener?.("resize", repositionLanguageSelector, { passive: true });
-  globalThis?.addEventListener?.("scroll", repositionLanguageSelector, { passive: true, capture: true });
+  lifecycle.listen(globalThis, "resize", repositionLanguageSelector, { passive: true });
+  lifecycle.listen(globalThis, "scroll", repositionLanguageSelector, { passive: true, capture: true });
 
   Object.entries(namespaceMap).forEach(([scope, namespace]) => {
     if (normalizedFixedScope && scope !== normalizedFixedScope) {
@@ -2967,5 +2969,6 @@ export function createPromptWorkbenchShell({
       await ensureResourcesLoaded();
       syncUi();
     },
+    destroy: () => lifecycle.destroy(dirtyTimers, autoHistoryTimers),
   };
 }

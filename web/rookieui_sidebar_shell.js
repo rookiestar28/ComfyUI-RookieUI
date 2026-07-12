@@ -44,8 +44,10 @@ import {
   resolveActiveClientId,
   createGenerationRuntimeState,
   createGenerationRuntimeHelpers,
+  destroyGenerationRuntimeState,
   createPreviewFullscreenViewer,
 } from "./rookieui_sidebar_shell_deps.js";
+import { buildShellFooter, captureContainerMarkers, createShellDisposer, destroyTabLifecycles } from "./rookieui_sidebar_lifecycle.js";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -1167,6 +1169,7 @@ function buildPaneModuleContext() {
     buildProfileLookup,
     buildPresetLookup,
     createGenerationRuntimeState,
+    destroyGenerationRuntimeState,
     createSelect,
     createInput,
     createRangeInput,
@@ -1582,6 +1585,7 @@ function buildTabbedShell(container, definitions, controller = {}, options = {})
       activateTab(activeIndex);
     }
   };
+  controller.destroy = () => { activeIndex = destroyTabLifecycles(lifecycles, activeIndex); };
 
   definitions.forEach((definition, index) => {
     const button = document.createElement("button");
@@ -1617,15 +1621,8 @@ function buildTabbedShell(container, definitions, controller = {}, options = {})
   return controller;
 }
 
-function buildShellFooter(container, bootstrapState) {
-  const footer = document.createElement("footer");
-  footer.className = "rookieui-shell__footer";
-  container.appendChild(footer);
-  const theme = container.dataset.theme ?? "normal";
-  footer.textContent = `host: ${bootstrapState.hostSurface ?? "unknown"} • models: ${bootstrapState.models?.source ?? "fallback"} • theme: ${theme}`;
-}
-
 export function renderRookieUISidebar(container, bootstrapState) {
+  const restoreContainerMarkers = captureContainerMarkers(container);
   container.replaceChildren();
   container.className = "rookieui-shell";
   container.dataset.theme = resolveIntegratedShellTheme(container.ownerDocument);
@@ -1648,7 +1645,7 @@ export function renderRookieUISidebar(container, bootstrapState) {
   const persistedActiveTopTab = formRegistry.__shellPersistence.readActiveTopTab();
 
   buildShellHeader(container, bootstrapState);
-  // IMPORTANT: keep tab wiring in per-tab modules so pane ownership is explicit and future tab-level refactors do not reopen a single giant definition block.
+  // IMPORTANT: keep tab ownership in per-tab modules.
   buildTabbedShell(container, tabDefinitions, shellTabs, {
     onActiveTabIdChange: (tabId) => {
       shellStateContract.setActiveTopTab(tabId);
@@ -1657,4 +1654,5 @@ export function renderRookieUISidebar(container, bootstrapState) {
   });
   shellTabs.activateTabById(persistedActiveTopTab);
   buildShellFooter(container, bootstrapState);
+  return createShellDisposer(container, shellTabs, restoreContainerMarkers);
 }
