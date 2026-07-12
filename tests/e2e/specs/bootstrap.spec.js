@@ -296,6 +296,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "hidream_i1_dev_fp8.safetensors",
     "hidream_i1_fast_fp8.safetensors",
     "hidream_i1_full_fp8.safetensors",
+    "krea2_turbo.safetensors",
     "longcat_image_bf16.safetensors",
     "longcat_image_edit_bf16.safetensors",
     "z_image_bf16.safetensors",
@@ -927,6 +928,31 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   expect(extrasRequests).toHaveLength(1);
   expect(extrasRequests[0].mode).toBe("single_image");
   await expect(page.locator(".rookieui-shell__footer")).toContainText("host: standalone-web");
+});
+
+test("keeps Krea and Flux.2 template LoRAs explicitly opt-in", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-shell-title")).toHaveText("RookieUI");
+  await page.locator("#rookieui-txt2img-workspace-tab-lora").click();
+
+  await page.locator("#rookieui-preset").selectOption("krea2_turbo");
+  await expect(page.locator("#rookieui-template-lora-name")).toHaveValue("Krea/krea2_darkbrush.safetensors");
+  await expect(page.locator("#rookieui-template-lora-enabled")).not.toBeChecked();
+  await expect(page.locator("#rookieui-template-lora-strength")).toHaveValue("0.8");
+  await expect(page.locator("#rookieui-template-lora-trigger-word")).toHaveValue("muted minimalist sketch style");
+  await expect(page.locator("#rookieui-template-lora-strength")).toBeDisabled();
+  await page.locator("#rookieui-template-lora-enabled").check();
+  await expect(page.locator("#rookieui-template-lora-strength")).toBeEnabled();
+  await expect(page.locator("#rookieui-template-lora-trigger-word")).toBeEnabled();
+
+  await page.locator("#rookieui-preset").selectOption("flux2_dev");
+  await expect(page.locator("#rookieui-template-lora-enabled")).not.toBeChecked();
+  await expect(page.locator("#rookieui-steps")).toHaveValue("20");
+  await page.locator("#rookieui-template-lora-enabled").check();
+  await expect(page.locator("#rookieui-steps")).toHaveValue("8");
+  await expect(page.locator("#rookieui-steps-slider")).toHaveValue("8");
+  await page.locator("#rookieui-template-lora-enabled").uncheck();
+  await expect(page.locator("#rookieui-steps")).toHaveValue("20");
 });
 
 test("routes txt2img preview toolbar image handoffs to target panes", async ({ page }) => {

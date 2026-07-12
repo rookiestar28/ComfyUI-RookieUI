@@ -21,6 +21,9 @@ class Txt2ImgRequest:
     vae_name: str = "Automatic"
     text_encoder_name: str = "Automatic"
     template_lora_name: str | None = None
+    template_lora_enabled: bool | None = None
+    template_lora_strength: float | None = None
+    template_lora_trigger_word: str | None = None
     width: int | None = None
     height: int | None = None
     steps: int | None = None
@@ -130,6 +133,9 @@ class NormalizedTxt2ImgRequest:
     text_encoder_name: str
     aux_text_encoder_name: str
     template_lora_name: str
+    template_lora_enabled: bool
+    template_lora_strength: float
+    template_lora_trigger_word: str
     width: int
     height: int
     steps: int

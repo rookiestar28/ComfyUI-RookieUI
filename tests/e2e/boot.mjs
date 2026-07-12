@@ -23,6 +23,18 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
   illustrious: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
   noob: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
   flux: { checkpoint_name: "flux1-dev.safetensors", vae_name: "ae.safetensors", text_encoder_name: "Automatic" },
+  flux2_dev: {
+    checkpoint_name: "flux2_dev_fp8mixed.safetensors",
+    vae_name: "full_encoder_small_decoder.safetensors",
+    text_encoder_name: "mistral_3_small_flux2_bf16.safetensors",
+    template_lora_name: "Flux/Flux_2-Turbo-LoRA_comfyui.safetensors",
+  },
+  krea2_turbo: {
+    checkpoint_name: "krea2_turbo.safetensors",
+    vae_name: "qwen_image_vae.safetensors",
+    text_encoder_name: "Automatic",
+    template_lora_name: "Krea/krea2_darkbrush.safetensors",
+  },
   qwen_image: {
     checkpoint_name: "qwen_image_2512_fp8_e4m3fn.safetensors",
     vae_name: "qwen_image_vae.safetensors",
@@ -123,6 +135,7 @@ const E2E_MODEL_FAMILY_ENTRIES = DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES.map((entr
   checkpoint_name: E2E_SELECTOR_DEFAULTS_BY_ID[entry.id]?.checkpoint_name ?? "__host_default__",
   vae_name: E2E_SELECTOR_DEFAULTS_BY_ID[entry.id]?.vae_name ?? "Automatic",
   text_encoder_name: E2E_SELECTOR_DEFAULTS_BY_ID[entry.id]?.text_encoder_name ?? "Automatic",
+  template_lora_name: E2E_SELECTOR_DEFAULTS_BY_ID[entry.id]?.template_lora_name ?? "",
 }));
 
 const E2E_PARITY_PROFILES = E2E_MODEL_FAMILY_ENTRIES.map((entry) => ({
@@ -159,6 +172,10 @@ const E2E_PRESETS = E2E_MODEL_FAMILY_ENTRIES.map((entry) => ({
   checkpoint_name: entry.checkpoint_name,
   vae_name: entry.vae_name,
   text_encoder_name: entry.text_encoder_name,
+  template_lora_name: entry.template_lora_name,
+  template_lora_enabled: entry.default_template_lora_enabled,
+  template_lora_strength: entry.default_template_lora_strength,
+  template_lora_trigger_word: entry.default_template_lora_trigger_word,
   width: entry.default_width,
   height: entry.default_height,
   steps: entry.default_steps,
@@ -179,6 +196,7 @@ const E2E_PRIMARY_MODEL_CATEGORY_BY_FAMILY = { ...DEFAULT_PRIMARY_MODEL_CATEGORY
 const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux",
   "flux_kontext_dev_edit",
+  "flux2_dev",
   "flux2_image_edit",
   "qwen_image",
   "qwen_image_edit",
@@ -193,6 +211,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "hidream_i1_dev_fp8",
   "hidream_i1_fast",
   "hidream_i1_full",
+  "krea2_turbo",
   "longcat_image",
   "longcat_image_edit",
   "z_image",
@@ -203,9 +222,9 @@ const E2E_MODEL_FAMILY_ENTRY_BY_ID = Object.freeze(
   Object.fromEntries(E2E_MODEL_FAMILY_ENTRIES.map((entry) => [entry.id, entry])),
 );
 
-const E2E_DIFFUSION_MODELS = E2E_DIFFUSION_PROFILE_ORDER.map(
+const E2E_DIFFUSION_MODELS = [...new Set(E2E_DIFFUSION_PROFILE_ORDER.map(
   (profileId) => E2E_MODEL_FAMILY_ENTRY_BY_ID[profileId]?.checkpoint_name,
-).filter(Boolean);
+).filter(Boolean))];
 
 const E2E_VAE_OPTIONS = [
   "Automatic",
@@ -744,6 +763,8 @@ async function handleE2EFetch(url, options = {}) {
         embeddings: ["badhandv4.pt"],
         loras: [
           "detail_tweaker.safetensors",
+          "Flux/Flux_2-Turbo-LoRA_comfyui.safetensors",
+          "Krea/krea2_darkbrush.safetensors",
           "Qwen-Image-Edit-Lightning-4steps-V1.0-bf16.safetensors",
           "FireRed-Image-Edit-1.0-Lightning-8steps-v1.0.safetensors",
         ],

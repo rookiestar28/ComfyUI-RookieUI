@@ -615,6 +615,7 @@ def _append_model_only_lora_chain(
     allocator: NodeIdAllocator,
     model_source: list[object],
     template_lora_name: str = "",
+    template_lora_strength: float = 1.0,
     template_lora_names: list[str] | tuple[str, ...] | None = None,
     inline_lora_activations: list[PromptLoraActivation] | None = None,
 ) -> list[object]:
@@ -635,6 +636,7 @@ def _append_model_only_lora_chain(
             allocator=allocator,
             model_source=chained_model_source,
             lora_name=effective_lora_name,
+            strength_model=template_lora_strength,
         )
     for activation in inline_lora_activations or []:
         chained_model_source = _append_lora_loader_model_only_node(
@@ -1039,6 +1041,7 @@ def _build_flux_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]
         allocator=allocator,
         model_source=[unet_id, 0],
         template_lora_name=request.template_lora_name,
+        template_lora_strength=request.template_lora_strength,
         inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_flux_dual_clip_source(
@@ -1324,6 +1327,7 @@ def _build_flux2_dev_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         model_source=[unet_id, 0],
         template_lora_name=request.template_lora_name,
+        template_lora_strength=request.template_lora_strength,
         inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_single_clip_source(
@@ -1498,6 +1502,7 @@ def _build_krea2_turbo_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, 
         allocator=allocator,
         model_source=[unet_id, 0],
         template_lora_name=request.template_lora_name,
+        template_lora_strength=request.template_lora_strength,
         inline_lora_activations=request.lora_activations,
     )
     clip_source = _build_single_clip_source(

@@ -71,6 +71,20 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             controlnet=[],
         )
 
+    def _flux2_dev_inventory(self, *, include_lora: bool = True) -> ModelInventorySnapshot:
+        return ModelInventorySnapshot(
+            source="host",
+            checkpoints=["SDXL\\realvisxl.safetensors"],
+            diffusion_models=["flux\\flux2_dev_fp8mixed.safetensors"],
+            vae=["full_encoder_small_decoder.safetensors"],
+            text_encoders=["mistral_3_small_flux2_bf16.safetensors"],
+            loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"] if include_lora else [],
+            default_checkpoint="SDXL\\realvisxl.safetensors",
+            default_vae="full_encoder_small_decoder.safetensors",
+            default_text_encoder="mistral_3_small_flux2_bf16.safetensors",
+            controlnet=[],
+        )
+
     def test_normalize_txt2img_request_applies_sd15_defaults(self) -> None:
         request = normalize_txt2img_request({"prompt": "city skyline"})
 
@@ -901,7 +915,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     if profile_id == "flux_krea_dev":
                         self.assertEqual(normalized.template_lora_name, "")
                     if profile_id == "flux2_dev":
-                        self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+                        self.assertFalse(normalized.template_lora_enabled)
+                        self.assertEqual(normalized.template_lora_name, "")
                         self.assertEqual(normalized.flux_guidance, 4.0)
                     if profile_id == "ideogram4":
                         self.assertEqual(normalized.steps, 20)
@@ -913,7 +928,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                         self.assertEqual(normalized.cfg_scale, 1.0)
                         self.assertEqual(normalized.sampler_name, "euler")
                         self.assertEqual(normalized.scheduler_name, "simple")
-                        self.assertEqual(normalized.template_lora_name, "Krea\\krea2_darkbrush.safetensors")
+                        self.assertFalse(normalized.template_lora_enabled)
+                        self.assertEqual(normalized.template_lora_name, "")
                     if profile_id in {"ernie_image", "ernie_image_turbo"}:
                         self.assertEqual(normalized.aux_text_encoder_name, "ernie-image-prompt-enhancer.safetensors")
                     if profile_id == "ernie_image":
@@ -1312,21 +1328,10 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(sampler_node["inputs"]["steps"], 20)
         self.assertEqual(sampler_node["inputs"]["cfg"], 1.0)
 
-    def test_translate_txt2img_request_builds_flux2_dev_custom_sampler_graph(self) -> None:
+    def test_translate_txt2img_request_builds_flux2_dev_base_without_installed_turbo_lora(self) -> None:
         with mock.patch(
             "rookieui.services.txt2img.discover_model_inventory",
-            return_value=mock.Mock(
-                source="host",
-                checkpoints=["SDXL\\realvisxl.safetensors"],
-                diffusion_models=["flux\\flux2_dev_fp8mixed.safetensors"],
-                vae=["full_encoder_small_decoder.safetensors"],
-                text_encoders=["mistral_3_small_flux2_bf16.safetensors"],
-                loras=["Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors"],
-                default_checkpoint="SDXL\\realvisxl.safetensors",
-                default_vae="full_encoder_small_decoder.safetensors",
-                default_text_encoder="mistral_3_small_flux2_bf16.safetensors",
-                controlnet=[],
-            ),
+            return_value=self._flux2_dev_inventory(),
         ):
             normalized = normalize_txt2img_request(
                 {
@@ -1341,7 +1346,6 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         result = translate_txt2img_request(normalized).to_payload()
         workflow = result["workflow"]
         class_types = {node["class_type"] for node in workflow.values()}
-        lora_node = next(node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly")
         clip_node = next(node for node in workflow.values() if node["class_type"] == "CLIPLoader")
         guidance_node = next(node for node in workflow.values() if node["class_type"] == "FluxGuidance")
         scheduler_node = next(node for node in workflow.values() if node["class_type"] == "Flux2Scheduler")
@@ -1351,18 +1355,45 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.checkpoint_name, "flux\\flux2_dev_fp8mixed.safetensors")
         self.assertEqual(normalized.text_encoder_name, "mistral_3_small_flux2_bf16.safetensors")
         self.assertEqual(normalized.vae_name, "full_encoder_small_decoder.safetensors")
-        self.assertEqual(normalized.template_lora_name, "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+        self.assertFalse(normalized.template_lora_enabled)
+        self.assertEqual(normalized.template_lora_name, "")
         self.assertIn("BasicGuider", class_types)
         self.assertIn("RandomNoise", class_types)
         self.assertIn("KSamplerSelect", class_types)
         self.assertIn("SamplerCustomAdvanced", class_types)
         self.assertNotIn("KSampler", class_types)
-        self.assertEqual(lora_node["inputs"]["lora_name"], "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+        self.assertNotIn("LoraLoaderModelOnly", class_types)
         self.assertEqual(clip_node["inputs"]["type"], "flux2")
         self.assertEqual(guidance_node["inputs"]["guidance"], 4.0)
         self.assertEqual(scheduler_node["inputs"]["steps"], 20)
         self.assertEqual(latent_node["inputs"]["width"], 1024)
         self.assertEqual(latent_node["inputs"]["height"], 1024)
+
+    def test_translate_flux2_dev_turbo_couples_lora_and_eight_steps(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._flux2_dev_inventory(),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux2_dev",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                    "steps": 20,
+                    "template_lora_enabled": True,
+                }
+            )
+
+        workflow = translate_txt2img_request(normalized).workflow
+        lora_node = next(node for node in workflow.values() if node["class_type"] == "LoraLoaderModelOnly")
+        scheduler_node = next(node for node in workflow.values() if node["class_type"] == "Flux2Scheduler")
+        self.assertTrue(normalized.template_lora_enabled)
+        self.assertEqual(normalized.steps, 8)
+        self.assertEqual(lora_node["inputs"]["lora_name"], "Flux\\Flux_2-Turbo-LoRA_comfyui.safetensors")
+        self.assertEqual(lora_node["inputs"]["strength_model"], 1.0)
+        self.assertEqual(scheduler_node["inputs"]["steps"], 8)
 
     def test_translate_txt2img_request_builds_ideogram4_dual_model_graph(self) -> None:
         with mock.patch(
@@ -1583,6 +1614,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                     "checkpoint_name": "",
                     "vae_name": "",
                     "text_encoder_name": "",
+                    "template_lora_enabled": True,
                 }
             )
 
@@ -1594,10 +1626,54 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         sampler_node = next(node for node in workflow.values() if node["class_type"] == "KSampler")
 
         self.assertEqual(normalized.profile, "krea2_turbo")
+        self.assertTrue(normalized.template_lora_enabled)
+        self.assertEqual(normalized.template_lora_strength, 0.8)
+        self.assertEqual(normalized.template_lora_trigger_word, "muted minimalist sketch style")
+        self.assertEqual(normalized.prompt, "painted fashion editorial, muted minimalist sketch style")
         self.assertEqual(normalized.template_lora_name, "Krea\\krea2_darkbrush.safetensors")
         self.assertEqual(lora_node["inputs"]["lora_name"], "Krea\\krea2_darkbrush.safetensors")
+        self.assertEqual(lora_node["inputs"]["strength_model"], 0.8)
         self.assertEqual(lora_node["inputs"]["model"], ["1", 0])
         self.assertEqual(sampler_node["inputs"]["model"], [lora_id, 0])
+
+    def test_krea2_installed_lora_remains_inactive_when_flag_is_missing_or_false(self) -> None:
+        for payload_override in ({}, {"template_lora_enabled": False, "template_lora_name": "Krea/krea2_darkbrush.safetensors"}):
+            with self.subTest(payload_override=payload_override), mock.patch(
+                "rookieui.services.txt2img.discover_model_inventory",
+                return_value=self._krea2_turbo_inventory(include_lora=True),
+            ):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "painted fashion editorial",
+                        "profile": "krea2_turbo",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                        **payload_override,
+                    }
+                )
+                workflow = translate_txt2img_request(normalized).workflow
+                self.assertFalse(normalized.template_lora_enabled)
+                self.assertEqual(normalized.template_lora_name, "")
+                self.assertEqual(normalized.prompt, "painted fashion editorial")
+                self.assertFalse(any(node["class_type"] == "LoraLoaderModelOnly" for node in workflow.values()))
+
+    def test_enabled_template_lora_requires_inventory_selector(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._krea2_turbo_inventory(include_lora=False),
+        ):
+            with self.assertRaisesRegex(ValueError, "enabled template LoRA is missing from the host loras inventory"):
+                normalize_txt2img_request(
+                    {
+                        "prompt": "painted fashion editorial",
+                        "profile": "krea2_turbo",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                        "template_lora_enabled": True,
+                    }
+                )
 
     def test_translate_txt2img_request_appends_inline_lora_after_template_owned_lora_for_flux(self) -> None:
         with mock.patch(

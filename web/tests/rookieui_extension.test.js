@@ -1471,6 +1471,8 @@ describe("registerRookieUIBootstrapExtension", () => {
                   template_lora_visible: true,
                   template_lora_override_allowed: true,
                   official_template_lora_label: "Flux_2-Turbo-LoRA_comfyui.safetensors",
+                  default_template_lora_enabled: true,
+                  default_template_lora_strength: 1,
                   notes: [],
                 },
                 {
@@ -1486,6 +1488,8 @@ describe("registerRookieUIBootstrapExtension", () => {
                   default_scheduler: "simple",
                   default_clip_skip: 1,
                   supports_clip_skip: false,
+                  default_template_lora_enabled: true,
+                  default_template_lora_strength: 1,
                   notes: [],
                 },
                 {
@@ -2025,6 +2029,7 @@ describe("registerRookieUIBootstrapExtension", () => {
     document.getElementById("rookieui-preset").dispatchEvent(new Event("change", { bubbles: true }));
     expect(document.getElementById("rookieui-template-lora-name").disabled).toBe(false);
     expect(document.getElementById("rookieui-template-lora-name").value).toBe("Flux_2-Turbo-LoRA_comfyui.safetensors");
+    expect(document.getElementById("rookieui-template-lora-enabled").checked).toBe(true);
     expect(document.getElementById("rookieui-txt2img-template-lora-status").textContent).toContain(
       "Official default active",
     );

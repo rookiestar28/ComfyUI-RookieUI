@@ -310,6 +310,9 @@ class PresetDefinition:
     vae_name: str
     text_encoder_name: str
     template_lora_name: str
+    template_lora_enabled: bool
+    template_lora_strength: float
+    template_lora_trigger_word: str
     width: int
     height: int
     steps: int

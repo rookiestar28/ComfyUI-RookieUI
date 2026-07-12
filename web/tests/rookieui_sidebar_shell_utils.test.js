@@ -25,4 +25,30 @@ describe("sidebar shell profile lookup", () => {
       default_ideogram_mode: "default",
     });
   });
+
+  test("preserves template LoRA activation defaults independently from selector availability", () => {
+    const lookup = buildProfileLookup({
+      parity: { profiles: [{ id: "krea2_turbo", title: "Krea-2 Turbo" }] },
+      model_families: {
+        entries: [
+          {
+            id: "krea2_turbo",
+            title: "Krea-2 Turbo",
+            template_lora_visible: true,
+            default_template_lora_enabled: false,
+            default_template_lora_strength: 0.8,
+            default_template_lora_trigger_word: "muted minimalist sketch style",
+            template_lora_trigger_visible: true,
+          },
+        ],
+      },
+    });
+
+    expect(lookup.get("krea2_turbo")).toMatchObject({
+      default_template_lora_enabled: false,
+      default_template_lora_strength: 0.8,
+      default_template_lora_trigger_word: "muted minimalist sketch style",
+      template_lora_trigger_visible: true,
+    });
+  });
 });

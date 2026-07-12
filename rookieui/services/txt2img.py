@@ -280,11 +280,40 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     )
     lora_strength_model = _coerce_lora_strength(request.lora_strength_model, "lora_strength_model")
     lora_strength_clip = _coerce_lora_strength(request.lora_strength_clip, "lora_strength_clip")
+    raw_template_lora_name = str(request.template_lora_name or "").strip()
+    if request.template_lora_enabled is None:
+        template_lora_enabled = bool(raw_template_lora_name) or profile_entry.default_template_lora_enabled
+        applied_defaults.append("template_lora_enabled")
+    else:
+        template_lora_enabled = _coerce_bool(request.template_lora_enabled, "template_lora_enabled")
+    if request.template_lora_strength is None:
+        template_lora_strength = profile_entry.default_template_lora_strength
+        applied_defaults.append("template_lora_strength")
+    else:
+        template_lora_strength = _coerce_lora_strength(
+            request.template_lora_strength,
+            "template_lora_strength",
+        )
+    template_lora_trigger_word = normalize_prompt_text(
+        request.template_lora_trigger_word,
+        "template_lora_trigger_word",
+        max_length=256,
+    )
+    if not template_lora_trigger_word and template_lora_enabled:
+        template_lora_trigger_word = profile_entry.default_template_lora_trigger_word
+        if template_lora_trigger_word:
+            applied_defaults.append("template_lora_trigger_word")
+    if profile.id == "krea2_turbo" and template_lora_enabled and template_lora_trigger_word:
+        prompt = f"{prompt}, {template_lora_trigger_word}"
     ideogram_mode = normalize_ideogram4_mode(request.ideogram_mode) if profile.id == "ideogram4" else ""
     if profile.id == "ideogram4":
         if request.ideogram_mode is None or not str(request.ideogram_mode).strip():
             applied_defaults.append("ideogram_mode")
         steps = IDEOGRAM4_MODE_CONTRACTS[ideogram_mode].steps
+        if request.steps != steps:
+            applied_defaults.append("steps")
+    elif profile.id == "flux2_dev":
+        steps = 8 if template_lora_enabled else 20
         if request.steps != steps:
             applied_defaults.append("steps")
     else:
@@ -445,7 +474,16 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         profile_id=profile.id,
         inventory_selectors=inventory.loras,
         strict_match=inventory_is_host,
-    ) or resolve_template_lora_selector_context(profile.id, inventory)
+    )
+    if template_lora_enabled and not template_lora_name:
+        template_lora_name = resolve_template_lora_selector_context(profile.id, inventory)
+    if template_lora_enabled and not template_lora_name and profile.id in {"flux2_dev", "krea2_turbo"}:
+        raise ValueError(
+            f"{profile_entry.title} enabled template LoRA is missing from the host loras inventory. "
+            "Install the official LoRA or disable the template LoRA option."
+        )
+    if not template_lora_enabled:
+        template_lora_name = ""
     text_encoder_name = resolve_inventory_selector(
         raw_text_encoder_selector,
         "text_encoder_name",
@@ -553,6 +591,9 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         text_encoder_name=text_encoder_name,
         aux_text_encoder_name=aux_text_encoder_name,
         template_lora_name=template_lora_name,
+        template_lora_enabled=template_lora_enabled,
+        template_lora_strength=template_lora_strength,
+        template_lora_trigger_word=template_lora_trigger_word,
         width=width,
         height=height,
         steps=steps,

@@ -1,17 +1,34 @@
 import { setProfileFieldVisibility } from "./rookieui_ideogram_mode_controls.js";
 
-export function createTemplateLoraController({ profileLookup, presetLookup, elements, controls }) {
+export function createTemplateLoraController({ profileLookup, presetLookup, elements, controls, setElementValue }) {
+  const setValue = setElementValue ?? ((element, value) => {
+    if (!element) return;
+    if ("checked" in element) element.checked = Boolean(value);
+    else element.value = String(value);
+  });
   const resolvePresetDefault = () =>
     String(presetLookup.get(elements.preset.value)?.template_lora_name ?? "").trim();
-  const sync = () => {
+  const sync = ({ resetDefaults = false } = {}) => {
     const profile = profileLookup.get(String(elements.profileState.value ?? "").trim().toLowerCase()) ?? null;
     const visible = Boolean(profile?.template_lora_visible);
     const overrideAllowed = Boolean(profile?.template_lora_override_allowed);
+    if (resetDefaults) {
+      setValue(elements.templateLoraName, resolvePresetDefault());
+      setValue(elements.templateLoraEnabled, Boolean(profile?.default_template_lora_enabled));
+      setValue(elements.templateLoraStrength, profile?.default_template_lora_strength ?? 1);
+      setValue(elements.templateLoraTriggerWord, profile?.default_template_lora_trigger_word ?? "");
+    }
+    const enabled = visible && (elements.templateLoraEnabled
+      ? Boolean(elements.templateLoraEnabled.checked)
+      : Boolean(profile?.default_template_lora_enabled));
     const currentValue = String(elements.templateLoraName.value ?? "").trim();
     const presetDefault = resolvePresetDefault();
     const officialLabel = String(profile?.official_template_lora_label ?? "").trim();
     const officialResolved = presetDefault || officialLabel;
     setProfileFieldVisibility(controls.field, visible);
+    setProfileFieldVisibility(controls.enableField, visible);
+    setProfileFieldVisibility(controls.strengthField, visible && enabled);
+    setProfileFieldVisibility(controls.triggerField, visible && enabled && Boolean(profile?.template_lora_trigger_visible));
     if (controls.libraryHeading) {
       controls.libraryHeading.hidden = !visible;
     }
@@ -29,7 +46,20 @@ export function createTemplateLoraController({ profileLookup, presetLookup, elem
       controls.resetButton.disabled = !visible || !overrideAllowed;
     }
     elements.templateLoraName.disabled = !visible || !overrideAllowed;
+    if (elements.templateLoraEnabled) elements.templateLoraEnabled.disabled = !visible;
+    if (elements.templateLoraStrength) elements.templateLoraStrength.disabled = !visible || !enabled;
+    if (elements.templateLoraTriggerWord) {
+      elements.templateLoraTriggerWord.disabled = !visible || !enabled || !profile?.template_lora_trigger_visible;
+    }
+    if (profile?.id === "flux2_dev") {
+      setValue(elements.steps, enabled ? 8 : 20);
+      setValue(elements.stepsSlider, enabled ? 8 : 20);
+    }
     if (!visible || !controls.statusNode) {
+      return;
+    }
+    if (!enabled) {
+      controls.statusNode.textContent = "Template LoRA is available but inactive. Enable it to apply the selected asset.";
       return;
     }
     if (!currentValue && !officialResolved) {

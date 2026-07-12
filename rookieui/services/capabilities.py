@@ -124,6 +124,12 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "official_template_lora_label": normalize_metadata_text(
                     entry.get("official_template_lora_label", "")
                 ),
+                "default_template_lora_enabled": bool(entry.get("default_template_lora_enabled", False)),
+                "default_template_lora_strength": float(entry.get("default_template_lora_strength", 1.0)),
+                "default_template_lora_trigger_word": normalize_metadata_text(
+                    entry.get("default_template_lora_trigger_word", "")
+                ),
+                "template_lora_trigger_visible": bool(entry.get("template_lora_trigger_visible", False)),
                 "image_edit_profile": bool(entry.get("image_edit_profile", False)),
                 "request_contract_surface": normalize_metadata_text(entry.get("request_contract_surface", "")),
                 "reference_input_mode": normalize_metadata_text(entry.get("reference_input_mode", "")),

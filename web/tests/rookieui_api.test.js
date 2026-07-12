@@ -75,6 +75,7 @@ describe("fetchRookieUICapabilities", () => {
     const chromaEntry = result.data.model_families.entries.find((entry) => entry.id === "chroma");
     const ernieEntry = result.data.model_families.entries.find((entry) => entry.id === "ernie_image");
     const fluxEntry = result.data.model_families.entries.find((entry) => entry.id === "flux");
+    const flux2Entry = result.data.model_families.entries.find((entry) => entry.id === "flux2_dev");
     const ideogramEntry = result.data.model_families.entries.find((entry) => entry.id === "ideogram4");
     const kreaEntry = result.data.model_families.entries.find((entry) => entry.id === "krea2_turbo");
     const longcatEntry = result.data.model_families.entries.find((entry) => entry.id === "longcat_image");
@@ -96,6 +97,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(fluxEntry.template_lora_visible).toBe(true);
     expect(fluxEntry.template_lora_override_allowed).toBe(true);
     expect(fluxEntry.official_template_lora_label).toBe("Flux_2-Turbo-LoRA_comfyui.safetensors");
+    expect(flux2Entry.default_steps).toBe(20);
+    expect(flux2Entry.default_template_lora_enabled).toBe(false);
+    expect(flux2Entry.default_template_lora_strength).toBe(1);
     expect(ideogramEntry.public_base_family).toBe("ideogram4");
     expect(ideogramEntry.default_steps).toBe(20);
     expect(ideogramEntry.default_cfg_scale).toBe(7);
@@ -105,6 +109,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(kreaEntry.default_cfg_scale).toBe(1);
     expect(kreaEntry.template_lora_visible).toBe(true);
     expect(kreaEntry.official_template_lora_label).toBe("krea2_darkbrush.safetensors");
+    expect(kreaEntry.default_template_lora_enabled).toBe(false);
+    expect(kreaEntry.default_template_lora_strength).toBe(0.8);
+    expect(kreaEntry.default_template_lora_trigger_word).toBe("muted minimalist sketch style");
     expect(longcatEntry.flux_guidance_visible).toBe(true);
     expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(qwenEntry.template_lora_visible).toBe(true);
@@ -296,6 +303,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "flux2_dev",
       "ideogram4",
       "krea2_turbo",
       "klein_4b",
@@ -327,6 +335,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "flux2_dev",
       "ideogram4",
       "krea2_turbo",
       "klein_4b",
@@ -350,11 +359,15 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "chroma")?.shift).toBe(1);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.profile).toBe("qwen_image");
     expect(presets.data.presets.find((preset) => preset.id === "flux")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "flux2_dev")?.template_lora_enabled).toBe(false);
+    expect(presets.data.presets.find((preset) => preset.id === "flux2_dev")?.steps).toBe(20);
     expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.base_family).toBe("ideogram4");
     expect(presets.data.presets.find((preset) => preset.id === "ideogram4")?.cfg_scale).toBe(7);
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.base_family).toBe("krea2");
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.steps).toBe(8);
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_name).toBe("");
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_enabled).toBe(false);
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_strength).toBe(0.8);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");

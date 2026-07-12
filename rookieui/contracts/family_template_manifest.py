@@ -106,6 +106,10 @@ class FamilyTemplateManifestEntry:
     template_lora_visible: bool
     template_lora_override_allowed: bool
     official_template_lora_label: str
+    default_template_lora_enabled: bool
+    default_template_lora_strength: float
+    default_template_lora_trigger_word: str
+    template_lora_trigger_visible: bool
     support_tier: str
     compatibility_summary: str
     experimental: bool = False
@@ -163,6 +167,10 @@ class FamilyTemplateManifestEntry:
             "template_lora_visible": self.template_lora_visible,
             "template_lora_override_allowed": self.template_lora_override_allowed,
             "official_template_lora_label": self.official_template_lora_label,
+            "default_template_lora_enabled": self.default_template_lora_enabled,
+            "default_template_lora_strength": self.default_template_lora_strength,
+            "default_template_lora_trigger_word": self.default_template_lora_trigger_word,
+            "template_lora_trigger_visible": self.template_lora_trigger_visible,
             "support_tier": self.support_tier,
             "compatibility_summary": self.compatibility_summary,
             "experimental": self.experimental,
@@ -196,6 +204,9 @@ class FamilyTemplateManifestEntry:
             "vae_name": vae_name,
             "text_encoder_name": text_encoder_name,
             "template_lora_name": template_lora_name,
+            "template_lora_enabled": self.default_template_lora_enabled,
+            "template_lora_strength": self.default_template_lora_strength,
+            "template_lora_trigger_word": self.default_template_lora_trigger_word,
             "width": self.default_width,
             "height": self.default_height,
             "steps": self.default_steps,
@@ -261,6 +272,10 @@ def _parity_entry(
         template_lora_visible=False,
         template_lora_override_allowed=False,
         official_template_lora_label="",
+        default_template_lora_enabled=False,
+        default_template_lora_strength=1.0,
+        default_template_lora_trigger_word="",
+        template_lora_trigger_visible=False,
         support_tier="parity",
         compatibility_summary=compatibility_summary,
         notes=notes,
@@ -298,6 +313,10 @@ def _template_entry(
     template_lora_visible: bool = False,
     template_lora_override_allowed: bool = False,
     official_template_lora_label: str = "",
+    default_template_lora_enabled: bool | None = None,
+    default_template_lora_strength: float = 1.0,
+    default_template_lora_trigger_word: str = "",
+    template_lora_trigger_visible: bool = False,
     flow_kind: str = "txt2img",
     available_surface_flows: tuple[str, ...] = ("txt2img",),
     runtime_adapter_id: str = "",
@@ -343,6 +362,14 @@ def _template_entry(
         template_lora_visible=template_lora_visible,
         template_lora_override_allowed=template_lora_override_allowed,
         official_template_lora_label=official_template_lora_label,
+        default_template_lora_enabled=(
+            template_lora_visible
+            if default_template_lora_enabled is None
+            else default_template_lora_enabled
+        ),
+        default_template_lora_strength=default_template_lora_strength,
+        default_template_lora_trigger_word=default_template_lora_trigger_word,
+        template_lora_trigger_visible=template_lora_trigger_visible,
         support_tier="family-adapted",
         compatibility_summary=compatibility_summary,
         experimental=True,
@@ -654,6 +681,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_visible=True,
         template_lora_override_allowed=True,
         official_template_lora_label="Flux_2-Turbo-LoRA_comfyui.safetensors",
+        default_template_lora_enabled=False,
+        default_template_lora_strength=1.0,
         runtime_adapter_id="flux2_dev",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Flux.2 Dev).json",
         diffusion_model_hints=("flux2", "dev"),
@@ -720,6 +749,10 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_visible=True,
         template_lora_override_allowed=True,
         official_template_lora_label="krea2_darkbrush.safetensors",
+        default_template_lora_enabled=False,
+        default_template_lora_strength=0.8,
+        default_template_lora_trigger_word="muted minimalist sketch style",
+        template_lora_trigger_visible=True,
         runtime_adapter_id="krea2_turbo",
         official_template_path="comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
         diffusion_model_hints=("krea2", "krea", "turbo"),

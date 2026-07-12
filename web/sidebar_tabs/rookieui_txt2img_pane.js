@@ -196,6 +196,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       initialLowBits,
     ),
     templateLoraName: createInput("text", "rookieui-template-lora-name", ""),
+    templateLoraEnabled: createCheckbox("rookieui-template-lora-enabled", false),
+    templateLoraStrength: createInput("number", "rookieui-template-lora-strength", "1", {
+      step: 0.05, min: -4, max: 4, inputMode: "decimal",
+    }),
+    templateLoraTriggerWord: createInput("text", "rookieui-template-lora-trigger-word", ""),
     loraName: createInput("text", "rookieui-lora-name", ""),
     loraStrengthModel: createInput("number", "rookieui-lora-strength-model", "1", {
       step: 0.05,
@@ -314,6 +319,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   };
   const templateLoraControls = {
     field: null,
+    enableField: null,
+    strengthField: null,
+    triggerField: null,
     statusNode: null,
     resetButton: null,
     libraryHeading: null,
@@ -323,7 +331,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     elements.ideogramMode, elements.profileState, profileLookup, setElementValue,
   );
   const templateLoraController = createTemplateLoraController({
-    profileLookup, presetLookup, elements, controls: templateLoraControls,
+    profileLookup, presetLookup, elements, controls: templateLoraControls, setElementValue,
   });
 
   const buildXYZBaseRequest = () => buildTxt2ImgPayloadFromElements(elements);
@@ -524,7 +532,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   );
   syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   ideogramModeController.sync();
-  templateLoraController.sync();
+  templateLoraController.sync({ resetDefaults: true });
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
@@ -536,7 +544,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     );
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     ideogramModeController.sync();
-    templateLoraController.sync();
+    templateLoraController.sync({ resetDefaults: true });
   });
 
   const subtabHost = document.createElement("div");
@@ -824,6 +832,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         loraGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         loraSection.appendChild(loraGrid);
         templateLoraControls.field = createField(loraGrid, "Template LoRA", elements.templateLoraName);
+        templateLoraControls.enableField = createInlineCheckboxField(loraGrid, "Enable Template LoRA", elements.templateLoraEnabled);
+        templateLoraControls.strengthField = createField(loraGrid, "Template Strength", elements.templateLoraStrength);
+        templateLoraControls.triggerField = createField(loraGrid, "Trigger Word", elements.templateLoraTriggerWord);
         createField(loraGrid, "Model Strength", elements.loraStrengthModel);
         createField(loraGrid, "CLIP Strength", elements.loraStrengthClip);
 
@@ -895,6 +906,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
         elements.templateLoraName.addEventListener("input", templateLoraController.sync);
         elements.templateLoraName.addEventListener("change", templateLoraController.sync);
+        elements.templateLoraEnabled.addEventListener("change", templateLoraController.sync);
         templateLoraController.sync();
       },
     },
@@ -971,6 +983,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         hires_denoise: "hiresDenoise",
         hires_upscale_method: "hiresUpscaleMethod",
         template_lora_name: "templateLoraName",
+        template_lora_enabled: "templateLoraEnabled",
+        template_lora_strength: "templateLoraStrength",
+        template_lora_trigger_word: "templateLoraTriggerWord",
         lora_name: "loraName",
         lora_strength_model: "loraStrengthModel",
         lora_strength_clip: "loraStrengthClip",
