@@ -34,6 +34,13 @@ def _public_doc_paths() -> list[Path]:
 
 
 class PublicDocsTruthfulnessTests(unittest.TestCase):
+    def test_public_docs_use_the_current_official_template_source_basis(self) -> None:
+        for path in _public_doc_paths():
+            text = _read_text(path)
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertNotIn("`comfyui-workflow-templates` 0.11.2", text)
+        self.assertIn("`comfyui-workflow-templates` 0.11.6", _read_text(README))
+
     def test_readme_lists_accepted_local_ideogram_and_krea_txt2img_profiles(self) -> None:
         text = _read_text(README)
         shipped_profile_line = next(

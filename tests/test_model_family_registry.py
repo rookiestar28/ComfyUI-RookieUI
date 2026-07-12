@@ -42,7 +42,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.2")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.6")
         entries = list_model_family_registry_entries()
         stale_source_markers = ("0.9.91", "0.9.98", "0.10.3")
         stale_entries = [
@@ -85,7 +85,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
                 self.assertIn(observed_marker, OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
         self.assertNotIn("Text to Image (Ideogram v4)", OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS)
 
-    def test_host_0_11_2_gallery_json_delta_is_tracked_separately(self) -> None:
+    def test_host_0_11_6_gallery_json_delta_is_tracked_separately(self) -> None:
         expected_deferred_gallery_markers = (
             "api_ideogram_v4_t2i",
             "api_krea2_t2i",

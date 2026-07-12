@@ -3,9 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from rookieui.contracts.host_source_basis import (
+    HOST_SOURCE_BASIS,
+    WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6,
+)
+
 MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
-OFFICIAL_TEMPLATE_SOURCE_VERSION = "0.11.2"
+OFFICIAL_TEMPLATE_SOURCE_VERSION = HOST_SOURCE_BASIS.core.workflow_templates_version
 OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     "Image Inpainting (Qwen-image)",
     "Image Outpainting (Qwen-Image)",
@@ -66,6 +71,7 @@ OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
     *OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS,
     *OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
     *OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
+    *WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6.deferred,
 )
 
 
