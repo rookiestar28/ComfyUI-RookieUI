@@ -996,7 +996,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                         self.assertEqual(normalized.steps, 20)
                         self.assertEqual(normalized.cfg_scale, 7.0)
                         self.assertEqual(normalized.sampler_name, "euler")
-                        self.assertEqual(normalized.scheduler_name, "simple")
+                        self.assertEqual(normalized.scheduler_name, "ideogram4")
                     if profile_id == "krea2_turbo":
                         self.assertEqual(normalized.steps, 8)
                         self.assertEqual(normalized.cfg_scale, 1.0)
@@ -1442,6 +1442,45 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(scheduler_node["inputs"]["steps"], 20)
         self.assertEqual(latent_node["inputs"]["width"], 1024)
         self.assertEqual(latent_node["inputs"]["height"], 1024)
+
+    def test_specialized_txt2img_metadata_omits_ignored_scheduler_and_negative_prompt(self) -> None:
+        scenarios = (
+            ("flux2_dev", self._flux2_dev_inventory(), "flux2"),
+            ("ideogram4", self._ideogram4_inventory(), "ideogram4"),
+        )
+
+        for profile, inventory, expected_scheduler in scenarios:
+            with self.subTest(profile=profile):
+                with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=inventory):
+                    normalized = normalize_txt2img_request(
+                        {
+                            "prompt": "fashion editorial",
+                            "negative_prompt": "ignored private note",
+                            "profile": profile,
+                            "checkpoint_name": "",
+                            "vae_name": "",
+                            "text_encoder_name": "",
+                            "scheduler_name": "karras",
+                        }
+                    )
+
+                result = translate_txt2img_request(normalized).to_payload()
+                class_types = [node["class_type"] for node in result["workflow"].values()]
+                parameters = result["generation_metadata"]["parameters"]
+                structured = result["generation_metadata"]["extra_pnginfo"]["rookieui"]
+
+                self.assertEqual(normalized.negative_prompt, "")
+                self.assertEqual(normalized.scheduler_name, expected_scheduler)
+                self.assertNotIn("Negative prompt:", parameters)
+                self.assertNotIn("Schedule type:", parameters)
+                self.assertEqual(structured["scheduler_control_mode"], expected_scheduler)
+                self.assertEqual(structured["negative_prompt_mode"], "unused" if profile == "flux2_dev" else "zeroed")
+                self.assertEqual(structured["scheduler_name"], expected_scheduler)
+                self.assertIn("IGNORED_NEGATIVE_PROMPT", normalized.parameter_warning_codes)
+                self.assertIn("IGNORED_GENERIC_SCHEDULER", normalized.parameter_warning_codes)
+                self.assertEqual(class_types.count("CLIPTextEncode"), 1)
+                self.assertEqual(class_types.count("ConditioningZeroOut"), 1 if profile == "ideogram4" else 0)
+                self.assertIn("BasicGuider" if profile == "flux2_dev" else "DualModelGuider", class_types)
 
     def test_translate_flux2_dev_preserves_explicit_zero_guidance(self) -> None:
         with mock.patch(

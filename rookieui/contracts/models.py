@@ -320,6 +320,8 @@ class PresetDefinition:
     sampler_name: str
     scheduler_name: str
     clip_skip: int
+    scheduler_control_mode: str = "generic"
+    negative_prompt_mode: str = "encoded"
     shift: float | None = None
     flux_guidance: float | None = None
     prompt_enhancement_enabled: bool = False

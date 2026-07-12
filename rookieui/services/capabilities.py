@@ -93,6 +93,12 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "default_cfg_scale": float(entry.get("default_cfg_scale", 0.0) or 0.0),
                 "default_sampler": normalize_metadata_text(entry.get("default_sampler", "")),
                 "default_scheduler": normalize_metadata_text(entry.get("default_scheduler", "")),
+                "scheduler_control_mode": normalize_metadata_text(
+                    entry.get("scheduler_control_mode", "generic")
+                ) or "generic",
+                "negative_prompt_mode": normalize_metadata_text(
+                    entry.get("negative_prompt_mode", "encoded")
+                ) or "encoded",
                 "default_clip_skip": int(entry.get("default_clip_skip", 0) or 0),
                 "supports_clip_skip": bool(entry.get("supports_clip_skip", False)),
                 "primary_model_category": normalize_metadata_text(entry.get("primary_model_category", "")),

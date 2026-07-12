@@ -955,6 +955,39 @@ test("keeps Krea and Flux.2 template LoRAs explicitly opt-in", async ({ page }) 
   await expect(page.locator("#rookieui-steps")).toHaveValue("20");
 });
 
+test("clears unsupported scheduler and negative prompt across specialized profile transitions", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-shell-title")).toHaveText("RookieUI");
+
+  await page.locator("#rookieui-preset").selectOption("sd15");
+  await page.locator("#rookieui-prompt").fill("effective parameter transition");
+  await page.locator("#rookieui-negative-prompt").fill("stale negative value");
+  await page.locator("#rookieui-scheduler").selectOption("normal");
+  await expect(page.locator("#rookieui-negative-prompt")).toBeVisible();
+  await expect(page.locator("#rookieui-scheduler")).toBeVisible();
+
+  await page.locator("#rookieui-preset").selectOption("flux2_dev");
+  await expect(page.locator("#rookieui-negative-prompt")).toBeHidden();
+  await expect(page.locator("#rookieui-negative-prompt")).toBeDisabled();
+  await expect(page.locator("#rookieui-negative-prompt")).toHaveValue("");
+  await expect(page.locator("#rookieui-scheduler")).toBeHidden();
+  await expect(page.locator("#rookieui-scheduler")).toBeDisabled();
+  await expect(page.locator("#rookieui-scheduler")).toHaveValue("");
+
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123");
+  const request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request.negative_prompt).toBe("");
+  expect(request.scheduler_name).toBe("");
+
+  await page.locator("#rookieui-preset").selectOption("sd15");
+  await expect(page.locator("#rookieui-negative-prompt")).toBeVisible();
+  await expect(page.locator("#rookieui-negative-prompt")).toBeEnabled();
+  await expect(page.locator("#rookieui-scheduler")).toBeVisible();
+  await expect(page.locator("#rookieui-scheduler")).toBeEnabled();
+  await expect(page.locator("#rookieui-scheduler")).toHaveValue("normal");
+});
+
 test("routes txt2img preview toolbar image handoffs to target panes", async ({ page }) => {
   await page.goto("test-harness.html");
   await expect(page.locator("#rookieui-root")).toContainText('"hostSurfaceSupported":true', { timeout: 15000 });

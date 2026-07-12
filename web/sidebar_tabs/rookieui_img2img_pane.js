@@ -505,6 +505,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   elements.imageAsset.placeholder = "required";
   elements.maskAsset.placeholder = "optional";
   const advancedParameterControls = {
+    schedulerField: null,
+    schedulerInput: elements.scheduler,
+    negativePromptField: null,
+    negativePromptInput: elements.negativePrompt,
+    negativePromptWorkbench: null,
     shiftField: null,
     shiftInput: elements.shift,
     fluxGuidanceField: null,
@@ -594,13 +599,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       statusNode.textContent = message;
     },
   }));
-  createPromptField(
+  advancedParameterControls.negativePromptField = createPromptField(
     promptStack,
     "Negative Prompt",
     elements.negativePrompt,
     "rookieui-img2img-negative-prompt-counter",
   );
-  own(createPromptWorkbenchShell({
+  const negativePromptWorkbench = own(createPromptWorkbenchShell({
     idPrefix: "rookieui-img2img-negative-workbench",
     parent: promptStack,
     bootstrapState,
@@ -617,6 +622,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       statusNode.textContent = message;
     },
   }));
+  advancedParameterControls.negativePromptWorkbench = negativePromptWorkbench?.element ?? null;
 
   const actionRail = document.createElement("div");
   actionRail.className = "rookieui-shell__action-rail";
@@ -1001,7 +1007,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         generationGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         generationSection.appendChild(generationGrid);
         createField(generationGrid, "Sampling Method", elements.sampler);
-        createField(generationGrid, "Schedule Type", elements.scheduler);
+        advancedParameterControls.schedulerField = createField(generationGrid, "Schedule Type", elements.scheduler);
         modeAwareFieldControls.widthField = createSliderField(
           generationGrid,
           "Width",

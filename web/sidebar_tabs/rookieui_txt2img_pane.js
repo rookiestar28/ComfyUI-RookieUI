@@ -310,6 +310,11 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   elements.negativePrompt.placeholder =
     "Negative Prompt\n(Ctrl+Enter to Generate ; Alt+Enter to Skip ; Esc to Interrupt)";
   const advancedParameterControls = {
+    schedulerField: null,
+    schedulerInput: elements.scheduler,
+    negativePromptField: null,
+    negativePromptInput: elements.negativePrompt,
+    negativePromptWorkbench: null,
     shiftField: null,
     shiftInput: elements.shift,
     fluxGuidanceField: null,
@@ -381,8 +386,13 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       statusNode.textContent = message;
     },
   }));
-  createPromptField(promptStack, "Negative Prompt", elements.negativePrompt, "rookieui-negative-prompt-counter");
-  own(createPromptWorkbenchShell({
+  advancedParameterControls.negativePromptField = createPromptField(
+    promptStack,
+    "Negative Prompt",
+    elements.negativePrompt,
+    "rookieui-negative-prompt-counter",
+  );
+  const negativePromptWorkbench = own(createPromptWorkbenchShell({
     idPrefix: "rookieui-txt2img-negative-workbench",
     parent: promptStack,
     bootstrapState,
@@ -399,6 +409,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       statusNode.textContent = message;
     },
   }));
+  advancedParameterControls.negativePromptWorkbench = negativePromptWorkbench?.element ?? null;
 
   const actionRail = document.createElement("div");
   actionRail.className = "rookieui-shell__action-rail";
@@ -574,7 +585,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         samplingGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         samplingSection.appendChild(samplingGrid);
         createField(samplingGrid, "Sampling Method", elements.sampler);
-        createField(samplingGrid, "Schedule Type", elements.scheduler);
+        advancedParameterControls.schedulerField = createField(samplingGrid, "Schedule Type", elements.scheduler);
         ideogramModeController.attach(createField(samplingGrid, "Ideogram Mode", elements.ideogramMode));
         createSliderField(samplingGrid, "Sampling Steps", elements.steps, elements.stepsSlider, "rookieui-steps-field");
         createSliderField(samplingGrid, "CFG Scale", elements.cfgScale, elements.cfgScaleSlider, "rookieui-cfg-scale-field");

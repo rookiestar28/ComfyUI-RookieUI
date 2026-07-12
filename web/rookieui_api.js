@@ -1,6 +1,7 @@
 import { rookieUIDebugWarn } from "./rookieui_debug_deps.js";
 import { inspectRookieUIPngInfo } from "./api/rookieui_generation_api.js";
 import { postRookieUIJson, toErrorDetail } from "./api/rookieui_api_transport.js";
+import { POLICY_CONTRACT_VERSION, resolveEffectiveParameterPolicy } from "./rookieui_effective_parameter_policy.js";
 export {
   inspectRookieUIPngInfo,
   submitRookieUIExtras,
@@ -9,7 +10,6 @@ export {
 } from "./api/rookieui_generation_api.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
-const MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707";
 const CURRENT_HOST_DEFERRED_PROFILE_IDS = new Set([
   "klein_4b_distilled",
   "klein_9b_distilled",
@@ -1058,6 +1058,7 @@ export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
     available_surface_flows: entry.support_tier === "parity" ? ["txt2img", "img2img"] : ["txt2img"],
     ...entry,
     ...(DEFAULT_TEMPLATE_PARAMETER_OVERRIDES[entry.id] ?? {}),
+    ...resolveEffectiveParameterPolicy(entry.id),
   })),
 );
 
@@ -1093,7 +1094,7 @@ const DEFAULT_PRESETS = Object.freeze(
     shift: entry.default_shift ?? null,
     flux_guidance: entry.default_flux_guidance ?? null,
     sampler_name: entry.default_sampler,
-    scheduler_name: entry.default_scheduler,
+    scheduler_name: entry.scheduler_control_mode === "generic" ? entry.default_scheduler : "",
     clip_skip: entry.default_clip_skip,
     prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
     edit_megapixels: entry.default_edit_megapixels ?? null,
@@ -1103,6 +1104,8 @@ const DEFAULT_PRESETS = Object.freeze(
     max_direct_references: entry.max_direct_references ?? 0,
     encoder_family: entry.encoder_family ?? "",
     template_lora_chain_mode: entry.template_lora_chain_mode ?? "none",
+    scheduler_control_mode: entry.scheduler_control_mode,
+    negative_prompt_mode: entry.negative_prompt_mode,
     ideogram_mode: entry.default_ideogram_mode ?? "",
   })),
 );
@@ -1167,7 +1170,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
     },
   },
   model_families: {
-    contract_version: MODEL_FAMILY_REGISTRY_CONTRACT_VERSION,
+    contract_version: POLICY_CONTRACT_VERSION,
     entries: DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES,
   },
   prompt_semantics: {

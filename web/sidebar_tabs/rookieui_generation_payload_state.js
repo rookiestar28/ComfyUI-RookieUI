@@ -42,7 +42,7 @@ export function readOptionalNumericValue(input) {
 export function buildTxt2ImgPayloadFromElements(elements) {
   return {
     prompt: elements.prompt.value,
-    negative_prompt: elements.negativePrompt.value,
+    negative_prompt: elements.negativePrompt.disabled ? "" : elements.negativePrompt.value,
     profile: elements.profileState.value,
     dtype_profile: elements.lowBits.value,
     checkpoint_name: elements.checkpoint.value,
@@ -55,7 +55,7 @@ export function buildTxt2ImgPayloadFromElements(elements) {
     shift: readOptionalNumericValue(elements.shift),
     flux_guidance: readOptionalNumericValue(elements.fluxGuidance),
     sampler_name: elements.sampler.value,
-    scheduler_name: elements.scheduler.value,
+    scheduler_name: elements.scheduler.disabled ? "" : elements.scheduler.value,
     ideogram_mode: elements.ideogramMode?.value ?? "default",
     prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
     seed: Number(elements.seed.value),
@@ -83,7 +83,7 @@ export function buildTxt2ImgPayloadFromElements(elements) {
 export function buildImg2ImgPayloadFromElements(elements, imageEditReferencePayload = {}) {
   return {
     prompt: elements.prompt.value,
-    negative_prompt: elements.negativePrompt.value,
+    negative_prompt: elements.negativePrompt.disabled ? "" : elements.negativePrompt.value,
     profile: elements.profileState.value,
     dtype_profile: elements.lowBits.value,
     checkpoint_name: elements.checkpoint.value,
@@ -106,7 +106,7 @@ export function buildImg2ImgPayloadFromElements(elements, imageEditReferencePayl
     flux_guidance: readOptionalNumericValue(elements.fluxGuidance),
     edit_megapixels: readOptionalNumericValue(elements.editMegapixels),
     sampler_name: elements.sampler.value,
-    scheduler_name: elements.scheduler.value,
+    scheduler_name: elements.scheduler.disabled ? "" : elements.scheduler.value,
     prompt_enhancement_enabled: elements.promptEnhancementEnabled.checked,
     seed: Number(elements.seed.value),
     seed_extra: elements.seedExtra.checked,

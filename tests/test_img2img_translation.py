@@ -1341,6 +1341,40 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(clip_node["inputs"]["type"], "flux2")
         self.assertEqual(noise_node["inputs"]["noise_seed"], result["normalized_request"]["execution_seed"])
 
+    def test_flux2_image_edit_metadata_omits_ignored_scheduler_and_negative_prompt(self) -> None:
+        with mock.patch(
+            "rookieui.services.img2img.discover_model_inventory",
+            return_value=self._build_flux2_edit_inventory(),
+        ):
+            normalized = normalize_img2img_request(
+                {
+                    "prompt": "refresh the product photo lighting",
+                    "negative_prompt": "ignored private note",
+                    "profile": "flux2_image_edit",
+                    "mode": "img2img",
+                    "image_asset": "flux2-source",
+                    "scheduler_name": "karras",
+                }
+            )
+
+        result = translate_img2img_request(normalized).to_payload()
+        class_types = [node["class_type"] for node in result["workflow"].values()]
+        parameters = result["generation_metadata"]["parameters"]
+        structured = result["generation_metadata"]["extra_pnginfo"]["rookieui"]
+
+        self.assertEqual(normalized.negative_prompt, "")
+        self.assertEqual(normalized.scheduler_name, "flux2")
+        self.assertNotIn("Negative prompt:", parameters)
+        self.assertNotIn("Schedule type:", parameters)
+        self.assertEqual(structured["scheduler_control_mode"], "flux2")
+        self.assertEqual(structured["negative_prompt_mode"], "unused")
+        self.assertEqual(structured["scheduler_name"], "flux2")
+        self.assertIn("IGNORED_NEGATIVE_PROMPT", normalized.parameter_warning_codes)
+        self.assertIn("IGNORED_GENERIC_SCHEDULER", normalized.parameter_warning_codes)
+        self.assertEqual(class_types.count("CLIPTextEncode"), 1)
+        self.assertNotIn("ConditioningZeroOut", class_types)
+        self.assertIn("BasicGuider", class_types)
+
     def test_translate_img2img_request_builds_klein_9b_kv_image_edit_workflow(self) -> None:
         with mock.patch(
             "rookieui.services.img2img.discover_model_inventory",

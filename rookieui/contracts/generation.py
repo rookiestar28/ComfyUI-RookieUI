@@ -169,6 +169,10 @@ class NormalizedTxt2ImgRequest:
     prompt_semantics: dict[str, Any] = field(default_factory=dict)
     negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)
+    scheduler_control_mode: str = "generic"
+    negative_prompt_mode: str = "encoded"
+    parameter_warnings: list[str] = field(default_factory=list)
+    parameter_warning_codes: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -243,6 +247,10 @@ class NormalizedImg2ImgRequest:
     prompt_semantics: dict[str, Any] = field(default_factory=dict)
     negative_prompt_semantics: dict[str, Any] = field(default_factory=dict)
     applied_defaults: list[str] = field(default_factory=list)
+    scheduler_control_mode: str = "generic"
+    negative_prompt_mode: str = "encoded"
+    parameter_warnings: list[str] = field(default_factory=list)
+    parameter_warning_codes: list[str] = field(default_factory=list)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

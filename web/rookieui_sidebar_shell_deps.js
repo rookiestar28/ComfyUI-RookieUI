@@ -68,6 +68,7 @@ export const {
   preventSummaryToggleOnCheckbox,
   readImg2ImgReferencePayload,
   syncBoundControls,
+  syncEffectiveControls,
 } = utilsModule;
 
 export const { rookieUIDebugWarn } = debugModule;

@@ -133,6 +133,23 @@ describe("generation payload state helpers", () => {
     });
   });
 
+  test("omits controls disabled by the effective workflow policy", () => {
+    const disabledNegative = { value: "must not leave the browser", disabled: true };
+    const disabledScheduler = { value: "karras", disabled: true };
+
+    const txt2imgPayload = buildTxt2ImgPayloadFromElements(
+      createTxt2ImgElements({ negativePrompt: disabledNegative, scheduler: disabledScheduler }),
+    );
+    const img2imgPayload = buildImg2ImgPayloadFromElements(
+      createImg2ImgElements({ negativePrompt: disabledNegative, scheduler: disabledScheduler }),
+    );
+
+    expect(txt2imgPayload.negative_prompt).toBe("");
+    expect(txt2imgPayload.scheduler_name).toBe("");
+    expect(img2imgPayload.negative_prompt).toBe("");
+    expect(img2imgPayload.scheduler_name).toBe("");
+  });
+
   test("builds img2img payloads with reference and mode-specific fields", () => {
     const payload = buildImg2ImgPayloadFromElements(createImg2ImgElements(), {
       referenceImages: [{ image_asset: "ref.png" }],

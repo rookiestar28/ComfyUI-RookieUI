@@ -84,18 +84,23 @@ def build_a1111_parameters(normalized_request: Mapping[str, Any]) -> str:
     """Build raw A1111-style infotext for generated PNG `parameters` chunks."""
 
     prompt = normalize_prompt_text(normalized_request.get("prompt", ""), "prompt")
-    negative_prompt = normalize_prompt_text(
-        normalized_request.get("negative_prompt", ""),
-        "negative_prompt",
-    )
+    negative_prompt_mode = _clean_text(normalized_request.get("negative_prompt_mode") or "encoded").lower()
+    negative_prompt = ""
+    if negative_prompt_mode == "encoded":
+        negative_prompt = normalize_prompt_text(
+            normalized_request.get("negative_prompt", ""),
+            "negative_prompt",
+        )
     fields: list[tuple[str, str]] = []
     _append_field(fields, "Steps", normalized_request.get("steps"))
     sampler_name = _format_sampler(normalized_request.get("sampler_name"))
     if sampler_name:
         fields.append(("Sampler", sampler_name))
-    scheduler_name = _format_scheduler(normalized_request.get("scheduler_name"))
-    if scheduler_name:
-        fields.append(("Schedule type", scheduler_name))
+    scheduler_control_mode = _clean_text(normalized_request.get("scheduler_control_mode") or "generic").lower()
+    if scheduler_control_mode == "generic":
+        scheduler_name = _format_scheduler(normalized_request.get("scheduler_name"))
+        if scheduler_name:
+            fields.append(("Schedule type", scheduler_name))
     _append_field(fields, "CFG scale", normalized_request.get("cfg_scale"))
     _append_field(fields, "Seed", normalized_request.get("execution_seed", normalized_request.get("seed")))
     width = _clean_text(normalized_request.get("width"))
@@ -172,6 +177,11 @@ def build_rookieui_extra_pnginfo(
     profile: str,
 ) -> dict[str, object]:
     surface = _infer_surface(normalized_request)
+    scheduler_control_mode = _clean_text(normalized_request.get("scheduler_control_mode") or "generic").lower()
+    negative_prompt_mode = _clean_text(normalized_request.get("negative_prompt_mode") or "encoded").lower()
+    scheduler_name = _clean_text(normalized_request.get("scheduler_name"))
+    if scheduler_control_mode != "generic":
+        scheduler_name = scheduler_control_mode
     return {
         "rookieui": {
             "schema": "rookieui.generation_metadata.v1",
@@ -182,7 +192,10 @@ def build_rookieui_extra_pnginfo(
             "height": normalized_request.get("height"),
             "steps": normalized_request.get("steps"),
             "sampler_name": _clean_text(normalized_request.get("sampler_name")),
-            "scheduler_name": _clean_text(normalized_request.get("scheduler_name")),
+            "scheduler_name": scheduler_name,
+            "scheduler_control_mode": scheduler_control_mode,
+            "negative_prompt_mode": negative_prompt_mode,
+            "parameter_warning_codes": list(normalized_request.get("parameter_warning_codes", []) or []),
             "seed": normalized_request.get("execution_seed", normalized_request.get("seed")),
         }
     }

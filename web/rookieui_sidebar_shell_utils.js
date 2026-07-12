@@ -74,6 +74,30 @@ export function buildProfileLookup(capabilities) {
   return lookup;
 }
 
+export function syncEffectiveControls(profile, controls) {
+  const syncControl = (fieldNode, inputNode, mode, supportedMode, companionNode = null) => {
+    if (!fieldNode || !inputNode) return;
+    const supported = mode === supportedMode;
+    fieldNode.hidden = !supported;
+    inputNode.hidden = !supported;
+    inputNode.disabled = !supported;
+    inputNode.dataset.executionMode = mode;
+    if (companionNode) companionNode.hidden = !supported;
+    if (!supported) {
+      inputNode.value = "";
+      inputNode.__syncBinding?.();
+    }
+  };
+  syncControl(controls.schedulerField, controls.schedulerInput, String(profile?.scheduler_control_mode ?? "generic"), "generic");
+  syncControl(
+    controls.negativePromptField,
+    controls.negativePromptInput,
+    String(profile?.negative_prompt_mode ?? "encoded"),
+    "encoded",
+    controls.negativePromptWorkbench,
+  );
+}
+
 export function readImg2ImgReferencePayload(elements) {
   const imageEditProfile = String(elements.imageEditProfile?.value ?? "").trim().toLowerCase() === "true";
   const maxDirectReferences = Math.max(0, Number(elements.maxDirectReferences?.value ?? 0) || 0);

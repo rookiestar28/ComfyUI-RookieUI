@@ -43,6 +43,56 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertIn("longcat_image_edit", [entry["id"] for entry in payload["entries"]])
         self.assertIn("z_image_turbo", [entry["id"] for entry in payload["entries"]])
 
+    def test_registry_declares_exact_effective_parameter_policy_matrix(self) -> None:
+        entries = list_model_family_registry_entries()
+        scheduler_overrides = {
+            entry.id: entry.scheduler_control_mode
+            for entry in entries
+            if entry.scheduler_control_mode != "generic"
+        }
+        negative_overrides = {
+            entry.id: entry.negative_prompt_mode
+            for entry in entries
+            if entry.negative_prompt_mode != "encoded"
+        }
+
+        self.assertEqual(
+            scheduler_overrides,
+            {
+                "flux2_dev": "flux2",
+                "ideogram4": "ideogram4",
+                "klein_4b": "flux2",
+                "klein_9b": "flux2",
+                "flux2_image_edit": "flux2",
+                "klein_9b_kv_image_edit": "flux2",
+            },
+        )
+        self.assertEqual(
+            negative_overrides,
+            {
+                "ernie_image_turbo": "zeroed",
+                "flux": "zeroed",
+                "flux_krea_dev": "zeroed",
+                "flux2_dev": "unused",
+                "ideogram4": "zeroed",
+                "krea2_turbo": "zeroed",
+                "qwen_image": "zeroed",
+                "flux_kontext_dev_edit": "zeroed",
+                "flux2_image_edit": "unused",
+                "klein_9b_kv_image_edit": "zeroed",
+                "z_image_turbo": "zeroed",
+            },
+        )
+        self.assertTrue(all(entry.scheduler_control_mode in {"generic", "flux2", "ideogram4"} for entry in entries))
+        self.assertTrue(all(entry.negative_prompt_mode in {"encoded", "zeroed", "unused"} for entry in entries))
+
+        payload_by_id = {entry["id"]: entry for entry in build_model_family_registry_payload()["entries"]}
+        presets_by_id = {preset["id"]: preset for preset in build_preset_payload()["presets"]}
+        for profile_id, scheduler_mode in scheduler_overrides.items():
+            with self.subTest(profile_id=profile_id):
+                self.assertEqual(payload_by_id[profile_id]["scheduler_control_mode"], scheduler_mode)
+                self.assertEqual(presets_by_id[profile_id]["scheduler_name"], "")
+
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
         self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.6")
         entries = list_model_family_registry_entries()

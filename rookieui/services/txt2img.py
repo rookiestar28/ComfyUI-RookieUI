@@ -26,7 +26,6 @@ from rookieui.services.model_inventory import (
 from rookieui.services.parity_matrix import (
     get_parity_profile,
     normalize_sampler_name,
-    normalize_scheduler_name,
 )
 from rookieui.services.coercion import (
     coerce_bool as _coerce_bool,
@@ -40,6 +39,10 @@ from rookieui.services.prompt_dsl import (
 )
 from rookieui.services.adetailer import normalize_adetailer_payload
 from rookieui.services.controlnet import normalize_controlnet_units
+from rookieui.services.effective_parameter_policy import (
+    resolve_effective_negative_prompt,
+    resolve_effective_scheduler,
+)
 
 _MIN_DIMENSION = 64
 _MAX_DIMENSION = 2048
@@ -269,6 +272,10 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
 
     profile = get_parity_profile(normalize_option_label(request.profile, "profile", max_length=32))
     profile_entry = get_model_family_registry_entry(profile.id)
+    negative_resolution = resolve_effective_negative_prompt(profile_entry, negative_prompt)
+    negative_prompt = negative_resolution.value
+    parameter_warnings = list(negative_resolution.warnings)
+    parameter_warning_codes = list(negative_resolution.warning_codes)
     inventory = discover_model_inventory()
     inventory_is_host = inventory.source == "host"
     applied_defaults: list[str] = []
@@ -386,11 +393,15 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     sampler_name = normalize_sampler_name(sampler_input)
 
     scheduler_input = normalize_option_label(request.scheduler_name, "scheduler_name")
-    scheduler_name = normalize_scheduler_name(
-        sampler_input or profile.default_sampler,
-        scheduler_input or None,
+    scheduler_resolution = resolve_effective_scheduler(
+        profile_entry,
+        sampler_name=sampler_input or profile.default_sampler,
+        scheduler_input=scheduler_input,
         default_scheduler=profile.default_scheduler,
     )
+    scheduler_name = scheduler_resolution.value
+    parameter_warnings.extend(scheduler_resolution.warnings)
+    parameter_warning_codes.extend(scheduler_resolution.warning_codes)
     if request.scheduler_name is None:
         applied_defaults.append("scheduler_name")
 
@@ -627,4 +638,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         prompt_semantics=prompt_preprocess.prompt_semantics.to_payload(),
         negative_prompt_semantics=prompt_preprocess.negative_prompt_semantics.to_payload(),
         applied_defaults=applied_defaults,
+        scheduler_control_mode=profile_entry.scheduler_control_mode,
+        negative_prompt_mode=profile_entry.negative_prompt_mode,
+        parameter_warnings=list(dict.fromkeys(parameter_warnings)),
+        parameter_warning_codes=list(dict.fromkeys(parameter_warning_codes)),
     )

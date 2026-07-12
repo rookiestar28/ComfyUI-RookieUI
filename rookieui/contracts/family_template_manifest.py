@@ -8,7 +8,7 @@ from rookieui.contracts.host_source_basis import (
     WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6,
 )
 
-MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260707"
+MODEL_FAMILY_REGISTRY_CONTRACT_VERSION = "model-family-20260713-effective-parameters"
 OFFICIAL_TEMPLATE_SOURCE_PACKAGE = "comfyui-workflow-templates"
 OFFICIAL_TEMPLATE_SOURCE_VERSION = HOST_SOURCE_BASIS.core.workflow_templates_version
 OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS: tuple[str, ...] = (
@@ -138,6 +138,8 @@ class FamilyTemplateManifestEntry:
     vae_deny_hints: tuple[str, ...] = ()
     ideogram_modes: tuple[str, ...] = ()
     default_ideogram_mode: str = ""
+    scheduler_control_mode: str = "generic"
+    negative_prompt_mode: str = "encoded"
 
     def to_registry_payload(self) -> dict[str, Any]:
         return {
@@ -185,6 +187,8 @@ class FamilyTemplateManifestEntry:
             "available_surface_flows": list(self.available_surface_flows),
             "ideogram_modes": list(self.ideogram_modes),
             "default_ideogram_mode": self.default_ideogram_mode,
+            "scheduler_control_mode": self.scheduler_control_mode,
+            "negative_prompt_mode": self.negative_prompt_mode,
         }
 
     def to_preset_payload(
@@ -214,7 +218,7 @@ class FamilyTemplateManifestEntry:
             "shift": self.default_shift,
             "flux_guidance": self.default_flux_guidance,
             "sampler_name": self.default_sampler,
-            "scheduler_name": self.default_scheduler,
+            "scheduler_name": self.default_scheduler if self.scheduler_control_mode == "generic" else "",
             "clip_skip": self.default_clip_skip,
             "prompt_enhancement_enabled": self.default_prompt_enhancement_enabled,
             "edit_megapixels": self.default_edit_megapixels,
@@ -225,6 +229,8 @@ class FamilyTemplateManifestEntry:
             "encoder_family": self.encoder_family,
             "template_lora_chain_mode": self.template_lora_chain_mode,
             "ideogram_mode": self.default_ideogram_mode,
+            "scheduler_control_mode": self.scheduler_control_mode,
+            "negative_prompt_mode": self.negative_prompt_mode,
         }
 
 
@@ -334,6 +340,8 @@ def _template_entry(
     vae_deny_hints: tuple[str, ...] = (),
     ideogram_modes: tuple[str, ...] = (),
     default_ideogram_mode: str = "",
+    scheduler_control_mode: str = "generic",
+    negative_prompt_mode: str = "encoded",
 ) -> FamilyTemplateManifestEntry:
     return FamilyTemplateManifestEntry(
         id=id,
@@ -398,6 +406,8 @@ def _template_entry(
         vae_deny_hints=vae_deny_hints,
         ideogram_modes=ideogram_modes,
         default_ideogram_mode=default_ideogram_mode,
+        scheduler_control_mode=scheduler_control_mode,
+        negative_prompt_mode=negative_prompt_mode,
     )
 
 
@@ -583,6 +593,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         ),
         prompt_enhancement_visible=True,
         default_prompt_enhancement_enabled=True,
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="ernie",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Ernie Image Turbo).json",
         diffusion_model_hints=("ernie", "turbo"),
@@ -614,6 +625,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_visible=True,
         template_lora_override_allowed=True,
         official_template_lora_label="Flux_2-Turbo-LoRA_comfyui.safetensors",
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="flux",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Flux.1 Dev).json",
         diffusion_model_hints=("flux",),
@@ -647,6 +659,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Text Encoder selector stays hidden because the official template owns the clip_l/t5xxl pair.",
             "Krea does not use the Flux.2 Turbo template LoRA.",
         ),
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="flux",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Flux.1 Krea Dev).json",
         diffusion_model_hints=("flux", "krea"),
@@ -683,6 +696,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         official_template_lora_label="Flux_2-Turbo-LoRA_comfyui.safetensors",
         default_template_lora_enabled=False,
         default_template_lora_strength=1.0,
+        scheduler_control_mode="flux2",
+        negative_prompt_mode="unused",
         runtime_adapter_id="flux2_dev",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Flux.2 Dev).json",
         diffusion_model_hints=("flux2", "dev"),
@@ -715,6 +730,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "The required unconditional Ideogram model is a hidden official graph asset, not a separate RookieUI selector.",
             "API-provider Ideogram remains unsupported.",
         ),
+        scheduler_control_mode="ideogram4",
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="ideogram4",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json",
         diffusion_model_hints=("ideogram4", "ideogram"),
@@ -753,6 +770,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         default_template_lora_strength=0.8,
         default_template_lora_trigger_word="muted minimalist sketch style",
         template_lora_trigger_visible=True,
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="krea2_turbo",
         official_template_path="comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
         diffusion_model_hints=("krea2", "krea", "turbo"),
@@ -779,6 +797,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Matches the official Flux.2 4B Distilled Klein template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
         ),
+        scheduler_control_mode="flux2",
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="klein_distilled",
         official_template_path="reference/workflow_templates/Flux.2 4B Distilled Klein.json",
         diffusion_model_hints=("klein", "4b"),
@@ -805,6 +825,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Matches the official Flux.2 4B Klein template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_4b pairing.",
         ),
+        scheduler_control_mode="flux2",
         runtime_adapter_id="klein",
         official_template_path="comfyui-workflow-templates-json==0.1.3:image_flux2_klein_text_to_image.json",
         diffusion_model_hints=("klein", "4b"),
@@ -831,6 +852,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Matches the official Flux.2 9B Distilled Klein template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_8b pairing.",
         ),
+        scheduler_control_mode="flux2",
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="klein_distilled",
         official_template_path="reference/workflow_templates/Flux.2 9B Distilled Klein.json",
         diffusion_model_hints=("klein", "9b"),
@@ -857,6 +880,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
             "Matches the official Flux.2 9B Klein template defaults.",
             "Text Encoder selector stays hidden because the official template owns the fixed qwen_3_8b pairing.",
         ),
+        scheduler_control_mode="flux2",
         runtime_adapter_id="klein",
         official_template_path="comfyui-workflow-templates-json==0.1.3:image_flux2_text_to_image_9b.json",
         diffusion_model_hints=("klein", "9b"),
@@ -1010,6 +1034,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_visible=True,
         template_lora_override_allowed=True,
         official_template_lora_label="Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="qwen_image",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Qwen-Image 2512).json",
         diffusion_model_hints=("qwen", "2512"),
@@ -1327,6 +1352,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_chain_mode="none",
         flux_guidance_visible=True,
         default_flux_guidance=2.5,
+        negative_prompt_mode="zeroed",
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="flux_kontext_dev_edit",
@@ -1375,6 +1401,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         default_flux_guidance=4.0,
         edit_megapixels_visible=True,
         default_edit_megapixels=1.0,
+        scheduler_control_mode="flux2",
+        negative_prompt_mode="unused",
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="flux2_image_edit",
@@ -1413,6 +1441,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         template_lora_chain_mode="none",
         edit_megapixels_visible=True,
         default_edit_megapixels=1.0,
+        scheduler_control_mode="flux2",
+        negative_prompt_mode="zeroed",
         flow_kind="edit",
         available_surface_flows=("img2img",),
         runtime_adapter_id="klein_9b_kv_image_edit",
@@ -1510,6 +1540,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         ),
         shift_visible=True,
         default_shift=3.0,
+        negative_prompt_mode="zeroed",
         runtime_adapter_id="z_image",
         official_template_path="reference/ComfyUI/blueprints/Text to Image (Z-Image-Turbo).json",
         diffusion_model_hints=("z-image", "z_image", "zimage", "turbo"),

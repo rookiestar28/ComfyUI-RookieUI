@@ -19,6 +19,7 @@ import {
   installExplicitFormSubmitShortcuts,
   preventSummaryToggleOnCheckbox,
   syncBoundControls,
+  syncEffectiveControls,
   rookieUIDebugWarn,
   readImg2ImgReferencePayload,
   createTxt2ImgTabDefinition,
@@ -559,6 +560,7 @@ function syncFamilyAwareAdvancedParameterFields(profileLookup, profileId, contro
     controls.editMegapixelsInput,
     Boolean(profile?.edit_megapixels_visible),
   );
+  syncEffectiveControls(profile, controls);
 }
 
 function readOptionalNumericControl(input) {
