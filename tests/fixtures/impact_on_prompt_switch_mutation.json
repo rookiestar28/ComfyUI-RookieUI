@@ -1,0 +1,28 @@
+{
+  "prompt": {
+    "1": {
+      "class_type": "ImpactInt",
+      "inputs": {
+        "value": 2
+      }
+    },
+    "2": {
+      "class_type": "ImpactSwitch",
+      "inputs": {
+        "input1": [
+          "10",
+          0
+        ],
+        "input2": [
+          "11",
+          0
+        ],
+        "sel_mode": true,
+        "select": [
+          "1",
+          0
+        ]
+      }
+    }
+  }
+}
