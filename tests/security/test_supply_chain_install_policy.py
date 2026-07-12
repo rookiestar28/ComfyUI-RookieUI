@@ -24,3 +24,24 @@ class TestSupplyChainInstallPolicy(unittest.TestCase):
                 text = read_repo_file(path)
                 self.assertIn("npm ci", text)
                 self.assertNotIn("npm install", text)
+
+    def test_full_validation_wrappers_verify_dependency_identity_before_tests(self):
+        wrapper_paths = (
+            "scripts/run_full_tests_windows.ps1",
+            "scripts/pre_push_checks.sh",
+        )
+        for path in wrapper_paths:
+            with self.subTest(path=path):
+                text = read_repo_file(path)
+                self.assertIn("verify_node_modules_lock.mjs", text)
+                self.assertNotIn("node_modules\\@playwright\\test\\package.json", text)
+                self.assertNotIn("node_modules/@playwright/test/package.json", text)
+
+        bash_text = read_repo_file("scripts/pre_push_checks.sh")
+        self.assertGreaterEqual(bash_text.count("verify_npm_deps"), 3)
+
+        powershell_text = read_repo_file("scripts/run_full_tests_windows.ps1")
+        self.assertGreaterEqual(
+            powershell_text.count("verify_node_modules_lock.mjs"),
+            2,
+        )

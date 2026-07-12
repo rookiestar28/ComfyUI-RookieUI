@@ -166,6 +166,10 @@ ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_host_embedded_e2
 ## Environment Guardrails
 
 - Keep Python interpreter consistent across all commands.
+- The repository full-test wrappers verify every declared top-level Node dependency
+  against the exact `package-lock.json` version before testing. A missing or stale
+  install is repaired with `npm ci` and verified again; package-marker existence is
+  not sufficient validation.
 - Do not mix global and venv-installed `pre-commit` accidentally.
 - Node must be 18+ before `npm test`.
 - On Windows, prefer repo-local `PRE_COMMIT_HOME` to avoid cache lock issues.

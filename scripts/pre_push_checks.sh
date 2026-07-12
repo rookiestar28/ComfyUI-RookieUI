@@ -195,13 +195,21 @@ report_precommit_repo_drift_and_exit() {
   exit 1
 }
 
+verify_npm_deps() {
+  node "$ROOT_DIR/scripts/verify_node_modules_lock.mjs"
+}
+
 ensure_npm_deps() {
-  if [ -f "$ROOT_DIR/node_modules/@playwright/test/package.json" ]; then
+  if verify_npm_deps; then
     return 0
   fi
-  # SECURITY: use lockfile-frozen installs in validation paths.
-  echo "[pre-push] Installing frontend dependencies via npm ci ..."
+  # SECURITY: verify dependency identity; a package marker does not prove lockfile parity.
+  echo "[pre-push] Frontend dependencies are missing or stale; repairing via npm ci ..."
   npm ci
+  if ! verify_npm_deps; then
+    echo "[pre-push] ERROR: frontend dependencies still differ from package-lock.json after npm ci." >&2
+    exit 1
+  fi
 }
 
 ensure_python_command_for_playwright() {

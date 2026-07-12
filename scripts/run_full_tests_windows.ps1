@@ -142,10 +142,12 @@ if ($nodeMajor -lt 18) {
   throw "[tests] ERROR: Node >=18 required, current=$(node -v)"
 }
 
-if (-not (Test-Path (Join-Path $root "node_modules\@playwright\test\package.json"))) {
-  # SECURITY: use lockfile-frozen installs in validation paths.
-  Write-Host "[tests] Installing frontend dependencies via npm ci ..."
+& node scripts\verify_node_modules_lock.mjs
+if ($LASTEXITCODE -ne 0) {
+  # SECURITY: verify dependency identity; a package marker does not prove lockfile parity.
+  Write-Host "[tests] Frontend dependencies are missing or stale; repairing via npm ci ..."
   Invoke-Checked "npm ci" { npm ci }
+  Invoke-Checked "dependency-state verification" { node scripts\verify_node_modules_lock.mjs }
 }
 
 $env:ROOKIEUI_E2E_PYTHON = $venvPython
