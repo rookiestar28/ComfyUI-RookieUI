@@ -280,6 +280,80 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(sampling_node["inputs"]["model"], [qwen_control_id, 0])
         self.assertEqual(sampler_node["inputs"]["model"], [sampling_node_id, 0])
 
+    def test_translate_z_image_turbo_preserves_explicit_zero_controlnet_strength(self) -> None:
+        with (
+            mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=self._z_image_turbo_inventory()),
+            mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "city skyline",
+                    "profile": "z_image_turbo",
+                    "controlnet_units": [
+                        {
+                            "enabled": True,
+                            "module": "none",
+                            "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                            "image_asset": "source-image",
+                            "weight": 0.0,
+                        }
+                    ],
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        control_node = next(
+            node for node in result["workflow"].values() if node["class_type"] == "QwenImageDiffsynthControlnet"
+        )
+
+        self.assertEqual(normalized.controlnet_units[0].weight, 0.0)
+        self.assertEqual(control_node["inputs"]["strength"], 0.0)
+        self.assertEqual(result["normalized_request"]["controlnet_units"][0]["weight"], 0.0)
+
+    def test_translate_z_image_turbo_preserves_controlnet_strength_boundary_matrix_and_default(self) -> None:
+        scenarios = (
+            ("zero", 0.0, 0.0),
+            ("minimum_positive", 0.001, 0.001),
+            ("missing_default", None, 1.0),
+            ("maximum", 2.0, 2.0),
+        )
+
+        for label, supplied, expected in scenarios:
+            with self.subTest(label=label):
+                control_unit = {
+                    "enabled": True,
+                    "module": "none",
+                    "model": "Z-Image\\Z-Image-Turbo-Fun-Controlnet-Union.safetensors",
+                    "image_asset": "source-image",
+                }
+                if supplied is not None:
+                    control_unit["weight"] = supplied
+                with (
+                    mock.patch(
+                        "rookieui.services.txt2img.discover_model_inventory",
+                        return_value=self._z_image_turbo_inventory(),
+                    ),
+                    mock.patch("rookieui.services.controlnet.resolve_asset_path", return_value=Path(__file__)),
+                ):
+                    normalized = normalize_txt2img_request(
+                        {
+                            "prompt": "city skyline",
+                            "profile": "z_image_turbo",
+                            "controlnet_units": [control_unit],
+                        }
+                    )
+
+                result = translate_txt2img_request(normalized).to_payload()
+                control_node = next(
+                    node
+                    for node in result["workflow"].values()
+                    if node["class_type"] == "QwenImageDiffsynthControlnet"
+                )
+
+                self.assertEqual(normalized.controlnet_units[0].weight, expected)
+                self.assertEqual(control_node["inputs"]["strength"], expected)
+                self.assertEqual(result["normalized_request"]["controlnet_units"][0]["weight"], expected)
+
     def test_translate_txt2img_request_builds_z_image_turbo_canny_adapter_shape(self) -> None:
         with (
             mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=self._z_image_turbo_inventory()),
@@ -1368,6 +1442,63 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(scheduler_node["inputs"]["steps"], 20)
         self.assertEqual(latent_node["inputs"]["width"], 1024)
         self.assertEqual(latent_node["inputs"]["height"], 1024)
+
+    def test_translate_flux2_dev_preserves_explicit_zero_guidance(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._flux2_dev_inventory(),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "fashion editorial",
+                    "profile": "flux2_dev",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                    "flux_guidance": 0.0,
+                }
+            )
+
+        result = translate_txt2img_request(normalized).to_payload()
+        guidance_node = next(node for node in result["workflow"].values() if node["class_type"] == "FluxGuidance")
+
+        self.assertEqual(normalized.flux_guidance, 0.0)
+        self.assertEqual(guidance_node["inputs"]["guidance"], 0.0)
+        self.assertEqual(result["normalized_request"]["flux_guidance"], 0.0)
+
+    def test_translate_flux2_dev_preserves_guidance_boundary_matrix_and_default(self) -> None:
+        scenarios = (
+            ("zero", 0.0, 0.0),
+            ("minimum_positive", 0.001, 0.001),
+            ("missing_default", None, 4.0),
+            ("maximum", 20.0, 20.0),
+        )
+
+        for label, supplied, expected in scenarios:
+            with self.subTest(label=label):
+                request_payload = {
+                    "prompt": "fashion editorial",
+                    "profile": "flux2_dev",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                }
+                if supplied is not None:
+                    request_payload["flux_guidance"] = supplied
+                with mock.patch(
+                    "rookieui.services.txt2img.discover_model_inventory",
+                    return_value=self._flux2_dev_inventory(),
+                ):
+                    normalized = normalize_txt2img_request(request_payload)
+
+                result = translate_txt2img_request(normalized).to_payload()
+                guidance_node = next(
+                    node for node in result["workflow"].values() if node["class_type"] == "FluxGuidance"
+                )
+
+                self.assertEqual(normalized.flux_guidance, expected)
+                self.assertEqual(guidance_node["inputs"]["guidance"], expected)
+                self.assertEqual(result["normalized_request"]["flux_guidance"], expected)
 
     def test_translate_flux2_dev_turbo_couples_lora_and_eight_steps(self) -> None:
         with mock.patch(

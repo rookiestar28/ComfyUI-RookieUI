@@ -402,6 +402,85 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(apply_node["inputs"]["weight_preset"], "balanced")
         self.assertEqual(apply_node["inputs"]["layer_weights_json"], "[]")
 
+    def test_txt2img_translation_preserves_zero_valid_controlnet_numeric_boundaries(self) -> None:
+        scenarios = (
+            (
+                "zero",
+                {
+                    "weight": 0.0,
+                    "guidance_start": 0.0,
+                    "guidance_end": 0.0,
+                    "threshold_a": 0.0,
+                    "threshold_b": 0.0,
+                },
+                (0.0, 0.0, 0.0, 0.0, 0.0),
+            ),
+            (
+                "minimum_positive",
+                {
+                    "weight": 0.001,
+                    "guidance_start": 0.0001,
+                    "guidance_end": 0.0001,
+                    "threshold_a": 0.001,
+                    "threshold_b": 0.001,
+                },
+                (0.001, 0.0001, 0.0001, 0.001, 0.001),
+            ),
+            ("missing_defaults", {}, (1.0, 0.0, 1.0, 64.0, 64.0)),
+            (
+                "maximum",
+                {
+                    "weight": 2.0,
+                    "guidance_start": 1.0,
+                    "guidance_end": 1.0,
+                    "threshold_a": 255.0,
+                    "threshold_b": 255.0,
+                },
+                (2.0, 1.0, 1.0, 255.0, 255.0),
+            ),
+        )
+
+        for label, numeric_inputs, expected in scenarios:
+            with self.subTest(label=label):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": "canny",
+                                "model": "control_v11p_sd15_canny.safetensors",
+                                "image_asset": "source-image",
+                                **numeric_inputs,
+                            }
+                        ],
+                    }
+                )
+                payload = translate_txt2img_request(normalized).to_payload()
+                preprocess_node = next(
+                    node
+                    for node in payload["workflow"].values()
+                    if node["class_type"] == "RookieUIControlNetPreprocess"
+                )
+                apply_node = next(
+                    node
+                    for node in payload["workflow"].values()
+                    if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+                )
+                unit_metadata = payload["normalized_request"]["controlnet_units"][0]
+                expected_weight, expected_start, expected_end, expected_a, expected_b = expected
+
+                self.assertEqual(apply_node["inputs"]["strength"], expected_weight)
+                self.assertEqual(apply_node["inputs"]["start_percent"], expected_start)
+                self.assertEqual(apply_node["inputs"]["end_percent"], expected_end)
+                self.assertEqual(preprocess_node["inputs"]["threshold_a"], expected_a)
+                self.assertEqual(preprocess_node["inputs"]["threshold_b"], expected_b)
+                self.assertEqual(unit_metadata["weight"], expected_weight)
+                self.assertEqual(unit_metadata["guidance_start"], expected_start)
+                self.assertEqual(unit_metadata["guidance_end"], expected_end)
+                self.assertEqual(unit_metadata["threshold_a"], expected_a)
+                self.assertEqual(unit_metadata["threshold_b"], expected_b)
+
     def test_txt2img_translation_passes_controlnet_pixel_perfect_to_preprocess_node(self) -> None:
         normalized = normalize_txt2img_request(
             {

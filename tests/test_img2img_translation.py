@@ -1429,6 +1429,36 @@ class Img2ImgTranslationTests(unittest.TestCase):
         )
         self.assertEqual(len([node for node in workflow.values() if node["class_type"] == "TextEncodeQwenImageEdit"]), 2)
 
+    def test_specialized_image_edit_builders_preserve_explicit_zero_flux_guidance(self) -> None:
+        scenarios = (
+            ("flux_kontext_dev_edit", self._build_flux_kontext_edit_inventory()),
+            ("flux2_image_edit", self._build_flux2_edit_inventory()),
+            ("longcat_image_edit", self._build_longcat_edit_inventory()),
+        )
+
+        for profile, inventory in scenarios:
+            with self.subTest(profile=profile):
+                with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=inventory):
+                    normalized = normalize_img2img_request(
+                        {
+                            "prompt": "refresh the product photo lighting",
+                            "profile": profile,
+                            "mode": "img2img",
+                            "image_asset": "source-image",
+                            "flux_guidance": 0.0,
+                        }
+                    )
+
+                result = translate_img2img_request(normalized).to_payload()
+                guidance_nodes = [
+                    node for node in result["workflow"].values() if node["class_type"] == "FluxGuidance"
+                ]
+
+                self.assertTrue(guidance_nodes)
+                self.assertTrue(all(node["inputs"]["guidance"] == 0.0 for node in guidance_nodes))
+                self.assertEqual(normalized.flux_guidance, 0.0)
+                self.assertEqual(result["normalized_request"]["flux_guidance"], 0.0)
+
     def test_translate_img2img_request_uses_rookieui_a1111_encode_for_sd15_attention_prompt(self) -> None:
         normalized = normalize_img2img_request(
             {

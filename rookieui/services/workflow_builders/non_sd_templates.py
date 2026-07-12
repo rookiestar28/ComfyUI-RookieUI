@@ -100,6 +100,17 @@ def _read_controlnet_unit_value(unit: NormalizedControlNetUnit, key: str) -> obj
     return getattr(unit, key, None)
 
 
+def _float_or_default(
+    value: object,
+    default: float | None = None,
+    *,
+    fallback: float = 0.0,
+) -> float:
+    # CRITICAL: accepted numeric zero is an effective graph value; only None may activate profile defaults.
+    selected = default if value is None else value
+    return float(fallback if selected is None else selected)
+
+
 def _append_model_patch_loader_node(
     workflow: dict[str, object],
     *,
@@ -298,7 +309,7 @@ def _append_z_image_controlnet_model_patch_node(
         "model_patch": [patch_id, 0],
         "vae": vae_source,
         "image": control_image_source,
-        "strength": float(_read_controlnet_unit_value(unit, "weight") or 1.0),
+        "strength": _float_or_default(_read_controlnet_unit_value(unit, "weight"), 1.0),
     }
     if mask_source is not None:
         inputs["mask"] = mask_source
@@ -1113,7 +1124,7 @@ def _build_hidream_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         allocator=allocator,
         class_type="ModelSamplingSD3",
         model_source=base_model_source,
-        shift=float(request.shift or 0.0),
+        shift=_float_or_default(request.shift),
     )
     positive_id, negative_id = _build_basic_positive_negative(
         workflow,
@@ -1179,7 +1190,7 @@ def _build_chroma_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, objec
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
         model_source=base_model_source,
-        shift=float(request.shift or 0.0),
+        shift=_float_or_default(request.shift),
     )
     positive_id, negative_id = _build_basic_positive_negative(
         workflow,
@@ -1349,7 +1360,7 @@ def _build_flux2_dev_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         workflow,
         allocator=allocator,
         conditioning_id=positive_id,
-        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+        guidance=_float_or_default(request.flux_guidance, profile_entry.default_flux_guidance),
     )
     latent_id = _append_empty_latent_node(
         workflow,
@@ -1577,7 +1588,7 @@ def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, o
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
         model_source=model_source,
-        shift=float(request.shift or 0.0),
+        shift=_float_or_default(request.shift),
     )
     positive_id, negative_id = _build_basic_positive_negative(
         workflow,
@@ -1663,7 +1674,7 @@ def _build_z_image_workflow(request: NormalizedTxt2ImgRequest, *, turbo: bool) -
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
         model_source=base_model_source,
-        shift=float(request.shift or 0.0),
+        shift=_float_or_default(request.shift),
     )
     positive_id, negative_id = _build_basic_positive_negative(
         workflow,
@@ -1744,13 +1755,13 @@ def _build_longcat_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, obje
         workflow,
         allocator=allocator,
         conditioning_id=positive_id,
-        guidance=float(request.flux_guidance or 0.0),
+        guidance=_float_or_default(request.flux_guidance),
     )
     guided_negative_id = _append_flux_guidance_node(
         workflow,
         allocator=allocator,
         conditioning_id=negative_id,
-        guidance=float(request.flux_guidance or 0.0),
+        guidance=_float_or_default(request.flux_guidance),
     )
     model_source = _append_cfg_norm_node(
         workflow,
@@ -2011,7 +2022,7 @@ def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) ->
         allocator=allocator,
         class_type="ModelSamplingAuraFlow",
         model_source=model_source,
-        shift=float(request.shift or 0.0),
+        shift=_float_or_default(request.shift),
     )
     model_source = _append_cfg_norm_node(
         workflow,
@@ -2097,7 +2108,7 @@ def _build_flux_kontext_dev_image_edit_workflow(request: NormalizedImg2ImgReques
         workflow,
         allocator=allocator,
         conditioning_id=positive_id,
-        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+        guidance=_float_or_default(request.flux_guidance, profile_entry.default_flux_guidance),
     )
     unet_id = allocator.next()
     workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
@@ -2162,7 +2173,7 @@ def _build_flux2_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[
         workflow,
         allocator=allocator,
         conditioning_id=positive_id,
-        guidance=float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0),
+        guidance=_float_or_default(request.flux_guidance, profile_entry.default_flux_guidance),
     )
     reference_latent_id = _append_vae_encode_node(
         workflow,
@@ -2329,7 +2340,7 @@ def _build_longcat_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dic
         vae_source=[vae_id, 0],
         image_id=references.main_image_node_id,
     )
-    guidance = float(request.flux_guidance or profile_entry.default_flux_guidance or 0.0)
+    guidance = _float_or_default(request.flux_guidance, profile_entry.default_flux_guidance)
     positive_id = _append_flux_reference_method_branch(
         workflow,
         allocator=allocator,

@@ -24,6 +24,15 @@ def _read_controlnet_unit_value(
     return getattr(unit, key, None)
 
 
+def _float_or_default(value: object, default: float) -> float:
+    # CRITICAL: numeric zero is an effective ControlNet value; only absence may select a default.
+    return float(default if value is None else value)
+
+
+def _int_or_default(value: object, default: int) -> int:
+    return int(default if value is None else value)
+
+
 def _read_controlnet_advanced_request(
     unit: NormalizedControlNetUnit | NormalizedADetailerControlNetRequest | dict[str, object],
 ) -> object:
@@ -91,9 +100,9 @@ def _apply_controlnet_unit_entries(
         preprocess_inputs: dict[str, object] = {
             "image": image_ref,
             "module": module_name,
-            "processor_res": int(_read_controlnet_unit_value(unit, "processor_res") or 512),
-            "threshold_a": float(_read_controlnet_unit_value(unit, "threshold_a") or 64.0),
-            "threshold_b": float(_read_controlnet_unit_value(unit, "threshold_b") or 64.0),
+            "processor_res": _int_or_default(_read_controlnet_unit_value(unit, "processor_res"), 512),
+            "threshold_a": _float_or_default(_read_controlnet_unit_value(unit, "threshold_a"), 64.0),
+            "threshold_b": _float_or_default(_read_controlnet_unit_value(unit, "threshold_b"), 64.0),
             "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
             "target_width": int(request.width),
             "target_height": int(request.height),
@@ -126,9 +135,9 @@ def _apply_controlnet_unit_entries(
             }
 
         apply_segments = build_controlnet_apply_segments(
-            weight=float(_read_controlnet_unit_value(unit, "weight") or 1.0),
-            guidance_start=float(_read_controlnet_unit_value(unit, "guidance_start") or 0.0),
-            guidance_end=float(_read_controlnet_unit_value(unit, "guidance_end") or 1.0),
+            weight=_float_or_default(_read_controlnet_unit_value(unit, "weight"), 1.0),
+            guidance_start=_float_or_default(_read_controlnet_unit_value(unit, "guidance_start"), 0.0),
+            guidance_end=_float_or_default(_read_controlnet_unit_value(unit, "guidance_end"), 1.0),
             advanced=advanced,
         )
         for segment in apply_segments:
