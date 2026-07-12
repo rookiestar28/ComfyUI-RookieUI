@@ -41,6 +41,10 @@ jobs:
         # SECURITY: the repository wrapper includes the mandatory complete-graph advisory gate.
         run: bash scripts/run_full_tests_linux.sh
 
+      - name: Run required current-host contract lane
+        # IMPORTANT: report exact source-fixture revisions before this job can authorize publishing.
+        run: .venv/bin/python scripts/run_current_host_contract_lane.py
+
   publish-node:
     name: Publish Custom Node to registry
     # SECURITY: keep publishing in this workflow and gated by successful needs; see https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds

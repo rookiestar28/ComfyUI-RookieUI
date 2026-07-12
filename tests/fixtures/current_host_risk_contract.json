@@ -1,0 +1,50 @@
+{
+  "fixture_version": "current-host-risk-lane-v1",
+  "sources": {
+    "core": "69ea58697bb2f05124f5dc7e00ad111f7cfff645",
+    "frontend": "b40fad0e755ddee5b09db3b93566f7e0a9f6967f",
+    "desktop": "e2d964b7456cea8423c7b9d3371c612313c06baa"
+  },
+  "source_artifacts": [
+    {
+      "source": "core",
+      "path": "server.py",
+      "bytes": 63749,
+      "sha256": "75e49bbd56d704b27a86b9bcd90c4e4a6609d8b37fb2299c037319acdb5c5496"
+    },
+    {
+      "source": "core",
+      "path": "app/user_manager.py",
+      "bytes": 19795,
+      "sha256": "ac0c15bfe1c0d1409b05bb9f4e187da461d37b1f73c8c9279933b5b607e221ea"
+    },
+    {
+      "source": "frontend",
+      "path": "src/types/extensionTypes.ts",
+      "bytes": 3753,
+      "sha256": "bbd1f4b8d05fd3f49f39082b536680ba20e737cef2266220af7adfb23a87f307"
+    },
+    {
+      "source": "frontend",
+      "path": "src/components/common/ExtensionSlot.vue",
+      "bytes": 766,
+      "sha256": "f2f0e957102c8ab56830eb58caa297466f3bf8ad3b8b4096f482c03c1d8b3f3a"
+    },
+    {
+      "source": "frontend",
+      "path": "src/stores/workspace/sidebarTabStore.ts",
+      "bytes": 5474,
+      "sha256": "622c546c307653601b84f7b09ea048a371767ac8417622becbb8d245df1ab9ef"
+    }
+  ],
+  "case_ids": [
+    "source_basis",
+    "prompt_hook_mutation",
+    "prompt_sensitive_queue",
+    "route_alias_collision_retry",
+    "route_multi_user_boundary",
+    "sidebar_resource_cleanup",
+    "sidebar_real_remount_visual"
+  ],
+  "inference_required": false
+}
