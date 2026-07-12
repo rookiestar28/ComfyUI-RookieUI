@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import os
 import tempfile
 import unittest
@@ -289,6 +290,11 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertEqual(provider_config["base_url"], "https://example.test/v1")
         self.assertNotIn("test-openai-key", json.dumps(payload))  # pragma: allowlist secret
 
+    def test_export_api_has_no_raw_secret_bypass_parameter(self) -> None:
+        signature = inspect.signature(prompt_workbench_state.export_prompt_workbench_store)
+
+        self.assertNotIn("include_secrets", signature.parameters)
+
     def test_import_prompt_workbench_store_preserves_existing_secret_from_masked_export(self) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
@@ -321,3 +327,29 @@ class PromptWorkbenchStateTests(unittest.TestCase):
             stored["config"]["translation"]["providers"]["openai"]["api_key"],
             "test-openai-key",  # pragma: allowlist secret
         )
+
+    def test_explicit_secret_replacement_is_persisted_but_never_echoed(self) -> None:
+        sentinel = "f284-secret-replacement-sentinel"  # pragma: allowlist secret
+        prompt_workbench_state.update_prompt_workbench_config(
+            {
+                "translation": {
+                    "default_provider": "openai",
+                    "providers": {
+                        "openai": {
+                            "api_key": "existing-secret",  # pragma: allowlist secret
+                            "base_url": "https://example.test/v1",
+                            "model": "gpt-4.1-mini",
+                        }
+                    },
+                }
+            }
+        )
+        exported = prompt_workbench_state.export_prompt_workbench_store()
+        exported["data"]["config"]["translation"]["providers"]["openai"]["api_key"] = sentinel
+
+        result = prompt_workbench_state.import_prompt_workbench_store(exported)
+        stored = prompt_workbench_state.load_prompt_workbench_store()
+
+        self.assertEqual(stored["config"]["translation"]["providers"]["openai"]["api_key"], sentinel)
+        self.assertEqual(result["config"]["translation"]["providers"]["openai"]["api_key"], "********")
+        self.assertNotIn(sentinel, json.dumps(result))

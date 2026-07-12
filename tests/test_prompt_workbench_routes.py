@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import tempfile
 import unittest
@@ -69,6 +70,60 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
         self.assertEqual(response["payload"]["config"]["translation"]["providers"]["openai"]["api_key"], "********")
         self.assertEqual(response["payload"]["persistence"]["schema_version"], 1)
         self.assertNotIn("/", response["payload"]["persistence"]["storage"])
+
+    def test_prompt_tools_export_query_cannot_enable_raw_secret_readback(self) -> None:
+        sentinel = "f284-route-secret-sentinel"  # pragma: allowlist secret
+        asyncio.run(
+            routes.prompt_tools_config_update(
+                _FakeJsonRequest(
+                    {
+                        "config": {
+                            "translation": {
+                                "default_provider": "openai",
+                                "providers": {
+                                    "openai": {
+                                        "api_key": sentinel,
+                                        "base_url": "https://example.test/v1",
+                                        "model": "gpt-4.1-mini",
+                                    }
+                                },
+                            }
+                        }
+                    }
+                )
+            )
+        )
+
+        with mock.patch.object(routes, "_LOGGER") as mocked_logger:
+            response = asyncio.run(
+                routes.prompt_tools_export(
+                    _FakeJsonRequest(query={"include_secrets": "true"})  # pragma: allowlist secret
+                )
+            )
+
+        serialized = json.dumps(response)
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(response["payload"]["export"]["secret_policy"], "masked_provider_fields")
+        self.assertEqual(
+            response["payload"]["export"]["data"]["config"]["translation"]["providers"]["openai"]["api_key"],
+            "********",
+        )
+        self.assertNotIn(sentinel, serialized)
+        self.assertNotIn(sentinel, repr(mocked_logger.mock_calls))
+
+    def test_prompt_tools_import_error_does_not_echo_request_secret(self) -> None:
+        sentinel = "f284-invalid-import-sentinel"  # pragma: allowlist secret
+
+        with mock.patch.object(routes, "_LOGGER") as mocked_logger:
+            response = asyncio.run(
+                routes.prompt_tools_import(
+                    _FakeJsonRequest({"export": {"data": sentinel}})
+                )
+            )
+
+        self.assertEqual(response["status"], 400)
+        self.assertNotIn(sentinel, json.dumps(response))
+        self.assertNotIn(sentinel, repr(mocked_logger.mock_calls))
 
     def test_prompt_tools_state_route_rejects_invalid_namespace(self) -> None:
         response = asyncio.run(routes.prompt_tools_state(_FakeJsonRequest(query={"namespace": "invalid"})))

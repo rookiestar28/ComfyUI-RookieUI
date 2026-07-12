@@ -98,10 +98,10 @@ def build_prompt_workbench_provider_catalog_payload() -> dict[str, Any]:
     return build_prompt_workbench_provider_payload()
 
 
-def build_prompt_workbench_export_payload(*, include_secrets: bool = False) -> dict[str, Any]:
+def build_prompt_workbench_export_payload() -> dict[str, Any]:
     return {
         "contract": build_prompt_workbench_contract_meta(surface="prompt_tools_export"),
-        "export": export_prompt_workbench_store(include_secrets=include_secrets),
+        "export": export_prompt_workbench_store(),
     }
 
 

@@ -597,12 +597,12 @@ async def prompt_tools_providers(request: Any) -> Any:
 
 
 async def prompt_tools_export(request: Any) -> Any:
-    include_secrets = coerce_bool(_read_request_query_value(request, "include_secrets"), "include_secrets", strict=False)
+    # SECURITY: this browser-readable route must never accept a raw-secret export option.
     return _json_response(
         {
             "service": normalize_metadata_text("rookieui"),
             "status": normalize_metadata_text("ok"),
-            **build_prompt_workbench_export_payload(include_secrets=include_secrets),
+            **build_prompt_workbench_export_payload(),
         },
         request=request,
     )

@@ -455,14 +455,15 @@ def get_prompt_workbench_bootstrap_payload() -> dict[str, Any]:
     return snapshot.to_payload()
 
 
-def export_prompt_workbench_store(*, include_secrets: bool = False) -> dict[str, Any]:
+def export_prompt_workbench_store() -> dict[str, Any]:
     store = load_prompt_workbench_store()
-    exported_store = deepcopy(store) if include_secrets else _mask_sensitive_fields(store)
+    # SECURITY: exports are browser-readable; keep provider credentials masked unconditionally.
+    exported_store = _mask_sensitive_fields(store)
     return {
         "schema_version": PROMPT_WORKBENCH_STATE_SCHEMA_VERSION,
         "exported_at": int(time.time()),
         "includes": ["config", "blacklist", "surfaces"],
-        "secret_policy": "include_secrets" if include_secrets else "masked_provider_fields",  # pragma: allowlist secret
+        "secret_policy": "masked_provider_fields",  # pragma: allowlist secret
         "data": exported_store,
     }
 
