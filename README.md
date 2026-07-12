@@ -25,6 +25,19 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Current host runtime and release hardening (stability/security)</strong></summary>
+
+- Refreshed the current ComfyUI host source basis and revalidated shipped workflow graphs, node signatures, prompt submission behavior, and compatibility boundaries against it.
+- Direct prompt submission now follows current host hook, validation, metadata, queue, and sensitive-data handling semantics more closely, including third-party prompt-hook compatibility coverage.
+- Route registration is now retry-safe and tolerant of optional compatibility-route collisions; stateful or sensitive RookieUI routes fail closed when ComfyUI multi-user mode is enabled.
+- Prompt Workbench provider secrets remain write-only, while custom provider endpoints require explicit opt-in and use bounded schemes, credentials, timeouts, payload sizes, and concurrency.
+- Provider, Extras, and ControlNet work is moved off the main event loop where needed, and sidebar teardown now releases listeners, observers, timers, object URLs, and shared layout changes across repeated remounts.
+- CI now gates registry publication on the complete test job, verifies installed dependencies against the lockfile, blocks high-severity dependency advisories, runs a required current-host contract lane, and rejects internal-only paths or symlinks from public release artifacts.
+
+</details>
+
+<details>
+
 <summary><strong>ComfyUI host refresh alignment (stability/compatibility)</strong></summary>
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
