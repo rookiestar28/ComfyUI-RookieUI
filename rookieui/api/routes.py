@@ -62,6 +62,7 @@ from rookieui.services.controlnet import (
     build_controlnet_module_list_payload,
 )
 from rookieui.services.adetailer import build_adetailer_catalog_payload
+from rookieui.services.async_runtime import run_bounded_blocking
 from rookieui.security.asset_guard import normalize_metadata_text
 from rookieui.security.request_guard import normalize_client_id, normalize_option_label
 from rookieui.security.route_guard import API_INTERNAL_ROUTE_PREFIX, INTERNAL_ROUTE_PREFIX, SafeRouteRegistrar
@@ -259,7 +260,7 @@ async def controlnet_detect(request: Any) -> Any:
             requested_module,
             requested_image_count,
         )
-        result = build_controlnet_detect_payload(payload)
+        result = await run_bounded_blocking("controlnet", build_controlnet_detect_payload, payload)
     except ValueError as exc:
         _LOGGER.warning("RookieUI ControlNet detect rejected invalid request: %s", str(exc))
         return _json_response(
@@ -635,7 +636,7 @@ async def prompt_tools_import(request: Any) -> Any:
 async def prompt_tools_translate(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
-        result = execute_prompt_workbench_translate(payload)
+        result = await run_bounded_blocking("provider", execute_prompt_workbench_translate, payload)
     except ValueError as exc:
         return _json_response(
             {
@@ -669,7 +670,7 @@ async def prompt_tools_translate(request: Any) -> Any:
 async def prompt_tools_assist(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
-        result = execute_prompt_workbench_ai_assist(payload)
+        result = await run_bounded_blocking("provider", execute_prompt_workbench_ai_assist, payload)
     except ValueError as exc:
         return _json_response(
             {
@@ -1129,8 +1130,11 @@ async def img2img(request: Any) -> Any:
 async def extras_run(request: Any) -> Any:
     try:
         payload = await _read_request_payload(request)
-        normalized = normalize_extras_request(payload)
-        result = execute_extras_request(normalized)
+        def execute() -> Any:
+            normalized = normalize_extras_request(payload)
+            return execute_extras_request(normalized)
+
+        result = await run_bounded_blocking("extras", execute)
     except ValueError as exc:
         return _json_response(
             {

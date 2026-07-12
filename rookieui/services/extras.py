@@ -30,6 +30,7 @@ _MAX_SCALE_BY = 8.0
 _MIN_TARGET_DIMENSION = 64
 _MAX_TARGET_DIMENSION = 4096
 _UPSCALE_NONE = "None"
+_MAX_SOURCE_IMAGES = 8
 
 
 def _is_selected_upscaler(value: str) -> bool:
@@ -141,6 +142,12 @@ def normalize_extras_request(payload: dict[str, object]) -> NormalizedExtrasRequ
     mode = normalize_option_label(request.mode, "mode", max_length=32).lower() or "single_image"
     if mode not in {"single_image", "batch_process"}:
         raise ValueError("mode must be single_image or batch_process.")
+
+    if not isinstance(request.batch_images, list) or not isinstance(request.batch_assets, list):
+        raise ValueError("batch_images and batch_assets must be arrays.")
+    requested_source_count = int(bool(request.image_data or request.image_asset)) + len(request.batch_images) + len(request.batch_assets)
+    if requested_source_count > _MAX_SOURCE_IMAGES:
+        raise ValueError(f"Extras requests may contain at most {_MAX_SOURCE_IMAGES} images.")
 
     source_assets = _collect_source_assets(request)
     if mode == "single_image" and not source_assets:

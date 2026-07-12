@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
+import io
 import os
 import tempfile
 import time
 import unittest
 from pathlib import Path
 from unittest import mock
+
+from PIL import Image
 
 from rookieui.services import asset_store
 
@@ -103,3 +107,25 @@ class AssetStoreCleanupTests(unittest.TestCase):
             resolved = asset_store.resolve_generated_output_path("xyz/RookieUI_00090_.png")
 
         self.assertEqual(resolved, nested_file.resolve())
+
+    def test_decode_image_data_rejects_oversized_content_before_storage(self) -> None:
+        self.assertTrue(hasattr(asset_store, "MAX_IMAGE_UPLOAD_BYTES"))
+        if not hasattr(asset_store, "MAX_IMAGE_UPLOAD_BYTES"):
+            return
+
+        encoded = base64.b64encode(b"12345").decode("ascii")
+        with mock.patch.object(asset_store, "MAX_IMAGE_UPLOAD_BYTES", 4):
+            with self.assertRaisesRegex(ValueError, "at most 4 bytes"):
+                asset_store.decode_image_data(f"data:image/png;base64,{encoded}")
+
+    def test_decode_image_data_rejects_oversized_dimensions(self) -> None:
+        self.assertTrue(hasattr(asset_store, "MAX_IMAGE_DIMENSION"))
+        if not hasattr(asset_store, "MAX_IMAGE_DIMENSION"):
+            return
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (5, 1), color="white").save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        with mock.patch.object(asset_store, "MAX_IMAGE_DIMENSION", 4):
+            with self.assertRaisesRegex(ValueError, "dimensions"):
+                asset_store.decode_image_data(f"data:image/png;base64,{encoded}")

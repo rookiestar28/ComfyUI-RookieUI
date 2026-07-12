@@ -173,6 +173,12 @@ def _openai_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
             placeholder="https://api.openai.com/v1",
         ),
         PromptWorkbenchProviderField(
+            key="allow_custom_endpoint",
+            title="Allow Custom Endpoint",
+            value_type="boolean",
+            default=False,
+        ),
+        PromptWorkbenchProviderField(
             key="model",
             title="Model",
             required=True,
@@ -184,7 +190,7 @@ def _openai_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
             value_type="integer",
             default=20,
             min_value=5,
-            max_value=120,
+            max_value=60,
         ),
     )
 
@@ -201,6 +207,12 @@ def _mymemory_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
             title="Base URL",
             default="https://api.mymemory.translated.net/get",
             placeholder="https://api.mymemory.translated.net/get",
+        ),
+        PromptWorkbenchProviderField(
+            key="allow_custom_endpoint",
+            title="Allow Custom Endpoint",
+            value_type="boolean",
+            default=False,
         ),
         PromptWorkbenchProviderField(
             key="timeout_seconds",

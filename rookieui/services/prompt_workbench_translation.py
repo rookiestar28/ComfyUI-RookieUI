@@ -15,8 +15,10 @@ from rookieui.contracts.prompt_workbench import (
 )
 from rookieui.services.prompt_workbench_openai import (
     PromptWorkbenchOpenAIProviderError,
+    bounded_provider_timeout,
     openai_chat_completion,
     urlopen_json,
+    validate_provider_endpoint,
 )
 from rookieui.services.prompt_workbench_state import _prompt_workbench_root, load_prompt_workbench_store
 from rookieui.services.prompt_workbench_tokens import parse_prompt_workbench_tokens
@@ -208,8 +210,12 @@ def _translate_via_openai(text: str, *, from_lang: str, to_lang: str, provider_c
 
 
 def _translate_via_mymemory(text: str, *, from_lang: str, to_lang: str, provider_config: dict[str, Any]) -> str:
-    base_url = str(provider_config.get("base_url", "")).strip() or "https://api.mymemory.translated.net/get"
-    timeout_seconds = int(provider_config.get("timeout_seconds", 15) or 15)
+    base_url = validate_provider_endpoint(
+        provider_config.get("base_url"),
+        default_url="https://api.mymemory.translated.net/get",
+        allow_custom_endpoint=provider_config.get("allow_custom_endpoint") is True,
+    )
+    timeout_seconds = bounded_provider_timeout(provider_config.get("timeout_seconds", 15), default=15)
     query = {
         "q": text,
         "langpair": f"{from_lang}|{to_lang}",

@@ -29,6 +29,7 @@ import {
   normalizeGroupTagGroups,
   renderPromptWorkbenchCatalogPane,
 } from "./prompt_workbench/rookieui_prompt_workbench_catalog.js";
+import { createProviderConfigInput } from "./prompt_workbench/rookieui_prompt_workbench_provider_fields.js";
 let promptWorkbenchInstanceSequence = 0;
 
 
@@ -2279,13 +2280,7 @@ export function createPromptWorkbenchShell({
       const providerConfig = {
         ...(providerStore[providerSelect.value] ?? {}),
       };
-      const input = document.createElement("input");
-      input.type = fieldSpec?.secret ? "password" : "text";
-      input.id = `${idPrefix}-assist-config-${fieldKey}`;
-      input.className = "rookieui-shell__input";
-      input.placeholder = String(fieldSpec?.placeholder ?? "");
-      input.value = String(providerConfig[fieldKey] ?? fieldSpec?.default ?? "");
-      input.addEventListener("change", () => {
+      const input = createProviderConfigInput({ fieldSpec, fieldKey, providerConfig, idPrefix, onChange: (value) => {
         const selectedProviderId = String(configState?.ai_assist?.default_provider ?? "").trim();
         if (!selectedProviderId) {
           return;
@@ -2294,7 +2289,7 @@ export function createPromptWorkbenchShell({
           ...(configState.ai_assist?.providers ?? {}),
           [selectedProviderId]: {
             ...(configState.ai_assist?.providers?.[selectedProviderId] ?? {}),
-            [fieldKey]: input.value,
+            [fieldKey]: value,
           },
         };
         configState.ai_assist = {
@@ -2303,7 +2298,7 @@ export function createPromptWorkbenchShell({
           instruction_preset: String(configState.ai_assist?.instruction_preset ?? ""),
         };
         queueConfigPersist();
-      });
+      } });
       renderField(String(fieldSpec?.title ?? fieldKey), input);
     });
 

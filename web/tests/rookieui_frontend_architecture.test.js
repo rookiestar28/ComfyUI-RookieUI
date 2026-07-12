@@ -133,6 +133,7 @@ describe("frontend architecture guardrails", () => {
       "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_i18n.js",
       "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_tokens.js",
       "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_catalog.js",
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_provider_fields.js",
     ];
 
     expect(countLines(shellPath)).toBeLessThanOrEqual(3100);
@@ -142,6 +143,7 @@ describe("frontend architecture guardrails", () => {
     expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_i18n.js");
     expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_tokens.js");
     expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_catalog.js");
+    expect(shellSource).toContain("./prompt_workbench/rookieui_prompt_workbench_provider_fields.js");
     expect(shellSource).not.toMatch(/const\s+WORKBENCH_I18N\s*=/);
     expect(shellSource).not.toMatch(/function\s+splitPromptTokenText\s*\(/);
     expect(shellSource).not.toMatch(/function\s+normalizeGroupTagEntry\s*\(/);

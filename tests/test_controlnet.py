@@ -29,6 +29,11 @@ from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_img2img_request, translate_txt2img_request
 
 
+VALID_PNG_DATA_URL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
+
 class _FakeJsonRequest:
     def __init__(self, payload: dict[str, object]) -> None:
         self._payload = payload
@@ -733,7 +738,7 @@ class ControlNetRouteTests(unittest.TestCase):
         module_list = asyncio.run(routes.controlnet_module_list(None))
         control_types = asyncio.run(routes.controlnet_control_types(None))
         detect = asyncio.run(
-            routes.controlnet_detect(_FakeJsonRequest({"controlnet_module": "none", "image": "data:image/png;base64,ZmFrZQ=="}))
+            routes.controlnet_detect(_FakeJsonRequest({"controlnet_module": "none", "image": VALID_PNG_DATA_URL}))
         )
 
         self.assertEqual(model_list["status"], 200)
@@ -762,7 +767,7 @@ class ControlNetRouteTests(unittest.TestCase):
         payload = build_controlnet_detect_payload(
             {
                 "controlnet_module": "none",
-                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                "controlnet_input_images": [VALID_PNG_DATA_URL],
             }
         )
         self.assertEqual(payload["module"], "none")
@@ -774,7 +779,7 @@ class ControlNetRouteTests(unittest.TestCase):
             {
                 "controlnet_module": "none",
                 "controlnet_model": "xinsir-controlnet-depth-sdxl.safetensors",
-                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                "controlnet_input_images": [VALID_PNG_DATA_URL],
             }
         )
         self.assertEqual(payload["requested_controlnet_model"], "xinsir-controlnet-depth-sdxl.safetensors")
@@ -880,7 +885,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "lineart_anime",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                             }
                         )
 
@@ -912,7 +917,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "canny",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                                 "controlnet_pixel_perfect": True,
                                 "controlnet_resize_mode": "resize_and_fill",
                                 "target_width": 512,
@@ -947,7 +952,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "openpose_dw",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                             }
                         )
 
@@ -989,7 +994,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "depth",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                             }
                         )
 
@@ -1021,8 +1026,8 @@ class ControlNetRouteTests(unittest.TestCase):
                             payload = build_controlnet_detect_payload(
                                 {
                                     "controlnet_module": "inpaint",
-                                    "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
-                                    "controlnet_masks": ["data:image/png;base64,bWFzaw=="],
+                                    "controlnet_input_images": [VALID_PNG_DATA_URL],
+                                    "controlnet_masks": [VALID_PNG_DATA_URL],
                                 }
                             )
 
@@ -1047,7 +1052,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "depth",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                             }
                         )
 
@@ -1072,7 +1077,7 @@ class ControlNetRouteTests(unittest.TestCase):
                         payload = build_controlnet_detect_payload(
                             {
                                 "controlnet_module": "openpose",
-                                "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                "controlnet_input_images": [VALID_PNG_DATA_URL],
                             }
                         )
 
@@ -1103,7 +1108,7 @@ class ControlNetRouteTests(unittest.TestCase):
                                     {
                                         "controlnet_module": module_name,
                                         "controlnet_model": "unit-selected-model.safetensors",
-                                        "controlnet_input_images": ["data:image/png;base64,ZmFrZQ=="],
+                                        "controlnet_input_images": [VALID_PNG_DATA_URL],
                                     }
                                 )
 

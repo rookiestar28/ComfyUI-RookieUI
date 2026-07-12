@@ -21,8 +21,8 @@ class _FakeHttpResponse:
         self.headers = mock.Mock()
         self.headers.get_content_charset.return_value = "utf-8"
 
-    def read(self) -> bytes:
-        return self._payload
+    def read(self, amount: int = -1) -> bytes:
+        return self._payload if amount < 0 else self._payload[:amount]
 
     def __enter__(self) -> "_FakeHttpResponse":
         return self
@@ -52,6 +52,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
                             "base_url": "https://example.test/v1",
+                            "allow_custom_endpoint": True,
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -139,6 +140,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
                             "base_url": "https://example.test/v1",
+                            "allow_custom_endpoint": True,
                             "model": "gpt-4.1-mini",
                         }
                     },

@@ -264,3 +264,18 @@ class ExtrasTests(unittest.TestCase):
 
         self.assertEqual(response["status"], 400)
         self.assertEqual(response["payload"]["status"], "invalid-request")
+
+    def test_extras_rejects_more_than_eight_images_before_storage(self) -> None:
+        with (
+            mock.patch("rookieui.services.extras.store_uploaded_image") as mocked_store,
+            mock.patch("rookieui.services.extras.resolve_asset_path"),
+        ):
+            mocked_store.return_value = mock.Mock(handle="fixture.png")
+            with self.assertRaisesRegex(ValueError, "at most 8"):
+                normalize_extras_request(
+                    {
+                        "mode": "batch_process",
+                        "batch_images": ["fixture"] * 9,
+                    }
+                )
+        mocked_store.assert_not_called()

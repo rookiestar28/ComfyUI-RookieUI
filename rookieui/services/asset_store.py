@@ -32,6 +32,9 @@ _SUPPORTED_EXTENSIONS = {
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
 _RUNTIME_RETENTION_HOURS = 24
 _RUNTIME_MAX_FILES_PER_DIR = 500
+MAX_IMAGE_UPLOAD_BYTES = 16 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 8192
+MAX_IMAGE_PIXELS = 64 * 1024 * 1024
 _RUNTIME_CLEANUP_INTERVAL_SECONDS = 60
 _cleanup_lock = threading.Lock()
 # IMPORTANT: throttle runtime cleanup scans; running on every asset operation causes avoidable I/O spikes.
@@ -189,6 +192,10 @@ def decode_image_data(raw_value: object) -> tuple[bytes, str]:
     if extension is None:
         raise ValueError("image_data must be a supported PNG, JPEG, or WEBP data URL.")
 
+    max_encoded_length = 4 * ((MAX_IMAGE_UPLOAD_BYTES + 2) // 3)
+    if len(encoded) > max_encoded_length:
+        raise ValueError(f"image_data must be at most {MAX_IMAGE_UPLOAD_BYTES} bytes.")
+
     try:
         decoded = base64.b64decode(encoded, validate=True)
     except (ValueError, binascii.Error) as exc:
@@ -196,6 +203,18 @@ def decode_image_data(raw_value: object) -> tuple[bytes, str]:
 
     if not decoded:
         raise ValueError("image_data must not be empty.")
+    if len(decoded) > MAX_IMAGE_UPLOAD_BYTES:
+        raise ValueError(f"image_data must be at most {MAX_IMAGE_UPLOAD_BYTES} bytes.")
+
+    try:
+        with Image.open(io.BytesIO(decoded)) as image:
+            width, height = image.size
+    except (OSError, ValueError) as exc:
+        raise ValueError("image_data must contain a valid PNG, JPEG, or WEBP image.") from exc
+    if width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION or width * height > MAX_IMAGE_PIXELS:
+        raise ValueError(
+            f"image_data dimensions must not exceed {MAX_IMAGE_DIMENSION}px per side or {MAX_IMAGE_PIXELS} pixels."
+        )
 
     return decoded, extension
 
