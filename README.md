@@ -69,6 +69,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Added Qwen-Image Edit 2511 as an official `img2img` image-edit profile, including the plus edit encoder path, multi-reference request handling, Flux reference-method latent setup, and official default model-hint behavior.
 - Added official txt2img profile coverage for `Flux.1 Krea Dev` and `Flux.2 Dev`, including family-specific defaults, hidden official encoder bundles, Flux guidance where applicable, and source-backed model/text-encoder/VAE/LoRA selector hints.
 - Rechecked existing Qwen, Z-Image, ERNIE, FireRed, Flux.2 edit/Klein, and Longcat official profile hints so visible selectors describe real host prerequisites instead of accepting broad fallback matches.
+- Ideogram v4 now exposes the official Quality, Default, and Turbo modes, preserves the host inventory path for its hidden unconditional model, and reports a missing required model before workflow submission.
 - Template-owned LoRAs that are optional now require explicit activation, and explicit numeric zero values remain zero through request normalization, workflow inputs, and generation metadata instead of falling back to defaults.
 - Qwen-Image Edit 2511 keeps the selected main reference as the primary encoder and VAE source, while specialized scheduler and negative-prompt controls now expose and record only parameters the emitted graph actually consumes.
 
@@ -609,7 +610,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 - RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
 - Current official-template alignment uses `comfyui-workflow-templates` 0.11.6 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
-- These presets follow official template defaults for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
+- These presets follow official template defaults or source-backed mode values for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
@@ -623,8 +624,9 @@ If your host or Manager install path does not automatically install custom-node 
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
 - Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `Qwen-Image Edit 2511`, `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` hides official non-SD presets that are not aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
-- Official templates that preload a fixed LoRA are treated as template-owned dependencies rather than silent hidden assets:
-  - RookieUI shows the official default explicitly
+- Official templates that expose or preload a template-owned LoRA treat it as an explicit dependency rather than a silent hidden asset:
+  - RookieUI shows the official name and source-backed default configuration
+  - optional template LoRAs remain disabled until explicitly enabled
   - allows manual override
   - and warns when a custom override no longer matches the official ComfyUI template exactly
 - Template-owned LoRA controls are exposed for visible profiles:
@@ -648,7 +650,7 @@ If your host or Manager install path does not automatically install custom-node 
 
 - Shipped official non-SD template workflows now accept prompt-inline LoRA syntax such as `<lora:model_name:1>` on their native template runtime path instead of treating inline LoRAs as Stable Diffusion-only behavior.
 - RookieUI extracts inline LoRA activations from the prompt, creates model-only `Load LoRA` nodes, and chains them immediately after the official `Load Diffusion Model` path before submitting the final ComfyUI workflow JSON to the host.
-- When a preset already owns an official template LoRA, RookieUI preserves the official default first and appends prompt-inline LoRAs after it. This means the effective order is:
+- When a preset has an enabled official template LoRA, RookieUI preserves it first and appends prompt-inline LoRAs after it. This means the effective order is:
   - `Load Diffusion Model`
   - template-owned `Load LoRA` nodes
   - prompt-inline `Load LoRA` nodes
@@ -786,7 +788,7 @@ Behavior and compatibility:
 - Pose-capable preprocessors can return bounded OpenPose-format JSON metadata through the detect payload when the active host annotator exposes it; non-pose preprocessors do not claim this output.
 - Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
 - Z-Image Turbo ControlNet is a family-specific workflow path: matching Z-Image ControlNet files are read from host `model_patches`, loaded through `ModelPatchLoader`, and applied with `QwenImageDiffsynthControlnet` rather than the generic `ControlNetLoader` / `DiffControlNetLoader` path.
-- The Z-Image Turbo path currently supports one enabled unit at a time, with Canny, Depth, and Pose/control-image adapter behavior. Unsupported modules fail explicitly instead of silently falling back to the SD ControlNet graph.
+- The Z-Image Turbo path currently supports one enabled unit at a time. Canny preprocessing is built in; Depth and Pose require an explicitly acknowledged, already-preprocessed control-map upload and otherwise fail before submission. Unsupported modules fail explicitly instead of silently falling back to the SD ControlNet graph.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
 - API surface provides both canonical RookieUI routes and A1111-compatible aliases:
   - `/rookieui/controlnet/*`
