@@ -776,6 +776,7 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         default_template_lora_strength=0.8,
         default_template_lora_trigger_word="muted minimalist sketch style",
         template_lora_trigger_visible=True,
+        default_prompt_enhancement_enabled=True,
         negative_prompt_mode="zeroed",
         runtime_adapter_id="krea2_turbo",
         official_template_path="comfyui-workflow-templates-json==0.1.19:image_krea2_turbo_t2i.json",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import sys
+from collections.abc import Callable, Mapping
 
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.family_template_manifest import (
@@ -43,6 +44,38 @@ _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     "请据此扩写为一段内容丰富、细节充分的视觉描述，以帮助文生图模型生成高质量的图片。仅输出增强后的描述，"
     '不要包含任何解释或前缀。[/SYSTEM_PROMPT][INST]{"prompt": "{prompt}", "width": {width}, "height": {height}}[/INST]'
 )
+_KREA2_PROMPT_ENHANCER_TEMPLATE = """You are an expert prompt engineer for text-to-image models. Your task is to expand the user's prompt into a highly effective image-generation prompt.
+
+Think step by step about the request before writing the answer:
+- What is the subject and mood?
+- What visual styles, mediums, and lighting options would fit? Consider two or three alternatives and pick the one that best serves the caption.
+- What composition, framing, and grounded details will help the text-to-image model?
+
+Then output a single expanded prompt paragraph.
+
+Follow these rules strictly:
+1. **Faithfulness First:** Preserve all original subjects, actions, colors, and spatial relationships. Do not add new objects, props, characters, or animals unless the user clearly implies them.
+2. **Practical T2I Structure:** Write a prompt that a text-to-image model can parse cleanly. Group subjects with their own attributes and actions. Use grounded phrasing for poses, interactions, and spatial layout.
+3. **Style Planning Stays Internal:** Use your internal reasoning to choose style, medium, framing, and lighting. Do not emit planning tags or wrappers in the visible answer body.
+4. **Text Rendering:** If the user requests visible text, quotes, labels, or typography, specify the exact text clearly and wrap requested words in quotes.
+5. **Avoid Over-Specification:** Do not invent highly specific clothing, colors, materials, or scene details unless the input supports them.
+6. **Structure:** Write one cohesive paragraph after the thinking block. No bullets, JSON, or markdown.
+7. **Respect Existing Detail:** If the user's prompt is already detailed, lightly polish and finalize rather than heavily expanding — preserve their phrasing and direction.
+8. **Respect the Human Form:** Treat depictions of people with dignity. Assume clothing covers genitals and intimate anatomy.
+9. **Preserve User Medium:** When the user explicitly requests a medium (e.g. "photo of", "photograph of", "illustration of", "painting of", "sketch of", "3D render of"), honor it. Do not pivot to a different medium to avoid difficulty — match the user's stated intent.
+
+User's Input:
+
+{prompt}"""
+_KREA2_TEXT_GENERATE_INPUT_TYPES = {
+    "clip": frozenset({"CLIP"}),
+    "prompt": frozenset({"STRING"}),
+    "max_length": frozenset({"INT"}),
+    # Core V3 exposes COMFY_DYNAMICCOMBO_V3 at runtime; F304's static fixture uses DYNAMICCOMBO.
+    "sampling_mode": frozenset({"COMFY_DYNAMICCOMBO_V3", "DYNAMICCOMBO"}),
+    "thinking": frozenset({"BOOLEAN"}),
+    "use_default_template": frozenset({"BOOLEAN"}),
+}
 _IDEOGRAM4_CFG_OVERRIDE = 3.0
 _IDEOGRAM4_CFG_OVERRIDE_START_PERCENT = 0.7
 _IDEOGRAM4_CFG_OVERRIDE_END_PERCENT = 1.0
@@ -812,27 +845,78 @@ def _append_text_generate_node(
     allocator: NodeIdAllocator,
     prompt_id: str | list[object],
     clip_source: list[object],
+    max_length: int = 2048,
+    temperature: float = 0.6,
+    top_p: float = 0.8,
+    thinking: bool = False,
 ) -> str:
     node_id = allocator.next()
     workflow[node_id] = {
         "class_type": "TextGenerate",
         "inputs": {
             "prompt": _to_node_ref(prompt_id),
-            "max_length": 2048,
+            "max_length": max_length,
             "sampling_mode": "on",
-            "sampling_mode.temperature": 0.6,
+            "sampling_mode.temperature": temperature,
             "sampling_mode.top_k": 64,
-            "sampling_mode.top_p": 0.8,
+            "sampling_mode.top_p": top_p,
             "sampling_mode.min_p": 0.05,
             "sampling_mode.repetition_penalty": 1.05,
             "sampling_mode.seed": 0,
             "sampling_mode.presence_penalty": 0,
-            "thinking": False,
+            "thinking": thinking,
             "use_default_template": True,
             "clip": clip_source,
         },
     }
     return node_id
+
+
+def _normalize_host_input_type(raw_type: object) -> str:
+    value = getattr(raw_type, "value", raw_type)
+    return str(value).strip().upper()
+
+
+def _validate_krea2_text_generate_contract() -> None:
+    # CRITICAL: inspect an already-loaded host module only; importing nodes here breaks standalone/CI translation.
+    host_nodes = sys.modules.get("nodes")
+    if host_nodes is None:
+        return
+    mappings = getattr(host_nodes, "NODE_CLASS_MAPPINGS", None)
+    node_class = mappings.get("TextGenerate") if isinstance(mappings, Mapping) else None
+    input_types = getattr(node_class, "INPUT_TYPES", None)
+    if not callable(input_types):
+        raise ValueError(
+            "Krea-2 prompt enhancement requires compatible host TextGenerate inputs: "
+            "clip, prompt, max_length, sampling_mode, thinking, use_default_template."
+        )
+    try:
+        schema = input_types()
+    except Exception:
+        # IMPORTANT: do not expose host implementation details or local paths through generation errors.
+        raise ValueError(
+            "Krea-2 prompt enhancement requires compatible host TextGenerate inputs: "
+            "clip, prompt, max_length, sampling_mode, thinking, use_default_template."
+        ) from None
+    available: dict[str, object] = {}
+    if isinstance(schema, Mapping):
+        for group_name in ("required", "optional"):
+            group = schema.get(group_name)
+            if isinstance(group, Mapping):
+                available.update(group)
+    incompatible: list[str] = []
+    for input_name, expected_types in _KREA2_TEXT_GENERATE_INPUT_TYPES.items():
+        descriptor = available.get(input_name)
+        if not isinstance(descriptor, (list, tuple)) or not descriptor:
+            incompatible.append(input_name)
+            continue
+        if _normalize_host_input_type(descriptor[0]) not in expected_types:
+            incompatible.append(input_name)
+    if incompatible:
+        raise ValueError(
+            "Krea-2 prompt enhancement requires compatible host TextGenerate inputs: "
+            "clip, prompt, max_length, sampling_mode, thinking, use_default_template."
+        )
 
 
 def _append_switch_node(
@@ -1522,13 +1606,62 @@ def _build_krea2_turbo_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, 
     )
     vae_id = allocator.next()
     workflow[vae_id] = _build_vae_loader_node(request.vae_name)
-    positive_id, negative_id = _build_basic_positive_negative(
-        workflow,
-        allocator=allocator,
-        clip_source=clip_source,
-        request=request,
-        negative_mode="zero_out",
-    )
+    if request.prompt_enhancement_enabled:
+        _validate_krea2_text_generate_contract()
+        prompt_text_id = _append_primitive_string_node(
+            workflow,
+            allocator=allocator,
+            value=request.prompt,
+        )
+        prompt_payload_id = _append_string_replace_node(
+            workflow,
+            allocator=allocator,
+            string_value=_KREA2_PROMPT_ENHANCER_TEMPLATE,
+            find_value="{prompt}",
+            replace_value=[prompt_text_id, 0],
+        )
+        generated_prompt_id = _append_text_generate_node(
+            workflow,
+            allocator=allocator,
+            prompt_id=prompt_payload_id,
+            clip_source=clip_source,
+            max_length=512,
+            temperature=0.7,
+            top_p=0.95,
+            thinking=True,
+        )
+        prompt_toggle_id = _append_primitive_boolean_node(
+            workflow,
+            allocator=allocator,
+            value=True,
+        )
+        selected_prompt_id = _append_switch_node(
+            workflow,
+            allocator=allocator,
+            switch_id=prompt_toggle_id,
+            on_false=prompt_text_id,
+            on_true=generated_prompt_id,
+        )
+        positive_id = prompt_conditioning._append_prompt_encode_node(
+            workflow,
+            allocator=allocator,
+            clip_source=clip_source,
+            text=[selected_prompt_id, 0],
+            prompt_encoder="sd15",
+        )
+        negative_id = _append_conditioning_zero_out_node(
+            workflow,
+            allocator=allocator,
+            conditioning_id=positive_id,
+        )
+    else:
+        positive_id, negative_id = _build_basic_positive_negative(
+            workflow,
+            allocator=allocator,
+            clip_source=clip_source,
+            request=request,
+            negative_mode="zero_out",
+        )
     latent_id = _append_empty_latent_node(
         workflow,
         allocator=allocator,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -1845,6 +1846,188 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(sampler_node["inputs"]["denoise"], 1.0)
         self.assertEqual(sampler_node["inputs"]["negative"], [zero_node_id, 0])
         self.assertEqual(zero_node["inputs"]["conditioning"], sampler_node["inputs"]["positive"])
+
+    def test_krea2_prompt_enhancement_default_and_explicit_false_survive_normalization(self) -> None:
+        normalized_by_value: dict[object, object] = {}
+        for raw_value in (None, False, "false"):
+            payload = {
+                "prompt": "KREA_PROMPT_SENTINEL",
+                "profile": "krea2_turbo",
+                "checkpoint_name": "",
+                "vae_name": "",
+                "text_encoder_name": "",
+            }
+            if raw_value is not None:
+                payload["prompt_enhancement_enabled"] = raw_value
+            with self.subTest(raw_value=raw_value), mock.patch(
+                "rookieui.services.txt2img.discover_model_inventory",
+                return_value=self._krea2_turbo_inventory(),
+            ):
+                normalized = normalize_txt2img_request(payload)
+                normalized_by_value[raw_value] = normalized
+
+        defaulted = normalized_by_value[None]
+        self.assertTrue(defaulted.prompt_enhancement_enabled)
+        self.assertIn("prompt_enhancement_enabled", defaulted.applied_defaults)
+        for raw_value in (False, "false"):
+            explicit = normalized_by_value[raw_value]
+            self.assertFalse(explicit.prompt_enhancement_enabled)
+            self.assertNotIn("prompt_enhancement_enabled", explicit.applied_defaults)
+            self.assertFalse(explicit.to_payload()["prompt_enhancement_enabled"])
+
+    def test_translate_krea2_enabled_emits_source_backed_prompt_enhancement_graph(self) -> None:
+        class CompatibleTextGenerate:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {
+                    "required": {
+                        "clip": ("CLIP",),
+                        "prompt": ("STRING",),
+                        "max_length": ("INT",),
+                        "sampling_mode": ("COMFY_DYNAMICCOMBO_V3",),
+                    },
+                    "optional": {
+                        "thinking": ("BOOLEAN",),
+                        "use_default_template": ("BOOLEAN",),
+                    },
+                }
+
+        fake_nodes = mock.Mock(NODE_CLASS_MAPPINGS={"TextGenerate": CompatibleTextGenerate})
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._krea2_turbo_inventory(),
+        ), mock.patch.dict(sys.modules, {"nodes": fake_nodes}):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "KREA_PROMPT_SENTINEL",
+                    "profile": "krea2_turbo",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                    "prompt_enhancement_enabled": True,
+                    "seed": 123,
+                }
+            )
+            result = translate_txt2img_request(normalized).to_payload()
+
+        workflow = result["workflow"]
+        by_type: dict[str, list[tuple[str, dict[str, object]]]] = {}
+        for node_id, node in workflow.items():
+            by_type.setdefault(node["class_type"], []).append((node_id, node))
+
+        self.assertTrue(result["normalized_request"]["prompt_enhancement_enabled"])
+        self.assertEqual(len(by_type["TextGenerate"]), 1)
+        self.assertEqual(len(by_type["ComfySwitchNode"]), 1)
+        self.assertEqual(len(by_type["PrimitiveBoolean"]), 1)
+        text_generate_id, text_generate = by_type["TextGenerate"][0]
+        switch_id, prompt_switch = by_type["ComfySwitchNode"][0]
+        toggle_id, toggle = by_type["PrimitiveBoolean"][0]
+        prompt_id, raw_prompt = next(
+            (node_id, node)
+            for node_id, node in by_type["PrimitiveStringMultiline"]
+            if node["inputs"]["value"] == "KREA_PROMPT_SENTINEL"
+        )
+        template_id, template = next(iter(by_type["StringReplace"]))
+        clip_loader_id, _ = next(iter(by_type["CLIPLoader"]))
+        clip_encode = next(iter(by_type["CLIPTextEncode"]))[1]
+
+        self.assertIn("expert prompt engineer", template["inputs"]["string"])
+        self.assertIn("User's Input", template["inputs"]["string"])
+        self.assertEqual(template["inputs"]["find"], "{prompt}")
+        self.assertEqual(template["inputs"]["replace"], [prompt_id, 0])
+        self.assertEqual(
+            text_generate["inputs"],
+            {
+                "prompt": [template_id, 0],
+                "max_length": 512,
+                "sampling_mode": "on",
+                "sampling_mode.temperature": 0.7,
+                "sampling_mode.top_k": 64,
+                "sampling_mode.top_p": 0.95,
+                "sampling_mode.min_p": 0.05,
+                "sampling_mode.repetition_penalty": 1.05,
+                "sampling_mode.seed": 0,
+                "sampling_mode.presence_penalty": 0,
+                "thinking": True,
+                "use_default_template": True,
+                "clip": [clip_loader_id, 0],
+            },
+        )
+        self.assertIs(toggle["inputs"]["value"], True)
+        self.assertEqual(prompt_switch["inputs"]["switch"], [toggle_id, 0])
+        self.assertEqual(prompt_switch["inputs"]["on_false"], [prompt_id, 0])
+        self.assertEqual(prompt_switch["inputs"]["on_true"], [text_generate_id, 0])
+        self.assertEqual(clip_encode["inputs"]["text"], [switch_id, 0])
+
+    def test_translate_krea2_explicit_disabled_uses_only_raw_prompt_path(self) -> None:
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._krea2_turbo_inventory(),
+        ):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "KREA_PROMPT_SENTINEL",
+                    "profile": "krea2_turbo",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                    "prompt_enhancement_enabled": False,
+                }
+            )
+            result = translate_txt2img_request(normalized).to_payload()
+
+        workflow = result["workflow"]
+        class_types = [node["class_type"] for node in workflow.values()]
+        clip_encode = next(node for node in workflow.values() if node["class_type"] == "CLIPTextEncode")
+        effective_metadata = result["generation_metadata"]["extra_pnginfo"]["rookieui"].get(
+            "prompt_enhancement_enabled",
+            False,
+        )
+        self.assertFalse(result["normalized_request"]["prompt_enhancement_enabled"])
+        self.assertNotIn("TextGenerate", class_types)
+        self.assertNotIn("ComfySwitchNode", class_types)
+        self.assertEqual(clip_encode["inputs"]["text"], "KREA_PROMPT_SENTINEL")
+        self.assertIs(effective_metadata, False)
+
+    def test_krea2_enabled_fails_closed_for_missing_or_incompatible_host_text_generate(self) -> None:
+        class IncompatibleTextGenerate:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {
+                    "required": {
+                        "clip": ("CLIP",),
+                        "prompt": ("STRING",),
+                        "max_length": ("INT",),
+                        "sampling_mode": ("DYNAMICCOMBO",),
+                    },
+                    "optional": {"use_default_template": ("BOOLEAN",)},
+                }
+
+        host_mappings = ({}, {"TextGenerate": IncompatibleTextGenerate})
+        for mapping in host_mappings:
+            fake_nodes = mock.Mock(NODE_CLASS_MAPPINGS=mapping)
+            with self.subTest(mapping=tuple(mapping)), mock.patch(
+                "rookieui.services.txt2img.discover_model_inventory",
+                return_value=self._krea2_turbo_inventory(),
+            ), mock.patch.dict(sys.modules, {"nodes": fake_nodes}):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "KREA_PROMPT_SENTINEL",
+                        "profile": "krea2_turbo",
+                        "checkpoint_name": "",
+                        "vae_name": "",
+                        "text_encoder_name": "",
+                        "prompt_enhancement_enabled": True,
+                    }
+                )
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Krea-2 prompt enhancement requires compatible host TextGenerate inputs",
+                ) as raised:
+                    translate_txt2img_request(normalized)
+                error = str(raised.exception)
+                self.assertNotIn("KREA_PROMPT_SENTINEL", error)
+                self.assertNotRegex(error, r"[A-Za-z]:[\\/]")
 
     def test_translate_txt2img_request_applies_krea2_template_lora_when_resolved(self) -> None:
         with mock.patch(
