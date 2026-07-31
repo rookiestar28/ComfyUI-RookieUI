@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -39,7 +40,7 @@ class ValidationDependencyStateTests(unittest.TestCase):
                     "": {},
                     "node_modules/vue": {"version": "3.5.22"},
                     "node_modules/@playwright/test": {"version": "1.54.1"},
-                    "node_modules/vitest": {"version": "4.1.0"},
+                    "node_modules/vitest": {"version": "4.1.0", "bin": {"vitest": "vitest.mjs"}},
                 },
             },
         )
@@ -55,7 +56,56 @@ class ValidationDependencyStateTests(unittest.TestCase):
             root / "node_modules" / "vitest" / "package.json",
             {"name": "vitest", "version": installed_vitest},
         )
+        shim_suffix = ".cmd" if os.name == "nt" else ""
+        shim = root / "node_modules" / ".bin" / f"vitest{shim_suffix}"
+        shim.parent.mkdir(parents=True, exist_ok=True)
+        shim.write_text("@echo off\n" if shim_suffix else "#!/bin/sh\n", encoding="utf-8")
+        if not shim_suffix:
+            shim.chmod(0o755)
         return root
+
+    def _add_platform_native_fixture(self, root: Path, *, installed: bool) -> str:
+        details = json.loads(
+            subprocess.check_output(
+                [
+                    "node",
+                    "-e",
+                    (
+                        "const h=process.report.getReport().header;"
+                        "console.log(JSON.stringify({platform:process.platform,arch:process.arch,"
+                        "libc:h.glibcVersionRuntime?'gnu':'musl'}))"
+                    ),
+                ],
+                cwd=ROOT,
+                text=True,
+            )
+        )
+        platform_name = details["platform"]
+        arch = details["arch"]
+        if platform_name == "win32":
+            package_name = f"@rolldown/binding-win32-{arch}-msvc"
+        elif platform_name == "linux":
+            package_name = f"@rolldown/binding-linux-{arch}-{details['libc']}"
+        elif platform_name == "darwin":
+            package_name = f"@rolldown/binding-darwin-{arch}"
+        else:
+            self.skipTest(f"platform-native verifier fixture is unavailable for {platform_name}/{arch}")
+
+        lock_path = root / "package-lock.json"
+        lockfile = json.loads(lock_path.read_text(encoding="utf-8"))
+        lockfile["packages"][f"node_modules/{package_name}"] = {
+            "version": "1.0.3",
+            "optional": True,
+            "os": [platform_name],
+            "cpu": [arch],
+        }
+        self._write_json(lock_path, lockfile)
+        if installed:
+            self._write_json(
+                root / "node_modules" / Path(*package_name.split("/")) / "package.json",
+                {"name": package_name, "version": "1.0.3"},
+            )
+        return package_name
 
     def _run_verifier(self, root: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -70,7 +120,7 @@ class ValidationDependencyStateTests(unittest.TestCase):
         result = self._run_verifier(self._build_fixture())
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("3 declared dependencies match package-lock.json", result.stdout)
+        self.assertIn("3 declared dependencies, 1 executable shims", result.stdout)
 
     def test_installed_version_mismatch_fails_with_actionable_versions(self):
         result = self._run_verifier(self._build_fixture(installed_vitest="3.2.4"))
@@ -89,6 +139,27 @@ class ValidationDependencyStateTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("vue", result.stderr)
         self.assertIn("installed=missing", result.stderr)
+
+    def test_missing_platform_native_optional_dependency_fails(self):
+        root = self._build_fixture()
+        package_name = self._add_platform_native_fixture(root, installed=False)
+
+        result = self._run_verifier(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(package_name, result.stderr)
+        self.assertIn("platform-native", result.stderr)
+
+    def test_missing_current_platform_executable_shim_fails(self):
+        root = self._build_fixture()
+        shim_suffix = ".cmd" if os.name == "nt" else ""
+        (root / "node_modules" / ".bin" / f"vitest{shim_suffix}").unlink()
+
+        result = self._run_verifier(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("vitest", result.stderr)
+        self.assertIn("executable shim", result.stderr)
 
 
 if __name__ == "__main__":
