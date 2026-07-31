@@ -107,11 +107,13 @@ describe("fetchRookieUICapabilities", () => {
     expect(kreaEntry.public_base_family).toBe("krea2");
     expect(kreaEntry.default_steps).toBe(8);
     expect(kreaEntry.default_cfg_scale).toBe(1);
+    expect(kreaEntry.prompt_enhancement_visible).toBe(true);
+    expect(kreaEntry.default_prompt_enhancement_enabled).toBe(true);
     expect(kreaEntry.template_lora_visible).toBe(true);
     expect(kreaEntry.official_template_lora_label).toBe("krea2_darkbrush.safetensors");
     expect(kreaEntry.default_template_lora_enabled).toBe(false);
     expect(kreaEntry.default_template_lora_strength).toBe(0.8);
-    expect(kreaEntry.default_template_lora_trigger_word).toBe("muted minimalist sketch style");
+    expect(kreaEntry.default_template_lora_trigger_word).toBe("monochrome ink wash style");
     expect(longcatEntry.flux_guidance_visible).toBe(true);
     expect(longcatEntry.default_flux_guidance).toBe(4);
     expect(qwenEntry.template_lora_visible).toBe(true);
@@ -368,6 +370,12 @@ describe("fetchRookieUICapabilities", () => {
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_enabled).toBe(false);
     expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_strength).toBe(0.8);
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.template_lora_trigger_word).toBe(
+      "monochrome ink wash style",
+    );
+    expect(presets.data.presets.find((preset) => preset.id === "krea2_turbo")?.prompt_enhancement_enabled).toBe(
+      true,
+    );
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image")?.template_lora_name).toBe("");
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.edit_megapixels).toBe(1.5);
     expect(presets.data.presets.find((preset) => preset.id === "qwen_image_edit")?.template_lora_name).toBe("");

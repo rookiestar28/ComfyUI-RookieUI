@@ -868,19 +868,18 @@ const DEFAULT_PARITY_PROFILES = Object.freeze(
   })),
 );
 
+const PROMPT_ENHANCEMENT_ON = Object.freeze({
+  prompt_enhancement_visible: true,
+  default_prompt_enhancement_enabled: true,
+});
+
 const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
-  chroma: { shift_visible: true, default_shift: 1.0 },
-  ernie_image: {
-    prompt_enhancement_visible: true,
-    default_prompt_enhancement_enabled: true,
-  },
-  ernie_image_turbo: {
-    prompt_enhancement_visible: true,
-    default_prompt_enhancement_enabled: true,
-  },
-  hidream_i1_dev_fp8: { shift_visible: true, default_shift: 6.0 },
-  hidream_i1_fast: { shift_visible: true, default_shift: 3.0 },
-  hidream_i1_full: { shift_visible: true, default_shift: 3.0 },
+  chroma: { shift_visible: true, default_shift: 1 },
+  ernie_image: PROMPT_ENHANCEMENT_ON,
+  ernie_image_turbo: PROMPT_ENHANCEMENT_ON,
+  hidream_i1_dev_fp8: { shift_visible: true, default_shift: 6 },
+  hidream_i1_fast: { shift_visible: true, default_shift: 3 },
+  hidream_i1_full: { shift_visible: true, default_shift: 3 },
   flux: {
     template_lora_visible: true,
     template_lora_override_allowed: true,
@@ -897,12 +896,13 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     default_template_lora_strength: 1.0,
   },
   krea2_turbo: {
+    ...PROMPT_ENHANCEMENT_ON,
     template_lora_visible: true,
     template_lora_override_allowed: true,
     official_template_lora_label: "krea2_darkbrush.safetensors",
     default_template_lora_enabled: false,
     default_template_lora_strength: 0.8,
-    default_template_lora_trigger_word: "muted minimalist sketch style",
+    default_template_lora_trigger_word: "monochrome ink wash style",
     template_lora_trigger_visible: true,
   },
   longcat_image: { flux_guidance_visible: true, default_flux_guidance: 4.0 },

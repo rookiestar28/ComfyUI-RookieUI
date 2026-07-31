@@ -320,6 +320,11 @@
   min-width: 0;
 }
 
+/* IMPORTANT: explicit field visibility must win over the flex display rule for family-gated controls. */
+.rookieui-shell__inline-checkbox-field[hidden] {
+  display: none;
+}
+
 .rookieui-shell__integrated-form {
   display: grid;
   gap: 10px;

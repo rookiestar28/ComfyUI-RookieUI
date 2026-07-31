@@ -1958,6 +1958,10 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(prompt_switch["inputs"]["on_false"], [prompt_id, 0])
         self.assertEqual(prompt_switch["inputs"]["on_true"], [text_generate_id, 0])
         self.assertEqual(clip_encode["inputs"]["text"], [switch_id, 0])
+        self.assertIs(
+            result["generation_metadata"]["extra_pnginfo"]["rookieui"]["prompt_enhancement_enabled"],
+            True,
+        )
 
     def test_translate_krea2_explicit_disabled_uses_only_raw_prompt_path(self) -> None:
         with mock.patch(
@@ -1979,10 +1983,9 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         workflow = result["workflow"]
         class_types = [node["class_type"] for node in workflow.values()]
         clip_encode = next(node for node in workflow.values() if node["class_type"] == "CLIPTextEncode")
-        effective_metadata = result["generation_metadata"]["extra_pnginfo"]["rookieui"].get(
-            "prompt_enhancement_enabled",
-            False,
-        )
+        effective_metadata = result["generation_metadata"]["extra_pnginfo"]["rookieui"][
+            "prompt_enhancement_enabled"
+        ]
         self.assertFalse(result["normalized_request"]["prompt_enhancement_enabled"])
         self.assertNotIn("TextGenerate", class_types)
         self.assertNotIn("ComfySwitchNode", class_types)
@@ -2055,8 +2058,8 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(normalized.profile, "krea2_turbo")
         self.assertTrue(normalized.template_lora_enabled)
         self.assertEqual(normalized.template_lora_strength, 0.8)
-        self.assertEqual(normalized.template_lora_trigger_word, "muted minimalist sketch style")
-        self.assertEqual(normalized.prompt, "painted fashion editorial, muted minimalist sketch style")
+        self.assertEqual(normalized.template_lora_trigger_word, "monochrome ink wash style")
+        self.assertEqual(normalized.prompt, "painted fashion editorial, monochrome ink wash style")
         self.assertEqual(normalized.template_lora_name, "Krea\\krea2_darkbrush.safetensors")
         self.assertEqual(lora_node["inputs"]["lora_name"], "Krea\\krea2_darkbrush.safetensors")
         self.assertEqual(lora_node["inputs"]["strength_model"], 0.8)

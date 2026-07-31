@@ -41,10 +41,11 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>ComfyUI host refresh alignment (stability/compatibility)</strong></summary>
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
-- The official template manifest is aligned to `comfyui-workflow-templates` 0.11.6; shipped support remains limited to the RookieUI profiles listed below.
+- The official template manifest is aligned to `comfyui-workflow-templates` 0.11.20; shipped support remains limited to the RookieUI profiles listed below.
 - Host template tracking now separates core blueprints, packaged gallery JSON assets, and removed gallery entries so newly observed workflows are not treated as supported profiles until RookieUI has an explicit runtime surface for them.
 - Local `Ideogram v4` and `Krea-2 Turbo` txt2img workflows are now exposed as official template-backed profiles with host-specific model, encoder, VAE, sampler, and template LoRA prerequisites surfaced through the normal model selector contract.
 - The local Ideogram path follows the host dual-model scheduler workflow, while the local Krea path keeps the Krea2 text encoder, Qwen Image VAE, sampler defaults, and template-owned LoRA behavior on the existing `txt2img` surface.
+- Krea-2 Turbo prompt enhancement runs locally through the current ComfyUI text-generation graph, is enabled by default, and can be turned off to use the prompt as-is.
 - `RookieUISaveImageWithMetadata` now mirrors the current host `SaveImage` pass-through `IMAGE` output socket while preserving raw A1111 `parameters` PNG metadata.
 - API-provider Ideogram/Krea workflows and Krea style-reference workflow remain unsupported until dedicated provider, credential, and image-reference runtime scope exists.
 - Newly observed host blueprint/gallery additions, including SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Gemini Omni Flash, HappyHorse, Nano Banana, and Seedance workflows, are deferred or follow-up candidates until dedicated RookieUI UI/runtime scope exists.
@@ -609,12 +610,12 @@ If your host or Manager install path does not automatically install custom-node 
 ### Official Non-SD Template Presets
 
 - RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
-- Current official-template alignment uses `comfyui-workflow-templates` 0.11.6 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
+- Current official-template alignment uses `comfyui-workflow-templates` 0.11.20 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
 - These presets follow official template defaults or source-backed mode values for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
-  - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`
+  - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`, `Krea-2 Turbo`
 - Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
 - API-provider Ideogram/Krea workflows, Krea style-reference workflow, SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces.
 

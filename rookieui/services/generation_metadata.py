@@ -195,6 +195,9 @@ def build_rookieui_extra_pnginfo(
             "scheduler_name": scheduler_name,
             "scheduler_control_mode": scheduler_control_mode,
             "negative_prompt_mode": negative_prompt_mode,
+            "prompt_enhancement_enabled": bool(
+                normalized_request.get("prompt_enhancement_enabled", False)
+            ),
             "parameter_warning_codes": list(normalized_request.get("parameter_warning_codes", []) or []),
             "seed": normalized_request.get("execution_seed", normalized_request.get("seed")),
         }

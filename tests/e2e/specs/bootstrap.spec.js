@@ -939,7 +939,7 @@ test("keeps Krea and Flux.2 template LoRAs explicitly opt-in", async ({ page }) 
   await expect(page.locator("#rookieui-template-lora-name")).toHaveValue("Krea/krea2_darkbrush.safetensors");
   await expect(page.locator("#rookieui-template-lora-enabled")).not.toBeChecked();
   await expect(page.locator("#rookieui-template-lora-strength")).toHaveValue("0.8");
-  await expect(page.locator("#rookieui-template-lora-trigger-word")).toHaveValue("muted minimalist sketch style");
+  await expect(page.locator("#rookieui-template-lora-trigger-word")).toHaveValue("monochrome ink wash style");
   await expect(page.locator("#rookieui-template-lora-strength")).toBeDisabled();
   await page.locator("#rookieui-template-lora-enabled").check();
   await expect(page.locator("#rookieui-template-lora-strength")).toBeEnabled();
@@ -953,6 +953,56 @@ test("keeps Krea and Flux.2 template LoRAs explicitly opt-in", async ({ page }) 
   await expect(page.locator("#rookieui-steps-slider")).toHaveValue("8");
   await page.locator("#rookieui-template-lora-enabled").uncheck();
   await expect(page.locator("#rookieui-steps")).toHaveValue("20");
+});
+
+test("keeps Krea prompt enhancement truthful across payload and profile transitions", async ({ page }) => {
+  await page.goto("test-harness.html");
+  const enhancement = page.locator("#rookieui-prompt-enhancement-enabled");
+
+  await page.locator("#rookieui-preset").selectOption("krea2_turbo");
+  await page.locator("#rookieui-prompt").fill("Krea enhancement state transition");
+  await expect(enhancement).toBeVisible();
+  await expect(enhancement).toBeEnabled();
+  await expect(enhancement).toBeChecked();
+
+  await enhancement.uncheck();
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123");
+  let request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request.profile).toBe("krea2_turbo");
+  expect(request.prompt_enhancement_enabled).toBe(false);
+
+  await page.locator("#rookieui-tab-queue").click();
+  await page.locator("#rookieui-tab-txt2img").click();
+  await expect(enhancement).toBeVisible();
+  await expect(enhancement).toBeEnabled();
+  await expect(enhancement).not.toBeChecked();
+
+  await page.locator("#rookieui-preset").selectOption("ernie_image");
+  await expect(enhancement).toBeVisible();
+  await expect(enhancement).toBeEnabled();
+  await expect(enhancement).toBeChecked();
+
+  await page.locator("#rookieui-preset").selectOption("sdxl");
+  await expect(enhancement).toBeHidden();
+  await expect(enhancement).toBeDisabled();
+  await expect(enhancement).not.toBeChecked();
+  await page.locator("#rookieui-txt2img-submit").click();
+  request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request.profile).toBe("sdxl");
+  expect(request.prompt_enhancement_enabled).toBe(false);
+
+  await page.locator("#rookieui-preset").selectOption("krea2_turbo");
+  await expect(enhancement).toBeVisible();
+  await expect(enhancement).toBeEnabled();
+  await expect(enhancement).toBeChecked();
+  await page.locator("#rookieui-tab-img2img").click();
+  await page.locator("#rookieui-tab-txt2img").click();
+  await expect(enhancement).toBeChecked();
+  await page.locator("#rookieui-txt2img-submit").click();
+  request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request.profile).toBe("krea2_turbo");
+  expect(request.prompt_enhancement_enabled).toBe(true);
 });
 
 test("clears unsupported scheduler and negative prompt across specialized profile transitions", async ({ page }) => {

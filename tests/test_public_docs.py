@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import unittest
 
 from rookieui.contracts.family_template_manifest import (
@@ -38,8 +39,17 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
         for path in _public_doc_paths():
             text = _read_text(path)
             with self.subTest(path=path.relative_to(ROOT)):
-                self.assertNotIn("`comfyui-workflow-templates` 0.11.2", text)
-        self.assertIn("`comfyui-workflow-templates` 0.11.6", _read_text(README))
+                self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.2(?!\d)", text))
+                self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.6(?!\d)", text))
+        self.assertIn("`comfyui-workflow-templates` 0.11.20", _read_text(README))
+
+    def test_readme_describes_krea_prompt_enhancement_truthfully(self) -> None:
+        text = _read_text(README)
+
+        self.assertIn("`Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`, `Krea-2 Turbo`", text)
+        self.assertIn("Krea-2 Turbo prompt enhancement runs locally", text)
+        self.assertIn("enabled by default", text)
+        self.assertIn("use the prompt as-is", text)
 
     def test_readme_lists_accepted_local_ideogram_and_krea_txt2img_profiles(self) -> None:
         text = _read_text(README)
@@ -87,6 +97,8 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
             for fragment in forbidden_fragments:
                 with self.subTest(path=path.relative_to(ROOT), fragment=fragment):
                     self.assertNotIn(fragment, text)
+            with self.subTest(path=path.relative_to(ROOT), fragment="internal item code"):
+                self.assertIsNone(re.search(r"\b(?:F|R)\d{3}\b", text))
 
     def test_deferred_or_removed_gallery_ids_are_not_supported_profile_ids(self) -> None:
         unsupported_gallery_ids = set(OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS)
