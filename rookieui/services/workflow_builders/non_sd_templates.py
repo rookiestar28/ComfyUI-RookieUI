@@ -71,7 +71,7 @@ _KREA2_TEXT_GENERATE_INPUT_TYPES = {
     "clip": frozenset({"CLIP"}),
     "prompt": frozenset({"STRING"}),
     "max_length": frozenset({"INT"}),
-    # Core V3 exposes COMFY_DYNAMICCOMBO_V3 at runtime; F304's static fixture uses DYNAMICCOMBO.
+    # Core V3 exposes COMFY_DYNAMICCOMBO_V3 at runtime; the static fixture uses DYNAMICCOMBO.
     "sampling_mode": frozenset({"COMFY_DYNAMICCOMBO_V3", "DYNAMICCOMBO"}),
     "thinking": frozenset({"BOOLEAN"}),
     "use_default_template": frozenset({"BOOLEAN"}),

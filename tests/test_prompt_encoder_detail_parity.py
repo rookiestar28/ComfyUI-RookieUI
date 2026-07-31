@@ -34,24 +34,35 @@ class PromptEncoderDetailParityTests(unittest.TestCase):
         self.assertEqual(dimensions["a1111_default_parser"]["status"], "implemented")
         self.assertEqual(dimensions["live_tensor_differential"]["status"], "implemented")
 
-    def test_matrix_keeps_roadmap_items_aligned(self) -> None:
+    def test_matrix_keeps_public_features_aligned(self) -> None:
         payload = build_prompt_encoder_detail_parity_payload()
-        items = {entry["item_id"]: entry for entry in payload["items"]}
+        features = {entry["feature_id"]: entry for entry in payload["features"]}
 
-        self.assertEqual(set(items), {"R197", "F232", "F233", "F234", "F235", "F236", "R198"})
-        self.assertEqual(items["R197"]["status"], "completed")
-        self.assertEqual(items["F232"]["covers"], ["parser_mode_matrix"])
-        self.assertIn("sdxl_dual_channel_embedding", items["F235"]["covers"])
-        self.assertEqual(items["F236"]["status"], "completed")
-        self.assertEqual(items["R198"]["status"], "completed")
+        self.assertEqual(
+            set(features),
+            {
+                "reference_baseline",
+                "parser_modes",
+                "conditioning_weights",
+                "textual_inversion",
+                "sdxl_textual_inversion",
+                "tensor_differential",
+                "acceptance_closure",
+            },
+        )
+        self.assertEqual(features["reference_baseline"]["status"], "completed")
+        self.assertEqual(features["parser_modes"]["covers"], ["parser_mode_matrix"])
+        self.assertIn("sdxl_dual_channel_embedding", features["sdxl_textual_inversion"]["covers"])
+        self.assertEqual(features["tensor_differential"]["status"], "completed")
+        self.assertEqual(features["acceptance_closure"]["status"], "completed")
 
     def test_acceptance_closure_has_no_planned_phase_items(self) -> None:
         payload = build_prompt_encoder_detail_parity_payload()
-        items = {entry["item_id"]: entry for entry in payload["items"]}
+        features = {entry["feature_id"]: entry for entry in payload["features"]}
 
         non_completed = [
-            item_id
-            for item_id, entry in sorted(items.items())
+            feature_id
+            for feature_id, entry in sorted(features.items())
             if entry["status"] != "completed"
         ]
 
@@ -61,8 +72,8 @@ class PromptEncoderDetailParityTests(unittest.TestCase):
         payload = build_prompt_encoder_detail_parity_payload()
         allowed_statuses = set(PROMPT_ENCODER_DETAIL_PARITY_STATUSES)
 
-        for collection_name in ("dimensions", "items"):
-            ids = [entry.get("dimension_id") or entry.get("item_id") for entry in payload[collection_name]]
+        for collection_name in ("dimensions", "features"):
+            ids = [entry.get("dimension_id") or entry.get("feature_id") for entry in payload[collection_name]]
             self.assertEqual(len(ids), len(set(ids)))
             for entry in payload[collection_name]:
                 self.assertIn(entry["status"], allowed_statuses)

@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from scripts.check_public_release_boundary import find_forbidden_tracked_entries
+from scripts.check_public_release_boundary import (
+    find_forbidden_tracked_content,
+    find_forbidden_tracked_entries,
+)
 
 
 class PublicReleaseBoundaryTests(unittest.TestCase):
@@ -28,6 +31,28 @@ class PublicReleaseBoundaryTests(unittest.TestCase):
     def test_rejects_tracked_symlinks_as_archive_boundary_bypasses(self) -> None:
         violations = find_forbidden_tracked_entries([("120000", "docs/external-link")])
         self.assertEqual(violations, [{"path": "docs/external-link", "reason": "tracked-symlink"}])
+
+    def test_rejects_internal_item_codes_in_tracked_text(self) -> None:
+        private_code = b"F" + b"999"
+        violations = find_forbidden_tracked_content(
+            [("rookieui/contracts/public_payload.py", b'item_id = "' + private_code + b'"\n')]
+        )
+
+        self.assertEqual(
+            violations,
+            [{"path": "rookieui/contracts/public_payload.py", "reason": "internal-item-code"}],
+        )
+
+    def test_content_scan_allows_public_slugs_and_skips_binary_assets(self) -> None:
+        self.assertEqual(
+            find_forbidden_tracked_content(
+                [
+                    ("rookieui/contracts/public_payload.py", b'feature_id = "parser_modes"\n'),
+                    ("assets/example.bin", b"\x00F999\x01"),
+                ]
+            ),
+            [],
+        )
 
     def test_ci_runs_boundary_after_host_lane_before_publish_job_can_succeed(self) -> None:
         workflow = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml").read_text(

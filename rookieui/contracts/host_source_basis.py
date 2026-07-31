@@ -217,7 +217,7 @@ _ADDED_SURFACES = (
 _CHANGED_SURFACES = ("api_bytedance_seedream_5_0_lite_image_edit",)
 
 # Artifact presence is evidence of a reference surface, not implementation
-# support. F288 owns graph-signature validation before any surface can ship.
+# support. Graph-signature validation is required before any surface can ship.
 WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6 = WorkflowTemplateSurfaceDelta(
     added=_ADDED_SURFACES,
     changed=_CHANGED_SURFACES,

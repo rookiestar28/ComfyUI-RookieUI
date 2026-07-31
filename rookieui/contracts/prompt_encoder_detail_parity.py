@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any
 
-PROMPT_ENCODER_DETAIL_PARITY_CONTRACT_VERSION = "prompt-encoder-smznodes-detail-parity-20260429"
+PROMPT_ENCODER_DETAIL_PARITY_CONTRACT_VERSION = "prompt-encoder-smznodes-detail-parity-20260801"
 
 PROMPT_ENCODER_DETAIL_PARITY_STATUSES = (
     "completed",
@@ -23,7 +23,7 @@ class PromptEncoderDetailDimension:
     reference_surface: str
     rookieui_target: str
     status: str
-    roadmap_item: str
+    delivery_group: str
     acceptance_signal: str
 
     def to_payload(self) -> dict[str, Any]:
@@ -31,8 +31,8 @@ class PromptEncoderDetailDimension:
 
 
 @dataclass(frozen=True)
-class PromptEncoderDetailItem:
-    item_id: str
+class PromptEncoderDetailFeature:
+    feature_id: str
     title: str
     status: str
     covers: tuple[str, ...]
@@ -52,7 +52,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes CLIP Text Encode++ parser selector",
             rookieui_target="Expose or explicitly gate supported parser modes without changing default A1111 parity.",
             status="completed",
-            roadmap_item="F232",
+            delivery_group="parser_modes",
             acceptance_signal="unit tests prove parser mode selection and unsupported-mode diagnostics.",
         ),
         PromptEncoderDetailDimension(
@@ -61,7 +61,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="stable-diffusion-webui default prompt parser",
             rookieui_target="Keep Phase 100 default parser behavior stable.",
             status="implemented",
-            roadmap_item="F232",
+            delivery_group="parser_modes",
             acceptance_signal="existing node-level prompt encoding tests cover A1111 schedules, AND, BREAK, and attention.",
         ),
         PromptEncoderDetailDimension(
@@ -70,7 +70,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes full parser",
             rookieui_target="Pin whitespace/newline/special-character normalization when this mode is selected.",
             status="implemented",
-            roadmap_item="F232",
+            delivery_group="parser_modes",
             acceptance_signal="targeted tests prove full-parser text normalization before encoding.",
         ),
         PromptEncoderDetailDimension(
@@ -79,7 +79,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes comfy++ parser",
             rookieui_target="Use Comfy-style parsing with A1111-style encoding/mean handling or gate it truthfully.",
             status="implemented",
-            roadmap_item="F232",
+            delivery_group="parser_modes",
             acceptance_signal="targeted tests prove either implemented behavior or explicit gated diagnostics.",
         ),
         PromptEncoderDetailDimension(
@@ -88,7 +88,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes fixed attention parser",
             rookieui_target="Support an attention-disabled encode mode without disrupting A1111 default parsing.",
             status="implemented",
-            roadmap_item="F232",
+            delivery_group="parser_modes",
             acceptance_signal="targeted tests prove weighted syntax is encoded literally in fixed-attention mode.",
         ),
         PromptEncoderDetailDimension(
@@ -97,7 +97,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes old emphasis implementation flag",
             rookieui_target="Make old-emphasis selection observable and regression-tested.",
             status="implemented",
-            roadmap_item="F233",
+            delivery_group="conditioning_weights",
             acceptance_signal="deterministic fake conditioning tests prove old and current emphasis modes differ where expected.",
         ),
         PromptEncoderDetailDimension(
@@ -106,7 +106,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="stable-diffusion-webui prompt mean normalization",
             rookieui_target="Keep mean normalization selectable and numerically pinned.",
             status="implemented",
-            roadmap_item="F233",
+            delivery_group="conditioning_weights",
             acceptance_signal="unit tests cover enabled and disabled normalization behavior.",
         ),
         PromptEncoderDetailDimension(
@@ -115,7 +115,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes textual inversion embedding database",
             rookieui_target="Resolve explicit safe embedding roots without executing reference code.",
             status="implemented",
-            roadmap_item="F234",
+            delivery_group="textual_inversion",
             acceptance_signal="unit tests cover scanning and alias lookup using synthetic embedding fixtures.",
         ),
         PromptEncoderDetailDimension(
@@ -124,7 +124,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="A1111 optional embedding: prefix and bare embedding aliases",
             rookieui_target="Resolve prefixed and bare aliases consistently against the host-safe resolver.",
             status="implemented",
-            roadmap_item="F234",
+            delivery_group="textual_inversion",
             acceptance_signal="unit tests cover prefixed, bare, extensionless, and extension-bearing aliases.",
         ),
         PromptEncoderDetailDimension(
@@ -133,7 +133,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes/A1111 missing embedding handling",
             rookieui_target="Report missing embeddings truthfully without corrupting prompt text.",
             status="implemented",
-            roadmap_item="F234",
+            delivery_group="textual_inversion",
             acceptance_signal="unit tests cover missing embedding diagnostics and fallback text behavior.",
         ),
         PromptEncoderDetailDimension(
@@ -142,7 +142,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes textual inversion token fix injection",
             rookieui_target="Inject multi-vector embeddings at stable token offsets in the RookieUI encode path.",
             status="implemented",
-            roadmap_item="F234",
+            delivery_group="textual_inversion",
             acceptance_signal="unit tests cover multi-vector fix offsets and chunk-boundary behavior.",
         ),
         PromptEncoderDetailDimension(
@@ -151,7 +151,7 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="smZNodes SDXL clip_g/clip_l textual inversion vectors",
             rookieui_target="Validate and apply SDXL global/local vectors per channel.",
             status="implemented",
-            roadmap_item="F235",
+            delivery_group="sdxl_textual_inversion",
             acceptance_signal="unit tests cover g/l vector selection, mismatches, and fallback behavior.",
         ),
         PromptEncoderDetailDimension(
@@ -160,37 +160,37 @@ def _dimension_entries() -> tuple[PromptEncoderDetailDimension, ...]:
             reference_surface="same-model smZNodes/A1111 tensor comparison",
             rookieui_target="Provide optional local report-only tensor comparison tooling.",
             status="implemented",
-            roadmap_item="F236",
+            delivery_group="tensor_differential",
             acceptance_signal="CLI tests prove prerequisite detection and skipped-report behavior without private assets.",
         ),
     )
 
 
-def _item_entries() -> tuple[PromptEncoderDetailItem, ...]:
+def _feature_entries() -> tuple[PromptEncoderDetailFeature, ...]:
     return (
-        PromptEncoderDetailItem(
-            item_id="R197",
+        PromptEncoderDetailFeature(
+            feature_id="reference_baseline",
             title="smZNodes Detail Parity Reference Freeze",
             status="completed",
             covers=tuple(entry.dimension_id for entry in _dimension_entries()),
-            acceptance_signal="this executable matrix and tests freeze Phase 101 scope.",
+            acceptance_signal="this executable matrix and tests freeze the public reference scope.",
         ),
-        PromptEncoderDetailItem(
-            item_id="F232",
+        PromptEncoderDetailFeature(
+            feature_id="parser_modes",
             title="Prompt Parser Mode Matrix Parity",
             status="completed",
             covers=("parser_mode_matrix",),
             acceptance_signal="parser mode tests cover implemented and gated modes.",
         ),
-        PromptEncoderDetailItem(
-            item_id="F233",
+        PromptEncoderDetailFeature(
+            feature_id="conditioning_weights",
             title="Old Emphasis and Mean-Normalization Exactness",
             status="completed",
             covers=("old_emphasis", "mean_normalization_exactness"),
             acceptance_signal="emphasis/normalization tests prove observable behavior.",
         ),
-        PromptEncoderDetailItem(
-            item_id="F234",
+        PromptEncoderDetailFeature(
+            feature_id="textual_inversion",
             title="Textual Inversion Resolver Parity",
             status="completed",
             covers=(
@@ -201,22 +201,22 @@ def _item_entries() -> tuple[PromptEncoderDetailItem, ...]:
             ),
             acceptance_signal="resolver tests cover SD15 textual inversion behavior.",
         ),
-        PromptEncoderDetailItem(
-            item_id="F235",
+        PromptEncoderDetailFeature(
+            feature_id="sdxl_textual_inversion",
             title="SDXL Embedding and Dual-Channel Resolver Parity",
             status="completed",
             covers=("sdxl_dual_channel_embedding",),
             acceptance_signal="SDXL resolver tests cover dual-channel behavior.",
         ),
-        PromptEncoderDetailItem(
-            item_id="F236",
+        PromptEncoderDetailFeature(
+            feature_id="tensor_differential",
             title="Live Tensor Differential Harness",
             status="completed",
             covers=("live_tensor_differential",),
             acceptance_signal="harness tests cover safe skip/report behavior.",
         ),
-        PromptEncoderDetailItem(
-            item_id="R198",
+        PromptEncoderDetailFeature(
+            feature_id="acceptance_closure",
             title="smZNodes Detail Parity Acceptance Closure",
             status="completed",
             covers=tuple(entry.dimension_id for entry in _dimension_entries()),
@@ -230,5 +230,5 @@ def build_prompt_encoder_detail_parity_payload() -> dict[str, Any]:
         "contract_version": PROMPT_ENCODER_DETAIL_PARITY_CONTRACT_VERSION,
         "reference": "smZNodes CLIP Text Encode++ / stable-diffusion-webui prompt encoding",
         "dimensions": [entry.to_payload() for entry in _dimension_entries()],
-        "items": [entry.to_payload() for entry in _item_entries()],
+        "features": [entry.to_payload() for entry in _feature_entries()],
     }

@@ -250,8 +250,8 @@ def _provider_catalog_entries() -> tuple[PromptWorkbenchProviderCatalogEntry, ..
             summary="Network-backed translation path using an OpenAI-compatible chat-completions endpoint.",
             config_fields=_openai_provider_fields(),
             notes=(
-                "Translation execution ships in F115.",
-                "AI-assist execution ships in F120 through the same OpenAI-compatible provider contract.",
+                "Translation execution is available through the shipped provider contract.",
+                "AI-assist execution uses the same OpenAI-compatible provider contract.",
             ),
         ),
         PromptWorkbenchProviderCatalogEntry(
