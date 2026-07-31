@@ -113,7 +113,12 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(source_paths["ideogram4"], "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json")
         self.assertEqual(
             source_paths["krea2_turbo"],
-            "comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
+            "comfyui-workflow-templates-json==0.1.19:image_krea2_turbo_t2i.json",
+        )
+        packaged_paths = [path for path in source_paths.values() if path.startswith("comfyui-workflow")]
+        self.assertTrue(packaged_paths)
+        self.assertTrue(
+            all(path.startswith("comfyui-workflow-templates-json==0.1.19:") for path in packaged_paths)
         )
         self.assertEqual(
             source_paths["flux2_image_edit"],
@@ -204,6 +209,16 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         for deferred_marker in OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS:
             with self.subTest(deferred_marker=deferred_marker):
                 self.assertNotIn(deferred_marker, manifest_text)
+
+        for current_host_deferred_marker in (
+            "image_anima_lllite_any_control_to_image",
+            "image_joyai_image_edit",
+            "image_krea2_turbo_int8_image_style_reference",
+            "image_mage_flow_edit_int8",
+            "krea2_image_edit",
+            "krea2_style_reference",
+        ):
+            self.assertIn(current_host_deferred_marker, OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS)
 
     def test_registry_tracks_translation_and_public_family_separately(self) -> None:
         flux_entry = get_model_family_registry_entry("flux")

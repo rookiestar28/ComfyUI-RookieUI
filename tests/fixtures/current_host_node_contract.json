@@ -10,7 +10,9 @@
           "optional": false,
           "type": "MODEL"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "BasicScheduler": {
       "inputs": {
@@ -32,7 +34,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "CFGGuider": {
       "inputs": {
@@ -53,7 +57,9 @@
           "optional": false,
           "type": "CONDITIONING"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "CFGNorm": {
       "inputs": {
@@ -71,7 +77,9 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_cfg.py",
+      "source_sha256": "688a73094509efcc81bf22bf0e77b2cd8c9f1726f455ed55f6f9747dec656e99"
     },
     "CFGOverride": {
       "inputs": {
@@ -94,23 +102,27 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "CLIPLoader": {
       "inputs": {
         "clip_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "device": {
           "optional": true,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "type": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "Canny": {
       "inputs": {
@@ -128,15 +140,19 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_canny.py",
+      "source_sha256": "5efd352d92d7749b7b9734a1676fee18f4431d44a8e9477822a7a8f38ad26051"
     },
     "CheckpointLoaderSimple": {
       "inputs": {
         "ckpt_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "ComfySwitchNode": {
       "inputs": {
@@ -152,7 +168,9 @@
           "optional": false,
           "type": "BOOLEAN"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_logic.py",
+      "source_sha256": "2cb1ce149ce616c0b12a67962ed7b799eb398fbcdeb20dcec4c5210eb6af6df1"
     },
     "ConditioningZeroOut": {
       "inputs": {
@@ -160,27 +178,31 @@
           "optional": false,
           "type": "CONDITIONING"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "DualCLIPLoader": {
       "inputs": {
         "clip_name1": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "clip_name2": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "device": {
           "optional": true,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "type": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "DualModelGuider": {
       "inputs": {
@@ -205,7 +227,9 @@
           "optional": false,
           "type": "CONDITIONING"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "EmptyFlux2LatentImage": {
       "inputs": {
@@ -224,7 +248,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "EmptyLatentImage": {
       "inputs": {
@@ -243,7 +269,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "EmptySD3LatentImage": {
       "inputs": {
@@ -262,7 +290,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_sd3.py",
+      "source_sha256": "90a79847332fed7cc97379abbc7092116e6b1b883a7c9e933ac88167a521f693"
     },
     "Flux2Scheduler": {
       "inputs": {
@@ -281,7 +311,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxGuidance": {
       "inputs": {
@@ -294,7 +326,9 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKVCache": {
       "inputs": {
@@ -302,7 +336,9 @@
           "optional": false,
           "type": "MODEL"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKontextImageScale": {
       "inputs": {
@@ -310,7 +346,9 @@
           "optional": false,
           "type": "IMAGE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKontextMultiReferenceLatentMethod": {
       "inputs": {
@@ -322,7 +360,9 @@
           "optional": false,
           "type": "COMBO"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "GetImageSize": {
       "inputs": {
@@ -330,7 +370,9 @@
           "optional": false,
           "type": "IMAGE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_images.py",
+      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
     },
     "Ideogram4Scheduler": {
       "inputs": {
@@ -359,13 +401,15 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_ideogram4.py",
+      "source_sha256": "2ef584e244ecb5614b7284eacfaaab7bbdfa398f0595c32c1562d99150ebe301"
     },
     "ImageScale": {
       "inputs": {
         "crop": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "height": {
           "default": 512,
@@ -378,14 +422,16 @@
         },
         "upscale_method": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "width": {
           "default": 512,
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "ImageScaleToTotalPixels": {
       "inputs": {
@@ -407,7 +453,9 @@
           "optional": false,
           "type": "COMBO"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_post_processing.py",
+      "source_sha256": "96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575"
     },
     "ImageStitch": {
       "inputs": {
@@ -439,7 +487,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_images.py",
+      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
     },
     "KSampler": {
       "inputs": {
@@ -471,11 +521,11 @@
         },
         "sampler_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "scheduler": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "seed": {
           "default": 0,
@@ -487,7 +537,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "KSamplerSelect": {
       "inputs": {
@@ -495,13 +547,15 @@
           "optional": false,
           "type": "COMBO"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "LatentUpscale": {
       "inputs": {
         "crop": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "height": {
           "default": 512,
@@ -514,14 +568,16 @@
         },
         "upscale_method": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "width": {
           "default": 512,
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "LoraLoader": {
       "inputs": {
@@ -531,7 +587,7 @@
         },
         "lora_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "model": {
           "optional": false,
@@ -547,13 +603,15 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "LoraLoaderModelOnly": {
       "inputs": {
         "lora_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "model": {
           "optional": false,
@@ -564,15 +622,19 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "ModelPatchLoader": {
       "inputs": {
         "name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_model_patch.py",
+      "source_sha256": "44367a762417d88ddac58d37602f03eafb95c676a1ca3e020e24c18e123fb4e6"
     },
     "ModelSamplingAuraFlow": {
       "inputs": {
@@ -585,7 +647,9 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_model_advanced.py",
+      "source_sha256": "ffa70c4bb3568537ba13b368092d2599b861db7c83b1bcfa41347058b40dcba7"
     },
     "ModelSamplingSD3": {
       "inputs": {
@@ -598,7 +662,9 @@
           "optional": false,
           "type": "FLOAT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_model_advanced.py",
+      "source_sha256": "ffa70c4bb3568537ba13b368092d2599b861db7c83b1bcfa41347058b40dcba7"
     },
     "PrimitiveBoolean": {
       "inputs": {
@@ -606,7 +672,9 @@
           "optional": false,
           "type": "BOOLEAN"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_primitive.py",
+      "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
     },
     "PrimitiveStringMultiline": {
       "inputs": {
@@ -614,7 +682,9 @@
           "optional": false,
           "type": "STRING"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_primitive.py",
+      "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
     },
     "QuadrupleCLIPLoader": {
       "inputs": {
@@ -634,7 +704,9 @@
           "optional": false,
           "type": "COMBO"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_hidream.py",
+      "source_sha256": "727fe71d9afa086a0d2613639f9546019c650449cfa04d1b98d8abf8de611a89"
     },
     "QwenImageDiffsynthControlnet": {
       "inputs": {
@@ -663,7 +735,9 @@
           "optional": false,
           "type": "VAE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_model_patch.py",
+      "source_sha256": "44367a762417d88ddac58d37602f03eafb95c676a1ca3e020e24c18e123fb4e6"
     },
     "RandomNoise": {
       "inputs": {
@@ -672,7 +746,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "ReferenceLatent": {
       "inputs": {
@@ -684,7 +760,9 @@
           "optional": true,
           "type": "LATENT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_edit_model.py",
+      "source_sha256": "8fe4edaa13707df052ddf883fade1190f7b68416d54c7026cefefd489a13ee7e"
     },
     "SamplerCustomAdvanced": {
       "inputs": {
@@ -708,7 +786,9 @@
           "optional": false,
           "type": "SIGMAS"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
     },
     "StringReplace": {
       "inputs": {
@@ -724,7 +804,9 @@
           "optional": false,
           "type": "STRING"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_string.py",
+      "source_sha256": "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1"
     },
     "T5TokenizerOptions": {
       "inputs": {
@@ -742,7 +824,9 @@
           "optional": false,
           "type": "INT"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_cond.py",
+      "source_sha256": "ee78f3f890c97c20dc4de1f5f4445b0cfbcd4e9e2cc3d61a77f2b55a5682d075"
     },
     "TextEncodeQwenImageEdit": {
       "inputs": {
@@ -762,7 +846,9 @@
           "optional": true,
           "type": "VAE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_qwen.py",
+      "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
     },
     "TextEncodeQwenImageEditPlus": {
       "inputs": {
@@ -790,7 +876,9 @@
           "optional": true,
           "type": "VAE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_qwen.py",
+      "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
     },
     "TextGenerate": {
       "inputs": {
@@ -834,19 +922,23 @@
           "optional": true,
           "type": "IMAGE"
         }
-      }
+      },
+      "source_path": "comfy_extras/nodes_textgen.py",
+      "source_sha256": "b328e8a2dc89cfd3a93ab49c1be880a3e89ec4521eef506823753617c86c99e9"
     },
     "UNETLoader": {
       "inputs": {
         "unet_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         },
         "weight_dtype": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "VAEDecode": {
       "inputs": {
@@ -858,7 +950,9 @@
           "optional": false,
           "type": "VAE"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "VAEEncode": {
       "inputs": {
@@ -870,16 +964,20 @@
           "optional": false,
           "type": "VAE"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     },
     "VAELoader": {
       "inputs": {
         "vae_name": {
           "optional": false,
-          "type": "UNKNOWN"
+          "type": "COMBO"
         }
-      }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
     }
   },
-  "source_revision": "69ea58697bb2f05124f5dc7e00ad111f7cfff645"
+  "source_revision": "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25"
 }

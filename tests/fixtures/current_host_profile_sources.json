@@ -1,5 +1,5 @@
 {
-  "core_revision": "69ea58697bb2f05124f5dc7e00ad111f7cfff645",
+  "core_revision": "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25",
   "profiles": {
     "anima": {
       "locator": "reference/ComfyUI/blueprints/Text to Image (Anima).json",
@@ -7,7 +7,7 @@
       "source_kind": "core-blueprint"
     },
     "chroma": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_chroma_text_to_image.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_chroma_text_to_image.json",
       "sha256": "7fd2bbee72b1d32aa437433ed95d69d8676b41177d3db6880f8ece6f5421ccbc",
       "source_kind": "workflow-template-package"
     },
@@ -47,7 +47,7 @@
       "source_kind": "core-blueprint"
     },
     "flux_kontext_dev_edit": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:flux_kontext_dev_basic.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:flux_kontext_dev_basic.json",
       "sha256": "9fe3687dae2e2427e894e9e05d41dd3354bac377962588254dfa3a1c0717ee5e",
       "source_kind": "workflow-template-package"
     },
@@ -57,17 +57,17 @@
       "source_kind": "core-blueprint"
     },
     "hidream_i1_dev_fp8": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_dev.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:hidream_i1_dev.json",
       "sha256": "3e929f0cb81a126c36436a7e07d5a2d7b7a55e656f6392edfd4749e365cf87ea",
       "source_kind": "workflow-template-package"
     },
     "hidream_i1_fast": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_fast.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:hidream_i1_fast.json",
       "sha256": "345400d918e9645f5328a329377cc7de3799fa102d696ed97ee897bdd2a9b7ee",
       "source_kind": "workflow-template-package"
     },
     "hidream_i1_full": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:hidream_i1_full.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:hidream_i1_full.json",
       "sha256": "af698df59699a8ec0659d2e5e60fe17b0b9a7d7cd70cd81fb007126f0a8d6a06",
       "source_kind": "workflow-template-package"
     },
@@ -77,28 +77,28 @@
       "source_kind": "core-blueprint"
     },
     "klein_4b": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_klein_text_to_image.json",
-      "sha256": "237b436e577cdd2a97527766637e87af162b4c14fb293c9c269b470b7a2d0166",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_flux2_klein_text_to_image.json",
+      "sha256": "f5b2e75448e1ef44ab3d08da00900000f0258f8f963934370c6a1c329d1328c2",
       "source_kind": "workflow-template-package"
     },
     "klein_9b": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_text_to_image_9b.json",
-      "sha256": "01d26f79edf66714ae2280afa5117edb71d11865423307ab15303192657ef69b",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_flux2_text_to_image_9b.json",
+      "sha256": "81f534c8761fffb34030d8e09de51b96a3dd7d0ebf0505104444568cd0360c62",
       "source_kind": "workflow-template-package"
     },
     "klein_9b_kv_image_edit": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_flux2_klein_9b_kv_image_edit.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_flux2_klein_9b_kv_image_edit.json",
       "sha256": "8971a174ac2387a4cdda19ee1102ebc560e4cac75783f6162467c38eb07a499f",
       "source_kind": "workflow-template-package"
     },
     "krea2_turbo": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_krea2_turbo_t2i.json",
-      "sha256": "06f0b86b19d057c02b5a528c1df17fce121581bb742f5bf6e71fe9fcc8066869",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_krea2_turbo_t2i.json",
+      "sha256": "a75e5e49cadd37e13856f2198bff275004cc6e6102ba47e699347d6dc76f267d",
       "source_kind": "workflow-template-package"
     },
     "longcat_image": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_longcat_text_to_image.json",
-      "sha256": "b070f72c798fba15545c64716d5dc166f3eb5d0e65b2d99d4a28d3cbbc7e3504",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_longcat_text_to_image.json",
+      "sha256": "51228b25166ada6ea743adc6d44b4c2bff32728971f99e022ec34bfe86c37244",
       "source_kind": "workflow-template-package"
     },
     "longcat_image_edit": {
@@ -112,7 +112,7 @@
       "source_kind": "core-blueprint"
     },
     "qwen_image_edit": {
-      "locator": "comfyui-workflow-templates-json==0.1.3:image_qwen_image_edit.json",
+      "locator": "comfyui-workflow-templates-json==0.1.19:image_qwen_image_edit.json",
       "sha256": "2c8a46d0f89dd0956d4422a92aab15363fbdec51a7cc4d1350f4a9d3ef268d48",
       "source_kind": "workflow-template-package"
     },
@@ -132,5 +132,6 @@
       "source_kind": "core-blueprint"
     }
   },
-  "workflow_templates_json_version": "0.1.3"
+  "workflow_templates_json_version": "0.1.19",
+  "workflow_templates_version": "0.11.20"
 }

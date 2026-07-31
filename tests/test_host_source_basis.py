@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+from rookieui.contracts import host_source_basis as source_basis
 from rookieui.contracts.host_source_basis import (
     HOST_SOURCE_BASIS,
     WORKFLOW_TEMPLATE_ARTIFACTS,
+    WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS,
     WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6,
 )
 
@@ -35,11 +37,91 @@ class HostSourceBasisTests(unittest.TestCase):
             WORKFLOW_TEMPLATE_ARTIFACTS["0.11.6"].sha256,
             "67c290064ab9171637a863875da0726b5fe89cfb954645bf93e9098a8f2fdd21",
         )
+        self.assertEqual(
+            WORKFLOW_TEMPLATE_ARTIFACTS["0.11.20"].sha256,
+            "51a997f697eb04319185231744c76f0af2975c281557afee897650ea0dab775f",
+        )
         for version, artifact in WORKFLOW_TEMPLATE_ARTIFACTS.items():
             with self.subTest(version=version):
                 self.assertEqual(artifact.version, version)
                 self.assertEqual(len(artifact.sha256), 64)
                 self.assertNotIn("latest", artifact.filename.lower())
+
+    def test_current_workflow_template_component_closure_is_exact(self) -> None:
+        current = {
+            artifact.package: (artifact.version, artifact.sha256)
+            for artifact in WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS
+            if artifact.basis_version == "0.11.20"
+        }
+        self.assertEqual(
+            current,
+            {
+                "comfyui-workflow-templates-core": (
+                    "0.3.285",
+                    "565fe48a98b39e43c55275df152ea2292616b5b68a5a4884a564aaa76b8270be",
+                ),
+                "comfyui-workflow-templates-json": (
+                    "0.1.19",
+                    "d30ad6c6043a1fb022065a04f21bb88e34fff61af8605ef848b4462bb9a2091f",
+                ),
+                "comfyui-workflow-templates-media-assets-01": (
+                    "0.1.13",
+                    "7668f34f80fec894fe35d04f369d168cd1a90fb74d5694da5f728c563c49fe09",
+                ),
+                "comfyui-workflow-templates-media-api": (
+                    "0.3.84",
+                    "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+                ),
+                "comfyui-workflow-templates-media-image": (
+                    "0.3.160",
+                    "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+                ),
+                "comfyui-workflow-templates-media-other": (
+                    "0.3.229",
+                    "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+                ),
+                "comfyui-workflow-templates-media-video": (
+                    "0.3.101",
+                    "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+                ),
+            },
+        )
+
+    def test_current_workflow_surface_disposition_is_complete_and_disjoint(self) -> None:
+        delta = getattr(source_basis, "WORKFLOW_TEMPLATE_DELTA_0_11_6_TO_0_11_20", None)
+        self.assertIsNotNone(delta)
+        self.assertEqual(delta.from_version, "0.11.6")
+        self.assertEqual(delta.to_version, "0.11.20")
+        self.assertEqual(
+            (delta.added_count, delta.removed_count, delta.changed_count, delta.unchanged_count),
+            (41, 6, 138, 332),
+        )
+        self.assertEqual(
+            delta.source_report_sha256,
+            "2dd6322d3f7c78c8f91b9f6c03864ae586e8a7f9c58507a8fa41b2c24c3ee306",
+        )
+        ledgers = tuple(
+            set(values)
+            for values in (delta.supported, delta.deferred, delta.removed, delta.reference_only)
+        )
+        for index, left in enumerate(ledgers):
+            for right in ledgers[index + 1 :]:
+                self.assertFalse(left & right)
+        self.assertEqual(tuple(map(len, ledgers)), (4, 81, 6, 94))
+        self.assertEqual(len(set().union(*ledgers)), 185)
+        self.assertIn("image_krea2_turbo_t2i", ledgers[0])
+        for deferred in (
+            "image_anima_lllite_any_control_to_image",
+            "image_joyai_image_edit",
+            "image_krea2_turbo_int8_image_style_reference",
+            "image_mage_flow_edit_int8",
+        ):
+            self.assertIn(deferred, ledgers[1])
+        for reference_only in (
+            "api_recraft_v4_1_text_to_vector",
+            "video_wan_dancer",
+        ):
+            self.assertIn(reference_only, ledgers[3])
 
     def test_exact_workflow_surface_delta_is_complete_and_disjoint(self) -> None:
         delta = WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6

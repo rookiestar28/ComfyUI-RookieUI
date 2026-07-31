@@ -4,6 +4,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+from rookieui.contracts.current_workflow_template_delta import (
+    WORKFLOW_TEMPLATE_0_11_20_DEFERRED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_20_REFERENCE_ONLY_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_20_REMOVED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_20_SUPPORTED_SURFACES,
+)
+
 
 @dataclass(frozen=True)
 class CoreSourceBasis:
@@ -58,6 +65,21 @@ class WorkflowTemplateSurfaceDelta:
     deferred: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class WorkflowTemplateDeltaContract:
+    from_version: str
+    to_version: str
+    added_count: int
+    removed_count: int
+    changed_count: int
+    unchanged_count: int
+    source_report_sha256: str
+    supported: tuple[str, ...]
+    deferred: tuple[str, ...]
+    removed: tuple[str, ...]
+    reference_only: tuple[str, ...]
+
+
 # IMPORTANT: these are separate compatibility envelopes; do not collapse them
 # into a mutable or synthetic "latest ComfyUI" version.
 HOST_SOURCE_BASIS = HostSourceBasis(
@@ -91,10 +113,15 @@ WORKFLOW_TEMPLATE_ARTIFACTS: Mapping[str, WorkflowTemplateArtifact] = MappingPro
             filename="comfyui_workflow_templates-0.11.6-py3-none-any.whl",
             sha256="67c290064ab9171637a863875da0726b5fe89cfb954645bf93e9098a8f2fdd21",
         ),
+        "0.11.20": WorkflowTemplateArtifact(
+            version="0.11.20",
+            filename="comfyui_workflow_templates-0.11.20-py3-none-any.whl",
+            sha256="51a997f697eb04319185231744c76f0af2975c281557afee897650ea0dab775f",
+        ),
     }
 )
 
-WORKFLOW_TEMPLATE_CHANGED_COMPONENT_ARTIFACTS: tuple[WorkflowTemplateComponentArtifact, ...] = (
+WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS: tuple[WorkflowTemplateComponentArtifact, ...] = (
     WorkflowTemplateComponentArtifact(
         "0.11.2",
         "comfyui-workflow-templates-core",
@@ -131,7 +158,52 @@ WORKFLOW_TEMPLATE_CHANGED_COMPONENT_ARTIFACTS: tuple[WorkflowTemplateComponentAr
         "0.1.1",
         "16c1c2dab19a12ea0a144f115fa67aded94202f9a035104856f9b3688eaea56b",
     ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-core",
+        "0.3.285",
+        "565fe48a98b39e43c55275df152ea2292616b5b68a5a4884a564aaa76b8270be",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-json",
+        "0.1.19",
+        "d30ad6c6043a1fb022065a04f21bb88e34fff61af8605ef848b4462bb9a2091f",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-media-assets-01",
+        "0.1.13",
+        "7668f34f80fec894fe35d04f369d168cd1a90fb74d5694da5f728c563c49fe09",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-media-api",
+        "0.3.84",
+        "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-media-image",
+        "0.3.160",
+        "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-media-other",
+        "0.3.229",
+        "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.20",
+        "comfyui-workflow-templates-media-video",
+        "0.3.101",
+        "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+    ),
 )
+
+# Backward-compatible name retained for consumers of the pre-0.11.20 ledger.
+WORKFLOW_TEMPLATE_CHANGED_COMPONENT_ARTIFACTS = WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS
 
 _ADDED_SURFACES = (
     "api_bytedance_seed_audio1_0_t2a",
@@ -152,4 +224,20 @@ WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6 = WorkflowTemplateSurfaceDelta(
     removed=(),
     supported=(),
     deferred=(*_ADDED_SURFACES, *_CHANGED_SURFACES),
+)
+
+# IMPORTANT: the four ledgers classify the complete changed/added/removed
+# 0.11.6 -> 0.11.20 JSON surface set; only `supported` is a runtime claim.
+WORKFLOW_TEMPLATE_DELTA_0_11_6_TO_0_11_20 = WorkflowTemplateDeltaContract(
+    from_version="0.11.6",
+    to_version="0.11.20",
+    added_count=41,
+    removed_count=6,
+    changed_count=138,
+    unchanged_count=332,
+    source_report_sha256="2dd6322d3f7c78c8f91b9f6c03864ae586e8a7f9c58507a8fa41b2c24c3ee306",
+    supported=WORKFLOW_TEMPLATE_0_11_20_SUPPORTED_SURFACES,
+    deferred=WORKFLOW_TEMPLATE_0_11_20_DEFERRED_SURFACES,
+    removed=WORKFLOW_TEMPLATE_0_11_20_REMOVED_SURFACES,
+    reference_only=WORKFLOW_TEMPLATE_0_11_20_REFERENCE_ONLY_SURFACES,
 )
