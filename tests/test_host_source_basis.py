@@ -11,11 +11,12 @@ from rookieui.contracts.host_source_basis import (
 
 class HostSourceBasisTests(unittest.TestCase):
     def test_host_envelopes_remain_distinct_and_exact(self) -> None:
-        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "69ea58697bb2f05124f5dc7e00ad111f7cfff645")
-        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.45.20")
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.6")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "b40fad0e755ddee5b09db3b93566f7e0a9f6967f")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.48.2")
+        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25")
+        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.47.11")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.20")
+        self.assertEqual(HOST_SOURCE_BASIS.core.embedded_docs_version, "0.5.9")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "e1718dacb7bd8afeff41f00069747ff55065bf50")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.49.2")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.revision, "e2d964b7456cea8423c7b9d3371c612313c06baa")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.source_version, "0.9.4")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.packaged_core_version, "0.22.3")

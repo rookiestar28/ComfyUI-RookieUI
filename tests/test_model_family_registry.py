@@ -94,7 +94,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
                 self.assertEqual(presets_by_id[profile_id]["scheduler_name"], "")
 
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.6")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.20")
         entries = list_model_family_registry_entries()
         stale_source_markers = ("0.9.91", "0.9.98", "0.10.3")
         stale_entries = [

@@ -62,14 +62,14 @@ class WorkflowTemplateSurfaceDelta:
 # into a mutable or synthetic "latest ComfyUI" version.
 HOST_SOURCE_BASIS = HostSourceBasis(
     core=CoreSourceBasis(
-        revision="69ea58697bb2f05124f5dc7e00ad111f7cfff645",
-        frontend_package_version="1.45.20",
-        workflow_templates_version="0.11.6",
-        embedded_docs_version="0.5.7",
+        revision="5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25",
+        frontend_package_version="1.47.11",
+        workflow_templates_version="0.11.20",
+        embedded_docs_version="0.5.9",
     ),
     frontend=FrontendSourceBasis(
-        revision="b40fad0e755ddee5b09db3b93566f7e0a9f6967f",
-        source_version="1.48.2",
+        revision="e1718dacb7bd8afeff41f00069747ff55065bf50",
+        source_version="1.49.2",
     ),
     desktop=DesktopSourceBasis(
         revision="e2d964b7456cea8423c7b9d3371c612313c06baa",

@@ -32,6 +32,11 @@ DEFERRED_PROFILE_IDS = {
     "klein_9b_distilled",
     "qwen_image_edit_multi_lora",
 }
+# IMPORTANT: F303 rebaselines host identity; F304 owns replacement of these
+# active legacy graph fixtures and must keep this explicit drift visible.
+LEGACY_GRAPH_FIXTURE_CORE_REVISION = (
+    "69ea58697bb2f05124f5dc7e00ad111f7cfff645"  # pragma: allowlist secret
+)
 
 
 def _load_fixture(name: str) -> dict[str, object]:
@@ -78,9 +83,10 @@ def _literal_emitted_classes_and_nodes() -> tuple[set[str], list[tuple[str, set[
 
 
 class CurrentHostGraphContractTests(unittest.TestCase):
-    def test_every_shipped_profile_has_exact_current_source_provenance(self) -> None:
+    def test_active_profile_fixture_remains_explicitly_legacy_until_f304(self) -> None:
         fixture = _load_fixture("comfyui_0_11_6_profile_sources.json")
-        self.assertEqual(fixture["core_revision"], HOST_SOURCE_BASIS.core.revision)
+        self.assertEqual(fixture["core_revision"], LEGACY_GRAPH_FIXTURE_CORE_REVISION)
+        self.assertNotEqual(fixture["core_revision"], HOST_SOURCE_BASIS.core.revision)
         self.assertEqual(fixture["workflow_templates_json_version"], "0.1.3")
         expected_profiles = fixture["profiles"]
         entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
@@ -101,9 +107,10 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     get_family_template_manifest_entry(profile_id)
 
-    def test_all_literal_emitted_host_classes_and_inputs_match_current_contract(self) -> None:
+    def test_active_node_fixture_remains_explicitly_legacy_until_f304(self) -> None:
         fixture = _load_fixture("comfyui_0_11_6_node_contract.json")
-        self.assertEqual(fixture["source_revision"], HOST_SOURCE_BASIS.core.revision)
+        self.assertEqual(fixture["source_revision"], LEGACY_GRAPH_FIXTURE_CORE_REVISION)
+        self.assertNotEqual(fixture["source_revision"], HOST_SOURCE_BASIS.core.revision)
         contracts = fixture["classes"]
         emitted, literal_nodes = _literal_emitted_classes_and_nodes()
         self.assertFalse(emitted - set(contracts) - LOCAL_NODE_CLASSES)
