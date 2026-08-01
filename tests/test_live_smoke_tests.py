@@ -2226,7 +2226,7 @@ class LiveSmokeADetailerTests(unittest.TestCase):
                     "6": {"class_type": "RookieUIControlNetApplyNativeAdvanced", "inputs": {}},
                     "7": {"class_type": "RookieUIControlNetApplyNativeAdvanced", "inputs": {}},
                     "8": {"class_type": "VAEDecode", "inputs": {}},
-                    "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0]}},
+                    "9": {"class_type": "RookieUISaveImageWithMetadata", "inputs": {"images": ["8", 0]}},
                 },
             },
         )

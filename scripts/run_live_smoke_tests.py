@@ -95,6 +95,7 @@ _CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILA
 _CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
 _CONTROLNET_SD15_MODEL_MARKERS = ("sd15", "sd1.5", "sd-15", "sd_15")
 _CONTROLNET_SDXL_MODEL_MARKERS = ("sdxl", "pony", "illustrious", "noob")
+_IMAGE_OUTPUT_NODE_TYPES = frozenset({"RookieUISaveImageWithMetadata", "SaveImage"})
 _CONTROLNET_ALLOWED_DETECT_BACKENDS = {
     "comfy_host_preprocessor",
     "comfy_host_preprocessor_aio",
@@ -3885,7 +3886,13 @@ def _validate_adetailer_dry_run_case_response(
         if isinstance(node, dict) and node.get("class_type") == "RookieUIControlNetApplyNativeAdvanced"
     ]
     decode_nodes = [(node_id, node) for node_id, node in workflow.items() if isinstance(node, dict) and node.get("class_type") == "VAEDecode"]
-    save_nodes = [node for node in workflow.values() if isinstance(node, dict) and node.get("class_type") == "SaveImage"]
+    # IMPORTANT: shipped workflows use the metadata-preserving saver; retain native
+    # SaveImage support so the host validator also covers compatible legacy graphs.
+    save_nodes = [
+        node
+        for node in workflow.values()
+        if isinstance(node, dict) and node.get("class_type") in _IMAGE_OUTPUT_NODE_TYPES
+    ]
 
     if len(sampler_nodes) != case.expected_sampler_nodes:
         errors.append(
