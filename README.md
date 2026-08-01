@@ -25,6 +25,18 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Krea-2 Turbo prompt enhancement and refreshed host alignment (new functionality/stability)</strong></summary>
+
+- Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template source basis, including template coverage through `comfyui-workflow-templates` 0.11.20.
+- Krea-2 Turbo now exposes local prompt enhancement on its normal txt2img surface. It is enabled by default, runs through the host `TextGenerate` graph, and can be disabled to send the original prompt through unchanged.
+- Krea-2 graph generation now validates the active host text-generation inputs before submission and keeps the official model, Qwen encoder/VAE, sampler, and optional template LoRA behavior aligned with the shipped local template.
+- Current-host validation now covers the refreshed source identities and workflow graphs, while frontend dependency checks detect Windows/WSL native-package drift before tests start.
+- Public release checks now inspect tracked text as well as paths and symlinks, reducing the risk of packaging internal-only material.
+
+</details>
+
+<details>
+
 <summary><strong>Current host runtime and release hardening (stability/security)</strong></summary>
 
 - Refreshed the current ComfyUI host source basis and revalidated shipped workflow graphs, node signatures, prompt submission behavior, and compatibility boundaries against it.
@@ -462,7 +474,6 @@ Current extension seams:
 ## Table of Contents
 
 - [Last updates](#last-updates---click-to-expand)
-  - [Generation metadata and preview action parity hotfix](#generation-metadata-and-preview-action-parity-hotfix)
 - [Installation](#installation)
 - [Feature Overview](#feature-overview)
   - [Official Non-SD Template Presets](#official-non-sd-template-presets)
@@ -498,6 +509,8 @@ python -m pip install -r requirements.txt
 ```
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
+
+RookieUI requires Python 3.10 or newer and must be installed into the same Python environment used by ComfyUI.
 
 `ControlNet` and `ADetailer` support are built into RookieUI itself. You do not need to install separate external custom-node packs just to use RookieUI's integrated ControlNet or ADetailer surfaces.
 
@@ -535,6 +548,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including parser modes, `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, old-emphasis compatibility, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - Official txt2img profiles include newer lanes such as `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
+- Krea-2 Turbo prompt enhancement is enabled by default on its local txt2img profile; turning it off preserves and encodes the original prompt without adding the host text-generation stage
 - Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
 - ComfyUI-native prompt submission with host API-node usage-source attribution, embedded A1111-style `parameters` metadata, and separate RookieUI origin metadata
 
@@ -833,6 +847,7 @@ Behavior and compatibility:
 
 ### ComfyUI Host Compatibility
 
+- Compatibility is validated against separate tested ComfyUI Core, frontend, Desktop, and workflow-template source snapshots rather than inferred from one mutable "latest ComfyUI" version.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
