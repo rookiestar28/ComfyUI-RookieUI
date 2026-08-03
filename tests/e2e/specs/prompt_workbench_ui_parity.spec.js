@@ -184,8 +184,16 @@ test("captures Prompt Workbench prompt-all-in-one UI parity evidence", async ({ 
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveText("5 tags");
   await expect(workbench.locator("[data-pw-ui='inline-counter']")).toHaveAttribute("role", "status");
   await expect(workbench.locator("[data-pw-ui='inline-language']")).toContainText("prompt");
-  const counterFontSize = await workbench.locator("[data-pw-ui='inline-counter']").evaluate((node) => getComputedStyle(node).fontSize);
-  await expect(workbench.locator("[data-pw-ui='inline-language']")).toHaveCSS("font-size", counterFontSize);
+  // IMPORTANT: poll both values; parallel E2E may observe one element before the stylesheet settles.
+  await expect
+    .poll(async () =>
+      Promise.all(
+        ["inline-counter", "inline-language"].map((ui) =>
+          workbench.locator(`[data-pw-ui='${ui}']`).evaluate((node) => getComputedStyle(node).fontSize),
+        ),
+      ),
+    )
+    .toEqual(["11px", "11px"]);
   await expect(workbench.locator("[data-pw-ui='inline-language']")).toHaveAttribute(
     "aria-label",
     "Prompt workbench language and scope",
