@@ -17,15 +17,14 @@ function Require-Cmd($cmd) {
   }
 }
 
-function Invoke-Checked {
+function Invoke-NativeCapture {
   param(
-    [Parameter(Mandatory = $true)][string]$Label,
-    [Parameter(Mandatory = $true)][scriptblock]$Command
+    [Parameter(Mandatory = $true)][scriptblock]$Command,
+    [switch]$ReplayOutput
   )
-  # Python unittest writes its normal progress/results to stderr. In Windows PowerShell,
-  # ErrorActionPreference=Stop can terminate on that stream before the native process
-  # finishes, producing a false failure after the first test line. Capture the merged
-  # streams while Continue is scoped to this native command, then check the saved exit.
+  # Windows PowerShell represents native stderr as error records. Keep the
+  # policy relaxed only while the native process runs, then restore the caller
+  # preference before returning the real process exit code.
   $commandOutput = @()
   $commandExitCode = 0
   $previousErrorActionPreference = $ErrorActionPreference
@@ -38,10 +37,21 @@ function Invoke-Checked {
     $ErrorActionPreference = $previousErrorActionPreference
   }
 
-  foreach ($outputLine in $commandOutput) {
-    Write-Host $outputLine
+  if ($ReplayOutput) {
+    foreach ($outputLine in $commandOutput) {
+      Write-Host $outputLine
+    }
   }
 
+  return $commandExitCode
+}
+
+function Invoke-Checked {
+  param(
+    [Parameter(Mandatory = $true)][string]$Label,
+    [Parameter(Mandatory = $true)][scriptblock]$Command
+  )
+  $commandExitCode = Invoke-NativeCapture -Command $Command -ReplayOutput
   if ($commandExitCode -ne 0) {
     throw "[tests] ERROR: $Label failed with exit code $commandExitCode"
   }
@@ -144,14 +154,14 @@ if (-not (Test-VenvPython -PythonExe $venvPython)) {
   throw "[tests] ERROR: project venv python is not runnable: $venvPython"
 }
 
-& $venvPython -m pre_commit --version | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$preCommitVersionExit = Invoke-NativeCapture -Command { & $venvPython -m pre_commit --version }
+if ($preCommitVersionExit -ne 0) {
   Write-Host "[tests] Installing pre-commit into project venv ..."
   Invoke-Checked "pip install pre-commit" { & $venvPython -m pip install -U pip pre-commit }
 }
 
-& $venvPython -c "import numpy, PIL, aiohttp" | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$runtimeDependencyExit = Invoke-NativeCapture -Command { & $venvPython -c "import numpy, PIL, aiohttp" }
+if ($runtimeDependencyExit -ne 0) {
   Write-Host "[tests] Installing numpy/pillow/aiohttp into project venv ..."
   Invoke-Checked "pip install numpy pillow aiohttp" { & $venvPython -m pip install numpy pillow aiohttp }
 }
@@ -161,8 +171,8 @@ if ($nodeMajor -lt 18) {
   throw "[tests] ERROR: Node >=18 required, current=$(node -v)"
 }
 
-& node scripts\verify_node_modules_lock.mjs
-if ($LASTEXITCODE -ne 0) {
+$dependencyCheckExit = Invoke-NativeCapture -Command { & node scripts\verify_node_modules_lock.mjs } -ReplayOutput
+if ($dependencyCheckExit -ne 0) {
   # SECURITY: verify dependency identity; a package marker does not prove lockfile parity.
   Write-Host "[tests] Frontend dependencies are missing or stale; repairing via npm ci ..."
   Invoke-Checked "npm ci" { npm ci }
@@ -188,8 +198,8 @@ Invoke-Checked "detect-secrets" { & $venvPython -m pre_commit run detect-secrets
 Write-Host "[tests] 4/8 pre-commit all hooks"
 $worktreeBefore = Get-GitDiffSnapshot
 $indexBefore = Get-GitDiffSnapshot -Cached
-& $venvPython -m pre_commit run --all-files --show-diff-on-failure
-if ($LASTEXITCODE -ne 0) {
+$preCommitExit = Invoke-NativeCapture -Command { & $venvPython -m pre_commit run --all-files --show-diff-on-failure } -ReplayOutput
+if ($preCommitExit -ne 0) {
   Write-Host "[tests] INFO: pre-commit returned non-zero; running second pass for verification ..."
   Invoke-Checked "pre-commit verify pass" { & $venvPython -m pre_commit run --all-files --show-diff-on-failure }
 }
