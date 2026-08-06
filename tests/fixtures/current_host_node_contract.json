@@ -1,5 +1,29 @@
 {
   "classes": {
+    "ControlNetLoader": {
+      "inputs": {
+        "control_net_name": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
+    "DiffControlNetLoader": {
+      "inputs": {
+        "control_net_name": {
+          "optional": false,
+          "type": "COMBO"
+        },
+        "model": {
+          "optional": false,
+          "type": "MODEL"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
     "BasicGuider": {
       "inputs": {
         "conditioning": {
@@ -12,7 +36,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "BasicScheduler": {
       "inputs": {
@@ -36,7 +60,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "CFGGuider": {
       "inputs": {
@@ -59,7 +83,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "CFGNorm": {
       "inputs": {
@@ -104,7 +128,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "CLIPLoader": {
       "inputs": {
@@ -122,7 +146,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "Canny": {
       "inputs": {
@@ -144,6 +168,21 @@
       "source_path": "comfy_extras/nodes_canny.py",
       "source_sha256": "5efd352d92d7749b7b9734a1676fee18f4431d44a8e9477822a7a8f38ad26051"
     },
+    "CLIPSetLastLayer": {
+      "inputs": {
+        "clip": {
+          "optional": false,
+          "type": "CLIP"
+        },
+        "stop_at_clip_layer": {
+          "default": -1,
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
     "CheckpointLoaderSimple": {
       "inputs": {
         "ckpt_name": {
@@ -152,7 +191,56 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
+    "ConditioningCombine": {
+      "inputs": {
+        "conditioning_1": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "conditioning_2": {
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
+    "ConditioningSetAreaStrength": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "strength": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
+    "ConditioningSetTimestepRange": {
+      "inputs": {
+        "conditioning": {
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "end": {
+          "default": 1.0,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "start": {
+          "default": 0.0,
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "ComfySwitchNode": {
       "inputs": {
@@ -180,7 +268,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "DualCLIPLoader": {
       "inputs": {
@@ -202,7 +290,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "DualModelGuider": {
       "inputs": {
@@ -229,7 +317,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "EmptyFlux2LatentImage": {
       "inputs": {
@@ -271,7 +359,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "EmptySD3LatentImage": {
       "inputs": {
@@ -431,7 +519,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "ImageScaleToTotalPixels": {
       "inputs": {
@@ -539,7 +627,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "KSamplerSelect": {
       "inputs": {
@@ -549,7 +637,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "LatentUpscale": {
       "inputs": {
@@ -577,7 +665,26 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
+    },
+    "LatentUpscaleBy": {
+      "inputs": {
+        "samples": {
+          "optional": false,
+          "type": "LATENT"
+        },
+        "scale_by": {
+          "default": 1.5,
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "upscale_method": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "source_path": "nodes.py",
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "LoraLoader": {
       "inputs": {
@@ -605,7 +712,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "LoraLoaderModelOnly": {
       "inputs": {
@@ -624,7 +731,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "ModelPatchLoader": {
       "inputs": {
@@ -748,7 +855,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "ReferenceLatent": {
       "inputs": {
@@ -788,7 +895,7 @@
         }
       },
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_sha256": "c3bd7c80dd55992b6bf40126756a6275688dfbbd7c2fa7592b69ebfdcbb804d4"
+      "source_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b"
     },
     "StringReplace": {
       "inputs": {
@@ -938,7 +1045,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "VAEDecode": {
       "inputs": {
@@ -952,7 +1059,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "VAEEncode": {
       "inputs": {
@@ -966,7 +1073,7 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
     "VAELoader": {
       "inputs": {
@@ -976,8 +1083,8 @@
         }
       },
       "source_path": "nodes.py",
-      "source_sha256": "860b5aa27a99be08627c4f996b2852c998081473a54e7be4f24c6c421f667a8d"
+      "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     }
   },
-  "source_revision": "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25"
+  "source_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5"
 }

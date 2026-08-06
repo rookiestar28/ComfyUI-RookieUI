@@ -9,6 +9,12 @@ from rookieui.contracts.current_workflow_template_delta import (
     WORKFLOW_TEMPLATE_0_11_20_REFERENCE_ONLY_SURFACES,
     WORKFLOW_TEMPLATE_0_11_20_REMOVED_SURFACES,
     WORKFLOW_TEMPLATE_0_11_20_SUPPORTED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_ADDED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_DEFERRED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_REMOVED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_31_SUPPORTED_SURFACES,
 )
 
 
@@ -78,20 +84,22 @@ class WorkflowTemplateDeltaContract:
     deferred: tuple[str, ...]
     removed: tuple[str, ...]
     reference_only: tuple[str, ...]
+    added: tuple[str, ...] = ()
+    changed: tuple[str, ...] = ()
 
 
 # IMPORTANT: these are separate compatibility envelopes; do not collapse them
 # into a mutable or synthetic "latest ComfyUI" version.
 HOST_SOURCE_BASIS = HostSourceBasis(
     core=CoreSourceBasis(
-        revision="5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25",
-        frontend_package_version="1.47.11",
-        workflow_templates_version="0.11.20",
+        revision="6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+        frontend_package_version="1.48.6",
+        workflow_templates_version="0.11.31",
         embedded_docs_version="0.5.9",
     ),
     frontend=FrontendSourceBasis(
-        revision="e1718dacb7bd8afeff41f00069747ff55065bf50",
-        source_version="1.49.2",
+        revision="2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
+        source_version="1.50.1",
     ),
     desktop=DesktopSourceBasis(
         revision="e2d964b7456cea8423c7b9d3371c612313c06baa",
@@ -117,6 +125,11 @@ WORKFLOW_TEMPLATE_ARTIFACTS: Mapping[str, WorkflowTemplateArtifact] = MappingPro
             version="0.11.20",
             filename="comfyui_workflow_templates-0.11.20-py3-none-any.whl",
             sha256="51a997f697eb04319185231744c76f0af2975c281557afee897650ea0dab775f",
+        ),
+        "0.11.31": WorkflowTemplateArtifact(
+            version="0.11.31",
+            filename="comfyui_workflow_templates-0.11.31-py3-none-any.whl",
+            sha256="6841413b025d695c16d410b2d070c627d1704f42fe55dcef57219dc77fa5fde2",
         ),
     }
 )
@@ -200,6 +213,48 @@ WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS: tuple[WorkflowTemplateComponentArtifact, 
         "0.3.101",
         "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
     ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-core",
+        "0.3.295",
+        "7b89b0c98e70c00ea14391df217eb7fe7c99bdbae71907e5d89fc8f4abf0c3b3",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-json",
+        "0.1.30",
+        "61ba5b43f2acd74b3db9395e9a4138f171a75f4a304fb3fc0fd8d77051beeaf9",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-media-assets-01",
+        "0.1.19",
+        "a127995e73f47cd82a35acaba723267b74b44eb1a3a62fbd685d5e57a7576bfc",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-media-api",
+        "0.3.84",
+        "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-media-image",
+        "0.3.160",
+        "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-media-other",
+        "0.3.229",
+        "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.31",
+        "comfyui-workflow-templates-media-video",
+        "0.3.101",
+        "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+    ),
 )
 
 # Backward-compatible name retained for consumers of the pre-0.11.20 ledger.
@@ -240,4 +295,23 @@ WORKFLOW_TEMPLATE_DELTA_0_11_6_TO_0_11_20 = WorkflowTemplateDeltaContract(
     deferred=WORKFLOW_TEMPLATE_0_11_20_DEFERRED_SURFACES,
     removed=WORKFLOW_TEMPLATE_0_11_20_REMOVED_SURFACES,
     reference_only=WORKFLOW_TEMPLATE_0_11_20_REFERENCE_ONLY_SURFACES,
+)
+
+# The source report digest is SHA-256 over the canonical JSON object containing
+# both old/new filename-to-digest maps and sorted added/removed/changed/
+# unchanged lists. It is a static provenance receipt, not a runtime dependency.
+WORKFLOW_TEMPLATE_DELTA_0_11_20_TO_0_11_31 = WorkflowTemplateDeltaContract(
+    from_version="0.11.20",
+    to_version="0.11.31",
+    added_count=7,
+    removed_count=4,
+    changed_count=22,
+    unchanged_count=484,
+    source_report_sha256="eee601042dba13323d8be1201e729701875085784231fcb619ddefc835980fd0",
+    supported=WORKFLOW_TEMPLATE_0_11_31_SUPPORTED_SURFACES,
+    deferred=WORKFLOW_TEMPLATE_0_11_31_DEFERRED_SURFACES,
+    removed=WORKFLOW_TEMPLATE_0_11_31_REMOVED_SURFACES,
+    reference_only=WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES,
+    added=WORKFLOW_TEMPLATE_0_11_31_ADDED_SURFACES,
+    changed=WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES,
 )

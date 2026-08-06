@@ -21,8 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "tests" / "fixtures" / "current_host_risk_contract.json"
 CI_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 EXPECTED_SOURCES = {
-    "core": "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25",
-    "frontend": "e1718dacb7bd8afeff41f00069747ff55065bf50",
+    "core": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+    "frontend": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
     "desktop": "e2d964b7456cea8423c7b9d3371c612313c06baa",
 }
 EXPECTED_ARTIFACTS = {
@@ -80,6 +80,14 @@ class CurrentHostContractLaneTests(unittest.TestCase):
             self.assertEqual(len(report["verified_artifacts"]), 5)
         else:
             self.assertEqual(report["verified_artifacts"], [])
+
+    def test_refreshed_host_envelope_keeps_core_pinned_and_standalone_frontends_distinct(self) -> None:
+        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.48.6")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.50.1")
+        self.assertNotEqual(
+            HOST_SOURCE_BASIS.core.frontend_package_version,
+            HOST_SOURCE_BASIS.frontend.source_version,
+        )
 
     def test_validator_fails_closed_on_reference_revision_and_file_drift(self) -> None:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))

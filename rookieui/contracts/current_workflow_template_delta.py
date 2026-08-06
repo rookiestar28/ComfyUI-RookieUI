@@ -199,3 +199,59 @@ WORKFLOW_TEMPLATE_0_11_20_REFERENCE_ONLY_SURFACES: tuple[str, ...] = (
     "video_wan_vace_flf2v",
     "video_wan_vace_inpainting",
 )
+
+# Generated from the exact static 0.11.20 -> 0.11.31 JSON inventory. The
+# changed Krea surface is the only shipped profile source; every other added
+# or changed surface remains deferred until a separate product-scope decision.
+WORKFLOW_TEMPLATE_0_11_31_ADDED_SURFACES: tuple[str, ...] = (
+    "api_bfl_flux3_i2v",
+    "api_bfl_flux3_t2v",
+    "api_topaz_image_enhance_bloom2",
+    "api_topaz_image_enhance_wonder3_5",
+    "video_minimax_h3_i2v",
+    "video_minimax_h3_r2v",
+    "video_minimax_h3_t2v",
+)
+
+WORKFLOW_TEMPLATE_0_11_31_REMOVED_SURFACES: tuple[str, ...] = (
+    "api_hailuo_minimax_i2v",
+    "api_hailuo_minimax_t2v",
+    "api_hailuo_minimax_video",
+    "api_recraft_v4_1_image_to_vector",
+)
+
+WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES: tuple[str, ...] = (
+    "api_minimax_h3_flf2v",
+    "api_minimax_h3_r2v",
+    "api_minimax_h3_t2v",
+    "api_topaz_starlight_precise25",
+    "api_topaz_video_enhance",
+    "image_krea2_turbo_int8_image_style_reference",
+    "image_krea2_turbo_t2i",
+    "image_krea2_turbo_t2i_int8",
+    "index.ar",
+    "index.es",
+    "index.fa",
+    "index.fr",
+    "index.ja",
+    "index.json",
+    "index.ko",
+    "index.mcp",
+    "index.pt-BR",
+    "index.ru",
+    "index.tr",
+    "index.zh-TW",
+    "index.zh",
+    "video_ltx2_3_i2v",
+)
+
+WORKFLOW_TEMPLATE_0_11_31_SUPPORTED_SURFACES: tuple[str, ...] = (
+    "image_krea2_turbo_t2i",
+)
+
+WORKFLOW_TEMPLATE_0_11_31_DEFERRED_SURFACES: tuple[str, ...] = (
+    *WORKFLOW_TEMPLATE_0_11_31_ADDED_SURFACES,
+    *(surface for surface in WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES if surface != "image_krea2_turbo_t2i"),
+)
+
+WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES: tuple[str, ...] = ()

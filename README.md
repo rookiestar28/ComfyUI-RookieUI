@@ -27,7 +27,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <summary><strong>Krea-2 Turbo prompt enhancement and refreshed host alignment (new functionality/stability)</strong></summary>
 
-- Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template source basis, including template coverage through `comfyui-workflow-templates` 0.11.20.
+- Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template source basis, including template coverage through `comfyui-workflow-templates` 0.11.31.
 - Krea-2 Turbo now exposes local prompt enhancement on its normal txt2img surface. It is enabled by default, runs through the host `TextGenerate` graph, and can be disabled to send the original prompt through unchanged.
 - Krea-2 graph generation now validates the active host text-generation inputs before submission and keeps the official model, Qwen encoder/VAE, sampler, and optional template LoRA behavior aligned with the shipped local template.
 - Current-host validation now covers the refreshed source identities and workflow graphs, while frontend dependency checks detect Windows/WSL native-package drift before tests start.
@@ -53,7 +53,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>ComfyUI host refresh alignment (stability/compatibility)</strong></summary>
 
 - Direct RookieUI queue submissions now carry the `comfyui-rookieui` ComfyUI API-node usage-source tag while preserving separate RookieUI origin metadata and A1111-style PNG `parameters` metadata.
-- The official template manifest is aligned to `comfyui-workflow-templates` 0.11.20; shipped support remains limited to the RookieUI profiles listed below.
+- The official template manifest is aligned to `comfyui-workflow-templates` 0.11.31; shipped support remains limited to the RookieUI profiles listed below.
 - Host template tracking now separates core blueprints, packaged gallery JSON assets, and removed gallery entries so newly observed workflows are not treated as supported profiles until RookieUI has an explicit runtime surface for them.
 - Local `Ideogram v4` and `Krea-2 Turbo` txt2img workflows are now exposed as official template-backed profiles with host-specific model, encoder, VAE, sampler, and template LoRA prerequisites surfaced through the normal model selector contract.
 - The local Ideogram path follows the host dual-model scheduler workflow, while the local Krea path keeps the Krea2 text encoder, Qwen Image VAE, sampler defaults, and template-owned LoRA behavior on the existing `txt2img` surface.
@@ -624,7 +624,7 @@ If your host or Manager install path does not automatically install custom-node 
 ### Official Non-SD Template Presets
 
 - RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
-- Current official-template alignment uses `comfyui-workflow-templates` 0.11.20 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
+- Current official-template alignment uses `comfyui-workflow-templates` 0.11.31 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
 - These presets follow official template defaults or source-backed mode values for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`

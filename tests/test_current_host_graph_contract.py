@@ -18,15 +18,24 @@ from rookieui.services.ideogram4 import IDEOGRAM4_MODE_CONTRACTS
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures"
 BUILDER_PATHS = (
+    ROOT / "rookieui" / "nodes.py",
+    ROOT / "rookieui" / "services" / "workflow_builders" / "adetailer.py",
     ROOT / "rookieui" / "services" / "workflow_builders" / "core.py",
+    ROOT / "rookieui" / "services" / "workflow_builders" / "controlnet.py",
     ROOT / "rookieui" / "services" / "workflow_builders" / "image_edit_foundation.py",
     ROOT / "rookieui" / "services" / "workflow_builders" / "non_sd_templates.py",
     ROOT / "rookieui" / "services" / "workflow_builders" / "output.py",
+    ROOT / "rookieui" / "services" / "workflow_builders" / "prompt_conditioning.py",
+    ROOT / "rookieui" / "services" / "workflow_builders" / "sd_family_graphs.py",
 )
 LOCAL_NODE_CLASSES = {
+    "RookieUIADetailerDetectMask",
     "RookieUILoadAssetImage",
     "RookieUILoadAssetMask",
     "RookieUISaveImageWithMetadata",
+    "RookieUIControlNetPreprocess",
+    "RookieUIControlNetApplyNativeAdvanced",
+    "RookieUIVAEEncodeForInpaint",
 }
 PROFILE_FIXTURE = "current_host_profile_sources.json"
 NODE_FIXTURE = "current_host_node_contract.json"
@@ -35,7 +44,7 @@ TEMPLATE_JSON_REFERENCE = (
     ROOT
     / "reference"
     / "workflow_templates_artifacts"
-    / "0.11.20"
+    / "0.11.31"
     / "extracted"
     / "json"
     / "comfyui_workflow_templates_json"
@@ -100,7 +109,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             fixture["workflow_templates_version"],
             HOST_SOURCE_BASIS.core.workflow_templates_version,
         )
-        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.19")
+        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.30")
         expected_profiles = fixture["profiles"]
         entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
         self.assertEqual(set(entries), set(expected_profiles))
@@ -123,7 +132,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 path = ROOT / locator
             else:
                 package, filename = locator.split(":", maxsplit=1)
-                self.assertEqual(package, "comfyui-workflow-templates-json==0.1.19")
+                self.assertEqual(package, "comfyui-workflow-templates-json==0.1.30")
                 path = TEMPLATE_JSON_REFERENCE / filename
             with self.subTest(profile_id=profile_id, path=path.name):
                 self.assertTrue(path.is_file())
@@ -146,6 +155,10 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         emitted, literal_nodes = _literal_emitted_classes_and_nodes()
         self.assertEqual(set(contracts), emitted - LOCAL_NODE_CLASSES)
         self.assertIn("TextGenerate", contracts)
+        self.assertEqual(contracts["ControlNetLoader"]["source_path"], "nodes.py")
+        self.assertEqual(contracts["DiffControlNetLoader"]["source_path"], "nodes.py")
+        self.assertEqual(set(contracts["ControlNetLoader"]["inputs"]), {"control_net_name"})
+        self.assertEqual(set(contracts["DiffControlNetLoader"]["inputs"]), {"model", "control_net_name"})
 
         for class_type, contract in contracts.items():
             with self.subTest(class_type=class_type):
@@ -174,6 +187,26 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 }
                 self.assertFalse(unknown_inputs)
                 self.assertTrue(required <= emitted_inputs)
+
+    def test_delegated_controlnet_builder_is_part_of_current_host_scan(self) -> None:
+        self.assertIn(ROOT / "rookieui" / "services" / "workflow_builders" / "controlnet.py", BUILDER_PATHS)
+        emitted, _ = _literal_emitted_classes_and_nodes()
+        self.assertIn("ControlNetLoader", emitted)
+        self.assertIn("DiffControlNetLoader", emitted)
+
+    def test_all_graph_emitting_owners_are_part_of_current_host_scan(self) -> None:
+        expected_paths = {
+            ROOT / "rookieui" / "nodes.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "adetailer.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "core.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "controlnet.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "image_edit_foundation.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "non_sd_templates.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "output.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "prompt_conditioning.py",
+            ROOT / "rookieui" / "services" / "workflow_builders" / "sd_family_graphs.py",
+        }
+        self.assertEqual(set(BUILDER_PATHS), expected_paths)
 
     def test_active_node_provenance_matches_local_current_core_when_available(self) -> None:
         if not CORE_REFERENCE.exists():

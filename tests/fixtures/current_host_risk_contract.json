@@ -1,8 +1,8 @@
 {
   "fixture_version": "current-host-risk-lane-v2",
   "sources": {
-    "core": "5cc026f5b81b3f01fe7a1438a0fd4131d2ebda25",
-    "frontend": "e1718dacb7bd8afeff41f00069747ff55065bf50",
+    "core": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+    "frontend": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
     "desktop": "e2d964b7456cea8423c7b9d3371c612313c06baa"
   },
   "source_artifacts": [
