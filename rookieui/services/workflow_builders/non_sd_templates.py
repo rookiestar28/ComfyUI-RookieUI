@@ -1628,7 +1628,7 @@ def _build_krea2_turbo_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, 
             max_length=512,
             temperature=0.7,
             top_p=0.95,
-            thinking=True,
+            thinking=False,
         )
         prompt_toggle_id = _append_primitive_boolean_node(
             workflow,

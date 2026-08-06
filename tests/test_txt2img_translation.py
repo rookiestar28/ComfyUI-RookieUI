@@ -1948,7 +1948,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 "sampling_mode.repetition_penalty": 1.05,
                 "sampling_mode.seed": 0,
                 "sampling_mode.presence_penalty": 0,
-                "thinking": True,
+                "thinking": False,
                 "use_default_template": True,
                 "clip": [clip_loader_id, 0],
             },
