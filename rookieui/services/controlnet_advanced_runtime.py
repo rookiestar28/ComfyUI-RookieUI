@@ -10,6 +10,11 @@ _ADVANCED_WEIGHT_PRESET_RANGES: dict[str, tuple[float, float]] = {
     "soft": (0.65, 1.0),
     "strong": (1.0, 1.35),
 }
+_CONTROLNET_MODE_PROFILES: dict[str, tuple[str, bool]] = {
+    "balanced": ("balanced", True),
+    "prompt": ("soft", True),
+    "control": ("soft", False),
+}
 
 
 def _coerce_advanced_request(
@@ -39,6 +44,34 @@ def _coerce_advanced_request(
         ],
         mask_aware_apply=bool(advanced.get("mask_aware_apply", False)),
     )
+
+
+def resolve_controlnet_stage_profile(
+    *,
+    control_mode: str,
+    advanced: NormalizedControlNetAdvancedRequest | Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Resolve the effective stage profile without leaking disabled advanced state."""
+    normalized_mode = str(control_mode or "balanced").strip().lower()
+    mode_preset, apply_to_negative = _CONTROLNET_MODE_PROFILES.get(
+        normalized_mode,
+        _CONTROLNET_MODE_PROFILES["balanced"],
+    )
+    advanced_request = _coerce_advanced_request(advanced)
+    if advanced_request.enabled:
+        advanced_preset = str(advanced_request.weight_preset or "balanced").strip().lower()
+        if advanced_preset not in _ADVANCED_WEIGHT_PRESET_RANGES:
+            advanced_preset = "balanced"
+        return {
+            "weight_preset": advanced_preset,
+            "layer_weights": [round(float(value), 4) for value in advanced_request.layer_weights],
+            "apply_to_negative": apply_to_negative,
+        }
+    return {
+        "weight_preset": mode_preset,
+        "layer_weights": [],
+        "apply_to_negative": apply_to_negative,
+    }
 
 
 def build_controlnet_apply_segments(

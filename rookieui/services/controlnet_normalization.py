@@ -18,6 +18,7 @@ from rookieui.services.controlnet_catalog import (
     DEFAULT_CONTROLNET_MODULE,
 )
 from rookieui.services.controlnet_warnings import (
+    CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL,
     CONTROLNET_WARNING_ALIAS_DISABLED,
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
@@ -78,13 +79,23 @@ def _normalize_choice(value: object, *, field_name: str, aliases: dict[str, str]
     return normalized
 
 
-def _normalize_control_type(value: object, *, field_name: str) -> str:
+def _normalize_control_type(
+    value: object,
+    *,
+    field_name: str,
+    warning_codes: list[str] | None = None,
+) -> str:
     raw = normalize_option_label(value, field_name, max_length=48)
     if not raw:
         return "All"
     alias_key = "".join(character for character in raw.strip().lower() if character.isalnum())
+    normalized = CONTROL_TYPE_ALIASES.get(alias_key)
+    if normalized is not None:
+        return normalized
     # IMPORTANT: keep unknown/legacy control-type labels rollback-safe by degrading to "All" instead of throwing; this avoids breaking older payload snapshots during phased integrated rollout.
-    return CONTROL_TYPE_ALIASES.get(alias_key, "All")
+    if warning_codes is not None:
+        warning_codes.append(CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL)
+    return "All"
 
 
 def _coerce_unit_weight(value: object, field_name: str) -> float:
@@ -374,6 +385,7 @@ def normalize_controlnet_units(
         control_type = _normalize_control_type(
             _extract_unit_field(raw_unit, "control_type", "type"),
             field_name=f"controlnet_units[{index}].control_type",
+            warning_codes=warning_codes,
         )
         allow_preview = _coerce_bool(
             _extract_unit_field(raw_unit, "allow_preview"),
@@ -390,6 +402,12 @@ def normalize_controlnet_units(
         advanced = _normalize_controlnet_advanced_block(
             _extract_unit_field(raw_unit, "advanced"),
             field_prefix=f"controlnet_units[{index}].advanced",
+        )
+        concat_mask = _coerce_bool(
+            raw_unit.get("concat_mask"),
+            f"controlnet_units[{index}].concat_mask",
+            default=False,
+            strict=False,
         )
 
         weight = _coerce_unit_weight(raw_unit.get("weight", 1.0), f"controlnet_units[{index}].weight")
@@ -466,6 +484,7 @@ def normalize_controlnet_units(
                 use_mask=use_mask,
                 allow_preview=allow_preview,
                 advanced=advanced,
+                concat_mask=concat_mask,
             )
         )
 

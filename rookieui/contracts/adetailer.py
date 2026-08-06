@@ -80,6 +80,7 @@ def build_adetailer_integrated_contract_meta() -> dict[str, object]:
         "detector_provider_families": list(ADETAILER_DETECTOR_PROVIDER_FAMILIES),
         "detector_result_contract": "rookieui_detection_regions_v1",
         "controlnet_advanced_contract": dict(build_controlnet_integrated_contract_meta()["advanced_contract"]),
+        "controlnet_union_contract": dict(build_controlnet_integrated_contract_meta()["union_contract"]),
         "mask_filter_methods": list(ADETAILER_MASK_FILTER_METHODS),
         "mask_merge_modes": list(ADETAILER_MASK_MERGE_MODES),
         "defaults": dict(ADETAILER_UNIT_DEFAULTS),
@@ -94,6 +95,9 @@ class NormalizedADetailerControlNetRequest:
     weight: float = 1.0
     guidance_start: float = 0.0
     guidance_end: float = 1.0
+    control_mode: str = "balanced"
+    control_type: str = "All"
+    concat_mask: bool = False
     advanced: NormalizedControlNetAdvancedRequest = field(default_factory=NormalizedControlNetAdvancedRequest)
 
     def to_payload(self) -> dict[str, Any]:

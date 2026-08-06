@@ -794,6 +794,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
 
 class RookieUIControlNetApplyNativeAdvanced:
     _weight_presets = ("balanced", "soft", "strong")
+    _control_modes = ("balanced", "prompt", "control")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -813,6 +814,8 @@ class RookieUIControlNetApplyNativeAdvanced:
             "optional": {
                 "mask_optional": ("MASK",),
                 "vae_optional": ("VAE",),
+                "control_mode": (list(cls._control_modes),),
+                "apply_to_negative": ("BOOLEAN", {"default": True}),
             },
         }
 
@@ -864,25 +867,45 @@ class RookieUIControlNetApplyNativeAdvanced:
         weight_preset="balanced",
         layer_weights_json="[]",
         mask_aware_apply=False,
+        control_mode="balanced",
         mask_optional=None,
         vae_optional=None,
+        apply_to_negative=None,
     ):
         self._require_controlnet_runtime()
         if strength == 0:
             return (positive, negative)
 
         layer_weights = self._parse_layer_weights(layer_weights_json)
+        normalized_control_mode = str(control_mode or "balanced").strip().lower()
+        if normalized_control_mode not in {"balanced", "prompt", "control"}:
+            normalized_control_mode = "balanced"
+        # The mode is authoritative: an injected optional flag cannot re-enable
+        # the new unit on the negative lane for control-priority semantics.
+        effective_apply_to_negative = normalized_control_mode != "control"
+        if apply_to_negative is not None:
+            effective_apply_to_negative = effective_apply_to_negative and bool(apply_to_negative)
         control_hint = image.movedim(-1, 1)
         normalized_mask = self._normalize_mask(mask_optional) if mask_aware_apply else None
         cnets = {}
         out = []
 
-        for conditioning in [positive, negative]:
+        for is_negative, conditioning in ((False, positive), (True, negative)):
             conditioned = []
             if conditioning is not None:
                 for token, conditioning_state in conditioning:
                     cloned_state = conditioning_state.copy()
                     prev_cnet = cloned_state.get("control", None)
+                    if is_negative and not effective_apply_to_negative:
+                        # Control-priority adds only the new unit to positive;
+                        # retain any existing negative chain exactly as supplied.
+                        if prev_cnet is None:
+                            cloned_state.pop("control", None)
+                        else:
+                            cloned_state["control"] = prev_cnet
+                        cloned_state["control_apply_to_uncond"] = False
+                        conditioned.append([token, cloned_state])
+                        continue
                     if prev_cnet in cnets:
                         c_net = cnets[prev_cnet]
                     else:

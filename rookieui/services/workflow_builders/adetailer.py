@@ -135,6 +135,9 @@ def _build_adetailer_custom_controlnet_unit(unit: NormalizedADetailerUnitRequest
         "weight": controlnet.weight,
         "guidance_start": controlnet.guidance_start,
         "guidance_end": controlnet.guidance_end,
+        "control_mode": controlnet.control_mode,
+        "control_type": controlnet.control_type,
+        "concat_mask": controlnet.concat_mask,
         # IMPORTANT: keep the full advanced block when adapting ADetailer-local custom ControlNet
         # into the shared unit seam. Dropping it here silently desynchronizes local detailer behavior
         # from the primary ControlNet runtime even though both paths claim the same contract.

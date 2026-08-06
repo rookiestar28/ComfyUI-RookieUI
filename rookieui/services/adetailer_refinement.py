@@ -8,6 +8,7 @@ from rookieui.contracts.adetailer import (
     NormalizedADetailerControlNetRequest,
     NormalizedADetailerUnitRequest,
 )
+from rookieui.contracts.controlnet_integrated import CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER
 from rookieui.security.request_guard import normalize_option_label, normalize_prompt_text, resolve_inventory_selector
 from rookieui.services.coercion import coerce_bool as _coerce_bool
 from rookieui.services.coercion import coerce_float as _coerce_float
@@ -103,6 +104,24 @@ def normalize_controlnet_block(
         raise ValueError(f"{field_prefix}.guidance_end must be between 0.0 and 1.0.")
     if guidance_start > guidance_end:
         raise ValueError(f"{field_prefix}.guidance_start must not exceed guidance_end.")
+    control_mode = normalize_choice(
+        raw_block.get("control_mode"),
+        f"{field_prefix}.control_mode",
+        ("balanced", "prompt", "control"),
+        "balanced",
+    )
+    control_type = normalize_choice(
+        raw_block.get("control_type"),
+        f"{field_prefix}.control_type",
+        CONTROLNET_INTEGRATED_CONTROL_TYPE_ORDER,
+        "All",
+    )
+    concat_mask = _coerce_bool(
+        raw_block.get("concat_mask"),
+        f"{field_prefix}.concat_mask",
+        default=False,
+        strict=False,
+    )
 
     return NormalizedADetailerControlNetRequest(
         mode=mode,
@@ -111,6 +130,9 @@ def normalize_controlnet_block(
         weight=weight,
         guidance_start=guidance_start,
         guidance_end=guidance_end,
+        control_mode=control_mode,
+        control_type=control_type,
+        concat_mask=concat_mask,
         advanced=_normalize_controlnet_advanced_block(
             raw_block.get("advanced"),
             field_prefix=f"{field_prefix}.advanced",

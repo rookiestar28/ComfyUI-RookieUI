@@ -222,6 +222,7 @@ def _normalize_adetailer_payload(payload: dict[str, object]) -> dict[str, object
             "detector_provider_families": _normalize_metadata_list(contract.get("detector_provider_families", [])),
             "detector_result_contract": normalize_metadata_text(contract.get("detector_result_contract", "")),
             "controlnet_advanced_contract": _normalize_loose_mapping(contract.get("controlnet_advanced_contract", {})),
+            "controlnet_union_contract": _normalize_loose_mapping(contract.get("controlnet_union_contract", {})),
             "mask_filter_methods": _normalize_metadata_list(contract.get("mask_filter_methods", [])),
             "mask_merge_modes": _normalize_metadata_list(contract.get("mask_merge_modes", [])),
             "defaults": _normalize_loose_mapping(contract.get("defaults", {})),

@@ -10,6 +10,25 @@ export {
 } from "./api/rookieui_generation_api.js";
 
 const PROMPT_WORKBENCH_CONTRACT_VERSION = "r145f141f142-20260418";
+const CONTROLNET_UNION_CONTRACT_FALLBACK = Object.freeze({
+  host_node: "SetUnionControlNetType",
+  type_map: Object.freeze({
+    OpenPose: "openpose",
+    Depth: "depth",
+    SoftEdge: "hed/pidi/scribble/ted",
+    Scribble: "hed/pidi/scribble/ted",
+    Canny: "canny/lineart/anime_lineart/mlsd",
+    Lineart: "canny/lineart/anime_lineart/mlsd",
+    MLSD: "canny/lineart/anime_lineart/mlsd",
+    NormalMap: "normal",
+    Segmentation: "segment",
+    Tile: "tile",
+    Inpaint: "repaint",
+  }),
+  unmapped_policy: "preserve_control_object",
+  fallback_warning_code: "control_type_fallback_all",
+  inpaint_source_mask_policy: "deferred_until_f318",
+});
 const CURRENT_HOST_DEFERRED_PROFILE_IDS = new Set([
   "klein_4b_distilled",
   "klein_9b_distilled",
@@ -1259,6 +1278,7 @@ const DEFAULT_CAPABILITIES = Object.freeze({
         supports_mask_aware_apply: true,
         runtime_state: "rookieui_native_advanced_runtime",
       },
+      controlnet_union_contract: CONTROLNET_UNION_CONTRACT_FALLBACK,
       mask_filter_methods: ["Area", "Confidence"],
       mask_merge_modes: ["None", "Merge", "Merge and Invert"],
       defaults: {
@@ -1806,6 +1826,7 @@ export async function fetchRookieUIControlNetModels(fetchImpl = globalThis.fetch
           supports_mask_aware_apply: true,
           runtime_state: "rookieui_native_advanced_runtime",
         },
+        union_contract: CONTROLNET_UNION_CONTRACT_FALLBACK,
       },
       model_list: [],
       default_model: "",
@@ -1831,6 +1852,7 @@ export async function fetchRookieUIControlNetModules(fetchImpl = globalThis.fetc
           supports_mask_aware_apply: true,
           runtime_state: "rookieui_native_advanced_runtime",
         },
+        union_contract: CONTROLNET_UNION_CONTRACT_FALLBACK,
       },
       module_list: ["none", "canny"],
       default_module: "none",
@@ -1856,6 +1878,7 @@ export async function fetchRookieUIControlNetTypes(fetchImpl = globalThis.fetch)
           supports_mask_aware_apply: true,
           runtime_state: "rookieui_native_advanced_runtime",
         },
+        union_contract: CONTROLNET_UNION_CONTRACT_FALLBACK,
       },
       control_type_order: [
         "All",
@@ -1912,6 +1935,7 @@ export async function fetchRookieUIADetailerCatalog(fetchImpl = globalThis.fetch
           supports_mask_aware_apply: true,
           runtime_state: "rookieui_native_advanced_runtime",
         },
+        controlnet_union_contract: CONTROLNET_UNION_CONTRACT_FALLBACK,
         mask_filter_methods: ["Area", "Confidence"],
         mask_merge_modes: ["None", "Merge", "Merge and Invert"],
         defaults: {

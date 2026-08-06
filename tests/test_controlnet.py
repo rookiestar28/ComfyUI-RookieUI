@@ -27,6 +27,7 @@ from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RU
 from rookieui.services.img2img import normalize_img2img_request
 from rookieui.services.txt2img import normalize_txt2img_request
 from rookieui.services.workflow_translation import translate_img2img_request, translate_txt2img_request
+from rookieui.services.workflow_builders import controlnet as controlnet_builder
 
 
 VALID_PNG_DATA_URL = (
@@ -260,6 +261,46 @@ class ControlNetNormalizationTests(unittest.TestCase):
         self.assertEqual(request.controlnet_units[0].control_type, "IP-Adapter")
         self.assertEqual(request.controlnet_units[1].control_type, "All")
 
+    def test_controlnet_unknown_type_emits_content_free_fallback_warning(self) -> None:
+        request = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "control_type": "legacy-model-specific-alias",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(request.controlnet_units[0].control_type, "All")
+        self.assertIn("control_type_fallback_all", request.controlnet_warning_codes)
+        self.assertNotIn("legacy-model-specific-alias", " ".join(request.controlnet_warnings))
+
+    def test_controlnet_union_mapping_is_exact_and_does_not_guess_unknown_types(self) -> None:
+        expected = {
+            "OpenPose": "openpose",
+            "Depth": "depth",
+            "SoftEdge": "hed/pidi/scribble/ted",
+            "Scribble": "hed/pidi/scribble/ted",
+            "Canny": "canny/lineart/anime_lineart/mlsd",
+            "Lineart": "canny/lineart/anime_lineart/mlsd",
+            "MLSD": "canny/lineart/anime_lineart/mlsd",
+            "NormalMap": "normal",
+            "Segmentation": "segment",
+            "Tile": "tile",
+            "Inpaint": "repaint",
+        }
+        for control_type, host_type in expected.items():
+            with self.subTest(control_type=control_type):
+                self.assertEqual(controlnet_builder.controlnet_union_type_for_control_type(control_type), host_type)
+        for control_type in ("All", "Blur", "IP-Adapter", "Instant-ID", "Reference", "Unknown"):
+            with self.subTest(control_type=control_type):
+                self.assertIsNone(controlnet_builder.controlnet_union_type_for_control_type(control_type))
+
     def test_controlnet_normalization_accepts_reserved_advanced_block(self) -> None:
         request = normalize_txt2img_request(
             {
@@ -357,6 +398,135 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(len(controlnet_apply), 1)
         self.assertEqual(controlnet_apply[0]["inputs"]["start_percent"], 0.2)
         self.assertEqual(controlnet_apply[0]["inputs"]["end_percent"], 0.8)
+
+    def test_control_mode_changes_apply_profile_and_advanced_disabled_cannot_leak(self) -> None:
+        expected = {
+            "balanced": ("balanced", "balanced", True),
+            "prompt": ("soft", "prompt", True),
+            "control": ("soft", "control", False),
+        }
+        for mode, (weight_preset, emitted_mode, apply_to_negative) in expected.items():
+            with self.subTest(mode=mode):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": "canny",
+                                "model": "control_v11p_sd15_canny.safetensors",
+                                "image_asset": "source-image",
+                                "control_mode": mode,
+                                "advanced": {
+                                    "enabled": False,
+                                    "weight_preset": "strong",
+                                    "layer_weights": [0.2, 0.4],
+                                },
+                            }
+                        ],
+                    }
+                )
+                apply_node = next(
+                    node
+                    for node in translate_txt2img_request(normalized).to_payload()["workflow"].values()
+                    if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+                )
+                self.assertEqual(apply_node["inputs"]["weight_preset"], weight_preset)
+                self.assertEqual(apply_node["inputs"]["layer_weights_json"], "[]")
+                self.assertEqual(apply_node["inputs"]["control_mode"], emitted_mode)
+                self.assertEqual(apply_node["inputs"]["apply_to_negative"], apply_to_negative)
+
+    def test_enabled_advanced_profile_precedes_control_mode_profile(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "control_mode": "prompt",
+                        "advanced": {
+                            "enabled": True,
+                            "weight_preset": "strong",
+                            "layer_weights": [0.2, 0.4],
+                        },
+                    }
+                ],
+            }
+        )
+        apply_node = next(
+            node
+            for node in translate_txt2img_request(normalized).to_payload()["workflow"].values()
+            if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
+        self.assertEqual(apply_node["inputs"]["weight_preset"], "strong")
+        self.assertEqual(apply_node["inputs"]["layer_weights_json"], "[0.2, 0.4]")
+        self.assertEqual(apply_node["inputs"]["apply_to_negative"], True)
+
+    def test_exact_union_type_emits_current_host_selector_and_all_is_unchanged(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "openpose",
+                        "model": "control_v11p_sd15_openpose.safetensors",
+                        "image_asset": "source-image",
+                        "control_type": "OpenPose",
+                    }
+                ],
+            }
+        )
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        loader_id, loader = next(
+            (node_id, node)
+            for node_id, node in workflow.items()
+            if node["class_type"] == "DiffControlNetLoader"
+        )
+        union_nodes = [node for node in workflow.values() if node["class_type"] == "SetUnionControlNetType"]
+        self.assertEqual(len(union_nodes), 1)
+        self.assertEqual(union_nodes[0]["inputs"]["control_net"], [loader_id, 0])
+        self.assertEqual(union_nodes[0]["inputs"]["type"], "openpose")
+        self.assertEqual(loader["inputs"]["control_net_name"], "control_v11p_sd15_openpose.safetensors")
+
+        all_normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "control_type": "All",
+                    }
+                ],
+            }
+        )
+        all_workflow = translate_txt2img_request(all_normalized).to_payload()["workflow"]
+        self.assertNotIn("SetUnionControlNetType", {node["class_type"] for node in all_workflow.values()})
+
+    def test_inpaint_concat_mask_fails_closed_until_f318_source_mask_contract(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "masked portrait",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "inpaint",
+                        "model": "control_v11p_sd15_inpaint.safetensors",
+                        "image_asset": "source-image",
+                        "control_type": "Inpaint",
+                        "concat_mask": True,
+                    }
+                ],
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "F318 source-mask contract"):
+            translate_txt2img_request(normalized)
 
     def test_txt2img_translation_wires_controlnet_preprocess_and_mask(self) -> None:
         normalized = normalize_txt2img_request(
@@ -841,6 +1011,14 @@ class ControlNetRouteTests(unittest.TestCase):
             CONTROLNET_ADVANCED_RUNTIME_STATE,
         )
         self.assertEqual(control_types["payload"]["default_type"], "All")
+        self.assertEqual(
+            control_types["payload"]["contract"]["union_contract"]["host_node"],
+            "SetUnionControlNetType",
+        )
+        self.assertEqual(
+            control_types["payload"]["contract"]["union_contract"]["type_map"]["OpenPose"],
+            "openpose",
+        )
 
     def test_detect_payload_supports_passthrough_none_module(self) -> None:
         payload = build_controlnet_detect_payload(

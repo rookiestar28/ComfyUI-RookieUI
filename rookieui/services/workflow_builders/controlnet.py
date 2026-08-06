@@ -4,11 +4,15 @@ import json
 
 from rookieui.contracts.adetailer import NormalizedADetailerControlNetRequest
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
+from rookieui.contracts.controlnet import CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE
 from rookieui.contracts.generation import (
     NormalizedImg2ImgRequest,
     NormalizedTxt2ImgRequest,
 )
-from rookieui.services.controlnet_advanced_runtime import build_controlnet_apply_segments
+from rookieui.services.controlnet_advanced_runtime import (
+    build_controlnet_apply_segments,
+    resolve_controlnet_stage_profile,
+)
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
     _to_node_ref,
@@ -39,6 +43,11 @@ def _read_controlnet_advanced_request(
     return _read_controlnet_unit_value(unit, "advanced")
 
 
+def controlnet_union_type_for_control_type(control_type: object) -> str | None:
+    """Return the exact current-host Union selector for a canonical UI type."""
+    return CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE.get(str(control_type or "").strip())
+
+
 def _apply_controlnet_unit_entries(
     workflow: dict[str, object],
     *,
@@ -60,6 +69,9 @@ def _apply_controlnet_unit_entries(
         mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
         use_mask = bool(_read_controlnet_unit_value(unit, "use_mask"))
         advanced = _read_controlnet_advanced_request(unit)
+        control_type = str(_read_controlnet_unit_value(unit, "control_type") or "All").strip() or "All"
+        control_mode = str(_read_controlnet_unit_value(unit, "control_mode") or "balanced").strip().lower() or "balanced"
+        stage_profile = resolve_controlnet_stage_profile(control_mode=control_mode, advanced=advanced)
         module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
         if not model_name:
@@ -134,6 +146,24 @@ def _apply_controlnet_unit_entries(
                 },
             }
 
+        control_net_ref: list[object] = [loader_id, 0]
+        union_type = controlnet_union_type_for_control_type(control_type)
+        if union_type is not None:
+            union_id = allocator.next()
+            workflow[union_id] = {
+                "class_type": "SetUnionControlNetType",
+                "inputs": {
+                    "control_net": control_net_ref,
+                    "type": union_type,
+                },
+            }
+            control_net_ref = [union_id, 0]
+
+        if control_type == "Inpaint" and bool(_read_controlnet_unit_value(unit, "concat_mask")):
+            # F318 owns real source-mask/VAE wiring; never route an ID-7 control
+            # through the host's all-ones placeholder during this intermediate phase.
+            raise ValueError("ControlNet Inpaint concat_mask requires the F318 source-mask contract.")
+
         apply_segments = build_controlnet_apply_segments(
             weight=_float_or_default(_read_controlnet_unit_value(unit, "weight"), 1.0),
             guidance_start=_float_or_default(_read_controlnet_unit_value(unit, "guidance_start"), 0.0),
@@ -145,15 +175,17 @@ def _apply_controlnet_unit_entries(
             apply_inputs: dict[str, object] = {
                 "positive": _to_node_ref(current_positive),
                 "negative": _to_node_ref(current_negative),
-                "control_net": [loader_id, 0],
+                "control_net": control_net_ref,
                 "image": [preprocess_id, 0],
                 "strength": float(segment["strength"]),
                 "start_percent": float(segment["start_percent"]),
                 "end_percent": float(segment["end_percent"]),
                 "vae_optional": vae_source,
-                "weight_preset": str(getattr(advanced, "weight_preset", "balanced") or "balanced"),
-                "layer_weights_json": json.dumps(list(getattr(advanced, "layer_weights", []) or [])),
+                "weight_preset": str(stage_profile["weight_preset"]),
+                "layer_weights_json": json.dumps(list(stage_profile["layer_weights"])),
                 "mask_aware_apply": apply_mask_aware,
+                "control_mode": control_mode,
+                "apply_to_negative": bool(stage_profile["apply_to_negative"]),
             }
             if apply_mask_aware and mask_ref is not None:
                 apply_inputs["mask_optional"] = mask_ref

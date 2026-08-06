@@ -24,6 +24,20 @@
       "source_path": "nodes.py",
       "source_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087"
     },
+    "SetUnionControlNetType": {
+      "inputs": {
+        "control_net": {
+          "optional": false,
+          "type": "CONTROL_NET"
+        },
+        "type": {
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "source_path": "comfy_extras/nodes_controlnet.py",
+      "source_sha256": "197972863ab797c8b1e1137db99fbbbdf2c9d6668d57cb6fa4413ed993b6ae59"
+    },
     "BasicGuider": {
       "inputs": {
         "conditioning": {

@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 
 from rookieui import nodes
+from rookieui.services import controlnet_advanced_runtime
 from rookieui.services.controlnet_advanced_runtime import (
     CONTROLNET_ADVANCED_RUNTIME_STATE,
     build_controlnet_apply_segments,
@@ -188,6 +189,36 @@ def _wrapper_probe(*, weight_preset="soft", layer_weights=None):
 
 
 class ControlNetAdvancedRuntimeTests(unittest.TestCase):
+    def test_control_mode_profiles_are_distinct_and_advanced_precedence_is_fail_closed(self) -> None:
+        self.assertEqual(
+            controlnet_advanced_runtime.resolve_controlnet_stage_profile(
+                control_mode="balanced",
+                advanced={"enabled": False, "weight_preset": "strong", "layer_weights": [0.2, 0.4]},
+            ),
+            {"weight_preset": "balanced", "layer_weights": [], "apply_to_negative": True},
+        )
+        self.assertEqual(
+            controlnet_advanced_runtime.resolve_controlnet_stage_profile(
+                control_mode="prompt",
+                advanced={"enabled": False, "weight_preset": "strong", "layer_weights": [0.2, 0.4]},
+            ),
+            {"weight_preset": "soft", "layer_weights": [], "apply_to_negative": True},
+        )
+        self.assertEqual(
+            controlnet_advanced_runtime.resolve_controlnet_stage_profile(
+                control_mode="control",
+                advanced={"enabled": False, "weight_preset": "strong", "layer_weights": [0.2, 0.4]},
+            ),
+            {"weight_preset": "soft", "layer_weights": [], "apply_to_negative": False},
+        )
+        self.assertEqual(
+            controlnet_advanced_runtime.resolve_controlnet_stage_profile(
+                control_mode="control",
+                advanced={"enabled": True, "weight_preset": "strong", "layer_weights": [0.2, 0.4]},
+            ),
+            {"weight_preset": "strong", "layer_weights": [0.2, 0.4], "apply_to_negative": False},
+        )
+
     def test_stage_weight_wrapper_current_host_multigpu_clone_is_registered_after_repair(self) -> None:
         wrapper = _wrapper_probe()
 

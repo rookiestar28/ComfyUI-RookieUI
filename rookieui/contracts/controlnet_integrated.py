@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from rookieui.contracts.controlnet import CONTROLNET_ADVANCED_WEIGHT_PRESETS
+from rookieui.contracts.controlnet import (
+    CONTROLNET_ADVANCED_WEIGHT_PRESETS,
+    CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE,
+)
 from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 
 CONTROLNET_INTEGRATED_CONTRACT_VERSION = "r72-20260412"
@@ -60,6 +63,13 @@ def build_controlnet_integrated_contract_meta() -> dict[str, object]:
             "supports_timestep_keyframes": True,
             "supports_mask_aware_apply": True,
             "runtime_state": CONTROLNET_ADVANCED_RUNTIME_STATE,
+        },
+        "union_contract": {
+            "host_node": "SetUnionControlNetType",
+            "type_map": dict(CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE),
+            "unmapped_policy": "preserve_control_object",
+            "fallback_warning_code": "control_type_fallback_all",
+            "inpaint_source_mask_policy": "deferred_until_f318",
         },
         # IMPORTANT: reserve this extensibility signal so future integrated packs (e.g. ADetailer coupling) can extend without rebreaking base ControlNet contracts.
         "integrated_extension_slots": "reserved",

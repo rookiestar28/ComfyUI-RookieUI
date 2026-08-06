@@ -5,6 +5,20 @@ from typing import Any
 
 CONTROLNET_ADVANCED_WEIGHT_PRESETS = ("balanced", "soft", "strong")
 
+CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE = {
+    "OpenPose": "openpose",
+    "Depth": "depth",
+    "SoftEdge": "hed/pidi/scribble/ted",
+    "Scribble": "hed/pidi/scribble/ted",
+    "Canny": "canny/lineart/anime_lineart/mlsd",
+    "Lineart": "canny/lineart/anime_lineart/mlsd",
+    "MLSD": "canny/lineart/anime_lineart/mlsd",
+    "NormalMap": "normal",
+    "Segmentation": "segment",
+    "Tile": "tile",
+    "Inpaint": "repaint",
+}
+
 
 @dataclass(frozen=True)
 class NormalizedControlNetAdvancedRequest:
@@ -41,6 +55,7 @@ class NormalizedControlNetUnit:
     use_mask: bool = False
     allow_preview: bool = False
     advanced: NormalizedControlNetAdvancedRequest = field(default_factory=NormalizedControlNetAdvancedRequest)
+    concat_mask: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

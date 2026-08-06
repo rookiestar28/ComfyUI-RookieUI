@@ -416,6 +416,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
             adetailer["contract"]["controlnet_advanced_contract"]["runtime_state"],
             CONTROLNET_ADVANCED_RUNTIME_STATE,
         )
+        self.assertEqual(
+            adetailer["contract"]["controlnet_union_contract"]["host_node"],
+            "SetUnionControlNetType",
+        )
         self.assertEqual(adetailer["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])
         self.assertIn("/rookieui/adetailer/catalog", adetailer["routes"])

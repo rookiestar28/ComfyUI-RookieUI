@@ -151,6 +151,44 @@ class ADetailerChainRegressionTests(unittest.TestCase):
         self.assertEqual(apply_nodes[0]["inputs"]["weight_preset"], "soft")
         self.assertIn("RookieUIADetailerDetectMask", [node["class_type"] for node in workflow.values()])
 
+    def test_adetailer_custom_controlnet_preserves_mode_and_union_type_contract(self) -> None:
+        response = asyncio.run(
+            routes.txt2img(
+                _FakeJsonRequest(
+                    {
+                        "prompt": "portrait",
+                        "dry_run": True,
+                        "adetailer": {
+                            "enabled": True,
+                            "units": [
+                                {
+                                    "enabled": True,
+                                    "detector": "face_yolov8n.pt",
+                                    "controlnet": {
+                                        "mode": "custom",
+                                        "model": "control_v11p_sd15_openpose.safetensors",
+                                        "module": "openpose",
+                                        "control_mode": "control",
+                                        "control_type": "OpenPose",
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                )
+            )
+        )
+
+        self.assertEqual(response["status"], 200)
+        workflow = response["payload"]["workflow"]
+        apply_node = next(
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
+        union_node = next(node for node in workflow.values() if node["class_type"] == "SetUnionControlNetType")
+        self.assertEqual(apply_node["inputs"]["control_mode"], "control")
+        self.assertFalse(apply_node["inputs"]["apply_to_negative"])
+        self.assertEqual(union_node["inputs"]["type"], "openpose")
+
 
 if __name__ == "__main__":
     unittest.main()
