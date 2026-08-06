@@ -160,9 +160,9 @@ def _apply_controlnet_unit_entries(
             control_net_ref = [union_id, 0]
 
         if control_type == "Inpaint" and bool(_read_controlnet_unit_value(unit, "concat_mask")):
-            # F318 owns real source-mask/VAE wiring; never route an ID-7 control
-            # through the host's all-ones placeholder during this intermediate phase.
-            raise ValueError("ControlNet Inpaint concat_mask requires the F318 source-mask contract.")
+            # The canonical source-mask/VAE wiring is not available yet; never
+            # route an ID-7 control through the host's all-ones placeholder.
+            raise ValueError("ControlNet Inpaint concat_mask requires the canonical source-mask contract.")
 
         apply_segments = build_controlnet_apply_segments(
             weight=_float_or_default(_read_controlnet_unit_value(unit, "weight"), 1.0),

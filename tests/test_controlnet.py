@@ -525,7 +525,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
                 ],
             }
         )
-        with self.assertRaisesRegex(ValueError, "F318 source-mask contract"):
+        with self.assertRaisesRegex(ValueError, "canonical source-mask contract"):
             translate_txt2img_request(normalized)
 
     def test_txt2img_translation_wires_controlnet_preprocess_and_mask(self) -> None:
