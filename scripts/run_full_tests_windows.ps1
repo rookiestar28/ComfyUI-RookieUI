@@ -22,9 +22,28 @@ function Invoke-Checked {
     [Parameter(Mandatory = $true)][string]$Label,
     [Parameter(Mandatory = $true)][scriptblock]$Command
   )
-  & $Command
-  if ($LASTEXITCODE -ne 0) {
-    throw "[tests] ERROR: $Label failed with exit code $LASTEXITCODE"
+  # Python unittest writes its normal progress/results to stderr. In Windows PowerShell,
+  # ErrorActionPreference=Stop can terminate on that stream before the native process
+  # finishes, producing a false failure after the first test line. Capture the merged
+  # streams while Continue is scoped to this native command, then check the saved exit.
+  $commandOutput = @()
+  $commandExitCode = 0
+  $previousErrorActionPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = "Continue"
+    $commandOutput = @(& $Command 2>&1)
+    $commandExitCode = $LASTEXITCODE
+  }
+  finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+
+  foreach ($outputLine in $commandOutput) {
+    Write-Host $outputLine
+  }
+
+  if ($commandExitCode -ne 0) {
+    throw "[tests] ERROR: $Label failed with exit code $commandExitCode"
   }
 }
 
