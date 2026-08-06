@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+import sys
+import types
 import unittest
+from unittest import mock
 
+from rookieui import nodes
 from rookieui.services.controlnet_advanced_runtime import (
     CONTROLNET_ADVANCED_RUNTIME_STATE,
     build_controlnet_apply_segments,
@@ -10,7 +16,267 @@ from rookieui.services.controlnet_advanced_runtime import (
 )
 
 
+class _F315HostControlBase:
+    """Deterministic current-host lifecycle double; never loads a real model."""
+
+    def __init__(self, *, name: str = "control", device: str = "cpu") -> None:
+        self.name = name
+        self.device = device
+        self.previous_controlnet = None
+        self.multigpu_clones = {}
+        self.cond_hint_original = None
+        self.cond_hint = None
+        self.strength = 1.0
+        self.timestep_percent_range = (0.0, 1.0)
+        self.timestep_range = None
+        self.latent_format = None
+        self.global_average_pooling = False
+        self.compression_ratio = 8
+        self.upscale_algorithm = "nearest-exact"
+        self.extra_args = {}
+        self.extra_conds = []
+        self.strength_type = None
+        self.concat_mask = False
+        self.extra_concat_orig = []
+        self.extra_concat = None
+        self.extra_hooks = f"hook:{name}:{device}"
+        self.events: list[str] = []
+        self.deepclone_requests: list[tuple[str, bool]] = []
+        self.raise_on_get_control = False
+        self.control_payload = {"input": [2.0], "middle": [3.0], "output": [4.0]}
+
+    def deepclone_multigpu(self, _load_device, autoregister=False):
+        _ = autoregister
+        raise NotImplementedError("deepclone_multigpu is abstract on the host base")
+
+    def copy_to(self, target):
+        target.cond_hint_original = self.cond_hint_original
+        target.strength = self.strength
+        target.timestep_percent_range = self.timestep_percent_range
+        target.latent_format = self.latent_format
+        target.global_average_pooling = self.global_average_pooling
+        target.compression_ratio = self.compression_ratio
+        target.upscale_algorithm = self.upscale_algorithm
+        target.extra_args = self.extra_args.copy()
+        target.extra_conds = list(self.extra_conds)
+        target.strength_type = self.strength_type
+        target.concat_mask = self.concat_mask
+        target.extra_concat_orig = list(self.extra_concat_orig)
+        target.extra_hooks = self.extra_hooks
+
+    def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=None):
+        _ = vae
+        self.cond_hint_original = cond_hint
+        self.strength = strength
+        self.timestep_percent_range = timestep_percent_range
+        self.extra_concat_orig = list(extra_concat or [])
+        return self
+
+    def pre_run(self, _model, percent_to_timestep_function):
+        self.events.append("pre_run")
+        self.timestep_range = tuple(
+            percent_to_timestep_function(value) for value in self.timestep_percent_range
+        )
+
+    def cleanup(self):
+        self.events.append("cleanup")
+        self.cond_hint = None
+        self.extra_concat = None
+        self.timestep_range = None
+
+    def get_models(self):
+        self.events.append("get_models")
+        models = [f"model:{self.name}:{self.device}"]
+        for clone in self.multigpu_clones.values():
+            models.extend(clone.get_models_only_self())
+        return models
+
+    def get_models_only_self(self):
+        previous = self.previous_controlnet
+        self.previous_controlnet = None
+        try:
+            return self.get_models()
+        finally:
+            self.previous_controlnet = previous
+
+    def get_extra_hooks(self):
+        self.events.append("get_extra_hooks")
+        return [self.extra_hooks]
+
+    def inference_memory_requirements(self, _dtype):
+        self.events.append("memory")
+        return 7
+
+    def control_merge(self, control, control_prev, output_dtype=None):
+        _ = output_dtype
+        if control_prev is None:
+            return control
+        merged = {}
+        for key in ("input", "middle", "output"):
+            merged[key] = list(control.get(key, [])) + list(control_prev.get(key, []))
+        return merged
+
+
+class _F315ConcreteControl(_F315HostControlBase):
+    def copy(self):
+        clone = type(self)(name=f"{self.name}.copy", device=self.device)
+        self.copy_to(clone)
+        clone.control_payload = {key: list(values) for key, values in self.control_payload.items()}
+        clone.raise_on_get_control = self.raise_on_get_control
+        return clone
+
+    def deepclone_multigpu(self, load_device, autoregister=False):
+        self.deepclone_requests.append((str(load_device), bool(autoregister)))
+        clone = self.copy()
+        clone.name = f"{self.name}.clone"
+        clone.device = str(load_device)
+        if autoregister:
+            self.multigpu_clones[load_device] = clone
+        return clone
+
+    def cleanup(self):
+        for clone in list(self.multigpu_clones.values()):
+            clone.cleanup()
+        super().cleanup()
+
+    def get_control(self, *_args):
+        self.events.append("get_control")
+        if self.raise_on_get_control:
+            raise RuntimeError("injected control failure")
+        return {
+            key: [value * float(self.strength) for value in values]
+            for key, values in self.control_payload.items()
+        }
+
+
+def _f315_wrapper_type():
+    # Rebuild the private wrapper against the deterministic host base so tests
+    # exercise the same inheritance seam without importing reference code.
+    controlnet_module = types.ModuleType("comfy.controlnet")
+    controlnet_module.ControlBase = _F315HostControlBase
+    cli_args_module = types.ModuleType("comfy.cli_args")
+    cli_args_module.args = types.SimpleNamespace(disable_metadata=False)
+    model_management_module = types.ModuleType("comfy.model_management")
+    comfy_module = types.ModuleType("comfy")
+    comfy_module.__path__ = []
+    comfy_module.model_management = model_management_module
+    module_name = "rookieui._f315_nodes_probe"
+    spec = importlib.util.spec_from_file_location(module_name, Path(nodes.__file__))
+    if spec is None or spec.loader is None:
+        raise RuntimeError("F315 test could not load the local nodes module.")
+    probe_module = importlib.util.module_from_spec(spec)
+    with mock.patch.dict(
+        sys.modules,
+        {
+            "comfy": comfy_module,
+            "comfy.controlnet": controlnet_module,
+            "comfy.cli_args": cli_args_module,
+            "comfy.model_management": model_management_module,
+        },
+    ):
+        spec.loader.exec_module(probe_module)
+    return probe_module._RookieUIStageWeightedControlNet
+
+
+def _f315_wrapper(*, weight_preset="soft", layer_weights=None):
+    wrapper_type = _f315_wrapper_type()
+    return wrapper_type(
+        _F315ConcreteControl(),
+        weight_preset=weight_preset,
+        layer_weights=list(layer_weights or [0.5]),
+    )
+
+
 class ControlNetAdvancedRuntimeTests(unittest.TestCase):
+    def test_stage_weight_wrapper_current_host_multigpu_clone_is_registered_after_repair(self) -> None:
+        wrapper = _f315_wrapper()
+
+        clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
+
+        self.assertIs(wrapper.get_instance_for_device("cuda:1"), clone)
+
+    def test_stage_weight_wrapper_implements_current_host_clone_protocol(self) -> None:
+        wrapper = _f315_wrapper(layer_weights=[0.5, 0.75])
+
+        clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
+
+        self.assertIsNot(clone, wrapper)
+        self.assertIsNot(clone.base_control, wrapper.base_control)
+        self.assertEqual(clone.base_control.device, "cuda:1")
+        self.assertIs(wrapper.get_instance_for_device("cuda:1"), clone)
+        self.assertIs(wrapper.get_instance_for_device("cuda:2"), wrapper)
+        self.assertEqual(wrapper.base_control.deepclone_requests, [("cuda:1", False)])
+        self.assertEqual(clone.multigpu_clones, {})
+        self.assertEqual(clone.layer_weights, (0.5, 0.75))
+        self.assertIsInstance(clone.layer_weights, tuple)
+        clone.layer_weights += (0.9,)
+        self.assertEqual(wrapper.layer_weights, (0.5, 0.75))
+
+        unregistered = wrapper.deepclone_multigpu("cuda:2", autoregister=False)
+        self.assertEqual(unregistered.base_control.device, "cuda:2")
+        self.assertNotIn("cuda:2", wrapper.multigpu_clones)
+
+    def test_stage_weight_wrapper_lifecycle_enumerates_owned_objects_once(self) -> None:
+        wrapper = _f315_wrapper()
+        previous = _F315ConcreteControl(name="previous")
+        wrapper.set_previous_controlnet(previous)
+        clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
+        previous_clone = previous.deepclone_multigpu("cuda:1", autoregister=True)
+        clone.set_previous_controlnet(previous_clone)
+
+        models = wrapper.get_models()
+        self.assertEqual(
+            models,
+            [
+                "model:control.clone:cuda:1",
+                "model:control:cpu",
+                "model:previous:cpu",
+                "model:previous.clone:cuda:1",
+            ],
+        )
+        self.assertEqual(wrapper.get_models_only_self(), ["model:control.clone:cuda:1", "model:control:cpu"])
+
+        wrapper.pre_run(object(), lambda percent: percent + 10.0)
+        self.assertEqual(wrapper.base_control.events.count("pre_run"), 1)
+        self.assertEqual(previous.events.count("pre_run"), 1)
+        self.assertEqual(wrapper.get_extra_hooks(), ["hook:control:cpu", "hook:previous:cpu"])
+        self.assertEqual(wrapper.inference_memory_requirements(None), 14)
+
+        wrapper.cleanup()
+        self.assertEqual(wrapper.base_control.events.count("cleanup"), 1)
+        self.assertEqual(clone.base_control.events.count("cleanup"), 1)
+        self.assertEqual(previous.events.count("cleanup"), 1)
+        self.assertEqual(previous_clone.events.count("cleanup"), 1)
+
+    def test_stage_weight_wrapper_restores_wrapped_previous_control_on_success_and_failure(self) -> None:
+        wrapper = _f315_wrapper(layer_weights=[0.5, 0.5, 0.5])
+        sentinel = _F315ConcreteControl(name="wrapped-previous")
+        wrapper.base_control.previous_controlnet = sentinel
+
+        result = wrapper.get_control(None, None, {}, 1, {})
+        self.assertEqual(result["input"], [1.0])
+        self.assertIs(wrapper.base_control.previous_controlnet, sentinel)
+
+        wrapper.base_control.raise_on_get_control = True
+        with self.assertRaisesRegex(RuntimeError, "injected control failure"):
+            wrapper.get_control(None, None, {}, 1, {})
+        self.assertIs(wrapper.base_control.previous_controlnet, sentinel)
+
+    def test_stage_weight_wrapper_preserves_single_device_strength_and_previous_chain_output(self) -> None:
+        wrapper = _f315_wrapper(weight_preset="balanced", layer_weights=[0.5, 0.5, 0.5])
+        wrapper.set_cond_hint(None, strength=0.5)
+        previous = _F315ConcreteControl(name="previous")
+        previous.control_payload = {"input": [10.0], "middle": [20.0], "output": [30.0]}
+        wrapper.set_previous_controlnet(previous)
+
+        result = wrapper.get_control(None, None, {}, 1, {})
+
+        self.assertEqual(result["input"], [0.5, 10.0])
+        self.assertEqual(result["middle"], [0.75, 20.0])
+        self.assertEqual(result["output"], [1.0, 30.0])
+        self.assertEqual(wrapper.base_control.events.count("get_control"), 1)
+        self.assertEqual(previous.events.count("get_control"), 1)
+
     def test_build_controlnet_apply_segments_returns_base_segment_when_advanced_disabled(self) -> None:
         segments = build_controlnet_apply_segments(
             weight=0.8,

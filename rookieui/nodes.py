@@ -5,6 +5,7 @@ import json
 import logging
 import math
 import os
+from contextlib import contextmanager
 
 try:
     import numpy as np
@@ -568,14 +569,63 @@ class RookieUIControlNetPreprocess:
         return (output,)
 
 
+@contextmanager
+def _control_previous_isolated(control):
+    """Temporarily detach a host control's previous link and always restore it."""
+    if control is None:
+        yield
+        return
+    original_previous = getattr(control, "previous_controlnet", None)
+    control.previous_controlnet = None
+    try:
+        yield
+    finally:
+        control.previous_controlnet = original_previous
+
+
+def _get_control_models_only_self(control):
+    if control is None:
+        return []
+    getter = getattr(control, "get_models_only_self", None)
+    if callable(getter):
+        return list(getter())
+    with _control_previous_isolated(control):
+        return list(control.get_models())
+
+
+def _get_control_extra_hooks_only_self(control):
+    if control is None:
+        return []
+    with _control_previous_isolated(control):
+        return list(control.get_extra_hooks())
+
+
+def _get_control_memory_only_self(control, dtype):
+    if control is None:
+        return 0
+    with _control_previous_isolated(control):
+        return control.inference_memory_requirements(dtype)
+
+
 class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None else object):
-    def __init__(self, base_control, *, weight_preset: str, layer_weights: list[float]) -> None:
+    def __init__(
+        self,
+        base_control,
+        *,
+        weight_preset: str,
+        layer_weights: list[float] | tuple[float, ...],
+    ) -> None:
         if ControlBase is None:  # pragma: no cover - guarded by apply node runtime check
             raise RuntimeError("ComfyUI controlnet runtime is unavailable in this environment.")
         super().__init__()
+        # Hooks belong to the wrapped host control; keeping the wrapper hook slot
+        # empty avoids enumerating the same hook twice.
+        self.extra_hooks = None
         self.base_control = base_control
         self.weight_preset = str(weight_preset or "balanced").strip().lower() or "balanced"
-        self.layer_weights = [round(float(value), 4) for value in list(layer_weights or [])]
+        # Keep the stage-weight configuration immutable so per-device clones cannot
+        # accidentally share or mutate a caller-owned list.
+        self.layer_weights = tuple(round(float(value), 4) for value in list(layer_weights or []))
         self.latent_format = getattr(base_control, "latent_format", None)
         self.global_average_pooling = getattr(base_control, "global_average_pooling", False)
         self.compression_ratio = getattr(base_control, "compression_ratio", 8)
@@ -587,13 +637,49 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         self.preprocess_image = getattr(base_control, "preprocess_image", lambda image: image)
 
     def copy(self):
-        return type(self)(
+        clone = type(self)(
             self.base_control.copy(),
             weight_preset=self.weight_preset,
             layer_weights=self.layer_weights,
         )
+        self.copy_to(clone)
+        return clone
+
+    def copy_to(self, target):
+        super().copy_to(target)
+        target.weight_preset = self.weight_preset
+        target.layer_weights = tuple(self.layer_weights)
+        return target
+
+    def deepclone_multigpu(self, load_device, autoregister=False):
+        """Create a device-local wrapper and base-control clone for current Core."""
+        base_deepclone = getattr(self.base_control, "deepclone_multigpu", None)
+        if not callable(base_deepclone):
+            raise RuntimeError("RookieUI ControlNet base does not implement deepclone_multigpu.")
+        # The wrapper owns registration; registering the wrapped base separately
+        # would create a second clone map and duplicate host lifecycle work.
+        base_clone = base_deepclone(load_device, autoregister=False)
+        if base_clone is None:
+            raise RuntimeError("RookieUI ControlNet base returned no multi-GPU clone.")
+        clone = type(self)(
+            base_clone,
+            weight_preset=self.weight_preset,
+            layer_weights=self.layer_weights,
+        )
+        self.copy_to(clone)
+        clone._rookieui_load_device = load_device
+        if autoregister:
+            self.multigpu_clones[load_device] = clone
+        return clone
 
     def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=[]):
+        super().set_cond_hint(
+            cond_hint,
+            strength=strength,
+            timestep_percent_range=timestep_percent_range,
+            vae=vae,
+            extra_concat=extra_concat,
+        )
         self.base_control.set_cond_hint(
             cond_hint,
             strength=strength,
@@ -608,29 +694,53 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         return self
 
     def pre_run(self, model, percent_to_timestep_function):
-        self.base_control.pre_run(model, percent_to_timestep_function)
+        self.timestep_range = tuple(
+            percent_to_timestep_function(value) for value in self.timestep_percent_range
+        )
+        with _control_previous_isolated(self.base_control):
+            self.base_control.pre_run(model, percent_to_timestep_function)
         if self.previous_controlnet is not None:
             self.previous_controlnet.pre_run(model, percent_to_timestep_function)
 
     def cleanup(self):
-        self.base_control.cleanup()
         if self.previous_controlnet is not None:
             self.previous_controlnet.cleanup()
+        for device_cnet in list(self.multigpu_clones.values()):
+            with _control_previous_isolated(device_cnet):
+                device_cnet.cleanup()
+        with _control_previous_isolated(self.base_control):
+            self.base_control.cleanup()
+        self.cond_hint = None
+        self.extra_concat = None
+        self.timestep_range = None
+
+    def get_instance_for_device(self, device):
+        return self.multigpu_clones.get(device, self)
 
     def get_models(self):
-        out = list(self.base_control.get_models())
+        out = []
+        for device_cnet in self.multigpu_clones.values():
+            out += device_cnet.get_models_only_self()
+        out += _get_control_models_only_self(self.base_control)
         if self.previous_controlnet is not None:
             out += self.previous_controlnet.get_models()
         return out
 
+    def get_models_only_self(self):
+        with _control_previous_isolated(self):
+            return self.get_models()
+
     def get_extra_hooks(self):
-        out = list(self.base_control.get_extra_hooks())
+        out = []
+        if self.extra_hooks is not None:
+            out.append(self.extra_hooks)
+        out += _get_control_extra_hooks_only_self(self.base_control)
         if self.previous_controlnet is not None:
             out += self.previous_controlnet.get_extra_hooks()
         return out
 
     def inference_memory_requirements(self, dtype):
-        requirements = self.base_control.inference_memory_requirements(dtype)
+        requirements = _get_control_memory_only_self(self.base_control, dtype)
         if self.previous_controlnet is not None:
             requirements += self.previous_controlnet.inference_memory_requirements(dtype)
         return requirements
@@ -664,11 +774,22 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         if self.previous_controlnet is not None:
             control_prev = self.previous_controlnet.get_control(x_noisy, t, cond, batched_number, transformer_options)
 
-        self.base_control.previous_controlnet = None
-        control = self.base_control.get_control(x_noisy, t, cond, batched_number, transformer_options)
+        with _control_previous_isolated(self.base_control):
+            control = self.base_control.get_control(x_noisy, t, cond, batched_number, transformer_options)
         if control is None:
             return control_prev
-        return self.control_merge(self._scale_control_outputs(control), control_prev, output_dtype=None)
+        original_strength = self.strength
+        original_pooling = self.global_average_pooling
+        original_strength_type = self.strength_type
+        self.strength = 1.0
+        self.global_average_pooling = False
+        self.strength_type = None
+        try:
+            return self.control_merge(self._scale_control_outputs(control), control_prev, output_dtype=None)
+        finally:
+            self.strength = original_strength
+            self.global_average_pooling = original_pooling
+            self.strength_type = original_strength_type
 
 
 class RookieUIControlNetApplyNativeAdvanced:
