@@ -48,6 +48,20 @@ def controlnet_union_type_for_control_type(control_type: object) -> str | None:
     return CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE.get(str(control_type or "").strip())
 
 
+def _controlnet_unit_applies_to_pass(
+    unit: NormalizedControlNetUnit | NormalizedADetailerControlNetRequest | dict[str, object],
+    pass_scope: str | None,
+) -> bool:
+    if pass_scope is None:
+        return True
+    hr_option = str(_read_controlnet_unit_value(unit, "hr_option") or "both").strip().lower()
+    if pass_scope == "base":
+        return hr_option in {"both", "low_res_only"}
+    if pass_scope == "hires":
+        return hr_option in {"both", "high_res_only"}
+    raise ValueError("Unsupported ControlNet pass scope.")
+
+
 def _apply_controlnet_unit_entries(
     workflow: dict[str, object],
     *,
@@ -59,11 +73,14 @@ def _apply_controlnet_unit_entries(
     model_source: list[object],
     vae_source: list[object],
     control_image_ref: list[object] | None = None,
+    pass_scope: str | None = None,
 ) -> tuple[str | list[object], str | list[object]]:
     current_positive = positive_ref
     current_negative = negative_ref
     for unit in units:
         if not bool(_read_controlnet_unit_value(unit, "enabled")):
+            continue
+        if not _controlnet_unit_applies_to_pass(unit, pass_scope):
             continue
         image_asset = str(_read_controlnet_unit_value(unit, "image_asset") or "").strip()
         mask_asset = str(_read_controlnet_unit_value(unit, "mask_asset") or "").strip()
@@ -74,6 +91,7 @@ def _apply_controlnet_unit_entries(
         stage_profile = resolve_controlnet_stage_profile(control_mode=control_mode, advanced=advanced)
         module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
+        prepared_map = bool(_read_controlnet_unit_value(unit, "preprocessed_control_map"))
         if not model_name:
             continue
 
@@ -95,7 +113,7 @@ def _apply_controlnet_unit_entries(
 
         mask_ref: list[object] | None = None
         apply_mask_aware = bool(getattr(advanced, "enabled", False) and getattr(advanced, "mask_aware_apply", False))
-        if (use_mask or apply_mask_aware) and mask_asset:
+        if ((use_mask and not prepared_map) or apply_mask_aware) and mask_asset:
             mask_id = allocator.next()
             workflow[mask_id] = {
                 "class_type": "RookieUILoadAssetMask",
@@ -108,26 +126,29 @@ def _apply_controlnet_unit_entries(
             }
             mask_ref = [mask_id, 0]
 
-        preprocess_id = allocator.next()
-        preprocess_inputs: dict[str, object] = {
-            "image": image_ref,
-            "module": module_name,
-            "processor_res": _int_or_default(_read_controlnet_unit_value(unit, "processor_res"), 512),
-            "threshold_a": _float_or_default(_read_controlnet_unit_value(unit, "threshold_a"), 64.0),
-            "threshold_b": _float_or_default(_read_controlnet_unit_value(unit, "threshold_b"), 64.0),
-            "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
-            "target_width": int(request.width),
-            "target_height": int(request.height),
-            "resize_mode": str(_read_controlnet_unit_value(unit, "resize_mode") or getattr(request, "resize_mode", "crop_and_resize")),
-            "use_mask": bool(use_mask and mask_ref),
-        }
-        if use_mask and mask_ref is not None:
-            preprocess_inputs["mask"] = mask_ref
-        # IMPORTANT: keep preprocess node in the runtime path so integrated selector changes (module/threshold/use_mask) are not UI-only and always affect the emitted workflow.
-        workflow[preprocess_id] = {
-            "class_type": "RookieUIControlNetPreprocess",
-            "inputs": preprocess_inputs,
-        }
+        unit_control_image_ref = image_ref
+        if not prepared_map:
+            preprocess_id = allocator.next()
+            preprocess_inputs: dict[str, object] = {
+                "image": image_ref,
+                "module": module_name,
+                "processor_res": _int_or_default(_read_controlnet_unit_value(unit, "processor_res"), 512),
+                "threshold_a": _float_or_default(_read_controlnet_unit_value(unit, "threshold_a"), 64.0),
+                "threshold_b": _float_or_default(_read_controlnet_unit_value(unit, "threshold_b"), 64.0),
+                "pixel_perfect": bool(_read_controlnet_unit_value(unit, "pixel_perfect")),
+                "target_width": int(request.width),
+                "target_height": int(request.height),
+                "resize_mode": str(_read_controlnet_unit_value(unit, "resize_mode") or getattr(request, "resize_mode", "crop_and_resize")),
+                "use_mask": bool(use_mask and mask_ref),
+            }
+            if use_mask and mask_ref is not None:
+                preprocess_inputs["mask"] = mask_ref
+            # IMPORTANT: keep preprocess node in the runtime path so integrated selector changes (module/threshold/use_mask) are not UI-only and always affect the emitted workflow.
+            workflow[preprocess_id] = {
+                "class_type": "RookieUIControlNetPreprocess",
+                "inputs": preprocess_inputs,
+            }
+            unit_control_image_ref = [preprocess_id, 0]
 
         loader_id = allocator.next()
         if request.base_family in {"sd15", "sdxl"}:
@@ -176,7 +197,7 @@ def _apply_controlnet_unit_entries(
                 "positive": _to_node_ref(current_positive),
                 "negative": _to_node_ref(current_negative),
                 "control_net": control_net_ref,
-                "image": [preprocess_id, 0],
+                "image": unit_control_image_ref,
                 "strength": float(segment["strength"]),
                 "start_percent": float(segment["start_percent"]),
                 "end_percent": float(segment["end_percent"]),
@@ -209,6 +230,7 @@ def _apply_controlnet_units(
     negative_ref: str | list[object],
     model_source: list[object],
     vae_source: list[object],
+    pass_scope: str | None = None,
 ) -> tuple[str | list[object], str | list[object]]:
     return _apply_controlnet_unit_entries(
         workflow,
@@ -220,4 +242,53 @@ def _apply_controlnet_units(
         model_source=model_source,
         vae_source=vae_source,
         control_image_ref=None,
+        pass_scope=pass_scope,
     )
+
+
+def _build_controlnet_pass_references(
+    workflow: dict[str, object],
+    *,
+    allocator: NodeIdAllocator,
+    request: NormalizedTxt2ImgRequest | NormalizedImg2ImgRequest,
+    positive_ref: str | list[object],
+    negative_ref: str | list[object],
+    model_source: list[object],
+    vae_source: list[object],
+) -> tuple[
+    tuple[str | list[object], str | list[object]],
+    tuple[str | list[object], str | list[object]],
+]:
+    if not request.hires_enabled:
+        conditioned = _apply_controlnet_units(
+            workflow,
+            allocator=allocator,
+            request=request,
+            positive_ref=positive_ref,
+            negative_ref=negative_ref,
+            model_source=model_source,
+            vae_source=vae_source,
+        )
+        return conditioned, conditioned
+
+    base_conditioned = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_ref,
+        negative_ref=negative_ref,
+        model_source=model_source,
+        vae_source=vae_source,
+        pass_scope="base",
+    )
+    hires_conditioned = _apply_controlnet_units(
+        workflow,
+        allocator=allocator,
+        request=request,
+        positive_ref=positive_ref,
+        negative_ref=negative_ref,
+        model_source=model_source,
+        vae_source=vae_source,
+        pass_scope="hires",
+    )
+    return base_conditioned, hires_conditioned

@@ -15,6 +15,7 @@ CONTROLNET_WARNING_PREPROCESSOR_DISABLED = "CONTROLNET_PREPROCESSOR_DISABLED"
 CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE = "CONTROLNET_PREPROCESSOR_UNAVAILABLE"
 CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK = "CONTROLNET_PREPROCESSOR_HOST_FALLBACK"
 CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT = "CONTROLNET_PREPROCESSOR_EMPTY_OUTPUT"
+CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED = "prepared_map_module_ignored"
 
 _WARNING_MESSAGES = {
     CONTROLNET_WARNING_FEATURE_DISABLED: "ControlNet payload was ignored because ControlNet is disabled by feature flag.",
@@ -31,6 +32,9 @@ _WARNING_MESSAGES = {
     ),
     CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT: (
         "ComfyUI host preprocessor completed but output is near-empty for the current image/module settings."
+    ),
+    CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED: (
+        "Prepared ControlNet map uses the uploaded image directly; the requested preprocessor module was ignored."
     ),
 }
 

@@ -28,13 +28,14 @@ from rookieui.services.controlnet_runtime import (
     runtime_dependencies_available,
 )
 from rookieui.services.controlnet_warnings import (
-    CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL, CONTROLNET_WARNING_ALIAS_DISABLED,
+    CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL, CONTROLNET_WARNING_ALIAS_DISABLED, CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED,
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
     CONTROLNET_WARNING_PREPROCESSOR_DISABLED,
     CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT,
     CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK,
     CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE,
+    CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED,
     CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED,
     ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED_ENV,
     ROOKIEUI_CONTROLNET_ENABLED_ENV,
@@ -46,8 +47,7 @@ from rookieui.services.controlnet_warnings import (
 )
 from rookieui.services.model_inventory import discover_model_inventory
 
-# IMPORTANT: phase-59 refactor keeps this module as the stable ControlNet facade.
-# Route handlers and existing tests should continue importing and patching here while catalog/normalization/detect ownership is split behind it.
+# IMPORTANT: stable ControlNet facade; route/tests retain this seam while catalog/normalization/detect ownership moves behind it.
 
 __all__ = [
     "CONTROLNET_WARNING_ALIAS_DISABLED",
@@ -57,6 +57,7 @@ __all__ = [
     "CONTROLNET_WARNING_PREPROCESSOR_EMPTY_OUTPUT",
     "CONTROLNET_WARNING_PREPROCESSOR_HOST_FALLBACK",
     "CONTROLNET_WARNING_PREPROCESSOR_UNAVAILABLE",
+    "CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED",
     "CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED",
     "CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL",
     "ROOKIEUI_CONTROLNET_A1111_ALIAS_ENABLED_ENV",
@@ -76,8 +77,6 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
-
-
 def _coerce_inventory_model_list(inventory_models: object) -> list[object]:
     if inventory_models in (None, ""):
         return []
@@ -93,7 +92,7 @@ def normalize_controlnet_units(
     inventory_models: list[str] | None = None,
     strict_model_match: bool = False,
     fallback_image_asset: str = "",
-    fallback_image_data: str = "",
+    fallback_image_data: str = "", warn_on_prepared_map_module: bool = True,
 ) -> tuple[list[NormalizedControlNetUnit], list[str], list[str]]:
     available_modules = discover_controlnet_modules()
     module_aliases = build_module_alias_map(available_modules)
@@ -110,7 +109,7 @@ def normalize_controlnet_units(
         resolve_inventory_selector_fn=resolve_inventory_selector,
         resolve_asset_path_fn=resolve_asset_path,
         store_uploaded_image_fn=store_uploaded_image,
-        warning_message_builder=warning_messages_from_codes,
+        warning_message_builder=warning_messages_from_codes, warn_on_prepared_map_module=warn_on_prepared_map_module,
     )
 
 

@@ -399,6 +399,251 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         self.assertEqual(controlnet_apply[0]["inputs"]["start_percent"], 0.2)
         self.assertEqual(controlnet_apply[0]["inputs"]["end_percent"], 0.8)
 
+    def test_hires_controlnet_option_scopes_conditioning_references(self) -> None:
+        def sampler_conditioning(workflow: dict[str, object]) -> list[tuple[object, object]]:
+            return [
+                (node["inputs"]["positive"], node["inputs"]["negative"])
+                for node in workflow.values()
+                if node["class_type"] == "KSampler"
+            ]
+
+        baseline = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "profile": "sd15",
+                "hires_enabled": True,
+            }
+        )
+        baseline_refs = sampler_conditioning(translate_txt2img_request(baseline).to_payload()["workflow"])
+        self.assertEqual(len(baseline_refs), 2)
+
+        expected_conditioned = {
+            "both": (True, True),
+            "low_res_only": (True, False),
+            "high_res_only": (False, True),
+        }
+        for hr_option, (base_conditioned, hires_conditioned) in expected_conditioned.items():
+            with self.subTest(hr_option=hr_option):
+                normalized = normalize_txt2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "profile": "sd15",
+                        "hires_enabled": True,
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": "canny",
+                                "model": "control_v11p_sd15_canny.safetensors",
+                                "image_asset": "source-image",
+                                "hr_option": hr_option,
+                            }
+                        ],
+                    }
+                )
+                refs = sampler_conditioning(translate_txt2img_request(normalized).to_payload()["workflow"])
+                self.assertEqual(len(refs), 2)
+                self.assertEqual(refs[0] != baseline_refs[0], base_conditioned)
+                self.assertEqual(refs[1] != baseline_refs[1], hires_conditioned)
+
+        single_pass = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "profile": "sd15",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "canny",
+                        "model": "control_v11p_sd15_canny.safetensors",
+                        "image_asset": "source-image",
+                        "hr_option": "high_res_only",
+                    }
+                ],
+            }
+        )
+        single_refs = sampler_conditioning(translate_txt2img_request(single_pass).to_payload()["workflow"])
+        self.assertEqual(len(single_refs), 1)
+        self.assertNotEqual(single_refs[0], baseline_refs[0])
+        self.assertEqual(single_pass.controlnet_units[0].hr_option, "high_res_only")
+        self.assertEqual(single_pass.controlnet_warning_codes, [])
+
+    def test_prepared_control_map_bypasses_preprocessor_and_reports_ignored_module(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "profile": "sd15",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "depth",
+                        "model": "control_v11f1p_sd15_depth.safetensors",
+                        "image_asset": "prepared-control-map",
+                        "preprocessed_control_map": True,
+                    }
+                ],
+            }
+        )
+
+        payload = translate_txt2img_request(normalized).to_payload()
+        workflow = payload["workflow"]
+        image_id = next(
+            node_id
+            for node_id, node in workflow.items()
+            if node["class_type"] == "RookieUILoadAssetImage"
+        )
+        apply_node = next(
+            node for node in workflow.values() if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
+        self.assertNotIn(
+            "RookieUIControlNetPreprocess",
+            {node["class_type"] for node in workflow.values()},
+        )
+        self.assertEqual(apply_node["inputs"]["image"], [image_id, 0])
+        self.assertIn("prepared_map_module_ignored", normalized.controlnet_warning_codes)
+        self.assertIn("prepared_map_module_ignored", payload["normalized_request"]["controlnet_warning_codes"])
+
+    def test_prepared_control_map_warning_is_content_free_and_exact(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "city skyline",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "depth",
+                        "model": "control_v11f1p_sd15_depth.safetensors",
+                        "image_asset": "prepared-control-map",
+                        "preprocessed_control_map": True,
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(normalized.controlnet_warning_codes, ["prepared_map_module_ignored"])
+        self.assertEqual(len(normalized.controlnet_warnings), 1)
+        self.assertNotIn("depth", normalized.controlnet_warnings[0].lower())
+        self.assertNotIn("control_v11f1p", normalized.controlnet_warnings[0].lower())
+
+    def test_hires_controlnet_pass_scope_is_shared_by_sdxl_img2img_and_inpaint_graphs(self) -> None:
+        scenarios = (
+            (
+                "sdxl_txt2img",
+                normalize_txt2img_request,
+                translate_txt2img_request,
+                {"prompt": "city skyline", "profile": "sdxl", "hires_enabled": True},
+            ),
+            (
+                "sd15_img2img",
+                normalize_img2img_request,
+                translate_img2img_request,
+                {
+                    "prompt": "city skyline",
+                    "profile": "sd15",
+                    "image_asset": "input-image",
+                    "hires_enabled": True,
+                },
+            ),
+            (
+                "sdxl_inpaint",
+                normalize_img2img_request,
+                translate_img2img_request,
+                {
+                    "prompt": "city skyline",
+                    "profile": "sdxl",
+                    "image_asset": "input-image",
+                    "mask_asset": "input-mask",
+                    "mode": "inpaint",
+                    "hires_enabled": True,
+                },
+            ),
+        )
+
+        def sampler_conditioning(workflow: dict[str, object]) -> list[tuple[object, object]]:
+            return [
+                (node["inputs"]["positive"], node["inputs"]["negative"])
+                for node in workflow.values()
+                if node["class_type"] == "KSampler"
+            ]
+
+        for label, normalize, translate, base_payload in scenarios:
+            with self.subTest(surface=label):
+                baseline = normalize(base_payload)
+                baseline_refs = sampler_conditioning(translate(baseline).to_payload()["workflow"])
+                normalized = normalize(
+                    {
+                        **base_payload,
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": "canny",
+                                "model": "control_v11p_sd15_canny.safetensors",
+                                "image_asset": "source-image",
+                                "hr_option": "high_res_only",
+                            }
+                        ],
+                    }
+                )
+                refs = sampler_conditioning(translate(normalized).to_payload()["workflow"])
+                self.assertEqual(len(refs), 2)
+                self.assertEqual(refs[0], baseline_refs[0])
+                self.assertNotEqual(refs[1], baseline_refs[1])
+
+    def test_prepared_control_map_is_direct_in_sd_family_img2img_and_inpaint_graphs(self) -> None:
+        scenarios = (
+            (
+                "sdxl_img2img",
+                normalize_img2img_request,
+                translate_img2img_request,
+                {
+                    "prompt": "city skyline",
+                    "profile": "sdxl",
+                    "image_asset": "input-image",
+                },
+            ),
+            (
+                "sd15_inpaint",
+                normalize_img2img_request,
+                translate_img2img_request,
+                {
+                    "prompt": "city skyline",
+                    "profile": "sd15",
+                    "image_asset": "input-image",
+                    "mask_asset": "input-mask",
+                    "mode": "inpaint",
+                },
+            ),
+        )
+        for label, normalize, translate, base_payload in scenarios:
+            with self.subTest(surface=label):
+                normalized = normalize(
+                    {
+                        **base_payload,
+                        "controlnet_units": [
+                            {
+                                "enabled": True,
+                                "module": "depth",
+                                "model": "control_v11f1p_sd15_depth.safetensors",
+                                "image_asset": "prepared-control-map",
+                                "preprocessed_control_map": True,
+                            }
+                        ],
+                    }
+                )
+                workflow = translate(normalized).to_payload()["workflow"]
+                self.assertNotIn(
+                    "RookieUIControlNetPreprocess",
+                    {node["class_type"] for node in workflow.values()},
+                )
+                load_ids = {
+                    node_id
+                    for node_id, node in workflow.items()
+                    if node["class_type"] == "RookieUILoadAssetImage"
+                    and node["inputs"].get("asset_handle") == "prepared-control-map"
+                }
+                self.assertTrue(load_ids)
+                for node in workflow.values():
+                    if node["class_type"] != "RookieUIControlNetApplyNativeAdvanced":
+                        continue
+                    self.assertIn(node["inputs"]["image"][0], load_ids)
+
     def test_control_mode_changes_apply_profile_and_advanced_disabled_cannot_leak(self) -> None:
         expected = {
             "balanced": ("balanced", "balanced", True),

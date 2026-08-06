@@ -534,6 +534,7 @@ class Txt2ImgTranslationTests(unittest.TestCase):
                 get_size = next(node for node in workflow.values() if node["class_type"] == "GetImageSize")
 
                 self.assertTrue(normalized.controlnet_units[0].preprocessed_control_map)
+                self.assertEqual(normalized.controlnet_warning_codes, [])
                 self.assertEqual(qwen_control["inputs"]["image"], [image_id, 0])
                 self.assertEqual(get_size["inputs"]["image"], [image_id, 0])
                 self.assertNotIn("Canny", class_types)

@@ -436,6 +436,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         payload,
         inventory_models=controlnet_inventory_models,
         strict_model_match=inventory_is_host,
+        warn_on_prepared_map_module=profile.id != "z_image_turbo",
     )
     # IMPORTANT: keep ADetailer normalization detached from main ControlNet ownership here.
     # Later refinement runtime work depends on this seam so per-unit overrides do not pollute base generation units.

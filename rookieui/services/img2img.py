@@ -318,6 +318,7 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         strict_model_match=inventory_is_host,
         fallback_image_asset=image_asset,
         fallback_image_data=request.image_data or batch_image_seed,
+        warn_on_prepared_map_module=profile.id != "z_image_turbo",
     )
     # IMPORTANT: keep ADetailer refinement intent on its own normalized block.
     # The main img2img request must stay reusable even when future detailer units add local ControlNet/inpaint overrides.

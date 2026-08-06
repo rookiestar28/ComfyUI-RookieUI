@@ -22,6 +22,7 @@ from rookieui.services.controlnet_warnings import (
     CONTROLNET_WARNING_ALIAS_DISABLED,
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
+    CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED,
     CONTROLNET_WARNING_UNIT_LIMIT_TRUNCATED,
 )
 
@@ -293,6 +294,7 @@ def normalize_controlnet_units(
     resolve_asset_path_fn: Callable[[str], Any],
     store_uploaded_image_fn: Callable[[str], Any],
     warning_message_builder: Callable[[list[str]], list[str]],
+    warn_on_prepared_map_module: bool = True,
 ) -> tuple[list[NormalizedControlNetUnit], list[str], list[str]]:
     warning_codes: list[str] = []
 
@@ -399,6 +401,10 @@ def normalize_controlnet_units(
             default=False,
             strict=False,
         )
+        if warn_on_prepared_map_module and preprocessed_control_map and module != DEFAULT_CONTROLNET_MODULE:
+            # IMPORTANT: a prepared map is already the ControlNet hint; retain the requested field for persistence,
+            # but make the ignored module explicit so generic SD/SDXL callers cannot silently preprocess twice.
+            warning_codes.append(CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED)
         advanced = _normalize_controlnet_advanced_block(
             _extract_unit_field(raw_unit, "advanced"),
             field_prefix=f"controlnet_units[{index}].advanced",

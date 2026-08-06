@@ -6,7 +6,7 @@ from rookieui.contracts.generation import (
 )
 from rookieui.services.workflow_builders import prompt_conditioning
 from rookieui.services.workflow_builders.adetailer import _append_decode_adetailer_and_save
-from rookieui.services.workflow_builders.controlnet import _apply_controlnet_units
+from rookieui.services.workflow_builders.controlnet import _build_controlnet_pass_references
 from rookieui.services.workflow_builders.core import (
     NodeIdAllocator,
     _append_img2img_resize_node,
@@ -30,7 +30,7 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -79,8 +79,8 @@ def _build_sd15_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -121,7 +121,7 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -167,8 +167,8 @@ def _build_sdxl_txt2img_graph(request: NormalizedTxt2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -209,7 +209,7 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -279,8 +279,8 @@ def _build_sd15_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -321,7 +321,7 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -391,8 +391,8 @@ def _build_sdxl_img2img_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -431,7 +431,7 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         allocator=allocator,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -527,8 +527,8 @@ def _build_sd15_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
@@ -569,7 +569,7 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         height=request.height,
         clip_source=clip_source,
     )
-    positive_ref, negative_ref = _apply_controlnet_units(
+    (positive_ref, negative_ref), (hires_positive_ref, hires_negative_ref) = _build_controlnet_pass_references(
         workflow,
         allocator=allocator,
         request=request,
@@ -665,8 +665,8 @@ def _build_sdxl_inpaint_graph(request: NormalizedImg2ImgRequest) -> dict[str, ob
         _build_sampler_node(
             workflow,
             node_id=hires_sampler_id,
-            positive_id=positive_ref,
-            negative_id=negative_ref,
+            positive_id=hires_positive_ref,
+            negative_id=hires_negative_ref,
             latent_id=upscale_id,
             request=request,
             denoise=request.hires_denoise,
