@@ -16,7 +16,7 @@ from rookieui.services.controlnet_advanced_runtime import (
 )
 
 
-class _F315HostControlBase:
+class _HostControlBaseDouble:
     """Deterministic current-host lifecycle double; never loads a real model."""
 
     def __init__(self, *, name: str = "control", device: str = "cpu") -> None:
@@ -117,7 +117,7 @@ class _F315HostControlBase:
         return merged
 
 
-class _F315ConcreteControl(_F315HostControlBase):
+class _ConcreteControlDouble(_HostControlBaseDouble):
     def copy(self):
         clone = type(self)(name=f"{self.name}.copy", device=self.device)
         self.copy_to(clone)
@@ -149,21 +149,21 @@ class _F315ConcreteControl(_F315HostControlBase):
         }
 
 
-def _f315_wrapper_type():
+def _wrapper_probe_type():
     # Rebuild the private wrapper against the deterministic host base so tests
     # exercise the same inheritance seam without importing reference code.
     controlnet_module = types.ModuleType("comfy.controlnet")
-    controlnet_module.ControlBase = _F315HostControlBase
+    controlnet_module.ControlBase = _HostControlBaseDouble
     cli_args_module = types.ModuleType("comfy.cli_args")
     cli_args_module.args = types.SimpleNamespace(disable_metadata=False)
     model_management_module = types.ModuleType("comfy.model_management")
     comfy_module = types.ModuleType("comfy")
     comfy_module.__path__ = []
     comfy_module.model_management = model_management_module
-    module_name = "rookieui._f315_nodes_probe"
+    module_name = "rookieui._nodes_wrapper_probe"
     spec = importlib.util.spec_from_file_location(module_name, Path(nodes.__file__))
     if spec is None or spec.loader is None:
-        raise RuntimeError("F315 test could not load the local nodes module.")
+        raise RuntimeError("test could not load the local nodes module.")
     probe_module = importlib.util.module_from_spec(spec)
     with mock.patch.dict(
         sys.modules,
@@ -178,10 +178,10 @@ def _f315_wrapper_type():
     return probe_module._RookieUIStageWeightedControlNet
 
 
-def _f315_wrapper(*, weight_preset="soft", layer_weights=None):
-    wrapper_type = _f315_wrapper_type()
+def _wrapper_probe(*, weight_preset="soft", layer_weights=None):
+    wrapper_type = _wrapper_probe_type()
     return wrapper_type(
-        _F315ConcreteControl(),
+        _ConcreteControlDouble(),
         weight_preset=weight_preset,
         layer_weights=list(layer_weights or [0.5]),
     )
@@ -189,14 +189,14 @@ def _f315_wrapper(*, weight_preset="soft", layer_weights=None):
 
 class ControlNetAdvancedRuntimeTests(unittest.TestCase):
     def test_stage_weight_wrapper_current_host_multigpu_clone_is_registered_after_repair(self) -> None:
-        wrapper = _f315_wrapper()
+        wrapper = _wrapper_probe()
 
         clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
 
         self.assertIs(wrapper.get_instance_for_device("cuda:1"), clone)
 
     def test_stage_weight_wrapper_implements_current_host_clone_protocol(self) -> None:
-        wrapper = _f315_wrapper(layer_weights=[0.5, 0.75])
+        wrapper = _wrapper_probe(layer_weights=[0.5, 0.75])
 
         clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
 
@@ -217,8 +217,8 @@ class ControlNetAdvancedRuntimeTests(unittest.TestCase):
         self.assertNotIn("cuda:2", wrapper.multigpu_clones)
 
     def test_stage_weight_wrapper_lifecycle_enumerates_owned_objects_once(self) -> None:
-        wrapper = _f315_wrapper()
-        previous = _F315ConcreteControl(name="previous")
+        wrapper = _wrapper_probe()
+        previous = _ConcreteControlDouble(name="previous")
         wrapper.set_previous_controlnet(previous)
         clone = wrapper.deepclone_multigpu("cuda:1", autoregister=True)
         previous_clone = previous.deepclone_multigpu("cuda:1", autoregister=True)
@@ -249,8 +249,8 @@ class ControlNetAdvancedRuntimeTests(unittest.TestCase):
         self.assertEqual(previous_clone.events.count("cleanup"), 1)
 
     def test_stage_weight_wrapper_restores_wrapped_previous_control_on_success_and_failure(self) -> None:
-        wrapper = _f315_wrapper(layer_weights=[0.5, 0.5, 0.5])
-        sentinel = _F315ConcreteControl(name="wrapped-previous")
+        wrapper = _wrapper_probe(layer_weights=[0.5, 0.5, 0.5])
+        sentinel = _ConcreteControlDouble(name="wrapped-previous")
         wrapper.base_control.previous_controlnet = sentinel
 
         result = wrapper.get_control(None, None, {}, 1, {})
@@ -263,9 +263,9 @@ class ControlNetAdvancedRuntimeTests(unittest.TestCase):
         self.assertIs(wrapper.base_control.previous_controlnet, sentinel)
 
     def test_stage_weight_wrapper_preserves_single_device_strength_and_previous_chain_output(self) -> None:
-        wrapper = _f315_wrapper(weight_preset="balanced", layer_weights=[0.5, 0.5, 0.5])
+        wrapper = _wrapper_probe(weight_preset="balanced", layer_weights=[0.5, 0.5, 0.5])
         wrapper.set_cond_hint(None, strength=0.5)
-        previous = _F315ConcreteControl(name="previous")
+        previous = _ConcreteControlDouble(name="previous")
         previous.control_payload = {"input": [10.0], "middle": [20.0], "output": [30.0]}
         wrapper.set_previous_controlnet(previous)
 
