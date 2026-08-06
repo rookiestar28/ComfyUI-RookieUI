@@ -92,8 +92,11 @@ def _apply_controlnet_unit_entries(
         module_name = str(_read_controlnet_unit_value(unit, "module") or "none").strip().lower() or "none"
         model_name = str(_read_controlnet_unit_value(unit, "model") or "").strip()
         prepared_map = bool(_read_controlnet_unit_value(unit, "preprocessed_control_map"))
+        concat_mask = bool(_read_controlnet_unit_value(unit, "concat_mask"))
         if not model_name:
             continue
+        if concat_mask and not mask_asset:
+            raise ValueError("ControlNet concat_mask requires a real source mask asset.")
 
         if control_image_ref is None:
             if not image_asset:
@@ -113,7 +116,7 @@ def _apply_controlnet_unit_entries(
 
         mask_ref: list[object] | None = None
         apply_mask_aware = bool(getattr(advanced, "enabled", False) and getattr(advanced, "mask_aware_apply", False))
-        if ((use_mask and not prepared_map) or apply_mask_aware) and mask_asset:
+        if ((use_mask and not prepared_map) or apply_mask_aware or concat_mask) and mask_asset:
             mask_id = allocator.next()
             workflow[mask_id] = {
                 "class_type": "RookieUILoadAssetMask",
@@ -180,11 +183,6 @@ def _apply_controlnet_unit_entries(
             }
             control_net_ref = [union_id, 0]
 
-        if control_type == "Inpaint" and bool(_read_controlnet_unit_value(unit, "concat_mask")):
-            # The canonical source-mask/VAE wiring is not available yet; never
-            # route an ID-7 control through the host's all-ones placeholder.
-            raise ValueError("ControlNet Inpaint concat_mask requires the canonical source-mask contract.")
-
         apply_segments = build_controlnet_apply_segments(
             weight=_float_or_default(_read_controlnet_unit_value(unit, "weight"), 1.0),
             guidance_start=_float_or_default(_read_controlnet_unit_value(unit, "guidance_start"), 0.0),
@@ -210,6 +208,11 @@ def _apply_controlnet_unit_entries(
             }
             if apply_mask_aware and mask_ref is not None:
                 apply_inputs["mask_optional"] = mask_ref
+            if concat_mask:
+                # Keep the source role explicit even when the same asset is also
+                # used as an effect mask; the native apply node validates the VAE
+                # and supplies the real host `extra_concat` tensor.
+                apply_inputs["inpaint_mask_optional"] = mask_ref
             workflow[apply_id] = {
                 "class_type": "RookieUIControlNetApplyNativeAdvanced",
                 "inputs": apply_inputs,

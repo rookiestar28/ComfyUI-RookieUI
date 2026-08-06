@@ -37,6 +37,12 @@ from rookieui.services.controlnet_runtime import (
 from rookieui.services.controlnet_advanced_runtime import (
     build_controlnet_stage_weights,
 )
+from rookieui.services.controlnet_mask_runtime import (
+    apply_effect_mask_to_control,
+    is_all_zero_mask,
+    normalize_effect_mask,
+    prepare_concat_mask,
+)
 from rookieui.services.prompt_dsl import normalize_prompt_attention_for_weighted_encode
 from rookieui.services.a1111_prompt_encoding import (
     A1111PromptEncodingOptions,
@@ -614,6 +620,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         *,
         weight_preset: str,
         layer_weights: list[float] | tuple[float, ...],
+        effect_mask=None,
     ) -> None:
         if ControlBase is None:  # pragma: no cover - guarded by apply node runtime check
             raise RuntimeError("ComfyUI controlnet runtime is unavailable in this environment.")
@@ -626,6 +633,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         # Keep the stage-weight configuration immutable so per-device clones cannot
         # accidentally share or mutate a caller-owned list.
         self.layer_weights = tuple(round(float(value), 4) for value in list(layer_weights or []))
+        self.effect_mask = effect_mask.clone() if effect_mask is not None else None
         self.latent_format = getattr(base_control, "latent_format", None)
         self.global_average_pooling = getattr(base_control, "global_average_pooling", False)
         self.compression_ratio = getattr(base_control, "compression_ratio", 8)
@@ -641,6 +649,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
             self.base_control.copy(),
             weight_preset=self.weight_preset,
             layer_weights=self.layer_weights,
+            effect_mask=self.effect_mask,
         )
         self.copy_to(clone)
         return clone
@@ -649,6 +658,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         super().copy_to(target)
         target.weight_preset = self.weight_preset
         target.layer_weights = tuple(self.layer_weights)
+        target.effect_mask = self.effect_mask.clone() if self.effect_mask is not None else None
         return target
 
     def deepclone_multigpu(self, load_device, autoregister=False):
@@ -665,6 +675,7 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
             base_clone,
             weight_preset=self.weight_preset,
             layer_weights=self.layer_weights,
+            effect_mask=self.effect_mask,
         )
         self.copy_to(clone)
         clone._rookieui_load_device = load_device
@@ -672,7 +683,8 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
             self.multigpu_clones[load_device] = clone
         return clone
 
-    def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=[]):
+    def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0), vae=None, extra_concat=None):
+        extra_concat = list(extra_concat or [])
         super().set_cond_hint(
             cond_hint,
             strength=strength,
@@ -785,7 +797,9 @@ class _RookieUIStageWeightedControlNet(ControlBase if ControlBase is not None el
         self.global_average_pooling = False
         self.strength_type = None
         try:
-            return self.control_merge(self._scale_control_outputs(control), control_prev, output_dtype=None)
+            scaled_control = self._scale_control_outputs(control)
+            masked_control = apply_effect_mask_to_control(scaled_control, self.effect_mask)
+            return self.control_merge(masked_control, control_prev, output_dtype=None)
         finally:
             self.strength = original_strength
             self.global_average_pooling = original_pooling
@@ -813,6 +827,7 @@ class RookieUIControlNetApplyNativeAdvanced:
             },
             "optional": {
                 "mask_optional": ("MASK",),
+                "inpaint_mask_optional": ("MASK",),
                 "vae_optional": ("VAE",),
                 "control_mode": (list(cls._control_modes),),
                 "apply_to_negative": ("BOOLEAN", {"default": True}),
@@ -848,12 +863,7 @@ class RookieUIControlNetApplyNativeAdvanced:
 
     @staticmethod
     def _normalize_mask(mask):
-        if mask is None:
-            return None
-        mask = mask.clone()
-        if len(mask.shape) < 3:
-            mask = mask.unsqueeze(0)
-        return torch.clamp(mask, 0.0, 1.0)
+        return normalize_effect_mask(mask)
 
     def apply_controlnet(
         self,
@@ -869,6 +879,7 @@ class RookieUIControlNetApplyNativeAdvanced:
         mask_aware_apply=False,
         control_mode="balanced",
         mask_optional=None,
+        inpaint_mask_optional=None,
         vae_optional=None,
         apply_to_negative=None,
     ):
@@ -885,8 +896,19 @@ class RookieUIControlNetApplyNativeAdvanced:
         effective_apply_to_negative = normalized_control_mode != "control"
         if apply_to_negative is not None:
             effective_apply_to_negative = effective_apply_to_negative and bool(apply_to_negative)
-        control_hint = image.movedim(-1, 1)
         normalized_mask = self._normalize_mask(mask_optional) if mask_aware_apply else None
+        concat_mask = bool(getattr(control_net, "concat_mask", False))
+        extra_concat = []
+        control_image = image
+        if concat_mask:
+            if inpaint_mask_optional is None:
+                raise ValueError("ControlNet concat_mask requires a real inpaint_mask_optional source mask.")
+            if vae_optional is None:
+                raise ValueError("ControlNet concat_mask requires vae_optional for source-mask conditioning.")
+            control_image, extra_concat = prepare_concat_mask(image, inpaint_mask_optional)
+        if normalized_mask is not None and is_all_zero_mask(normalized_mask):
+            return (positive, negative)
+        control_hint = control_image.movedim(-1, 1)
         cnets = {}
         out = []
 
@@ -912,29 +934,25 @@ class RookieUIControlNetApplyNativeAdvanced:
                         if control_net is None:
                             raise RuntimeError("control_net is None; ControlNet loader failed before advanced apply.")
                         c_net = control_net.copy()
-                        if layer_weights or str(weight_preset).strip().lower() != "balanced":
+                        if layer_weights or str(weight_preset).strip().lower() != "balanced" or normalized_mask is not None:
                             c_net = _RookieUIStageWeightedControlNet(
                                 c_net,
                                 weight_preset=str(weight_preset).strip().lower(),
                                 layer_weights=layer_weights,
+                                effect_mask=normalized_mask,
                             )
                         c_net = c_net.set_cond_hint(
                             control_hint,
                             float(strength),
                             (float(start_percent), float(end_percent)),
                             vae=vae_optional,
+                            extra_concat=extra_concat,
                         )
                         c_net.set_previous_controlnet(prev_cnet)
                         cnets[prev_cnet] = c_net
 
                     cloned_state["control"] = c_net
                     cloned_state["control_apply_to_uncond"] = False
-                    if normalized_mask is not None:
-                        # IMPORTANT: mask-aware apply must stay attached only to the ControlNet-conditioned entries.
-                        # Promoting this to a broader conditioning mutation leaks the mask into unrelated prompt lanes.
-                        cloned_state["mask"] = normalized_mask
-                        cloned_state["mask_strength"] = 1.0
-                        cloned_state["set_area_to_bounds"] = False
                     conditioned.append([token, cloned_state])
             out.append(conditioned)
         return (out[0], out[1])

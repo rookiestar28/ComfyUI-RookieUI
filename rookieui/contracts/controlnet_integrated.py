@@ -69,7 +69,7 @@ def build_controlnet_integrated_contract_meta() -> dict[str, object]:
             "type_map": dict(CONTROLNET_UNION_TYPE_BY_CONTROL_TYPE),
             "unmapped_policy": "preserve_control_object",
             "fallback_warning_code": "control_type_fallback_all",
-            "inpaint_source_mask_policy": "deferred_until_f318",
+            "inpaint_source_mask_policy": "native_source_mask_required",
         },
         # IMPORTANT: reserve this extensibility signal so future integrated packs (e.g. ADetailer coupling) can extend without rebreaking base ControlNet contracts.
         "integrated_extension_slots": "reserved",

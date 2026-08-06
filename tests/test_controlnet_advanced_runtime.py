@@ -15,6 +15,11 @@ from rookieui.services.controlnet_advanced_runtime import (
     build_controlnet_stage_weights,
     stage_weights_require_wrapper,
 )
+from rookieui.services.controlnet_mask_runtime import (
+    apply_effect_mask_to_control,
+    normalize_effect_mask,
+    prepare_concat_mask,
+)
 
 
 class _HostControlBaseDouble:
@@ -179,12 +184,13 @@ def _wrapper_probe_type():
     return probe_module._RookieUIStageWeightedControlNet
 
 
-def _wrapper_probe(*, weight_preset="soft", layer_weights=None):
+def _wrapper_probe(*, weight_preset="soft", layer_weights=None, effect_mask=None):
     wrapper_type = _wrapper_probe_type()
     return wrapper_type(
         _ConcreteControlDouble(),
         weight_preset=weight_preset,
         layer_weights=list(layer_weights or [0.5]),
+        effect_mask=effect_mask,
     )
 
 
@@ -391,6 +397,119 @@ class ControlNetAdvancedRuntimeTests(unittest.TestCase):
 
     def test_runtime_state_constant_is_native(self) -> None:
         self.assertEqual(CONTROLNET_ADVANCED_RUNTIME_STATE, "rookieui_native_advanced_runtime")
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_effect_mask_scales_only_new_outputs_before_previous_chain_merge(self) -> None:
+        torch = nodes.torch
+        effect_mask = torch.tensor([[[1.0, 0.0], [0.0, 1.0]]], dtype=torch.float32)
+        wrapper = _wrapper_probe(weight_preset="balanced", layer_weights=[1.0], effect_mask=effect_mask)
+        wrapper.set_cond_hint(None, strength=1.0)
+        wrapper.base_control.control_payload = {
+            "input": [torch.ones((1, 1, 2, 2), dtype=torch.float32)],
+            "middle": [],
+            "output": [],
+        }
+        previous = _ConcreteControlDouble(name="previous")
+        previous.control_payload = {
+            "input": [torch.full((1, 1, 2, 2), 7.0, dtype=torch.float32)],
+            "middle": [],
+            "output": [],
+        }
+        wrapper.set_previous_controlnet(previous)
+
+        result = wrapper.get_control(None, None, {}, 1, {})
+
+        self.assertEqual(len(result["input"]), 2)
+        self.assertTrue(torch.equal(result["input"][0], torch.tensor([[[[1.0, 0.0], [0.0, 1.0]]]])))
+        self.assertTrue(torch.equal(result["input"][1], torch.full((1, 1, 2, 2), 7.0)))
+        self.assertTrue(torch.equal(previous.control_payload["input"][0], torch.full((1, 1, 2, 2), 7.0)))
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_all_zero_effect_mask_is_apply_identity_before_conditioning_mutation(self) -> None:
+        torch = nodes.torch
+        positive = [["positive", {"prompt": "keep"}]]
+        negative = [["negative", {"prompt": "keep"}]]
+        image = torch.zeros((1, 2, 2, 3), dtype=torch.float32)
+        node = nodes.RookieUIControlNetApplyNativeAdvanced()
+        with mock.patch.object(node, "_require_controlnet_runtime"):
+            result = node.apply_controlnet(
+                positive,
+                negative,
+                None,
+                image,
+                1.0,
+                0.0,
+                1.0,
+                mask_aware_apply=True,
+                mask_optional=torch.zeros((1, 2, 2), dtype=torch.float32),
+            )
+
+        self.assertIs(result[0], positive)
+        self.assertIs(result[1], negative)
+        self.assertNotIn("mask", positive[0][1])
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_concat_mask_prepares_real_extra_concat_and_zeroes_masked_source_pixels(self) -> None:
+        torch = nodes.torch
+        image = torch.ones((1, 4, 4, 3), dtype=torch.float32)
+        source_mask = torch.tensor([[[0.0, 1.0], [1.0, 0.0]]], dtype=torch.float32)
+
+        masked_image, extra_concat = prepare_concat_mask(image, source_mask)
+
+        self.assertEqual(tuple(extra_concat[0].shape), (1, 1, 2, 2))
+        self.assertTrue(torch.equal(extra_concat[0], torch.tensor([[[[1.0, 0.0], [0.0, 1.0]]]])))
+        self.assertEqual(tuple(masked_image.shape), (1, 4, 4, 3))
+        self.assertEqual(float(masked_image.min().item()), 0.0)
+        self.assertEqual(float(masked_image.max().item()), 1.0)
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_apply_passes_real_concat_mask_to_native_control_lifecycle(self) -> None:
+        torch = nodes.torch
+        control_net = _ConcreteControlDouble()
+        control_net.concat_mask = True
+        image = torch.ones((1, 4, 4, 3), dtype=torch.float32)
+        source_mask = torch.tensor([[[0.0, 1.0], [1.0, 0.0]]], dtype=torch.float32)
+        positive = [["positive", {}]]
+        negative = [["negative", {}]]
+        node = nodes.RookieUIControlNetApplyNativeAdvanced()
+        with mock.patch.object(node, "_require_controlnet_runtime"):
+            result = node.apply_controlnet(
+                positive,
+                negative,
+                control_net,
+                image,
+                1.0,
+                0.0,
+                1.0,
+                inpaint_mask_optional=source_mask,
+                vae_optional=object(),
+            )
+
+        applied_control = result[0][0][1]["control"]
+        self.assertEqual(len(applied_control.extra_concat_orig), 1)
+        self.assertTrue(torch.equal(applied_control.extra_concat_orig[0], torch.tensor([[[[1.0, 0.0], [0.0, 1.0]]]])))
+        self.assertTrue(torch.equal(applied_control.cond_hint_original[:, :, 0, 2], torch.zeros((1, 1))))
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_mask_shapes_are_strict_and_single_batch_broadcasts(self) -> None:
+        torch = nodes.torch
+        normalized = normalize_effect_mask(torch.ones((1, 2, 2), dtype=torch.float32), batch_size=2)
+        self.assertEqual(tuple(normalized.shape), (2, 2, 2))
+        with self.assertRaisesRegex(ValueError, "shape \[B,H,W\] or \[B,1,H,W\]"):
+            normalize_effect_mask(torch.ones((1, 1, 2, 2, 1), dtype=torch.float32))
+        with self.assertRaisesRegex(ValueError, "single-channel"):
+            normalize_effect_mask(torch.ones((1, 2, 2, 2), dtype=torch.float32))
+        with self.assertRaisesRegex(ValueError, "does not match target batch"):
+            normalize_effect_mask(torch.ones((2, 2, 2), dtype=torch.float32), batch_size=3)
+
+    @unittest.skipUnless(nodes.torch is not None, "torch is required for tensor mask semantics")
+    def test_non_tensor_control_output_fails_closed_when_effect_mask_is_enabled(self) -> None:
+        torch = nodes.torch
+        with self.assertRaisesRegex(ValueError, "rank 4"):
+            apply_effect_mask_to_control(
+                {"input": [1.0], "middle": [], "output": []},
+                torch.ones((1, 2, 2), dtype=torch.float32),
+            )
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ export const CONTROLNET_UNION_CONTRACT_FALLBACK = Object.freeze({
   }),
   unmapped_policy: "preserve_control_object",
   fallback_warning_code: "control_type_fallback_all",
-  inpaint_source_mask_policy: "deferred_until_f318",
+  inpaint_source_mask_policy: "native_source_mask_required",
 });
 
 function createControlNetFallbackContract() {

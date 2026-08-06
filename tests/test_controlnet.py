@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from rookieui import nodes
 from rookieui.api import routes
 from rookieui.contracts.controlnet_integrated import (
     CONTROLNET_INTEGRATED_CONTRACT_VERSION,
@@ -754,7 +755,48 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
         all_workflow = translate_txt2img_request(all_normalized).to_payload()["workflow"]
         self.assertNotIn("SetUnionControlNetType", {node["class_type"] for node in all_workflow.values()})
 
-    def test_inpaint_concat_mask_fails_closed_until_f318_source_mask_contract(self) -> None:
+    def test_inpaint_concat_mask_wires_explicit_source_role_and_real_mask_asset(self) -> None:
+        normalized = normalize_txt2img_request(
+            {
+                "prompt": "masked portrait",
+                "controlnet_units": [
+                    {
+                        "enabled": True,
+                        "module": "inpaint",
+                        "model": "control_v11p_sd15_inpaint.safetensors",
+                        "image_asset": "source-image",
+                        "mask_asset": "source-mask",
+                        "control_type": "Inpaint",
+                        "concat_mask": True,
+                        "advanced": {
+                            "enabled": True,
+                            "mask_aware_apply": True,
+                        },
+                    }
+                ],
+            }
+        )
+        workflow = translate_txt2img_request(normalized).to_payload()["workflow"]
+        apply_node = next(
+            node
+            for node in workflow.values()
+            if node["class_type"] == "RookieUIControlNetApplyNativeAdvanced"
+        )
+        mask_node_id, mask_node = next(
+            (node_id, node)
+            for node_id, node in workflow.items()
+            if node["class_type"] == "RookieUILoadAssetMask"
+        )
+        self.assertEqual(mask_node["inputs"]["asset_handle"], "source-mask")
+        self.assertEqual(apply_node["inputs"]["mask_optional"], [mask_node_id, 0])
+        self.assertEqual(apply_node["inputs"]["inpaint_mask_optional"], [mask_node_id, 0])
+
+    def test_inpaint_concat_mask_requires_explicit_internal_socket_without_public_schema_change(self) -> None:
+        input_types = nodes.RookieUIControlNetApplyNativeAdvanced.INPUT_TYPES()
+        self.assertIn("inpaint_mask_optional", input_types["optional"])
+        self.assertEqual(input_types["optional"]["inpaint_mask_optional"], ("MASK",))
+
+    def test_inpaint_concat_mask_fails_closed_without_source_asset(self) -> None:
         normalized = normalize_txt2img_request(
             {
                 "prompt": "masked portrait",
@@ -770,7 +812,7 @@ class ControlNetWorkflowTranslationTests(unittest.TestCase):
                 ],
             }
         )
-        with self.assertRaisesRegex(ValueError, "canonical source-mask contract"):
+        with self.assertRaisesRegex(ValueError, "real source mask asset"):
             translate_txt2img_request(normalized)
 
     def test_txt2img_translation_wires_controlnet_preprocess_and_mask(self) -> None:
@@ -1263,6 +1305,10 @@ class ControlNetRouteTests(unittest.TestCase):
         self.assertEqual(
             control_types["payload"]["contract"]["union_contract"]["type_map"]["OpenPose"],
             "openpose",
+        )
+        self.assertEqual(
+            control_types["payload"]["contract"]["union_contract"]["inpaint_source_mask_policy"],
+            "native_source_mask_required",
         )
 
     def test_detect_payload_supports_passthrough_none_module(self) -> None:

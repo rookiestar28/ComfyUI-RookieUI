@@ -420,6 +420,10 @@ class CapabilitySnapshotTests(unittest.TestCase):
             adetailer["contract"]["controlnet_union_contract"]["host_node"],
             "SetUnionControlNetType",
         )
+        self.assertEqual(
+            adetailer["contract"]["controlnet_union_contract"]["inpaint_source_mask_policy"],
+            "native_source_mask_required",
+        )
         self.assertEqual(adetailer["prompt_tokens"], ["[PROMPT]", "[SEP]", "[SKIP]"])
         self.assertEqual(adetailer["controlnet_modes"], ["none", "passthrough", "custom"])
         self.assertIn("/rookieui/adetailer/catalog", adetailer["routes"])

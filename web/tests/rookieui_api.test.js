@@ -1151,6 +1151,9 @@ describe("fetchRookieUICapabilities", () => {
     expect(fallbackTypes.data.contract.advanced_contract.runtime_state).toBe("rookieui_native_advanced_runtime");
     expect(fallbackTypes.data.contract.union_contract.host_node).toBe("SetUnionControlNetType");
     expect(fallbackTypes.data.contract.union_contract.type_map.OpenPose).toBe("openpose");
+    expect(fallbackTypes.data.contract.union_contract.inpaint_source_mask_policy).toBe(
+      "native_source_mask_required",
+    );
     expect(fallbackTypes.data.default_type).toBe("All");
   });
 
