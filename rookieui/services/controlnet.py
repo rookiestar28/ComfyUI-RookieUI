@@ -28,7 +28,7 @@ from rookieui.services.controlnet_runtime import (
     runtime_dependencies_available,
 )
 from rookieui.services.controlnet_warnings import (
-    CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL, CONTROLNET_WARNING_ALIAS_DISABLED, CONTROLNET_WARNING_PREPARED_MAP_MODULE_IGNORED,
+    CONTROLNET_WARNING_CONTROL_TYPE_FALLBACK_ALL, CONTROLNET_WARNING_ALIAS_DISABLED,
     CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE,
     CONTROLNET_WARNING_FEATURE_DISABLED,
     CONTROLNET_WARNING_PREPROCESSOR_DISABLED,
@@ -48,7 +48,6 @@ from rookieui.services.controlnet_warnings import (
 from rookieui.services.model_inventory import discover_model_inventory
 
 # IMPORTANT: stable ControlNet facade; route/tests retain this seam while catalog/normalization/detect ownership moves behind it.
-
 __all__ = [
     "CONTROLNET_WARNING_ALIAS_DISABLED",
     "CONTROLNET_WARNING_ALIAS_NATIVE_OVERRIDE",
@@ -77,6 +76,8 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger("ComfyUI-RookieUI")
+
+
 def _coerce_inventory_model_list(inventory_models: object) -> list[object]:
     if inventory_models in (None, ""):
         return []
