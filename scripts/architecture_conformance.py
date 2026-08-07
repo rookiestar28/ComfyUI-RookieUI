@@ -10,7 +10,6 @@ import ast
 import json
 import os
 import posixpath
-import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
@@ -27,10 +26,6 @@ _SKIPPED_PARTS = {
     "REFERENCE",
 }
 _SNAPSHOT_SUFFIXES = {".js", ".json", ".mjs", ".py", ".ps1", ".sh"}
-_ESM_IMPORT_RE = re.compile(r"(?:from\s+|import\s*\(\s*)[\"']([^\"']+)[\"']")
-_ESM_STAR_EXPORT_RE = re.compile(r"export\s+\*\s+from\s+[\"']([^\"']+)[\"']")
-_ESM_NAMED_EXPORT_RE = re.compile(r"export\s*\{(.*?)\}\s*(?:from\s+[\"']([^\"']+)[\"'])?\s*;", re.DOTALL)
-_ESM_DECL_EXPORT_RE = re.compile(r"export\s+(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z_$][\w$]*)")
 
 
 @dataclass(frozen=True, order=True)
@@ -38,6 +33,12 @@ class ArchitectureViolation:
     code: str
     path: str
     detail: str
+
+
+@dataclass(frozen=True)
+class _JsToken:
+    kind: str
+    value: str
 
 
 def normalize_repo_path(path: str | Path) -> str:
@@ -86,6 +87,99 @@ def _resolve_esm_path(source_path: str, specifier: str) -> str | None:
     return normalize_repo_path(posixpath.normpath(posixpath.join(posixpath.dirname(source_path), specifier)))
 
 
+def _tokenize_javascript(source: str) -> list[_JsToken]:
+    tokens: list[_JsToken] = []
+    index = 0
+    length = len(source)
+    while index < length:
+        char = source[index]
+        if char.isspace():
+            index += 1
+            continue
+        if source.startswith("//", index):
+            newline = source.find("\n", index + 2)
+            index = length if newline < 0 else newline + 1
+            continue
+        if source.startswith("/*", index):
+            end = source.find("*/", index + 2)
+            index = length if end < 0 else end + 2
+            continue
+        if char in {'"', "'", "`"}:
+            quote = char
+            index += 1
+            value: list[str] = []
+            while index < length:
+                char = source[index]
+                if char == "\\" and index + 1 < length:
+                    value.extend((char, source[index + 1]))
+                    index += 2
+                    continue
+                if char == quote:
+                    index += 1
+                    break
+                value.append(char)
+                index += 1
+            # Template text is deliberately opaque; import-like prose inside it is not a dependency declaration.
+            if quote != "`":
+                tokens.append(_JsToken("string", "".join(value)))
+            continue
+        if char.isalpha() or char in {"_", "$"}:
+            end = index + 1
+            while end < length and (source[end].isalnum() or source[end] in {"_", "$"}):
+                end += 1
+            tokens.append(_JsToken("identifier", source[index:end]))
+            index = end
+            continue
+        tokens.append(_JsToken("punctuation", char))
+        index += 1
+    return tokens
+
+
+def _collect_esm_specifiers(source: str) -> list[str]:
+    tokens = _tokenize_javascript(source)
+    specifiers: list[str] = []
+    for index, token in enumerate(tokens):
+        if token.kind != "identifier" or token.value not in {"import", "export"}:
+            continue
+        cursor = index + 1
+        if token.value == "import" and cursor < len(tokens):
+            next_token = tokens[cursor]
+            if next_token.kind == "string":
+                specifiers.append(next_token.value)
+                continue
+            if next_token.value == "(" and cursor + 1 < len(tokens) and tokens[cursor + 1].kind == "string":
+                specifiers.append(tokens[cursor + 1].value)
+                continue
+        while cursor < len(tokens) and cursor - index <= 256:
+            current = tokens[cursor]
+            if current.value == ";":
+                break
+            if current.kind == "identifier" and current.value == "from":
+                if cursor + 1 < len(tokens) and tokens[cursor + 1].kind == "string":
+                    specifiers.append(tokens[cursor + 1].value)
+                break
+            cursor += 1
+    return specifiers
+
+
+def _python_module_name(path: str) -> str:
+    module = path.removesuffix(".py").replace("/", ".")
+    return module.removesuffix(".__init__")
+
+
+def _resolve_python_import_from(own_module: str, node: ast.ImportFrom, *, is_package: bool) -> list[str]:
+    if node.level == 0:
+        return [node.module] if node.module else []
+    package_parts = own_module.split(".") if is_package else own_module.split(".")[:-1]
+    ascents = node.level - 1
+    if ascents > len(package_parts):
+        return []
+    base_parts = package_parts[: len(package_parts) - ascents]
+    if node.module:
+        return [".".join([*base_parts, *node.module.split(".")])]
+    return [".".join([*base_parts, alias.name]) for alias in node.names]
+
+
 def _python_domain_imports(
     path: str,
     source: str,
@@ -97,12 +191,12 @@ def _python_domain_imports(
         tree = ast.parse(source, filename=path)
     except SyntaxError as error:
         return [_violation("SOURCE_PARSE_ERROR", path, f"Python syntax error at line {error.lineno}")]
-    own_module = path.removesuffix(".py").replace("/", ".")
+    own_module = _python_module_name(path)
     prefix = domain_root.replace("/", ".") + "."
     for node in ast.walk(tree):
         imported: list[str] = []
-        if isinstance(node, ast.ImportFrom) and node.module:
-            imported.append(node.module)
+        if isinstance(node, ast.ImportFrom):
+            imported.extend(_resolve_python_import_from(own_module, node, is_package=path.endswith("/__init__.py")))
         elif isinstance(node, ast.Import):
             imported.extend(alias.name for alias in node.names)
         for module in imported:
@@ -130,7 +224,7 @@ def _validate_dependency_directions(files: Mapping[str, str], contract: Mapping[
             normalize_repo_path(item)
             for item in contract.get("allowed_frontend_dependencies", {}).get(path, [])
         }
-        for specifier in _ESM_IMPORT_RE.findall(source):
+        for specifier in _collect_esm_specifiers(source):
             target = _resolve_esm_path(path, specifier)
             if target == facade:
                 violations.append(_violation("FACADE_BACK_IMPORT", path, f"imports compatibility facade {target}"))
@@ -156,6 +250,19 @@ def _validate_composition_roots(files: Mapping[str, str], contract: Mapping[str,
             violations.append(_violation("SOURCE_PARSE_ERROR", path, f"Python syntax error at line {error.lineno}"))
             continue
         allowed_functions = set(rule.get("allowed_functions", []))
+        actual_functions = {
+            node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        required_functions = set(rule.get("required_functions", []))
+        missing_required = sorted(required_functions - actual_functions)
+        if missing_required:
+            violations.append(
+                _violation(
+                    "COMPOSITION_REQUIRED_FUNCTION_MISSING",
+                    path,
+                    f"missing required functions: {', '.join(missing_required)}",
+                )
+            )
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name not in allowed_functions:
                 violations.append(
@@ -202,15 +309,48 @@ def _validate_disposal(files: Mapping[str, str], contract: Mapping[str, Any]) ->
     return violations
 
 
-def _parse_named_exports(block: str) -> set[str]:
-    names: set[str] = set()
-    for raw in block.split(","):
-        token = re.sub(r"/\*.*?\*/", "", raw, flags=re.DOTALL).strip()
-        if not token:
+def _collect_direct_esm_exports(source: str) -> tuple[set[str], list[str]]:
+    tokens = _tokenize_javascript(source)
+    exports: set[str] = set()
+    star_specifiers: list[str] = []
+    index = 0
+    while index < len(tokens):
+        if tokens[index] != _JsToken("identifier", "export"):
+            index += 1
             continue
-        parts = re.split(r"\s+as\s+", token)
-        names.add(parts[-1].strip())
-    return names
+        cursor = index + 1
+        if cursor < len(tokens) and tokens[cursor] == _JsToken("identifier", "async"):
+            cursor += 1
+        if cursor >= len(tokens):
+            break
+        current = tokens[cursor]
+        if current.kind == "identifier" and current.value in {"function", "class", "const", "let", "var"}:
+            if cursor + 1 < len(tokens) and tokens[cursor + 1].kind == "identifier":
+                exports.add(tokens[cursor + 1].value)
+        elif current.value == "{":
+            cursor += 1
+            item: list[_JsToken] = []
+            while cursor < len(tokens) and tokens[cursor].value != "}":
+                if tokens[cursor].value == ",":
+                    identifiers = [token.value for token in item if token.kind == "identifier"]
+                    if identifiers:
+                        exports.add(identifiers[-1] if "as" in identifiers else identifiers[0])
+                    item = []
+                else:
+                    item.append(tokens[cursor])
+                cursor += 1
+            identifiers = [token.value for token in item if token.kind == "identifier"]
+            if identifiers:
+                exports.add(identifiers[-1] if "as" in identifiers else identifiers[0])
+        elif current.value == "*":
+            while cursor < len(tokens) and cursor - index <= 16:
+                if tokens[cursor] == _JsToken("identifier", "from"):
+                    if cursor + 1 < len(tokens) and tokens[cursor + 1].kind == "string":
+                        star_specifiers.append(tokens[cursor + 1].value)
+                    break
+                cursor += 1
+        index += 1
+    return exports, star_specifiers
 
 
 def _collect_esm_exports(path: str, files: Mapping[str, str], seen: set[str] | None = None) -> set[str]:
@@ -219,10 +359,8 @@ def _collect_esm_exports(path: str, files: Mapping[str, str], seen: set[str] | N
         return set()
     seen.add(path)
     source = files.get(path, "")
-    exports = set(_ESM_DECL_EXPORT_RE.findall(source))
-    for match in _ESM_NAMED_EXPORT_RE.finditer(source):
-        exports.update(_parse_named_exports(match.group(1)))
-    for specifier in _ESM_STAR_EXPORT_RE.findall(source):
+    exports, star_specifiers = _collect_direct_esm_exports(source)
+    for specifier in star_specifiers:
         target = _resolve_esm_path(path, specifier)
         if target:
             exports.update(_collect_esm_exports(target, files, seen))
@@ -324,6 +462,16 @@ def _validate_guards_and_discovery(files: Mapping[str, str], contract: Mapping[s
     return violations
 
 
+def _validate_enforcement_artifacts(
+    files: Mapping[str, str], contract: Mapping[str, Any]
+) -> list[ArchitectureViolation]:
+    return [
+        _violation("ENFORCEMENT_ARTIFACT_MISSING", path, "required conformance artifact is absent")
+        for path in contract.get("required_enforcement_artifacts", [])
+        if normalize_repo_path(path) not in files
+    ]
+
+
 def validate_snapshot(files: Mapping[str, str], contract: Mapping[str, Any]) -> list[ArchitectureViolation]:
     normalized_files = {normalize_repo_path(path): source for path, source in files.items()}
     violations: list[ArchitectureViolation] = []
@@ -336,6 +484,7 @@ def validate_snapshot(files: Mapping[str, str], contract: Mapping[str, Any]) -> 
     violations.extend(_validate_typed_coverage(normalized_files, contract))
     violations.extend(_validate_budgets(normalized_files, contract))
     violations.extend(_validate_guards_and_discovery(normalized_files, contract))
+    violations.extend(_validate_enforcement_artifacts(normalized_files, contract))
     return sorted(set(violations))
 
 

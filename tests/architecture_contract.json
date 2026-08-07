@@ -81,10 +81,33 @@
         "_register_rookieui_post",
         "build_route_matrix",
         "__getattr__"
+      ],
+      "required_functions": [
+        "register_routes",
+        "get_optional_alias_route_status",
+        "_reset_route_runtime_state_for_tests",
+        "_get_prompt_server_for_submission",
+        "_json_response",
+        "_read_request_payload",
+        "_read_request_query_value",
+        "_read_request_match_value",
+        "_count_detect_input_images",
+        "_register_controlnet_alias_routes",
+        "_register_rookieui_route_pair",
+        "_register_rookieui_get",
+        "_register_rookieui_post",
+        "build_route_matrix",
+        "__getattr__"
       ]
     },
     "rookieui/api/route_spec.py": {
       "allowed_functions": [
+        "build_route_matrix",
+        "_register_authoritative_spec",
+        "_register_optional_aliases",
+        "register_routes"
+      ],
+      "required_functions": [
         "build_route_matrix",
         "_register_authoritative_spec",
         "_register_optional_aliases",
@@ -187,6 +210,12 @@
     "scripts/run_full_tests_windows.ps1",
     "tests/test_host_source_basis.py",
     "web/tests/rookieui_frontend_architecture.test.js"
+  ],
+  "required_enforcement_artifacts": [
+    "scripts/architecture_conformance.py",
+    "scripts/check_architecture_conformance.py",
+    "tests/architecture_contract.json",
+    "tests/test_architecture_conformance.py"
   ],
   "test_discovery": {
     "package": "package.json",
