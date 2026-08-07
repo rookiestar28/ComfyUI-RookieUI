@@ -25,6 +25,30 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Current-host ControlNet execution alignment (new functionality/stability)</strong></summary>
+
+- Generic Stable Diffusion ControlNet now follows the current ComfyUI clone and multi-device lifecycle while preserving chained and single-device behavior.
+- Balanced, prompt-priority, and ControlNet-priority modes now produce distinct conditioning behavior, and compatible Union models use the host's exact control-type selection with truthful fallback for unmapped models.
+- Hires scope can target the low-resolution pass, high-resolution pass, or both; uploaded prepared control maps bypass preprocessing instead of being processed twice.
+- Preprocessor, effect, and inpainting source masks now have separate roles. An all-zero effect mask is an identity operation, while inpainting ControlNet requires a real source mask and VAE instead of creating placeholder conditioning.
+- The same execution semantics are preserved for primary generation and ADetailer-local ControlNet, with explicit warnings or fail-closed behavior when required inputs are unavailable.
+
+</details>
+
+<details>
+
+<summary><strong>Architecture ownership and conformance hardening (stability/maintainability)</strong></summary>
+
+- Backend routes are split into focused domain handlers behind guarded declarative route composition, without changing canonical or compatibility URLs.
+- Family and profile metadata now projects from one canonical manifest into capabilities, presets, workflow builders, and frontend fallback data.
+- Prompt Workbench and Img2Img now have dedicated controller and lifecycle ownership so teardown reliably cancels late asynchronous work and releases listeners, timers, and object URLs.
+- Frontend API ownership is split into focused inventory, ControlNet, generation, Prompt Workbench, queue, and XYZ Plot modules behind the existing compatibility facade.
+- Type checking now covers 29 frontend JavaScript modules, while semantic architecture checks protect dependency direction, composition roots, projections, disposal contracts, public exports, measured budgets, and test discovery.
+
+</details>
+
+<details>
+
 <summary><strong>Krea-2 Turbo prompt enhancement and refreshed host alignment (new functionality/stability)</strong></summary>
 
 - Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template source basis, including template coverage through `comfyui-workflow-templates` 0.11.31.
@@ -103,8 +127,8 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>Frontend maintainability and API contract hardening (stability/maintainability)</strong></summary>
 
 - Added broader frontend architecture budgets, TypeScript contract checks, and regression tests to prevent high-churn sidebar/API files from silently regrowing.
-- Extracted generation payload state conversion, Img2Img mode/reference helpers, generation API domain calls, ControlNet preview/preprocessor surfaces, design tokens, and ControlNet stylesheet ownership into focused frontend modules.
-- Kept public sidebar behavior stable while improving typed API request/response seams and making future `txt2img`, `img2img`, ControlNet, and official-template changes easier to validate.
+- Extracted generation payload state conversion, Img2Img mode/reference helpers, focused API domain calls, ControlNet preview/preprocessor surfaces, design tokens, and ControlNet stylesheet ownership into dedicated frontend modules.
+- Kept public sidebar behavior stable while improving typed API request/response seams and making future `txt2img`, `img2img`, ControlNet, Prompt Workbench, queue, XYZ Plot, and official-template changes easier to validate.
 
 </details>
 
@@ -304,6 +328,10 @@ ComfyUI process (single runtime)
    |  +- web/rookieui_sidebar_shell.js
    |
    +- internal routes under /rookieui/*
+   |  +- rookieui/api/route_spec.py
+   |  +- rookieui/api/route_runtime.py
+   |  +- rookieui/api/domains/*
+   |
    +- stable backend facades
    |  +- workflow_translation.py
    |  +- controlnet.py
@@ -314,14 +342,16 @@ ComfyUI process (single runtime)
    |  +- controlnet_* modules
    |  +- adetailer_* modules
    |  +- integrated_feature_registry.py
+   |  +- contracts/family_profile_projection.py
    |
    +- extracted frontend ownership seams
-      +- web/api/*
-      +- web/types/*
-      +- web/sidebar_tabs/img2img/*
-      +- web/sidebar_tabs/controlnet/*
-      +- web/rookieui_tokens.css
-      +- web/rookieui_controlnet.css
+       +- web/api/*
+       +- web/types/*
+       +- web/sidebar_tabs/img2img/*
+       +- web/sidebar_tabs/controlnet/*
+       +- web/sidebar_tabs/prompt_workbench/*
+       +- web/rookieui_tokens.css
+       +- web/rookieui_controlnet.css
    |
    +- workflow submission into host ComfyUI queue
 ```
@@ -330,10 +360,12 @@ Current extension seams:
 
 - `workflow_translation.py` is now a stable orchestration facade that delegates graph-building work into `rookieui/services/workflow_builders/*`.
 - `controlnet.py` and `adetailer.py` stay as route-facing facades while catalog, normalization, runtime/refinement, and warning ownership live in focused vertical modules.
+- RookieUI routes are assembled from declarative specifications and focused domain handlers, with collision-safe canonical and compatibility registration kept at the composition boundary.
+- Family/profile capabilities, presets, workflow behavior, and frontend fallback entries are projected from the canonical manifest instead of maintained as independent copies.
 - `web/rookieui_extension.js` and `web/rookieui_feature_registry.js` now own integrated bootstrap loading explicitly, instead of scattering one-off feature fetch wiring through the extension entrypoint.
-- `web/rookieui_api.js` remains a compatibility facade while generated requests move through focused API transport/domain modules and typed frontend contracts.
-- `txt2img` / `img2img` generation payloads, Img2Img reference and mode behavior, and ControlNet preview/preprocessor UI are now guarded by dedicated module-level tests.
-- The refactor is guarded by manifest-backed boundary checks, facade/file-size budgets, type checks, CSS ownership checks, and import-cycle regression coverage.
+- `web/rookieui_api.js` remains a compatibility facade while requests move through focused API transport/domain modules and typed frontend contracts.
+- `txt2img` / `img2img` generation payloads, Img2Img and Prompt Workbench controller/lifecycle behavior, and ControlNet preview/preprocessor UI are guarded by dedicated module-level tests.
+- The refactor is guarded by semantic dependency and composition checks, canonical-projection checks, disposal and export contracts, measured facade/file-size budgets, type checks, CSS ownership checks, import-cycle coverage, and test-discovery checks.
 
 </details>
 
@@ -802,6 +834,10 @@ Behavior and compatibility:
 - Selected preprocessor variants are dispatched to matching host annotator nodes when available, including exact OpenPose-family variant routing.
 - Pose-capable preprocessors can return bounded OpenPose-format JSON metadata through the detect payload when the active host annotator exposes it; non-pose preprocessors do not claim this output.
 - Advanced native ControlNet behavior is available through RookieUI's shared runtime seam, including staged weighting, timestep scheduling, and mask-aware application where supported by the selected route.
+- `Balanced`, prompt-priority, and ControlNet-priority modes now alter the actual conditioning path. Compatible Union models also receive the host's mapped Union control type; unknown or unmapped models continue without a false type claim.
+- Hires scope can apply a unit to the low-resolution pass, the high-resolution pass, or both. A source explicitly marked as an already-preprocessed control map bypasses its selected preprocessor to avoid double processing.
+- Preprocessor masks, effect masks, and inpainting source masks are handled as distinct inputs. All-zero effect masks leave conditioning unchanged, while inpainting ControlNet fails early unless a real source mask and VAE are available.
+- Generic ControlNet wrappers follow the current host clone and multi-device lifecycle, including chained controls, without changing normal single-device behavior.
 - Z-Image Turbo ControlNet is a family-specific workflow path: matching Z-Image ControlNet files are read from host `model_patches`, loaded through `ModelPatchLoader`, and applied with `QwenImageDiffsynthControlnet` rather than the generic `ControlNetLoader` / `DiffControlNetLoader` path.
 - The Z-Image Turbo path currently supports one enabled unit at a time. Canny preprocessing is built in; Depth and Pose require an explicitly acknowledged, already-preprocessed control-map upload and otherwise fail before submission. Unsupported modules fail explicitly instead of silently falling back to the SD ControlNet graph.
 - Request compatibility supports both RookieUI native units and A1111-style `alwayson_scripts.controlnet` payloads.
@@ -852,6 +888,8 @@ Behavior and compatibility:
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
 - The custom-node package declares its web asset directory through current ComfyUI package metadata while retaining the legacy `WEB_DIRECTORY` export used by existing hosts.
+- RookieUI route registration is composed from focused domain specifications, preserving canonical and compatibility aliases while keeping collision handling and multi-user fail-closed checks at the guarded runtime boundary.
+- Family/profile capabilities and fallback metadata are projected from the canonical manifest so backend builders and frontend selectors describe the same supported surface.
 - Host model discovery uses ComfyUI `folder_paths` keys rather than scanning arbitrary filesystem locations directly.
 - Z-Image ControlNet capability discovery uses the host `model_patches` catalog and reports those files separately from generic ControlNet model folders.
 
