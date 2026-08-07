@@ -166,6 +166,23 @@ export function createImg2ImgController(options = {}) {
     return getSnapshot();
   };
 
+  /**
+   * @param {{
+   *   profile?: unknown,
+   *   profile_id?: unknown,
+   *   image_edit_profile?: unknown,
+   *   max_direct_references?: unknown,
+   *   mode?: unknown,
+   *   image_asset?: unknown,
+   *   imageAsset?: unknown,
+   *   image_data?: unknown,
+   *   imageData?: unknown,
+   *   batch_images?: unknown,
+   *   batchImages?: unknown,
+   *   reference_images?: unknown,
+   *   main_reference_index?: unknown,
+   * }} payload
+   */
   const applyPayload = (payload = {}) => {
     if (destroyed || !payload || typeof payload !== "object") return getSnapshot();
     const hasProfileState =

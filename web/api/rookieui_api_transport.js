@@ -1,4 +1,5 @@
 import { rookieUIDebugWarn } from "../rookieui_debug_deps.js";
+import { DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE } from "../rookieui_family_profile_projection.js";
 
 export function toErrorDetail(error) {
   if (!error) {
@@ -8,6 +9,33 @@ export function toErrorDetail(error) {
     return error.message;
   }
   return String(error);
+}
+
+/**
+ * Fetch a RookieUI JSON resource while preserving the compatibility fallback envelope.
+ * @param {string} path
+ * @param {unknown} fallbackData
+ * @param {typeof globalThis.fetch} fetchImpl
+ */
+export async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.fetch) {
+  if (typeof fetchImpl !== "function") {
+    rookieUIDebugWarn("api.resource", "Using fallback resource because fetch() is unavailable.", { path });
+    return { ok: false, source: DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE.source, data: fallbackData };
+  }
+
+  try {
+    const response = await fetchImpl(path, { headers: { Accept: "application/json" } });
+    if (!response?.ok) {
+      throw new Error(`Request failed with status ${response?.status ?? "unknown"}`);
+    }
+    return { ok: true, source: "server", data: await response.json() };
+  } catch (_error) {
+    rookieUIDebugWarn("api.resource", "Resource request failed; returning fallback payload.", {
+      path,
+      error: toErrorDetail(_error),
+    });
+    return { ok: false, source: DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE.source, data: fallbackData };
+  }
 }
 
 export async function postRookieUIJson(path, payload, fallbackData, fetchImpl = globalThis.fetch, options = {}) {

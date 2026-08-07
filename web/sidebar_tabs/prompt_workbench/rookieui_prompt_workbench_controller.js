@@ -33,6 +33,10 @@ function normalizeNamespaceMap(namespaces = {}) {
   });
 }
 
+/**
+ * @param {unknown} namespace
+ * @param {{workbench_open?: unknown, active_panel?: unknown, draft_prompt?: unknown, selected_entry_id?: unknown}} payload
+ */
 function defaultNormalizeStatePayload(namespace, payload = {}) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
   return {

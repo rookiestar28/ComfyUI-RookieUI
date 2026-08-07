@@ -82,3 +82,38 @@ export interface RookieUIRegisterExtensionOptions {
   documentRef?: Document;
   fetchImpl?: typeof fetch;
 }
+
+export type RookieUIDisposer = () => void;
+
+export interface RookieUIControllerEvent<TPayload = unknown> {
+  type: string;
+  payload: TPayload;
+}
+
+export interface RookieUIControllerSubscription<TPayload = unknown> {
+  subscribe(listener: (event: RookieUIControllerEvent<TPayload>) => void): RookieUIDisposer;
+  destroy(): void;
+}
+
+export interface RookieUIImg2ImgControllerState {
+  mode: string;
+  profileId: string;
+  imageEditProfile: boolean;
+  referenceLimit: number;
+  referenceSlots: ReadonlyArray<Record<string, unknown>>;
+  selectedMainSlot: number;
+  imageAsset: string;
+  imageData: string;
+}
+
+export interface RookieUIPromptWorkbenchControllerState {
+  activeScope: "prompt" | "negative";
+  activePanel: string;
+  destroyed: boolean;
+}
+
+export interface RookieUILifecycleBoundary {
+  mount(): void | Promise<void>;
+  destroy(): void;
+  readonly destroyed?: boolean;
+}
