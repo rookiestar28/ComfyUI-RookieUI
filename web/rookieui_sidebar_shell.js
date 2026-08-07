@@ -801,14 +801,7 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
   }
 }
 
-async function submitImg2Img(
-  bootstrapState,
-  elements,
-  statusNode,
-  runtimeState,
-  previewBox,
-  maskCanvasContract = null,
-) {
+async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState, previewBox, maskCanvasContract, live) {
   statusNode.textContent = "Submitting img2img request...";
 
   const payload = readImg2ImgPayload(elements);
@@ -869,11 +862,13 @@ async function submitImg2Img(
     statusNode.textContent = "Mask asset or uploaded mask is required for inpaint mode.";
     return;
   }
-  const activeClientId = resolveActiveClientId(bootstrapState);
-  if (activeClientId) {
-    payload.client_id = activeClientId;
+  const clientId = resolveActiveClientId(bootstrapState);
+  if (clientId) {
+    payload.client_id = clientId;
   }
   const result = await bootstrapState.submitImg2ImgRequest(payload);
+  // CRITICAL: reject stale UI responses.
+  if (!live()) return;
   if (!result.ok) {
     const detail = String(result?.data?.detail ?? "").trim();
     statusNode.textContent = detail
@@ -882,22 +877,22 @@ async function submitImg2Img(
     return;
   }
 
-  const warningSuffix = formatGenerationWarnings(result.data);
+  const warnings = formatGenerationWarnings(result.data);
   const submission = result.data.submission ?? {};
   if (submission.accepted) {
-    statusNode.textContent = `Queued prompt ${submission.prompt_id}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
+    statusNode.textContent = `Queued prompt ${submission.prompt_id}${warnings ? ` | ${warnings}` : ""}`;
     void runtimeHelpers.trackGenerationRuntime(
       bootstrapState,
       String(submission.prompt_id ?? ""),
       statusNode,
       runtimeState,
       previewBox,
-      warningSuffix,
+      warnings,
     );
     return;
   }
 
-  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
+  statusNode.textContent = `Preview ready: ${result.data.workflow_kind}${warnings ? ` | ${warnings}` : ""}`;
 }
 
 function activateShellTab(formRegistry, tabId, statusNode, message = "") {

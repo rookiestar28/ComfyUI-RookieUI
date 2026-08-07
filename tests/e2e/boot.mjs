@@ -12,6 +12,10 @@ const sidebar = params.get("sidebar") !== "0";
 const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
 const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 const rejectRookieModels = params.get("rejectRookieModels") === "1";
+const requestedImg2ImgDelayMs = Number(params.get("img2imgDelayMs") ?? 0);
+const img2imgDelayMs = Number.isFinite(requestedImg2ImgDelayMs)
+  ? Math.max(0, Math.min(5000, Math.trunc(requestedImg2ImgDelayMs)))
+  : 0;
 
 const apiURL = (route) => (typeof route === "string" && route.startsWith("/api") ? route : `/api${route}`);
 const normalizeE2EApiRoute = (url) => (typeof url === "string" && url.startsWith("/api/") ? url.slice(4) : url);
@@ -361,6 +365,9 @@ async function handleE2EFetch(url, options = {}) {
   if (route === "/rookieui/generate/img2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.img2img.push(payload);
+    if (img2imgDelayMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, img2imgDelayMs));
+    }
     return new Response(
       JSON.stringify({
         mode: "queued",

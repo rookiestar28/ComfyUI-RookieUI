@@ -1971,8 +1971,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
 
         const setBatchFiles = async (files) => {
+          // CRITICAL: one user selection is one transaction; per-file epochs drop every concurrently read file except the last.
+          const requestEpoch = img2imgController.beginAsyncEpoch();
           const fileList = Array.from(files ?? []);
           if (!fileList.length) {
+            if (!isImg2ImgAsyncEpochLive(requestEpoch)) return;
             elements.batchImagesData.value = "[]";
             populateList(batchList, []);
             batchStatusNode.textContent = "No batch images selected.";
@@ -1982,11 +1985,12 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           const entries = await Promise.all(
             fileList.map(async (file) => ({
               name: file.name,
-              dataUrl: await readImg2ImgFile(file),
+              dataUrl: await readFileAsDataUrl(file),
             })),
           );
+          if (!isImg2ImgAsyncEpochLive(requestEpoch)) return;
           const liveEntries = entries.filter((entry) => entry.dataUrl);
-          if (!isImg2ImgLive() || !liveEntries.length) return;
+          if (!liveEntries.length) return;
           elements.batchImagesData.value = JSON.stringify(liveEntries.map((entry) => entry.dataUrl));
           populateList(batchList, liveEntries.map((entry) => entry.name));
           batchStatusNode.textContent = `Loaded ${liveEntries.length} batch image(s).`;
@@ -2258,8 +2262,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       runtimeState,
       img2imgPreviewBox,
       img2imgMaskCanvasContract,
+      () => isImg2ImgAsyncEpochLive(requestEpoch),
     );
-    if (!isImg2ImgAsyncEpochLive(requestEpoch)) return;
   });
 
   const img2imgStateLock = installPaneStateLock(formRegistry, "img2img", elements, () => {
