@@ -1567,13 +1567,16 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
     ),
 )
 
-_CURRENT_HOST_DEFERRED_PROFILE_IDS = frozenset(
+CURRENT_HOST_DEFERRED_PROFILE_IDS = frozenset(
     {
         "klein_4b_distilled",
         "klein_9b_distilled",
         "qwen_image_edit_multi_lora",
     }
 )
+# Backward-compatible private alias for internal callers that predate the
+# explicit projection contract export.
+_CURRENT_HOST_DEFERRED_PROFILE_IDS = CURRENT_HOST_DEFERRED_PROFILE_IDS
 # IMPORTANT: profiles without an accepted current source graph must fail closed
 # before registry, preset, selector, or runtime-adapter exposure.
 _MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = tuple(

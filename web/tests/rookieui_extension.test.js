@@ -1267,7 +1267,7 @@ describe("registerRookieUIBootstrapExtension", () => {
                   checkpoint_name: "qwen-image.safetensors",
                   vae_name: "Automatic",
                   text_encoder_name: "QwenImageTEModel_.safetensors",
-                  template_lora_name: "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+                  template_lora_name: "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
                   width: 1328,
                   height: 1328,
                   steps: 50,

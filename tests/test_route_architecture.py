@@ -10,7 +10,7 @@ ROUTES_SOURCE = ROOT / "rookieui" / "api" / "routes.py"
 
 
 class RouteArchitectureTests(unittest.TestCase):
-    """Ownership gates for F307; these intentionally fail before extraction."""
+    """Ownership gates for route extraction; these intentionally fail before extraction."""
 
     def test_authoritative_route_spec_and_explicit_domains_exist(self) -> None:
         from rookieui.api import route_spec

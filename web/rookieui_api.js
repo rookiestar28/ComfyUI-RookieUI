@@ -6,6 +6,15 @@ import {
   createControlNetResourceFetchers,
 } from "./api/rookieui_controlnet_resources.js";
 import { POLICY_CONTRACT_VERSION, resolveEffectiveParameterPolicy } from "./rookieui_effective_parameter_policy.js";
+import {
+  DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE,
+  buildModelFamilyStableProjection,
+} from "./rookieui_family_profile_projection.js";
+import {
+  FLUX_KREA_DEV_FALLBACK_ENTRY,
+  QWEN_IMAGE_EDIT_2511_FALLBACK_ENTRY,
+} from "./rookieui_family_profile_fallback_entries.js";
+export { DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE, buildModelFamilyStableProjection };
 export {
   inspectRookieUIPngInfo,
   submitRookieUIExtras,
@@ -194,7 +203,7 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     prompt_encoder: "clip_text_encode_sdxl",
     default_width: 1024,
     default_height: 1024,
-    default_steps: 40,
+    default_steps: 20,
     default_cfg_scale: 4.0,
     default_sampler: "euler",
     default_scheduler: "simple",
@@ -262,6 +271,7 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
       "Template LoRA stays explicit and defaults to the official turbo LoRA, but may be overridden with truthful drift messaging.",
     ],
   },
+  FLUX_KREA_DEV_FALLBACK_ENTRY,
   {
     id: "flux2_dev",
     title: "Flux.2 Dev",
@@ -285,7 +295,7 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     notes: [
       "Matches the official Flux.2 Dev txt2img template defaults.",
       "Text Encoder selector stays hidden because the official template owns the mistral_3_small_flux2 pairing.",
-      "The optional official Turbo LoRA changes the source-backed sampler contract from 20 to 8 steps.",
+      "Template LoRA stays explicit and defaults to the official Flux.2 Turbo LoRA.",
     ],
   },
   {
@@ -559,8 +569,8 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     prompt_encoder: "clip_text_encode_sdxl",
     default_width: 1328,
     default_height: 1328,
-    default_steps: 2,
-    default_cfg_scale: 1.0,
+    default_steps: 50,
+    default_cfg_scale: 4.0,
     default_sampler: "euler",
     default_scheduler: "simple",
     default_clip_skip: 1,
@@ -574,7 +584,8 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     aliases: ["qwen image", "qwen-image 2512", "qwen image 2512"],
     notes: [
       "Matches the official Qwen-Image 2512 template defaults.",
-      "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing and template-baked LoRA.",
+      "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing.",
+      "Template LoRA stays explicit and defaults to the official 4-step Lightning LoRA, but may be overridden with truthful drift messaging.",
     ],
   },
   {
@@ -595,15 +606,17 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     text_encoder_visible: false,
     support_tier: "family-adapted",
     compatibility_summary:
-      "Official ComfyUI Qwen-Image Edit template preset on the dedicated edit-flow seam.",
+      "Legacy Qwen-Image Edit compatibility preset retained on the dedicated edit-flow seam.",
     experimental: true,
     aliases: ["qwen image edit", "qwen-image edit"],
     notes: [
-      "Matches the official Qwen-Image Edit template defaults.",
-      "Edit flow requires a source image and does not require a mask.",
-      "This profile preserves the official single-reference Qwen edit template path.",
+      "Retains the pre-2511 Qwen-Image Edit compatibility defaults.",
+      "Edit flow requires a source image but does not require a mask.",
+      "Current Qwen 2509 plus-encoder parity is not silently substituted for this saved-request lane.",
+      "Template LoRA stays explicit and defaults to the official lightning LoRA, but may be overridden with truthful drift messaging.",
     ],
   },
+  QWEN_IMAGE_EDIT_2511_FALLBACK_ENTRY,
   {
     id: "qwen_image_edit_multi_lora",
     title: "Qwen-Image Edit Multi-LoRA",
@@ -723,8 +736,8 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     translation_base_family: "sdxl",
     public_base_family: "flux2_image_edit",
     prompt_encoder: "clip_text_encode_sdxl",
-    default_width: 1024,
-    default_height: 1024,
+    default_width: 1248,
+    default_height: 832,
     default_steps: 20,
     default_cfg_scale: 4,
     default_sampler: "euler",
@@ -739,7 +752,7 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     experimental: true,
     aliases: ["flux.2 image edit", "flux2 image edit"],
     notes: [
-      "Matches the default non-turbo branch of the official Flux.2 image-edit template.",
+      "Matches the current Flux.2 image-edit template dimensions and core assets.",
       "Edit flow requires one ordered source image and does not require a mask.",
       "The optional turbo-LoRA branch remains out of scope until a dedicated profile is planned.",
     ],
@@ -762,13 +775,14 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
     text_encoder_visible: false,
     support_tier: "family-adapted",
     compatibility_summary:
-      "Official ComfyUI Flux.2 Klein 9B KV image-edit template preset on the current non-SD translation seam.",
+      "Legacy Flux.2 Klein 9B KV image-edit compatibility preset retained on the current non-SD translation seam.",
     experimental: true,
     aliases: ["flux.2 klein 9b kv image edit", "klein 9b kv image edit", "klein kv edit"],
     notes: [
-      "Matches the official Flux.2 Klein 9B KV image-edit template defaults.",
+      "Retains the older Flux.2 Klein 9B KV image-edit template defaults.",
       "Edit flow supports ordered multi-reference images and does not require a mask.",
       "The first-wave adapter keeps a bounded three-reference cap even though the shared latent chain can extend further.",
+      "The current blueprint set exposes a separate Flux.2 Klein 4B image-edit blueprint that remains deferred from this drift sweep.",
     ],
   },
   {
@@ -912,10 +926,10 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
   longcat_image: { flux_guidance_visible: true, default_flux_guidance: 4.0 },
   qwen_image: {
     shift_visible: true,
-    default_shift: 3.0,
+    default_shift: 3.1,
     template_lora_visible: true,
     template_lora_override_allowed: true,
-    official_template_lora_label: "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+    official_template_lora_label: "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
     default_template_lora_enabled: true,
   },
   qwen_image_edit: {
@@ -933,6 +947,17 @@ const DEFAULT_TEMPLATE_PARAMETER_OVERRIDES = Object.freeze({
     max_direct_references: 1,
     encoder_family: "qwen_image_edit",
     template_lora_chain_mode: "single",
+    available_surface_flows: ["img2img"],
+  },
+  qwen_image_edit_2511: {
+    shift_visible: true,
+    default_shift: 3.1,
+    image_edit_profile: true,
+    request_contract_surface: "img2img",
+    reference_input_mode: "multi",
+    max_direct_references: 3,
+    encoder_family: "qwen_image_edit_2511",
+    template_lora_chain_mode: "none",
     available_surface_flows: ["img2img"],
   },
   qwen_image_edit_multi_lora: {
@@ -1413,7 +1438,7 @@ export async function fetchRookieUICapabilities(fetchImpl = globalThis.fetch) {
 async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.fetch) {
   if (typeof fetchImpl !== "function") {
     rookieUIDebugWarn("api.resource", "Using fallback resource because fetch() is unavailable.", { path });
-    return { ok: false, source: "fallback", data: fallbackData };
+    return { ok: false, source: DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE.source, data: fallbackData };
   }
 
   try {
@@ -1433,7 +1458,7 @@ async function fetchRookieUIResource(path, fallbackData, fetchImpl = globalThis.
       path,
       error: toErrorDetail(_error),
     });
-    return { ok: false, source: "fallback", data: fallbackData };
+    return { ok: false, source: DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE.source, data: fallbackData };
   }
 }
 

@@ -5,12 +5,17 @@ from collections.abc import Callable, Mapping
 
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.family_template_manifest import (
+    CURRENT_HOST_DEFERRED_PROFILE_IDS,
     build_non_sd_runtime_adapter_map,
     list_non_sd_edit_manifest_entries,
     build_non_sd_txt2img_profile_ids,
 )
+from rookieui.contracts.family_profile_projection import assert_runtime_adapter_bindings
 from rookieui.contracts.generation import NormalizedImg2ImgRequest, NormalizedTxt2ImgRequest
-from rookieui.contracts.model_family_registry import get_model_family_registry_entry
+from rookieui.contracts.model_family_registry import (
+    get_model_family_registry_entry,
+    list_model_family_registry_entries,
+)
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
 from rookieui.services.ideogram4 import IDEOGRAM4_MODE_CONTRACTS
 from rookieui.services.workflow_builders.core import (
@@ -2071,7 +2076,6 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
     "ideogram4": _build_ideogram4_workflow,
     "krea2_turbo": _build_krea2_turbo_workflow,
     "klein": lambda request: _build_klein_workflow(request, distilled=False),
-    "klein_distilled": lambda request: _build_klein_workflow(request, distilled=True),
     "qwen_image": _build_qwen_image_workflow,
     "longcat": _build_longcat_workflow,
     "z_image": _build_z_image_workflow_for_profile,
@@ -2531,6 +2535,17 @@ _NON_SD_EDIT_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedImg2ImgRequest], di
     "klein_9b_kv_image_edit": _build_klein_9b_kv_image_edit_workflow,
     "longcat_image_edit": _build_longcat_image_edit_workflow,
 }
+
+# IMPORTANT: keep manifest-declared adapter IDs and executable flow dispatch in
+# lockstep; deferred/reference-only adapters must not remain reachable by a
+# stale builder-map key.
+assert_runtime_adapter_bindings(
+    list_model_family_registry_entries(),
+    adapter_by_profile=_NON_SD_RUNTIME_ADAPTER_BY_PROFILE,
+    txt2img_builders=_NON_SD_RUNTIME_BUILDERS,
+    edit_builders=_NON_SD_EDIT_RUNTIME_BUILDERS,
+    deferred_profile_ids=CURRENT_HOST_DEFERRED_PROFILE_IDS,
+)
 
 
 def build_non_sd_txt2img_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:

@@ -119,7 +119,7 @@ describe("fetchRookieUICapabilities", () => {
     expect(qwenEntry.template_lora_visible).toBe(true);
     expect(qwenEntry.template_lora_override_allowed).toBe(true);
     expect(qwenEntry.official_template_lora_label).toBe(
-      "Wuli-Qwen-Image-2512-Turbo-LoRA-2steps-V1.0-bf16.safetensors",
+      "Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors",
     );
     expect(qwenEditEntry.available_surface_flows).toEqual(["img2img"]);
     expect(qwenEditEntry.template_lora_visible).toBe(true);
@@ -305,6 +305,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "flux_krea_dev",
       "flux2_dev",
       "ideogram4",
       "krea2_turbo",
@@ -316,6 +317,7 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
+      "qwen_image_edit_2511",
       "firered_image_edit",
       "firered_image_edit_lightning",
       "flux_kontext_dev_edit",
@@ -337,6 +339,7 @@ describe("fetchRookieUICapabilities", () => {
       "ernie_image",
       "ernie_image_turbo",
       "flux",
+      "flux_krea_dev",
       "flux2_dev",
       "ideogram4",
       "krea2_turbo",
@@ -348,6 +351,7 @@ describe("fetchRookieUICapabilities", () => {
       "longcat_image",
       "qwen_image",
       "qwen_image_edit",
+      "qwen_image_edit_2511",
       "firered_image_edit",
       "firered_image_edit_lightning",
       "flux_kontext_dev_edit",

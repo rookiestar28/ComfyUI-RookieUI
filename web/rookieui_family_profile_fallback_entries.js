@@ -1,0 +1,56 @@
+// Static entries that were historically omitted from the browser fallback.
+// They stay explicit here so the main API facade remains within its no-growth
+// budget while retaining manifest-equivalent public fields.
+export const FLUX_KREA_DEV_FALLBACK_ENTRY = Object.freeze({
+  id: "flux_krea_dev",
+  title: "Flux.1 Krea Dev",
+  translation_base_family: "sdxl",
+  public_base_family: "flux",
+  prompt_encoder: "clip_text_encode_sdxl",
+  default_width: 1024,
+  default_height: 1024,
+  default_steps: 20,
+  default_cfg_scale: 1.0,
+  default_sampler: "euler",
+  default_scheduler: "simple",
+  default_clip_skip: 1,
+  supports_clip_skip: false,
+  primary_model_category: "diffusion_models",
+  text_encoder_visible: false,
+  support_tier: "family-adapted",
+  compatibility_summary: "Official ComfyUI Flux.1 Krea Dev template preset on the current non-SD translation seam.",
+  experimental: true,
+  aliases: ["flux.1 krea dev", "flux krea dev", "flux1 krea"],
+  notes: [
+    "Matches the official Flux.1 Krea Dev template defaults.",
+    "Text Encoder selector stays hidden because the official template owns the clip_l/t5xxl pair.",
+    "Krea does not use the Flux.2 Turbo template LoRA.",
+  ],
+});
+
+export const QWEN_IMAGE_EDIT_2511_FALLBACK_ENTRY = Object.freeze({
+  id: "qwen_image_edit_2511",
+  title: "Qwen-Image Edit 2511",
+  translation_base_family: "sdxl",
+  public_base_family: "qwen_image_edit",
+  prompt_encoder: "clip_text_encode_sdxl",
+  default_width: 1328,
+  default_height: 1328,
+  default_steps: 40,
+  default_cfg_scale: 4.0,
+  default_sampler: "euler",
+  default_scheduler: "simple",
+  default_clip_skip: 1,
+  supports_clip_skip: false,
+  primary_model_category: "diffusion_models",
+  text_encoder_visible: false,
+  support_tier: "family-adapted",
+  compatibility_summary: "Official ComfyUI Qwen-Image Edit 2511 template preset on the dedicated edit-flow seam.",
+  experimental: true,
+  aliases: ["qwen image edit 2511", "qwen-image edit 2511", "qwen 2511 edit"],
+  notes: [
+    "Matches the official Qwen Image Edit 2511 template defaults.",
+    "Edit flow requires one source image and accepts up to two optional direct references.",
+    "Qwen 2511 uses the plus encoder and Flux reference-method nodes without a template-owned LoRA.",
+  ],
+});

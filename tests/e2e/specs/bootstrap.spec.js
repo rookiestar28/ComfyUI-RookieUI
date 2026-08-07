@@ -390,6 +390,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "illustrious",
     "noob",
     "qwen_image_edit",
+    "qwen_image_edit_2511",
     "firered_image_edit",
     "firered_image_edit_lightning",
     "flux_kontext_dev_edit",
