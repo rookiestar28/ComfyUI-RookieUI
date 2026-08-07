@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -16,8 +17,10 @@ from scripts.check_public_release_boundary import (
 
 class PublicReleaseBoundaryTests(unittest.TestCase):
     @staticmethod
-    def _run_cli(*args: str) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
-        root = Path(__file__).resolve().parents[1]
+    def _run_cli(
+        *args: str, root: Path | None = None
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+        root = root or Path(__file__).resolve().parents[1]
         completed = subprocess.run(
             [sys.executable, str(root / "scripts" / "check_public_release_boundary.py"), *args],
             cwd=root,
@@ -98,10 +101,36 @@ class PublicReleaseBoundaryTests(unittest.TestCase):
         self.assertIn("needs: full-test-gate", workflow)
 
     def test_historical_tree_detects_forbidden_content_without_checkout(self) -> None:
-        revision = "a05602f4d606ce4c2697433b01e5850513887e66"  # pragma: allowlist secret
-        before_head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, encoding="utf-8").strip()
+        root = self._new_repo()
+        scripts = root / "scripts"
+        scripts.mkdir()
+        shutil.copy2(
+            Path(__file__).resolve().parents[1] / "scripts" / "check_public_release_boundary.py",
+            scripts / "check_public_release_boundary.py",
+        )
 
-        completed, report = self._run_cli("--tree-ish", revision)
+        source = root / "public.py"
+        source.write_text('feature_name = "public"\n', encoding="utf-8")
+        self._git(root, "add", "public.py")
+        self._git(root, "commit", "-qm", "initial public tree")
+
+        private_code = "F" + "999"
+        source.write_text(f'private_marker = "{private_code}"\n', encoding="utf-8")
+        self._git(root, "add", "public.py")
+        self._git(root, "commit", "-qm", "historical forbidden tree")
+        revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True, encoding="utf-8"
+        ).strip()
+
+        source.write_text('feature_name = "public again"\n', encoding="utf-8")
+        self._git(root, "add", "public.py")
+        self._git(root, "commit", "-qm", "current clean tree")
+        before_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True, encoding="utf-8"
+        ).strip()
+        self.assertNotEqual(revision, before_head)
+
+        completed, report = self._run_cli("--tree-ish", revision, root=root)
 
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(report["inspection_mode"], "tree")
@@ -109,7 +138,9 @@ class PublicReleaseBoundaryTests(unittest.TestCase):
         self.assertEqual(report["status"], "failed")
         self.assertIn("internal-item-code", {entry["reason"] for entry in report["violations"]})
         self.assertEqual(
-            subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, encoding="utf-8").strip(),
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=root, text=True, encoding="utf-8"
+            ).strip(),
             before_head,
         )
 
