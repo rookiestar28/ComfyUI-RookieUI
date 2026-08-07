@@ -26,6 +26,8 @@ import {
   syncImg2ImgModeAvailability,
   syncImg2ImgModeParameterFields,
 } from "./img2img/rookieui_img2img_mode_surface.js";
+import { createImg2ImgController } from "./img2img/rookieui_img2img_controller.js";
+import { createImg2ImgLifecycle } from "./img2img/rookieui_img2img_lifecycle.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -86,6 +88,16 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const section = document.createElement("section");
   section.className = "rookieui-shell__integrated-pane";
   parent.appendChild(section);
+  const img2imgLifecycle = createImg2ImgLifecycle();
+  const img2imgController = createImg2ImgController();
+  img2imgLifecycle.trackNode(section);
+  const isImg2ImgLive = () => !img2imgLifecycle.destroyed && !img2imgController.isDestroyed();
+  const isImg2ImgAsyncEpochLive = (epoch) => isImg2ImgLive() && img2imgController.isAsyncEpochCurrent(epoch);
+  const readImg2ImgFile = async (file) => {
+    const requestEpoch = img2imgController.beginAsyncEpoch();
+    const dataUrl = await readFileAsDataUrl(file);
+    return isImg2ImgAsyncEpochLive(requestEpoch) ? dataUrl : null;
+  };
 
   const form = document.createElement("form");
   form.className = "rookieui-shell__form rookieui-shell__integrated-form";
@@ -187,11 +199,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const runtimeState = createGenerationRuntimeState({
     previewPlaceholder: "Generation preview will update while the job is running.",
   });
-  const ownedControllers = [];
   const own = (controller) => {
-    if (controller && typeof controller === "object") {
-      ownedControllers.push(controller);
-    }
+    img2imgLifecycle.own(controller);
     return controller;
   };
   let img2imgPreviewBox = null;
@@ -478,6 +487,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     adetailer: createInput("hidden", "rookieui-img2img-adetailer", "{}"),
     controlnetUnits: createInput("hidden", "rookieui-img2img-controlnet-units", "[]"),
   };
+  img2imgController.setMode(elements.mode.value);
+  img2imgController.setProfileState({ profileId: elements.profileState.value });
   form.appendChild(elements.adetailer);
   form.appendChild(elements.controlnetUnits);
   bindSliderPair(elements.width, elements.widthSlider);
@@ -537,11 +548,37 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     libraryHost: null,
   };
   const getActiveProfile = () => resolveActiveImg2ImgProfile(profileLookup, elements.profileState.value);
-  const buildImageEditReferencePayload = (referenceLimit = null) =>
-    buildImageEditReferencePayloadFromElements(elements, referenceLimit);
+  const syncControllerReferenceState = (referenceLimit = null) => {
+    if (referenceLimit !== null) {
+      img2imgController.setProfileState({
+        profileId: elements.profileState.value,
+        imageEditProfile: String(elements.imageEditProfile.value ?? "").toLowerCase() === "true",
+        maxDirectReferences: referenceLimit,
+      });
+    }
+    img2imgController.setReferenceSlots([
+      { image_asset: elements.imageAsset.value, image_data: elements.imageData.value },
+      { image_asset: elements.referenceAsset2.value, image_data: elements.referenceData2.value },
+      { image_asset: elements.referenceAsset3.value, image_data: elements.referenceData3.value },
+    ]);
+    img2imgController.setMainReferenceSlot(elements.mainReferenceIndex.value);
+    return img2imgController.getReferencePayload();
+  };
+  const buildImageEditReferencePayload = (referenceLimit = null) => {
+    const referencePayload = buildImageEditReferencePayloadFromElements(elements, referenceLimit);
+    syncControllerReferenceState(referenceLimit);
+    return referencePayload;
+  };
   const syncImageEditProfileState = () => {
     const activeProfile = getActiveProfile();
-    return syncImageEditProfileStateFromElements(elements, activeProfile);
+    const profileState = syncImageEditProfileStateFromElements(elements, activeProfile);
+    img2imgController.setProfileState({
+      profileId: elements.profileState.value,
+      imageEditProfile: profileState.imageEditProfile,
+      maxDirectReferences: profileState.referenceLimit,
+    });
+    syncControllerReferenceState(profileState.referenceLimit);
+    return profileState;
   };
 
   const buildXYZBaseRequest = () => {
@@ -645,13 +682,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     "Open Queue",
     "queue",
   );
-  queueIconButton.addEventListener("click", () => {
+  img2imgLifecycle.listen(queueIconButton, "click", () => {
     activateShellTab(formRegistry, "queue", statusNode, "Opened queue view");
   });
   actionRow.appendChild(queueIconButton);
 
   const clearButton = createIconActionButton("rookieui-img2img-clear", "pi-trash", "Clear Prompt Fields", "danger");
-  clearButton.addEventListener("click", () => {
+  img2imgLifecycle.listen(clearButton, "click", () => {
     elements.prompt.value = "";
     elements.negativePrompt.value = "";
     syncBoundControls([elements.prompt, elements.negativePrompt]);
@@ -660,7 +697,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   actionRow.appendChild(clearButton);
 
   const pngInfoButton = createIconActionButton("rookieui-img2img-open-pnginfo", "pi-file", "Open PNG Info", "metadata");
-  pngInfoButton.addEventListener("click", () => {
+  img2imgLifecycle.listen(pngInfoButton, "click", () => {
     activateShellTab(formRegistry, "pnginfo", statusNode, "Opened PNG Info");
   });
   actionRow.appendChild(pngInfoButton);
@@ -732,7 +769,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     const applied = applyCrossPanePayload(formRegistry, "txt2img", buildTxt2ImgTransferPayload());
     statusNode.textContent = applied ? "Sent current settings to Txt2Img" : "Txt2Img form is unavailable.";
   };
-  actionApplyButton.addEventListener("click", () => {
+  img2imgLifecycle.listen(actionApplyButton, "click", () => {
     const actionLabels = {
       queue: "Opened queue view",
       pnginfo: "Opened PNG Info",
@@ -944,13 +981,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     },
   });
   img2imgModeRouter.syncFromModeValue();
-  elements.preset.addEventListener("change", () => {
+  img2imgLifecycle.listen(elements.preset, "change", () => {
     syncImg2ImgModeSurface();
   });
-  elements.profileState.addEventListener("change", () => {
+  img2imgLifecycle.listen(elements.profileState, "change", () => {
     syncImg2ImgModeSurface();
   });
-  elements.mode.addEventListener("change", () => {
+  img2imgLifecycle.listen(elements.mode, "change", () => {
+    img2imgController.setMode(elements.mode.value);
     img2imgModeRouter.syncFromModeValue();
   });
 
@@ -982,7 +1020,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           button.setAttribute("role", "tab");
           button.setAttribute("aria-selected", "false");
           button.tabIndex = -1;
-          button.addEventListener("click", () => {
+          img2imgLifecycle.listen(button, "click", () => {
             img2imgModeRouter.activateSubtab(definition.id);
           });
           generationModeTabs.appendChild(button);
@@ -1121,7 +1159,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         );
         createField(hiresGrid, "Upscale Method", elements.hiresUpscaleMethod);
 
-        img2imgADetailerEditor = createADetailerEditor({
+        img2imgADetailerEditor = own(createADetailerEditor({
           idPrefix: "rookieui-img2img-adetailer",
           parent: generationSection,
           hiddenInput: elements.adetailer,
@@ -1138,9 +1176,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           appendTextElement,
           bindSliderPair,
           syncBoundControls,
-        });
+        }));
 
-        img2imgControlNetEditor = createControlNetUnitEditor({
+        img2imgControlNetEditor = own(createControlNetUnitEditor({
           idPrefix: "rookieui-img2img-controlnet",
           parent: generationSection,
           hiddenInput: elements.controlnetUnits,
@@ -1159,7 +1197,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           onStatusMessage: (message) => {
             statusNode.textContent = message;
           },
-        });
+        }));
         img2imgControlNetEditor.setControlTypeCatalog(controlnetTypeCatalog, controlnetCatalog.preprocessor_profiles);
 
         createSliderField(
@@ -1456,30 +1494,32 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
                 ? "Uploaded reference image ready."
                 : "No additional reference selected.";
           };
-          uploadButton.addEventListener("click", () => {
+          img2imgLifecycle.listen(uploadButton, "click", () => {
             fileInput.click();
           });
-          clearButton.addEventListener("click", () => {
+          img2imgLifecycle.listen(clearButton, "click", () => {
             assetInput.value = "";
             dataInput.value = "";
             syncBoundControls([assetInput, dataInput]);
             updateStatus();
             statusNode.textContent = `Cleared Reference ${slotNumber}.`;
           });
-          assetInput.addEventListener("input", () => {
+          img2imgLifecycle.listen(assetInput, "input", () => {
             if (String(assetInput.value ?? "").trim()) {
               dataInput.value = "";
             }
             syncBoundControls([assetInput, dataInput]);
             updateStatus();
           });
-          fileInput.addEventListener("change", async () => {
+          img2imgLifecycle.listen(fileInput, "change", async () => {
             const [file] = Array.from(fileInput.files ?? []);
             if (!file) {
               return;
             }
             try {
-              dataInput.value = await readFileAsDataUrl(file);
+              const dataUrl = await readImg2ImgFile(file);
+              if (dataUrl === null) return;
+              dataInput.value = dataUrl;
               assetInput.value = "";
               syncBoundControls([assetInput, dataInput]);
               updateStatus();
@@ -1489,7 +1529,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
               statusNode.textContent = `Failed to load Reference ${slotNumber}.`;
             }
           });
-          mainRadio.addEventListener("change", () => {
+          img2imgLifecycle.listen(mainRadio, "change", () => {
             if (!mainRadio.checked) {
               return;
             }
@@ -1508,7 +1548,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             updateStatus,
           };
         };
-        primaryReferenceMainRadio.addEventListener("change", () => {
+        img2imgLifecycle.listen(primaryReferenceMainRadio, "change", () => {
           if (!primaryReferenceMainRadio.checked) {
             return;
           }
@@ -1704,18 +1744,13 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         };
         syncSourceFullscreenButton();
         if (globalThis.document && typeof globalThis.document.addEventListener === "function") {
-          globalThis.document.addEventListener("fullscreenchange", syncSourceFullscreenButton);
-          globalThis.document.addEventListener("webkitfullscreenchange", syncSourceFullscreenButton);
-          own({
-            destroy() {
-              globalThis.document?.removeEventListener?.("fullscreenchange", syncSourceFullscreenButton);
-              globalThis.document?.removeEventListener?.("webkitfullscreenchange", syncSourceFullscreenButton);
-            },
-          });
+          img2imgLifecycle.listen(globalThis.document, "fullscreenchange", syncSourceFullscreenButton);
+          img2imgLifecycle.listen(globalThis.document, "webkitfullscreenchange", syncSourceFullscreenButton);
         }
 
         const loadSourceFile = async (file, options = {}) => {
-          const sourceImageData = await readFileAsDataUrl(file);
+          const sourceImageData = await readImg2ImgFile(file);
+          if (sourceImageData === null) return;
           await applySourceSnapshot(
             {
               imageData: sourceImageData,
@@ -1728,17 +1763,17 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           );
         };
 
-        sourceUploadButton.addEventListener("click", () => {
+        img2imgLifecycle.listen(sourceUploadButton, "click", () => {
           openSourceFilePicker();
         });
-        imageCanvasStage.addEventListener("click", () => {
+        img2imgLifecycle.listen(imageCanvasStage, "click", () => {
           if (!canCanvasStageOpenUpload(elements.imageData.value, elements.imageAsset.value)) {
             // CRITICAL: once source image exists, stage click must stop forcing file-picker opens; the integrated A1111-like flow switches the stage to edit-first behavior.
             return;
           }
           openSourceFilePicker();
         });
-        imageCanvasStage.addEventListener("keydown", (event) => {
+        img2imgLifecycle.listen(imageCanvasStage, "keydown", (event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             if (!canCanvasStageOpenUpload(elements.imageData.value, elements.imageAsset.value)) {
@@ -1748,7 +1783,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           }
         });
 
-        sourceRemoveButton.addEventListener("click", async () => {
+        img2imgLifecycle.listen(sourceRemoveButton, "click", async () => {
           // IMPORTANT: removing source image must clear both source fields together so mode guards do not observe split state.
           await applySourceSnapshot(
             {
@@ -1762,7 +1797,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           );
         });
 
-        sourceResetButton.addEventListener("click", async () => {
+        img2imgLifecycle.listen(sourceResetButton, "click", async () => {
           const sourceSnapshot = readSourceSnapshot();
           if (!hasCanvasSourceImage(sourceSnapshot.imageData, sourceSnapshot.imageAsset)) {
             statusNode.textContent = "No source image to reset.";
@@ -1772,7 +1807,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           statusNode.textContent = "Reset source canvas view.";
         });
 
-        sourceFullscreenButton.addEventListener("click", async () => {
+        img2imgLifecycle.listen(sourceFullscreenButton, "click", async () => {
           const fullscreenAction = await toggleCanvasFullscreen(imageCanvasSurface);
           syncSourceFullscreenButton();
           statusNode.textContent =
@@ -1783,7 +1818,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
                 : "Fullscreen is unavailable.";
         });
 
-        sourceUndoButton.addEventListener("click", async () => {
+        img2imgLifecycle.listen(sourceUndoButton, "click", async () => {
           if (!sourceHistoryState.undo.length) {
             return;
           }
@@ -1796,7 +1831,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           });
         });
 
-        sourceRedoButton.addEventListener("click", async () => {
+        img2imgLifecycle.listen(sourceRedoButton, "click", async () => {
           if (!sourceHistoryState.redo.length) {
             return;
           }
@@ -1845,7 +1880,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         );
 
         const attachDropzoneHandlers = (dropzone, fileInput, onFile) => {
-          fileInput.addEventListener("change", async () => {
+          img2imgLifecycle.listen(fileInput, "change", async () => {
             const [file] = Array.from(fileInput.files ?? []);
             if (!file) {
               return;
@@ -1857,14 +1892,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
               statusNode.textContent = "Failed to load image upload.";
             }
           });
-          dropzone.addEventListener("dragover", (event) => {
+          img2imgLifecycle.listen(dropzone, "dragover", (event) => {
             event.preventDefault();
             dropzone.dataset.dragging = "true";
           });
-          dropzone.addEventListener("dragleave", () => {
+          img2imgLifecycle.listen(dropzone, "dragleave", () => {
             dropzone.dataset.dragging = "false";
           });
-          dropzone.addEventListener("drop", async (event) => {
+          img2imgLifecycle.listen(dropzone, "drop", async (event) => {
             event.preventDefault();
             dropzone.dataset.dragging = "false";
             const [file] = Array.from(event.dataTransfer?.files ?? []);
@@ -1880,7 +1915,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           });
         };
 
-        imageFileInput.addEventListener("change", async () => {
+        img2imgLifecycle.listen(imageFileInput, "change", async () => {
           const [file] = Array.from(imageFileInput.files ?? []);
           if (!file) {
             return;
@@ -1893,14 +1928,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           }
         });
 
-        imageCanvasSurface.addEventListener("dragover", (event) => {
+        img2imgLifecycle.listen(imageCanvasSurface, "dragover", (event) => {
           event.preventDefault();
           imageCanvasSurface.dataset.dragging = "true";
         });
-        imageCanvasSurface.addEventListener("dragleave", () => {
+        img2imgLifecycle.listen(imageCanvasSurface, "dragleave", () => {
           imageCanvasSurface.dataset.dragging = "false";
         });
-        imageCanvasSurface.addEventListener("drop", async (event) => {
+        img2imgLifecycle.listen(imageCanvasSurface, "drop", async (event) => {
           event.preventDefault();
           imageCanvasSurface.dataset.dragging = "false";
           const [file] = Array.from(event.dataTransfer?.files ?? []);
@@ -1916,7 +1951,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         });
 
         attachDropzoneHandlers(maskDropzone, maskFileInput, async (file) => {
-          const maskData = await readFileAsDataUrl(file);
+          const maskData = await readImg2ImgFile(file);
+          if (maskData === null) return;
           elements.maskData.value = maskData;
           elements.maskAsset.value = "";
           img2imgMaskCanvasContract.handleExternalMaskMutation();
@@ -1925,11 +1961,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           await img2imgModeUi.maskEditor?.handleExternalMaskMutation();
         });
 
-        elements.imageData.addEventListener("input", () => {
+        img2imgLifecycle.listen(elements.imageData, "input", () => {
           renderSourceCanvasSurface();
           syncSourceHistoryButtons();
         });
-        elements.imageAsset.addEventListener("input", () => {
+        img2imgLifecycle.listen(elements.imageAsset, "input", () => {
           renderSourceCanvasSurface();
           syncSourceHistoryButtons();
         });
@@ -1946,19 +1982,21 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           const entries = await Promise.all(
             fileList.map(async (file) => ({
               name: file.name,
-              dataUrl: await readFileAsDataUrl(file),
+              dataUrl: await readImg2ImgFile(file),
             })),
           );
-          elements.batchImagesData.value = JSON.stringify(entries.map((entry) => entry.dataUrl));
-          populateList(batchList, entries.map((entry) => entry.name));
-          batchStatusNode.textContent = `Loaded ${entries.length} batch image(s).`;
-          if (entries[0]?.dataUrl) {
-            setPreviewContent(assetPreview, entries[0].dataUrl, runtimeState.previewPlaceholder);
+          const liveEntries = entries.filter((entry) => entry.dataUrl);
+          if (!isImg2ImgLive() || !liveEntries.length) return;
+          elements.batchImagesData.value = JSON.stringify(liveEntries.map((entry) => entry.dataUrl));
+          populateList(batchList, liveEntries.map((entry) => entry.name));
+          batchStatusNode.textContent = `Loaded ${liveEntries.length} batch image(s).`;
+          if (liveEntries[0]?.dataUrl) {
+            setPreviewContent(assetPreview, liveEntries[0].dataUrl, runtimeState.previewPlaceholder);
           }
           syncBoundControls([elements.batchImagesData]);
         };
 
-        batchFileInput.addEventListener("change", async () => {
+        img2imgLifecycle.listen(batchFileInput, "change", async () => {
           try {
             await setBatchFiles(batchFileInput.files);
           } catch (_error) {
@@ -1966,14 +2004,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             statusNode.textContent = "Failed to load batch image upload.";
           }
         });
-        batchDropzone.addEventListener("dragover", (event) => {
+        img2imgLifecycle.listen(batchDropzone, "dragover", (event) => {
           event.preventDefault();
           batchDropzone.dataset.dragging = "true";
         });
-        batchDropzone.addEventListener("dragleave", () => {
+        img2imgLifecycle.listen(batchDropzone, "dragleave", () => {
           batchDropzone.dataset.dragging = "false";
         });
-        batchDropzone.addEventListener("drop", async (event) => {
+        img2imgLifecycle.listen(batchDropzone, "drop", async (event) => {
           event.preventDefault();
           batchDropzone.dataset.dragging = "false";
           try {
@@ -2034,7 +2072,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
 
         previewActions.forEach((action) => {
           const button = createIconActionButton(action.id, action.iconClass, action.label, action.tone);
-          button.addEventListener("click", async () => {
+          img2imgLifecycle.listen(button, "click", async () => {
             if (action.id === "rookieui-img2img-preview-txt2img") {
               transferCurrentSettingsToTxt2Img();
               return;
@@ -2125,7 +2163,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           "rookieui-img2img-reset-template-lora",
           "Reset Template LoRA",
         );
-        templateLoraControls.resetButton.addEventListener("click", () => {
+        img2imgLifecycle.listen(templateLoraControls.resetButton, "click", () => {
           elements.templateLoraName.value = resolvePresetTemplateLoraDefault();
           syncTemplateLoraControls();
         });
@@ -2157,7 +2195,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         loraSection.appendChild(loraStatus);
 
         const clearButton = createActionButton("rookieui-img2img-clear-lora", "Clear LoRA");
-        clearButton.addEventListener("click", () => {
+        img2imgLifecycle.listen(clearButton, "click", () => {
           elements.loraName.value = "";
           loraStatus.textContent = "No LoRA selected. Generation will use the base checkpoint only.";
           pane.querySelectorAll(".rookieui-shell__library-item").forEach((node) => {
@@ -2174,7 +2212,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           "rookieui-img2img-lora-item",
           loraStatus,
         );
-        clearButton.addEventListener("click", () => {
+        img2imgLifecycle.listen(clearButton, "click", () => {
           if (loraLibraryControls?.select) {
             loraLibraryControls.select.value = "";
             if (loraLibraryControls.actionButton) {
@@ -2182,8 +2220,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
             }
           }
         });
-        elements.templateLoraName.addEventListener("input", syncTemplateLoraControls);
-        elements.templateLoraName.addEventListener("change", syncTemplateLoraControls);
+        img2imgLifecycle.listen(elements.templateLoraName, "input", syncTemplateLoraControls);
+        img2imgLifecycle.listen(elements.templateLoraName, "change", syncTemplateLoraControls);
         syncTemplateLoraControls();
       },
     },
@@ -2209,8 +2247,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     },
   }));
 
-  form.addEventListener("submit", async (event) => {
+  img2imgLifecycle.listen(form, "submit", async (event) => {
     event.preventDefault();
+    if (!isImg2ImgLive()) return;
+    const requestEpoch = img2imgController.beginAsyncEpoch();
     await submitImg2Img(
       bootstrapState,
       elements,
@@ -2219,6 +2259,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       img2imgPreviewBox,
       img2imgMaskCanvasContract,
     );
+    if (!isImg2ImgAsyncEpochLive(requestEpoch)) return;
   });
 
   const img2imgStateLock = installPaneStateLock(formRegistry, "img2img", elements, () => {
@@ -2234,10 +2275,12 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     syncTemplateLoraControls();
     syncImg2ImgModeSurface();
-  });
+  }, img2imgLifecycle);
+  img2imgLifecycle.own(img2imgStateLock);
 
   formRegistry.img2img = {
     applyPayload(payload) {
+      img2imgController.applyPayload(payload);
       const generationPayloadMap = {
         prompt: "prompt",
         negative_prompt: "negativePrompt",
@@ -2376,6 +2419,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         }
       }
       syncBoundControls(Object.values(elements));
+      img2imgController.setMode(elements.mode.value);
+      syncControllerReferenceState(
+        Number(elements.maxDirectReferences.value ?? 0) || 0,
+      );
       img2imgStateLock.capture();
     },
     maskCanvas: {
@@ -2397,12 +2444,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     onActivate: img2imgStateLock.restore,
     onDeactivate: img2imgStateLock.capture,
     destroy: () => {
+      if (!isImg2ImgLive()) return;
+      img2imgController.destroy();
       destroyGenerationRuntimeState(runtimeState);
-      img2imgControlNetEditor?.destroy?.();
-      ownedControllers.splice(0).reverse().forEach((controller) => {
-        controller.destroy?.();
-        controller.unmount?.();
-      });
+      img2imgLifecycle.destroy();
     },
   };
 }

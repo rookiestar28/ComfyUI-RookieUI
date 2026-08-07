@@ -169,7 +169,7 @@ export function createShellPersistenceController(container, bootstrapState) {
   });
 }
 
-export function installPaneStateLock(formRegistry, paneId, elements, afterRestore = null) {
+export function installPaneStateLock(formRegistry, paneId, elements, afterRestore = null, lifecycle = null) {
   const shellPersistence = formRegistry?.__shellPersistence ?? null;
   const syncBoundControls = formRegistry?.__syncBoundControls ?? null;
   const storedSnapshot = shellPersistence?.readPaneSnapshot?.(paneId);
@@ -185,12 +185,20 @@ export function installPaneStateLock(formRegistry, paneId, elements, afterRestor
     }
   };
 
+  const listenerDisposers = [];
   Object.values(elements).forEach((element) => {
     if (!element || typeof element.addEventListener !== "function" || element.type === "file") {
       return;
     }
-    element.addEventListener("input", capture);
-    element.addEventListener("change", capture);
+    if (lifecycle?.listen) {
+      listenerDisposers.push(lifecycle.listen(element, "input", capture));
+      listenerDisposers.push(lifecycle.listen(element, "change", capture));
+    } else {
+      element.addEventListener("input", capture);
+      element.addEventListener("change", capture);
+      listenerDisposers.push(() => element.removeEventListener?.("input", capture));
+      listenerDisposers.push(() => element.removeEventListener?.("change", capture));
+    }
   });
 
   if (formRegistry && paneId) {
@@ -207,5 +215,11 @@ export function installPaneStateLock(formRegistry, paneId, elements, afterRestor
   } else {
     capture();
   }
-  return { capture, restore };
+  const destroy = () => {
+    listenerDisposers.splice(0).reverse().forEach((dispose) => dispose?.());
+    if (formRegistry?.__paneStateLocks?.[paneId]?.capture === capture) {
+      delete formRegistry.__paneStateLocks[paneId];
+    }
+  };
+  return { capture, restore, destroy };
 }

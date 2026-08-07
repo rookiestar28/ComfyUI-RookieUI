@@ -1,5 +1,5 @@
 // IMPORTANT: bump this token whenever shipped frontend module wiring changes; otherwise Comfy-host browser caches can mask live UI fixes.
-export const ROOKIEUI_ASSET_REVISION = "20260807-prompt-workbench-lifecycle-hcb51640076"; // pragma: allowlist secret
+export const ROOKIEUI_ASSET_REVISION = "20260807-img2img-controller-lifecycle-hcbec443091"; // pragma: allowlist secret
 
 export function buildRevisionedModuleUrl(specifier, metaUrl = import.meta.url) {
   const moduleUrl = new URL(specifier, metaUrl);
