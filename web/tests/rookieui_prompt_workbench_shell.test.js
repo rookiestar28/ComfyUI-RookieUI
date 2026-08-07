@@ -387,6 +387,59 @@ describe("prompt workbench shell", () => {
     expect(document.getElementById("test-workbench-panel-format")?.dataset.active).toBe("true");
   });
 
+  test("destroy unbinds shared inputs and ignores late resource responses", async () => {
+    const { prompt, negative, parent } = createBaseDom();
+    let resolveCatalog;
+    const catalogPromise = new Promise((resolve) => {
+      resolveCatalog = resolve;
+    });
+    const onStatusMessage = vi.fn();
+    const bootstrapState = createBootstrapState({
+      fetchPromptWorkbenchCatalogRequest: vi.fn(() => catalogPromise),
+    });
+
+    const shellApi = createPromptWorkbenchShell({
+      idPrefix: "lifecycle-workbench",
+      parent,
+      bootstrapState,
+      promptInput: prompt,
+      negativePromptInput: negative,
+      namespaces: {
+        prompt: "txt2img_prompt",
+        negative: "txt2img_negative",
+      },
+      appendTextElement,
+      createActionButton,
+      onStatusMessage,
+    });
+
+    await flushPromises();
+    prompt.value = "before destroy";
+    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+    vi.advanceTimersByTime(200);
+    await flushPromises();
+    const writesBeforeDestroy = bootstrapState.updatePromptWorkbenchStateRequest.mock.calls.length;
+    expect(writesBeforeDestroy).toBeGreaterThan(0);
+
+    document.getElementById("lifecycle-workbench-toggle").click();
+    await flushPromises();
+    shellApi.destroy();
+
+    expect(shellApi.element.isConnected).toBe(false);
+    expect(prompt.isConnected).toBe(true);
+    expect(negative.isConnected).toBe(true);
+
+    prompt.value = "after destroy";
+    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+    vi.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(bootstrapState.updatePromptWorkbenchStateRequest).toHaveBeenCalledTimes(writesBeforeDestroy);
+
+    resolveCatalog({ ok: true, data: { group_tags: { groups: [] } } });
+    await flushPromises();
+    expect(onStatusMessage).not.toHaveBeenCalledWith("Opened Prompt Workbench");
+  });
+
   test("supports fixed-scope inline prompt and negative workbench surfaces", async () => {
     const { prompt, negative, parent } = createBaseDom();
     const promptField = document.createElement("label");

@@ -31,6 +31,9 @@ import {
 } from "./prompt_workbench/rookieui_prompt_workbench_catalog.js";
 import { createProviderConfigInput } from "./prompt_workbench/rookieui_prompt_workbench_provider_fields.js";
 import { createPromptWorkbenchLifecycle } from "./prompt_workbench/rookieui_prompt_workbench_lifecycle.js";
+import { createPromptWorkbenchController } from "./prompt_workbench/rookieui_prompt_workbench_controller.js";
+import { createPromptWorkbenchDataLoader } from "./prompt_workbench/rookieui_prompt_workbench_data_loader.js";
+import { collectPromptWorkbenchSuggestions } from "./prompt_workbench/rookieui_prompt_workbench_suggestions.js";
 let promptWorkbenchInstanceSequence = 0;
 
 export function createPromptWorkbenchShell({
@@ -60,16 +63,16 @@ export function createPromptWorkbenchShell({
   shell.tabIndex = -1;
   parent.appendChild(shell);
 
-  const configState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
-  configState.ui_preferences = configState.ui_preferences ?? {};
-  configState.translation = configState.translation ?? { default_provider: "", providers: {} };
-  configState.ai_assist = configState.ai_assist ?? {
+  const initialConfigState = structuredClone(bootstrapState?.promptWorkbench?.config ?? {});
+  initialConfigState.ui_preferences = initialConfigState.ui_preferences ?? {};
+  initialConfigState.translation = initialConfigState.translation ?? { default_provider: "", providers: {} };
+  initialConfigState.ai_assist = initialConfigState.ai_assist ?? {
     default_provider: "",
     providers: {},
     instruction_preset: "",
   };
-  const blacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [], translation_entries: [] });
-  blacklistState.translation_entries = Array.isArray(blacklistState.translation_entries) ? blacklistState.translation_entries : [];
+  const initialBlacklistState = structuredClone(bootstrapState?.promptWorkbench?.blacklist ?? { enabled: false, entries: [], translation_entries: [] });
+  initialBlacklistState.translation_entries = Array.isArray(initialBlacklistState.translation_entries) ? initialBlacklistState.translation_entries : [];
   const hostActions = structuredClone(bootstrapState?.promptWorkbench?.host_actions ?? {});
   const languageOptions = Array.isArray(bootstrapState?.promptWorkbench?.language_options)
     ? bootstrapState.promptWorkbench.language_options
@@ -81,28 +84,33 @@ export function createPromptWorkbenchShell({
     prompt: String(namespaces?.prompt ?? "").trim(),
     negative: String(namespaces?.negative ?? "").trim(),
   };
+  const workbenchController = createPromptWorkbenchController({
+    namespaces: namespaceMap,
+    fixedScope: normalizedFixedScope,
+    initialConfig: initialConfigState,
+    initialBlacklist: initialBlacklistState,
+    normalizeStatePayload,
+  });
+  const configState = workbenchController.configState;
+  const blacklistState = workbenchController.blacklistState;
   const inputMap = {
     prompt: promptInput,
     negative: negativePromptInput,
   };
   const languageSyncSourceId = `${idPrefix}-${++promptWorkbenchInstanceSequence}`;
-  const stateCache = new Map();
-  const editorCache = new Map();
-  const historyCache = new Map();
-  const favoritesCache = new Map();
+  const stateCache = workbenchController.stateCache;
+  const editorCache = workbenchController.editorCache;
+  const historyCache = workbenchController.historyCache;
+  const favoritesCache = workbenchController.favoritesCache;
   const dirtyTimers = new Map();
   const autoHistoryTimers = new Map();
   const lastAutoHistoryText = new Map();
   const catalogSearchState = { query: "" };
-  let providersPayload = null;
-  let catalogPayload = null;
-  let stateReadyPromise = null;
-  let resourcesReadyPromise = null;
-  let activeScope = normalizedFixedScope || "prompt";
+  let activeScope = workbenchController.getActiveScope();
   let activeSecondaryPopover = "";
   let languageSelectorOpen = false;
-  let resourcesLoaded = false;
   const lifecycle = createPromptWorkbenchLifecycle();
+  lifecycle.trackNode(shell);
   let dragTokenId = "";
   const assistState = {
     imageDescription: "",
@@ -116,12 +124,40 @@ export function createPromptWorkbenchShell({
     jsonText: "",
     busy: false,
   };
+  const isLive = () => !lifecycle.destroyed && !workbenchController.isDestroyed();
+  const isAsyncEpochLive = (epoch) => isLive() && workbenchController.isAsyncEpochCurrent(epoch);
   const languageSupport = createWorkbenchLanguageSupport(languageOptions);
   const getLanguageOptions = languageSupport.getLanguageOptions;
   const normalizeLanguageCode = languageSupport.normalizeLanguageCode;
   const t = (key) => languageSupport.translate(configState?.language ?? "en", key);
   const text = (key, replacements = {}) => languageSupport.format(configState?.language ?? "en", key, replacements);
 
+  const dataLoader = createPromptWorkbenchDataLoader({
+    bootstrapState,
+    controller: workbenchController,
+    namespaceMap,
+    fixedScope: normalizedFixedScope,
+    configState,
+    blacklistState,
+    stateCache,
+    editorCache,
+    historyCache,
+    favoritesCache,
+    normalizeStatePayload,
+    normalizePromptEntry,
+    parsePromptTokens,
+    normalizeLanguageCode,
+    getNamespaceInput,
+    getActiveScope: () => activeScope,
+    setActiveScope: (scope) => (activeScope = workbenchController.setActiveScope(scope)),
+    isLive,
+    isAsyncEpochLive,
+    updateStatus,
+    syncUi,
+  });
+  const getCatalogPayload = () => dataLoader.catalogPayload;
+  const ensureStateLoaded = dataLoader.ensureStateLoaded;
+  const ensureResourcesLoaded = dataLoader.ensureResourcesLoaded;
   const header = document.createElement("div");
   header.className = "rookieui-shell__prompt-workbench-header";
   header.dataset.pwUi = "prompt-card-header";
@@ -443,7 +479,7 @@ export function createPromptWorkbenchShell({
     button.className = "rookieui-shell__prompt-workbench-tab";
     button.textContent = label;
     button.addEventListener("click", () => {
-      activeScope = scope;
+      activeScope = workbenchController.setActiveScope(scope);
       syncUi();
     });
     namespaceTabs.appendChild(button);
@@ -493,7 +529,7 @@ export function createPromptWorkbenchShell({
     button.textContent = t(`panel${panelId.charAt(0).toUpperCase()}${panelId.slice(1)}`);
     button.addEventListener("click", () => {
       const currentState = getActiveState();
-      currentState.active_panel = panelId;
+      currentState.active_panel = workbenchController.setActivePanel(panelId);
       queueStatePersist();
       syncUi();
     });
@@ -514,7 +550,7 @@ export function createPromptWorkbenchShell({
     button.addEventListener("click", () => {
       activeSecondaryPopover = activeSecondaryPopover === surface ? "" : surface;
       const currentState = getActiveState();
-      currentState.active_panel = panelId;
+      currentState.active_panel = workbenchController.setActivePanel(panelId);
       queueStatePersist();
       syncUi();
     });
@@ -718,7 +754,7 @@ export function createPromptWorkbenchShell({
     }
     languageSelectorOpen = false;
     syncUi();
-    if (didChange && resourcesLoaded) {
+    if (didChange && dataLoader.resourcesLoaded) {
       void refreshCatalogForLanguage(normalizedLanguage);
     }
     if (broadcast) {
@@ -750,7 +786,7 @@ export function createPromptWorkbenchShell({
     configState.language = normalizedLanguage;
     languageSelectorOpen = false;
     syncUi();
-    if (didChange && resourcesLoaded) {
+    if (didChange && dataLoader.resourcesLoaded) {
       void refreshCatalogForLanguage(normalizedLanguage);
     }
   }
@@ -759,13 +795,16 @@ export function createPromptWorkbenchShell({
 
   async function refreshCatalogForLanguage(language) {
     const normalizedLanguage = normalizeLanguageCode(language);
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     try {
       const result = await bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(normalizedLanguage);
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data) {
-        catalogPayload = result.data;
+        dataLoader.setCatalogPayload(result.data);
       }
       updateStatus(`Prompt Workbench catalog refreshed for ${normalizedLanguage}`);
     } catch {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       updateStatus(`Prompt Workbench catalog refresh failed for ${normalizedLanguage}`);
     } finally {
       syncUi();
@@ -825,14 +864,14 @@ export function createPromptWorkbenchShell({
   function getActiveState() {
     const namespace = getActiveNamespace();
     if (!stateCache.has(namespace)) {
-      stateCache.set(namespace, normalizeStatePayload(namespace, { draft_prompt: getActiveInput()?.value ?? "" }));
+      workbenchController.setSurfaceState(namespace, { draft_prompt: getActiveInput()?.value ?? "" });
     }
     return stateCache.get(namespace);
   }
 
   function ensureEditorTokens(namespace) {
     if (!editorCache.has(namespace)) {
-      const state = stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
+      const state = stateCache.get(namespace) ?? workbenchController.getSurfaceState(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
       editorCache.set(namespace, parsePromptTokens(state.draft_prompt || getNamespaceInput(namespace)?.value, { scope: activeScope }));
     }
     return editorCache.get(namespace);
@@ -936,13 +975,12 @@ export function createPromptWorkbenchShell({
     const namespace = normalizeTokenText(namespaceOverride) || getActiveNamespace();
     const state =
       stateCache.get(namespace) ??
-      normalizeStatePayload(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
+      workbenchController.getSurfaceState(namespace, { draft_prompt: getNamespaceInput(namespace)?.value ?? "" });
     stateCache.set(namespace, state);
     const existingTimer = dirtyTimers.get(namespace);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
-    const nextTimer = setTimeout(async () => {
+    if (existingTimer) lifecycle.cancel(existingTimer);
+    const nextTimer = lifecycle.timeout(async () => {
+      if (!isLive()) return;
       dirtyTimers.delete(namespace);
       const result = await bootstrapState?.updatePromptWorkbenchStateRequest?.(namespace, {
         workbench_open: state.workbench_open,
@@ -950,10 +988,13 @@ export function createPromptWorkbenchShell({
         draft_prompt: state.draft_prompt,
         selected_entry_id: state.selected_entry_id,
       });
+      if (!isLive()) return;
       updateStatus(result?.ok === false ? "Prompt Workbench state saved with fallback semantics" : "Prompt Workbench state synchronized");
       syncUi();
     }, 180);
-    dirtyTimers.set(namespace, nextTimer);
+    if (nextTimer !== null) {
+      dirtyTimers.set(namespace, nextTimer);
+    }
   }
 
   function queueAutoHistoryCapture(namespace, scope, promptText, tokens) {
@@ -962,48 +1003,41 @@ export function createPromptWorkbenchShell({
       return;
     }
     const existingTimer = autoHistoryTimers.get(namespace);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-    }
+    if (existingTimer) lifecycle.cancel(existingTimer);
     const tokenSnapshot = serializeTokenPayloads(tokens, activeScope);
-    const nextTimer = setTimeout(() => {
+    const nextTimer = lifecycle.timeout(() => {
+      if (!isLive()) return;
       autoHistoryTimers.delete(namespace);
       if (normalizedText === lastAutoHistoryText.get(namespace)) {
         return;
       }
       lastAutoHistoryText.set(namespace, normalizedText);
+      const requestEpoch = workbenchController.beginAsyncEpoch();
       void bootstrapState?.updatePromptWorkbenchHistoryRequest?.(namespace, "auto_capture", {
         item: buildCollectionItem(scope, normalizedText, tokenSnapshot),
       }).then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
         historyCache.set(namespace, normalizedItems);
         updateStatus("Auto-saved prompt history");
         syncUi();
       });
     }, 600);
-    autoHistoryTimers.set(namespace, nextTimer);
+    if (nextTimer !== null) {
+      autoHistoryTimers.set(namespace, nextTimer);
+    }
   }
 
   function queueConfigPersist() {
-    void bootstrapState?.updatePromptWorkbenchConfigRequest?.(configState).then((result) => {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
+    void bootstrapState?.updatePromptWorkbenchConfigRequest?.(workbenchController.getConfigSnapshot()).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data?.config) {
         Object.assign(configState, result.data.config);
       }
       updateStatus(result?.ok === false ? "Formatting preferences saved with fallback semantics" : "Formatting preferences synchronized");
       syncUi();
     });
-  }
-
-  function getTranslationProviders() {
-    return Array.isArray(providersPayload?.surfaces?.translation?.providers)
-      ? providersPayload.surfaces.translation.providers.filter((entry) => entry?.execution_state === "shipped")
-      : [];
-  }
-
-  function getAiAssistProviders() {
-    return Array.isArray(providersPayload?.surfaces?.ai_assist?.providers)
-      ? providersPayload.surfaces.ai_assist.providers.filter((entry) => entry?.execution_state === "shipped")
-      : [];
   }
 
   function getDanbooruUpsampleAction() {
@@ -1030,7 +1064,7 @@ export function createPromptWorkbenchShell({
 
   function getTokenHighlight(token) {
     const tokenFamily = normalizeTokenText(token?.keyword_family) || "plain";
-    const tokenFamilyHighlights = catalogPayload?.catalog_highlights?.token_families ?? {};
+    const tokenFamilyHighlights = getCatalogPayload()?.catalog_highlights?.token_families ?? {};
     return normalizeTokenText(tokenFamilyHighlights[tokenFamily]?.highlight) || tokenFamily;
   }
 
@@ -1082,6 +1116,7 @@ export function createPromptWorkbenchShell({
       return;
     }
     updateStatus("Translating prompt text...");
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     void bootstrapState
       ?.translatePromptWorkbenchRequest?.({
         provider: providerId,
@@ -1090,6 +1125,7 @@ export function createPromptWorkbenchShell({
         text: promptText,
       })
       .then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         const translatedText = String(result?.data?.translated_text ?? "").trim();
         if (!translatedText) {
           updateStatus("Translation response did not include translated text");
@@ -1101,6 +1137,7 @@ export function createPromptWorkbenchShell({
         });
       })
       .catch(() => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         updateStatus("Prompt translation failed");
       });
   }
@@ -1122,6 +1159,7 @@ export function createPromptWorkbenchShell({
       return;
     }
     updateStatus("Translating selected prompt tokens...");
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     void bootstrapState
       ?.translatePromptWorkbenchRequest?.({
         provider: providerId,
@@ -1131,6 +1169,7 @@ export function createPromptWorkbenchShell({
         dictionary_first: true,
       })
       .then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         const translatedTexts = Array.isArray(result?.data?.translated_texts) ? result.data.translated_texts : [];
         selectedTokens.forEach((token, index) => {
           const translatedText = String(translatedTexts[index] ?? "").trim();
@@ -1142,6 +1181,7 @@ export function createPromptWorkbenchShell({
         syncUi();
       })
       .catch(() => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         updateStatus("Prompt token translation failed");
       });
   }
@@ -1165,6 +1205,7 @@ export function createPromptWorkbenchShell({
       return;
     }
     upsampleState.running = true;
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     updateStatus("Upsampling prompt tags through the host Danbooru node...");
     syncUi();
     const requestPromise = bootstrapState?.upsamplePromptWorkbenchRequest?.({
@@ -1180,6 +1221,7 @@ export function createPromptWorkbenchShell({
     }
     void requestPromise
       .then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         if (result?.ok === false) {
           const errorDetail =
             String(result?.data?.detail ?? "").trim() ||
@@ -1199,9 +1241,11 @@ export function createPromptWorkbenchShell({
         });
       })
       .catch(() => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         updateStatus("Danbooru upsampler request failed");
       })
       .finally(() => {
+        if (!isLive()) return;
         upsampleState.running = false;
         syncUi();
       });
@@ -1243,6 +1287,7 @@ export function createPromptWorkbenchShell({
       return;
     }
     assistState.generating = true;
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     updateStatus("Generating prompt with AI Assist...");
     syncUi();
     void bootstrapState
@@ -1254,13 +1299,16 @@ export function createPromptWorkbenchShell({
         theme_style: configState?.theme_style ?? "rookieui_classic",
       })
       .then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         assistState.generatedPrompt = String(result?.data?.generated_prompt ?? "").trim();
         updateStatus(assistState.generatedPrompt ? "AI Assist generated a prompt draft" : "AI Assist returned empty prompt text");
       })
       .catch(() => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         updateStatus("AI Assist request failed");
       })
       .finally(() => {
+        if (!isLive()) return;
         assistState.generating = false;
         syncUi();
       });
@@ -1300,7 +1348,9 @@ export function createPromptWorkbenchShell({
       return;
     }
     const item = buildCollectionItem(activeScope, promptText, ensureEditorTokens(namespace));
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     void actionMethod?.(namespace, "push", { item }).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
       if (collectionName === "favorites") {
         favoritesCache.set(namespace, normalizedItems);
@@ -1325,7 +1375,9 @@ export function createPromptWorkbenchShell({
       collectionName === "favorites"
         ? bootstrapState?.updatePromptWorkbenchFavoritesRequest
         : bootstrapState?.updatePromptWorkbenchHistoryRequest;
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     void actionMethod?.(namespace, action, payload).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       const normalizedItems = Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [];
       if (collectionName === "favorites") {
         favoritesCache.set(namespace, normalizedItems);
@@ -1355,7 +1407,9 @@ export function createPromptWorkbenchShell({
     const nextEntries = Array.from(new Set([...(blacklistState.entries ?? []), ...normalizedTokens]));
     blacklistState.enabled = true;
     blacklistState.entries = nextEntries;
-    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(workbenchController.getBlacklistSnapshot()).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data?.blacklist) {
         Object.assign(blacklistState, result.data.blacklist);
       }
@@ -1373,7 +1427,9 @@ export function createPromptWorkbenchShell({
     }
     const nextEntries = Array.from(new Set([...(blacklistState.translation_entries ?? []), ...normalizedTokens]));
     blacklistState.translation_entries = nextEntries;
-    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(workbenchController.getBlacklistSnapshot()).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data?.blacklist) {
         Object.assign(blacklistState, result.data.blacklist);
       }
@@ -1385,7 +1441,9 @@ export function createPromptWorkbenchShell({
 
   function removeBlacklistEntry(entryText) {
     blacklistState.entries = (blacklistState.entries ?? []).filter((entry) => entry !== entryText);
-    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(workbenchController.getBlacklistSnapshot()).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data?.blacklist) {
         Object.assign(blacklistState, result.data.blacklist);
       }
@@ -1397,7 +1455,9 @@ export function createPromptWorkbenchShell({
 
   function removeTranslationBlacklistEntry(entryText) {
     blacklistState.translation_entries = (blacklistState.translation_entries ?? []).filter((entry) => entry !== entryText);
-    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(blacklistState).then((result) => {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
+    void bootstrapState?.updatePromptWorkbenchBlacklistRequest?.(workbenchController.getBlacklistSnapshot()).then((result) => {
+      if (!isAsyncEpochLive(requestEpoch)) return;
       if (result?.data?.blacklist) {
         Object.assign(blacklistState, result.data.blacklist);
       }
@@ -1454,7 +1514,9 @@ export function createPromptWorkbenchShell({
     if (action === "favorite") {
       const selectedText = selectedTokens.map((token) => normalizeTokenText(token.raw_text ?? token.text)).filter(Boolean).join(", ");
       const item = buildCollectionItem(activeScope, selectedText, selectedTokens);
+      const requestEpoch = workbenchController.beginAsyncEpoch();
       void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(namespace, "push", { item }).then((result) => {
+        if (!isAsyncEpochLive(requestEpoch)) return;
         favoritesCache.set(
           namespace,
           Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [],
@@ -1477,32 +1539,12 @@ export function createPromptWorkbenchShell({
   }
 
   function getInlineSuggestions() {
-    const seen = new Set();
-    const suggestions = [];
-    const pushSuggestion = (source, label, fragment) => {
-      const normalizedFragment = normalizeTokenText(fragment);
-      if (!normalizedFragment || seen.has(normalizedFragment)) {
-        return;
-      }
-      seen.add(normalizedFragment);
-      suggestions.push({
-        source,
-        label: String(label ?? normalizedFragment),
-        fragment: normalizedFragment,
-      });
-    };
-
-    (favoritesCache.get(getActiveNamespace()) ?? []).slice(0, 3).forEach((entry) => {
-      pushSuggestion("favorites", entry.label || "Favorite", entry.prompt_text);
+    return collectPromptWorkbenchSuggestions({
+      favorites: favoritesCache.get(getActiveNamespace()),
+      history: historyCache.get(getActiveNamespace()),
+      catalogPayload: getCatalogPayload(),
+      normalizeFragment: normalizeTokenText,
     });
-    (historyCache.get(getActiveNamespace()) ?? []).slice(0, 3).forEach((entry) => {
-      pushSuggestion("history", entry.label || "History", entry.prompt_text);
-    });
-    (Array.isArray(catalogPayload?.tagcomplete?.entries) ? catalogPayload.tagcomplete.entries : []).slice(0, 6).forEach((entry) => {
-      pushSuggestion("tagcomplete", entry?.label ?? entry?.tag, entry?.insert_token ?? entry?.tag ?? entry?.label);
-    });
-
-    return suggestions.slice(0, 8);
   }
 
   function renderInlineSuggestions(parent, surfaceId = "inline") {
@@ -1531,7 +1573,7 @@ export function createPromptWorkbenchShell({
   }
 
   function getNormalizedGroupTagGroups() {
-    return normalizeGroupTagGroups(catalogPayload);
+    return normalizeGroupTagGroups(getCatalogPayload());
   }
 
   function isGroupTagsVisible() {
@@ -1805,7 +1847,7 @@ export function createPromptWorkbenchShell({
     providerPlaceholder.value = "";
     providerPlaceholder.textContent = "Translation provider";
     providerSelect.appendChild(providerPlaceholder);
-    getTranslationProviders().forEach((provider) => {
+    dataLoader.getTranslationProviders().forEach((provider) => {
       const option = document.createElement("option");
       option.value = String(provider.provider_id ?? "");
       option.textContent = String(provider.title ?? provider.provider_id ?? "");
@@ -2056,7 +2098,9 @@ export function createPromptWorkbenchShell({
           tag_tokens: [token.raw_text ?? token.text],
           token_payloads: [serializeTokenPayload(token, index, activeScope)],
         };
+        const requestEpoch = workbenchController.beginAsyncEpoch();
         void bootstrapState?.updatePromptWorkbenchFavoritesRequest?.(getActiveNamespace(), "push", { item }).then((result) => {
+          if (!isAsyncEpochLive(requestEpoch)) return;
           favoritesCache.set(
             getActiveNamespace(),
             Array.isArray(result?.data?.items) ? result.data.items.map(normalizePromptEntry) : [],
@@ -2179,7 +2223,7 @@ export function createPromptWorkbenchShell({
   function renderCatalogPane() {
     renderPromptWorkbenchCatalogPane({
       catalogPane,
-      catalogPayload,
+      catalogPayload: getCatalogPayload(),
       catalogSearchState,
       clearChildren,
       appendTextElement,
@@ -2253,7 +2297,7 @@ export function createPromptWorkbenchShell({
     providerPlaceholder.value = "";
     providerPlaceholder.textContent = "Select AI assist provider";
     providerSelect.appendChild(providerPlaceholder);
-    getAiAssistProviders().forEach((entry) => {
+    dataLoader.getAiAssistProviders().forEach((entry) => {
       const option = document.createElement("option");
       option.value = String(entry?.provider_id ?? "");
       option.textContent = String(entry?.title ?? entry?.provider_id ?? "");
@@ -2265,7 +2309,7 @@ export function createPromptWorkbenchShell({
     });
     renderField("Provider", providerSelect);
 
-    const providerDetails = getAiAssistProviders().find(
+    const providerDetails = dataLoader.getAiAssistProviders().find(
       (entry) => String(entry?.provider_id ?? "") === String(configState?.ai_assist?.default_provider ?? ""),
     );
     const providerFields = Array.isArray(providerDetails?.config_fields) ? providerDetails.config_fields : [];
@@ -2378,9 +2422,11 @@ export function createPromptWorkbenchShell({
   }
 
   async function exportWorkbenchJson(outputNode) {
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     importExportState.busy = true;
     syncUi();
     const result = await bootstrapState?.exportPromptWorkbenchRequest?.();
+    if (!isAsyncEpochLive(requestEpoch)) return;
     const payload = result?.data?.export ?? result?.data ?? {};
     importExportState.jsonText = JSON.stringify(payload, null, 2);
     if (outputNode) {
@@ -2405,12 +2451,13 @@ export function createPromptWorkbenchShell({
       return;
     }
     importExportState.busy = true;
+    const requestEpoch = workbenchController.beginAsyncEpoch();
     syncUi();
     const result = await bootstrapState?.importPromptWorkbenchRequest?.(payload);
+    if (!isAsyncEpochLive(requestEpoch)) return;
     importExportState.busy = false;
     updateStatus(result?.ok === false ? "Prompt Workbench import saved with fallback semantics" : t("importReady"));
-    resourcesReadyPromise = null;
-    resourcesLoaded = false;
+    dataLoader.resetResources();
     await ensureResourcesLoaded({
       statusMessage: result?.ok === false ? "Prompt Workbench import saved with fallback semantics" : t("importReady"),
     });
@@ -2627,7 +2674,7 @@ export function createPromptWorkbenchShell({
   }
 
   function syncUi() {
-    if (lifecycle.destroyed) return;
+    if (!isLive()) return;
     const state = getActiveState();
     state.active_panel = resolveVisiblePanel(state.active_panel);
     if ((activeSecondaryPopover === "history" && !isPanelVisible("history")) || (activeSecondaryPopover === "favorites" && !isPanelVisible("favorites"))) {
@@ -2639,6 +2686,8 @@ export function createPromptWorkbenchShell({
     if (configState.language !== language) {
       configState.language = language;
     }
+    const providersPayload = dataLoader.providersPayload;
+    const catalogPayload = getCatalogPayload();
     const translationSurface = providersPayload?.surfaces?.translation ?? null;
     const shippedProviders = Array.isArray(translationSurface?.shipped_provider_ids)
       ? translationSurface.shipped_provider_ids.length
@@ -2718,13 +2767,13 @@ export function createPromptWorkbenchShell({
       : 0;
     setText(
       summaryNodes.providers,
-      resourcesLoaded
+      dataLoader.resourcesLoaded
         ? `${shippedProviders} ${t("translateProviders")} / ${assistShippedProviders} ${t("assistProviders")} / ${language}`
         : t("lazy"),
     );
     setText(
       summaryNodes.catalogs,
-      resourcesLoaded
+      dataLoader.resourcesLoaded
         ? `${groupCount} ${t("groupsCount")} / ${libraryCount} ${t("sectionsCount")} / ${extraNetworkCount} ${t("networksCount")}`
         : t("lazy"),
     );
@@ -2752,107 +2801,20 @@ export function createPromptWorkbenchShell({
     renderLanguageSelector();
   }
 
-  async function ensureStateLoaded() {
-    if (stateReadyPromise) {
-      return stateReadyPromise;
-    }
-    const namespacesToLoad = Object.values(namespaceMap).filter(Boolean);
-    stateReadyPromise = Promise.all(
-      namespacesToLoad.map(async (namespace) => {
-        const result = await bootstrapState?.fetchPromptWorkbenchStateRequest?.(namespace);
-        const nextState = normalizeStatePayload(
-          namespace,
-          result?.data?.state ?? { draft_prompt: getNamespaceInput(namespace)?.value ?? "" },
-        );
-        if (!nextState.draft_prompt) {
-          nextState.draft_prompt = String(getNamespaceInput(namespace)?.value ?? "");
-        }
-        stateCache.set(namespace, nextState);
-        editorCache.set(namespace, parsePromptTokens(nextState.draft_prompt, { scope: activeScope }));
-      }),
-    )
-      .then(() => {
-        if (normalizedFixedScope) {
-          activeScope = normalizedFixedScope;
-          return;
-        }
-        const promptState = stateCache.get(namespaceMap.prompt);
-        const negativeState = stateCache.get(namespaceMap.negative);
-        if (!promptState?.workbench_open && negativeState?.workbench_open) {
-          activeScope = "negative";
-        }
-      })
-      .finally(() => {
-        syncUi();
-      });
-    return stateReadyPromise;
-  }
-
-  async function ensureResourcesLoaded({ statusMessage = "Prompt Workbench resources loaded" } = {}) {
-    if (resourcesReadyPromise) {
-      return resourcesReadyPromise;
-    }
-    resourcesReadyPromise = Promise.all([
-      bootstrapState?.fetchPromptWorkbenchProvidersRequest?.(),
-      bootstrapState?.fetchPromptWorkbenchCatalogRequest?.(normalizeLanguageCode(configState?.language ?? "en")),
-      bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.prompt),
-      bootstrapState?.fetchPromptWorkbenchHistoryRequest?.(namespaceMap.negative),
-      bootstrapState?.fetchPromptWorkbenchFavoritesRequest?.(namespaceMap.prompt),
-      bootstrapState?.fetchPromptWorkbenchFavoritesRequest?.(namespaceMap.negative),
-      bootstrapState?.fetchPromptWorkbenchBlacklistRequest?.(),
-    ])
-      .then(
-        ([
-          providersResult,
-          catalogResult,
-          promptHistory,
-          negativeHistory,
-          promptFavorites,
-          negativeFavorites,
-          blacklistResult,
-        ]) => {
-          providersPayload = providersResult?.data ?? null;
-          catalogPayload = catalogResult?.data ?? null;
-          historyCache.set(
-            namespaceMap.prompt,
-            Array.isArray(promptHistory?.data?.items) ? promptHistory.data.items.map(normalizePromptEntry) : [],
-          );
-          historyCache.set(
-            namespaceMap.negative,
-            Array.isArray(negativeHistory?.data?.items) ? negativeHistory.data.items.map(normalizePromptEntry) : [],
-          );
-          favoritesCache.set(
-            namespaceMap.prompt,
-            Array.isArray(promptFavorites?.data?.items) ? promptFavorites.data.items.map(normalizePromptEntry) : [],
-          );
-          favoritesCache.set(
-            namespaceMap.negative,
-            Array.isArray(negativeFavorites?.data?.items) ? negativeFavorites.data.items.map(normalizePromptEntry) : [],
-          );
-          if (blacklistResult?.data?.blacklist) {
-            Object.assign(blacklistState, blacklistResult.data.blacklist);
-          }
-          resourcesLoaded = true;
-          updateStatus(statusMessage);
-        },
-      )
-      .catch(() => {
-        updateStatus("Prompt Workbench resources are using fallback data");
-      })
-      .finally(() => {
-        syncUi();
-      });
-    return resourcesReadyPromise;
-  }
-
   toggleButton.addEventListener("click", () => {
     void ensureStateLoaded().then(async () => {
+      if (!isLive()) {
+        return;
+      }
       const state = getActiveState();
       state.workbench_open = !state.workbench_open;
       queueStatePersist();
       syncUi();
       if (state.workbench_open) {
         await ensureResourcesLoaded();
+        if (!isLive()) {
+          return;
+        }
         const preferredPanel = resolveVisiblePanel(configState?.ui_preferences?.preferred_panel ?? state.active_panel);
         if (preferredPanel !== state.active_panel) {
           state.active_panel = preferredPanel;
@@ -2940,7 +2902,7 @@ export function createPromptWorkbenchShell({
     if (!input || !namespace) {
       return;
     }
-    input.addEventListener("input", () => {
+    lifecycle.listen(input, "input", () => {
       const cachedState =
         stateCache.get(namespace) ?? normalizeStatePayload(namespace, { draft_prompt: String(input.value ?? "") });
       cachedState.draft_prompt = String(input.value ?? "");
@@ -2960,15 +2922,30 @@ export function createPromptWorkbenchShell({
   return {
     element: shell,
     async openWorkbench() {
+      if (!isLive()) {
+        return;
+      }
       await ensureStateLoaded();
+      if (!isLive()) {
+        return;
+      }
       const state = getActiveState();
       if (!state.workbench_open) {
         state.workbench_open = true;
         queueStatePersist();
       }
       await ensureResourcesLoaded();
+      if (!isLive()) {
+        return;
+      }
       syncUi();
     },
-    destroy: () => lifecycle.destroy(dirtyTimers, autoHistoryTimers),
+    destroy: () => {
+      if (lifecycle.destroyed) {
+        return;
+      }
+      workbenchController.destroy();
+      lifecycle.destroy(dirtyTimers, autoHistoryTimers);
+    },
   };
 }
