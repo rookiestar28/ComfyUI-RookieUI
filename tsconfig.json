@@ -18,6 +18,7 @@
     "web/rookieui_extension.js",
     "web/rookieui_feature_registry.js",
     "web/rookieui_host_surface.js",
+    "web/rookieui_api.js",
     "web/rookieui_sidebar_registration.js",
     "web/api/rookieui_api_transport.js",
     "web/api/rookieui_controlnet_api.js",

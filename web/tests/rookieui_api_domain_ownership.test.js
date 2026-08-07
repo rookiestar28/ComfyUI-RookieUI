@@ -109,7 +109,7 @@ const DOMAIN_EXPORTS = Object.freeze({
   queue: ["fetchRookieUIHistoryPrompt", "fetchRookieUIQueue", "fetchRookieUIQueueJob"],
 });
 
-describe("F311 frontend API domain ownership", () => {
+describe("frontend API domain ownership", () => {
   test("preserves the exact compatibility facade export surface", () => {
     expect(Object.keys(facade).sort()).toEqual([...FROZEN_FACADE_EXPORTS].sort());
   });

@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "governed_roots": [
+    {
+      "root": "rookieui/api/domains",
+      "extension": ".py",
+      "allowed_files": [
+        "rookieui/api/domains/__init__.py",
+        "rookieui/api/domains/controlnet.py",
+        "rookieui/api/domains/generation.py",
+        "rookieui/api/domains/health_bootstrap.py",
+        "rookieui/api/domains/inventory_capability.py",
+        "rookieui/api/domains/pnginfo_extras.py",
+        "rookieui/api/domains/prompt_workbench.py",
+        "rookieui/api/domains/queue.py",
+        "rookieui/api/domains/xyz_plot.py"
+      ]
+    },
+    {
+      "root": "web/api",
+      "extension": ".js",
+      "allowed_files": [
+        "web/api/rookieui_api_transport.js",
+        "web/api/rookieui_controlnet_api.js",
+        "web/api/rookieui_controlnet_resources.js",
+        "web/api/rookieui_generation_api.js",
+        "web/api/rookieui_inventory_api.js",
+        "web/api/rookieui_prompt_workbench_api.js",
+        "web/api/rookieui_queue_api.js",
+        "web/api/rookieui_xyz_plot_api.js"
+      ]
+    }
+  ],
+  "backend_domain_root": "rookieui/api/domains",
+  "allowed_backend_domain_edges": [
+    ["rookieui/api/domains/inventory_capability.py", "rookieui.api.domains.health_bootstrap"]
+  ],
+  "frontend_domain_files": [
+    "web/api/rookieui_controlnet_api.js",
+    "web/api/rookieui_generation_api.js",
+    "web/api/rookieui_inventory_api.js",
+    "web/api/rookieui_prompt_workbench_api.js",
+    "web/api/rookieui_queue_api.js",
+    "web/api/rookieui_xyz_plot_api.js"
+  ],
+  "allowed_frontend_dependencies": {
+    "web/api/rookieui_controlnet_api.js": [
+      "web/api/rookieui_api_transport.js",
+      "web/api/rookieui_controlnet_resources.js",
+      "web/rookieui_debug_deps.js"
+    ],
+    "web/api/rookieui_generation_api.js": ["web/api/rookieui_api_transport.js"],
+    "web/api/rookieui_inventory_api.js": [
+      "web/api/rookieui_api_transport.js",
+      "web/api/rookieui_controlnet_resources.js",
+      "web/rookieui_debug_deps.js",
+      "web/rookieui_effective_parameter_policy.js",
+      "web/rookieui_family_profile_fallback_entries.js",
+      "web/rookieui_family_profile_projection.js"
+    ],
+    "web/api/rookieui_prompt_workbench_api.js": ["web/api/rookieui_api_transport.js"],
+    "web/api/rookieui_queue_api.js": ["web/api/rookieui_api_transport.js"],
+    "web/api/rookieui_xyz_plot_api.js": ["web/api/rookieui_api_transport.js"]
+  },
+  "frontend_facade": "web/rookieui_api.js",
+  "composition_roots": {
+    "rookieui/api/routes.py": {
+      "allowed_functions": [
+        "register_routes",
+        "get_optional_alias_route_status",
+        "_reset_route_runtime_state_for_tests",
+        "_get_prompt_server_for_submission",
+        "_json_response",
+        "_read_request_payload",
+        "_read_request_query_value",
+        "_read_request_match_value",
+        "_count_detect_input_images",
+        "_register_controlnet_alias_routes",
+        "_register_rookieui_route_pair",
+        "_register_rookieui_get",
+        "_register_rookieui_post",
+        "build_route_matrix",
+        "__getattr__"
+      ]
+    },
+    "rookieui/api/route_spec.py": {
+      "allowed_functions": [
+        "build_route_matrix",
+        "_register_authoritative_spec",
+        "_register_optional_aliases",
+        "register_routes"
+      ]
+    }
+  },
+  "family_truth": {
+    "canonical_owner": "rookieui/contracts/family_template_manifest.py",
+    "assignment_name": "FAMILY_TEMPLATE_MANIFEST",
+    "projection_markers": {
+      "rookieui/contracts/family_profile_projection.py": [
+        "FAMILY_PROFILE_PROJECTION_CONTRACT_VERSION",
+        "build_family_profile_projection_entries",
+        "validate_runtime_adapter_bindings"
+      ],
+      "web/api/rookieui_inventory_api.js": [
+        "DEFAULT_MODEL_FAMILY_ENTRIES",
+        "buildModelFamilyStableProjection",
+        "CURRENT_HOST_DEFERRED_PROFILE_IDS"
+      ]
+    }
+  },
+  "disposal_contracts": {
+    "web/sidebar_tabs/img2img/rookieui_img2img_controller.js": ["destroy() {", "isDestroyed:"],
+    "web/sidebar_tabs/img2img/rookieui_img2img_lifecycle.js": ["destroy(...timerMaps) {", "disposers.splice(0).reverse()"],
+    "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_controller.js": ["destroy() {", "isDestroyed()"],
+    "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_lifecycle.js": ["destroy(...timerMaps) {", "disposers.splice(0).reverse()"]
+  },
+  "facade_exports": [
+    "DEFAULT_MODEL_FAMILY_ENTRIES",
+    "DEFAULT_MODEL_FAMILY_FALLBACK_PROVENANCE",
+    "DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES",
+    "DEFAULT_NEWER_FAMILY_PROFILES",
+    "DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY",
+    "assistRookieUIPromptWorkbench",
+    "buildModelFamilyStableProjection",
+    "cancelRookieUIXYZPlotSession",
+    "createDefaultCapabilities",
+    "detectRookieUIControlNet",
+    "exportRookieUIPromptWorkbench",
+    "fetchRookieUIADetailerCatalog",
+    "fetchRookieUICapabilities",
+    "fetchRookieUICompatibility",
+    "fetchRookieUIControlNetModels",
+    "fetchRookieUIControlNetModules",
+    "fetchRookieUIControlNetTypes",
+    "fetchRookieUIHistoryPrompt",
+    "fetchRookieUIModels",
+    "fetchRookieUIPresets",
+    "fetchRookieUIPromptWorkbenchBlacklist",
+    "fetchRookieUIPromptWorkbenchCatalog",
+    "fetchRookieUIPromptWorkbenchConfig",
+    "fetchRookieUIPromptWorkbenchFavorites",
+    "fetchRookieUIPromptWorkbenchHistory",
+    "fetchRookieUIPromptWorkbenchProviders",
+    "fetchRookieUIPromptWorkbenchState",
+    "fetchRookieUIQueue",
+    "fetchRookieUIQueueJob",
+    "fetchRookieUIXYZPlotAxes",
+    "fetchRookieUIXYZPlotSessionDetail",
+    "fetchRookieUIXYZPlotSessions",
+    "importRookieUIPromptWorkbench",
+    "inspectRookieUIPngInfo",
+    "parseRookieUIPngInfo",
+    "submitRookieUIExtras",
+    "submitRookieUIImg2Img",
+    "submitRookieUITxt2Img",
+    "submitRookieUIXYZPlotEstimate",
+    "submitRookieUIXYZPlotRun",
+    "translateRookieUIPromptWorkbench",
+    "updateRookieUIPromptWorkbenchBlacklist",
+    "updateRookieUIPromptWorkbenchConfig",
+    "updateRookieUIPromptWorkbenchFavorites",
+    "updateRookieUIPromptWorkbenchHistory",
+    "updateRookieUIPromptWorkbenchState",
+    "upsampleRookieUIPromptWorkbench"
+  ],
+  "typed_coverage": {
+    "config": "tsconfig.json",
+    "minimum_js_files": 29,
+    "required_files": [
+      "web/api/rookieui_controlnet_api.js",
+      "web/api/rookieui_inventory_api.js",
+      "web/api/rookieui_prompt_workbench_api.js",
+      "web/api/rookieui_queue_api.js",
+      "web/api/rookieui_xyz_plot_api.js",
+      "web/rookieui_api.js",
+      "web/sidebar_tabs/img2img/rookieui_img2img_controller.js",
+      "web/sidebar_tabs/img2img/rookieui_img2img_lifecycle.js",
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_controller.js",
+      "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_lifecycle.js"
+    ]
+  },
+  "required_guards": [
+    "scripts/check_public_release_boundary.py",
+    "scripts/check_supply_chain_hardening.py",
+    "scripts/run_current_host_contract_lane.py",
+    "scripts/run_full_tests_linux.sh",
+    "scripts/run_full_tests_windows.ps1",
+    "tests/test_host_source_basis.py",
+    "web/tests/rookieui_frontend_architecture.test.js"
+  ],
+  "test_discovery": {
+    "package": "package.json",
+    "unit_script": "vitest run",
+    "forbidden_tokens": ["--exclude", "exclude:", "testPathIgnorePatterns"]
+  },
+  "budgets": {
+    "rookieui/api/routes.py": {"baseline_bytes": 6985, "min_bytes": 4800, "max_bytes": 8400, "min_lines": 150, "max_lines": 245, "max_line_length": 320},
+    "rookieui/api/route_spec.py": {"baseline_bytes": 9469, "min_bytes": 6600, "max_bytes": 11400, "min_lines": 150, "max_lines": 250, "max_line_length": 320},
+    "rookieui/api/route_runtime.py": {"baseline_bytes": 4961, "min_bytes": 3400, "max_bytes": 6000, "min_lines": 110, "max_lines": 190, "max_line_length": 320},
+    "rookieui/contracts/family_template_manifest.py": {"baseline_bytes": 80962, "min_bytes": 56000, "max_bytes": 97200, "min_lines": 1260, "max_lines": 2170, "max_line_length": 320},
+    "rookieui/contracts/family_profile_projection.py": {"baseline_bytes": 7027, "min_bytes": 4900, "max_bytes": 8450, "min_lines": 112, "max_lines": 195, "max_line_length": 320},
+    "web/rookieui_api.js": {"baseline_bytes": 638, "min_bytes": 400, "max_bytes": 1200, "min_lines": 12, "max_lines": 30, "max_line_length": 320},
+    "web/api/rookieui_api_transport.js": {"baseline_bytes": 2860, "min_bytes": 2000, "max_bytes": 3450, "min_lines": 53, "max_lines": 95, "max_line_length": 320},
+    "web/api/rookieui_controlnet_api.js": {"baseline_bytes": 7206, "min_bytes": 5000, "max_bytes": 8700, "min_lines": 133, "max_lines": 230, "max_line_length": 320},
+    "web/api/rookieui_generation_api.js": {"baseline_bytes": 3143, "min_bytes": 2200, "max_bytes": 3800, "min_lines": 65, "max_lines": 115, "max_line_length": 320},
+    "web/api/rookieui_inventory_api.js": {"baseline_bytes": 64924, "min_bytes": 45000, "max_bytes": 78000, "min_lines": 1240, "max_lines": 2140, "max_line_length": 320},
+    "web/api/rookieui_prompt_workbench_api.js": {"baseline_bytes": 15399, "min_bytes": 10700, "max_bytes": 18500, "min_lines": 294, "max_lines": 505, "max_line_length": 320},
+    "web/api/rookieui_queue_api.js": {"baseline_bytes": 1881, "min_bytes": 1300, "max_bytes": 2300, "min_lines": 46, "max_lines": 82, "max_line_length": 320},
+    "web/api/rookieui_xyz_plot_api.js": {"baseline_bytes": 5514, "min_bytes": 3850, "max_bytes": 6650, "min_lines": 133, "max_lines": 230, "max_line_length": 320},
+    "web/sidebar_tabs/img2img/rookieui_img2img_controller.js": {"baseline_bytes": 9829, "min_bytes": 6800, "max_bytes": 11800, "min_lines": 187, "max_lines": 325, "max_line_length": 320},
+    "web/sidebar_tabs/img2img/rookieui_img2img_lifecycle.js": {"baseline_bytes": 4472, "min_bytes": 3100, "max_bytes": 5400, "min_lines": 104, "max_lines": 180, "max_line_length": 320},
+    "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_controller.js": {"baseline_bytes": 7245, "min_bytes": 5000, "max_bytes": 8700, "min_lines": 158, "max_lines": 275, "max_line_length": 320},
+    "web/sidebar_tabs/prompt_workbench/rookieui_prompt_workbench_lifecycle.js": {"baseline_bytes": 3217, "min_bytes": 2200, "max_bytes": 3900, "min_lines": 79, "max_lines": 140, "max_line_length": 320}
+  }
+}
