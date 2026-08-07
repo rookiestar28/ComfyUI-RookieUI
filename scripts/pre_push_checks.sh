@@ -270,16 +270,16 @@ fi
 echo "[pre-push] Playwright harness python: $ROOKIEUI_E2E_PYTHON"
 echo "[pre-push] Playwright harness port: $ROOKIEUI_E2E_PORT"
 
-echo "[pre-push] Step 1/8: supply-chain hardening scan"
+echo "[pre-push] Step 1/9: supply-chain hardening scan"
 "$VENV_PY" scripts/check_supply_chain_hardening.py --root "$ROOT_DIR"
 
-echo "[pre-push] Step 2/8: dependency advisory gate"
+echo "[pre-push] Step 2/9: dependency advisory gate"
 npm run audit:ci
 
-echo "[pre-push] Step 3/8: detect-secrets"
+echo "[pre-push] Step 3/9: detect-secrets"
 "$VENV_PY" -m pre_commit run detect-secrets --all-files
 
-echo "[pre-push] Step 4/8: pre-commit all hooks"
+echo "[pre-push] Step 4/9: pre-commit all hooks"
 capture_precommit_snapshots
 if "$VENV_PY" -m pre_commit run --all-files --show-diff-on-failure; then
   :
@@ -292,7 +292,10 @@ if precommit_changed_repo_state; then
 fi
 cleanup_precommit_snapshots
 
-echo "[pre-push] Step 5/8: prompt compiler guard tests"
+echo "[pre-push] Step 5/9: public release boundary (committed HEAD)"
+"$VENV_PY" scripts/check_public_release_boundary.py --tree-ish HEAD
+
+echo "[pre-push] Step 6/9: prompt compiler guard tests"
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
   "$VENV_PY" scripts/run_unittests.py --start-dir tests --pattern "test_a1111_prompt_encoding.py"
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
@@ -300,19 +303,19 @@ MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
   "$VENV_PY" scripts/run_unittests.py --start-dir tests --pattern "test_img2img_translation.py"
 
-echo "[pre-push] Step 6/8: backend unit tests"
+echo "[pre-push] Step 7/9: backend unit tests"
 MOLTBOT_STATE_DIR="$ROOT_DIR/moltbot_state/_local_unit" \
   "$VENV_PY" scripts/run_unittests.py --start-dir tests --pattern "test_*.py"
 
-echo "[pre-push] Step 7/8: frontend type validation + test suite"
+echo "[pre-push] Step 8/9: frontend type validation + test suite"
 npm run test:types
 npm test
 
 if [ "${ROOKIEUI_RUN_LIVE_SMOKE:-0}" = "1" ]; then
-  echo "[pre-push] Step 8/8: optional host-embedded E2E lane"
+  echo "[pre-push] Step 9/9: optional host-embedded E2E lane"
   "$VENV_PY" scripts/run_host_embedded_e2e.py
 else
-  echo "[pre-push] Step 8/8: optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
+  echo "[pre-push] Step 9/9: optional host-embedded E2E lane skipped (set ROOKIEUI_RUN_LIVE_SMOKE=1 to enable)"
 fi
 
 echo "[pre-push] PASS: all required checks completed."
