@@ -8,12 +8,40 @@ from unittest import mock
 from rookieui.api.routes import build_capabilities_snapshot
 from rookieui.contracts.capabilities import RookieUICapabilitiesSnapshot
 from rookieui.contracts.models import ModelInventorySnapshot
+from rookieui.contracts.workflow_template_surface_disposition_contract import (
+    load_surface_disposition_contract,
+)
 from rookieui.services.controlnet_advanced_runtime import CONTROLNET_ADVANCED_RUNTIME_STATE
 from rookieui.services.capabilities import build_capabilities_payload
 from rookieui.services.version import resolve_runtime_build_fingerprint, resolve_shell_version
 
 
 class CapabilitySnapshotTests(unittest.TestCase):
+    def test_workflow_template_candidate_surfaces_do_not_become_capabilities(self) -> None:
+        contract = load_surface_disposition_contract()
+        payload = build_capabilities_payload(routes=["/rookieui/capabilities"])
+
+        capability_ids: set[str] = set()
+
+        def collect_ids(value: object) -> None:
+            if isinstance(value, dict):
+                entry_id = value.get("id")
+                if isinstance(entry_id, str):
+                    capability_ids.add(entry_id)
+                for child in value.values():
+                    collect_ids(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect_ids(child)
+
+        collect_ids(payload)
+
+        self.assertEqual(contract.disposition_counts["supported"], 0)
+        for entry in contract.entries:
+            with self.subTest(surface=entry.id):
+                self.assertNotEqual(entry.disposition, "supported")
+                self.assertNotIn(entry.id, capability_ids)
+
     def test_capabilities_snapshot_enables_sidebar_shell(self) -> None:
         payload = build_capabilities_snapshot()
 

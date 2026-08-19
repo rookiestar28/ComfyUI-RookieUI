@@ -7,6 +7,7 @@ import unittest
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
     OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
+    OFFICIAL_TEMPLATE_0_11_43_UNSUPPORTED_SURFACE_MARKERS,
 )
 from rookieui.contracts.model_family_registry import list_model_family_registry_entries
 from rookieui.services.presets import build_preset_payload
@@ -111,3 +112,20 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
         self.assertIn("api_krea2_style_reference", unsupported_gallery_ids)
         self.assertIn("api_ideogram_v3_t2i", unsupported_gallery_ids)
         self.assertFalse(unsupported_gallery_ids & supported_ids)
+
+    def test_candidate_gallery_dispositions_remain_unsupported_and_internal(self) -> None:
+        unsupported_gallery_ids = set(OFFICIAL_TEMPLATE_0_11_43_UNSUPPORTED_SURFACE_MARKERS)
+        supported_ids = {entry.id for entry in list_model_family_registry_entries()}
+        supported_ids.update(preset["id"] for preset in build_preset_payload()["presets"])
+
+        self.assertEqual(len(unsupported_gallery_ids), 57)
+        self.assertIn("api_qwen3_t2i", unsupported_gallery_ids)
+        self.assertIn("audio_minimax_music_3", unsupported_gallery_ids)
+        self.assertIn("video_wan_animate2", unsupported_gallery_ids)
+        self.assertIn("image_qwen_image_layered", unsupported_gallery_ids)
+        self.assertFalse(unsupported_gallery_ids & supported_ids)
+        for path in _public_doc_paths():
+            text = _read_text(path)
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertNotIn("c3d1d85129ebd7785b42c7b601ed6a5aa19658757ab8b3f8d10c3a639c1dd409", text)
+                self.assertNotIn("workflow-template-surface-disposition-contract-v1", text)

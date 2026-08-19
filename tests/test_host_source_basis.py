@@ -9,6 +9,7 @@ from rookieui.contracts.host_source_basis import (
     WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS,
     WORKFLOW_TEMPLATE_DELTA_0_11_2_TO_0_11_6,
     WORKFLOW_TEMPLATE_DELTA_0_11_20_TO_0_11_31,
+    WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43,
 )
 
 
@@ -307,6 +308,40 @@ class HostSourceBasisTests(unittest.TestCase):
                 self.assertFalse(left & right)
         self.assertEqual(len(set().union(*ledgers)), 33)
         self.assertNotIn("video_minimax_h3_t2v", set(delta.supported))
+
+    def test_candidate_workflow_surface_delta_is_complete_without_active_promotion(self) -> None:
+        delta = WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43
+        self.assertEqual((delta.from_version, delta.to_version), ("0.11.31", "0.11.43"))
+        self.assertEqual(
+            (delta.added_count, delta.removed_count, delta.changed_count, delta.unchanged_count),
+            (21, 16, 20, 477),
+        )
+        self.assertEqual(
+            delta.source_report_sha256,
+            "c3d1d85129ebd7785b42c7b601ed6a5aa19658757ab8b3f8d10c3a639c1dd409",
+        )
+        self.assertEqual(delta.supported, ())
+        self.assertEqual(len(delta.deferred), 2)
+        self.assertEqual(len(delta.reference_only), 14)
+        self.assertEqual(len(delta.superseded), 16)
+        self.assertEqual(len(delta.out_of_scope), 25)
+        self.assertEqual(delta.removed, ())
+        ledgers = tuple(
+            set(values)
+            for values in (
+                delta.supported,
+                delta.deferred,
+                delta.removed,
+                delta.reference_only,
+                delta.superseded,
+                delta.out_of_scope,
+            )
+        )
+        for index, left in enumerate(ledgers):
+            for right in ledgers[index + 1 :]:
+                self.assertFalse(left & right)
+        self.assertEqual(len(set().union(*ledgers)), 57)
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.31")
 
 
 if __name__ == "__main__":

@@ -255,3 +255,111 @@ WORKFLOW_TEMPLATE_0_11_31_DEFERRED_SURFACES: tuple[str, ...] = (
 )
 
 WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES: tuple[str, ...] = ()
+
+# Generated from the exact inert 0.11.31 -> 0.11.43 active-gallery
+# filename/content inventory. Artifact presence never implies runtime support.
+WORKFLOW_TEMPLATE_0_11_43_ADDED_SURFACES: tuple[str, ...] = (
+    "api_bytedance_seedream_5_0_layer_separation",
+    "api_grok_imagine_image_2_image_edit",
+    "api_grok_imagine_image_2_t2i",
+    "api_ltx2_5_flf2v",
+    "api_ltx2_5_i2v",
+    "api_ltx2_5_t2v",
+    "api_qwen3_image_edit",
+    "api_qwen3_t2i",
+    "api_seedance2_5_flf2v",
+    "api_seedance2_5_i2v_1080p",
+    "api_seedance2_5_r2v",
+    "api_seedance2_5_t2v",
+    "api_seedance2_5_t2v_1080p",
+    "api_seedance2_5_video_editing",
+    "api_seedance2_5_video_extend",
+    "audio_minimax_music_3",
+    "video_ltx2_5_flf2v",
+    "video_ltx2_5_i2v",
+    "video_ltx2_5_t2v",
+    "video_wan_animate2",
+    "video_wan_animate2_distilled",
+)
+
+WORKFLOW_TEMPLATE_0_11_43_CHANGED_SURFACES: tuple[str, ...] = (
+    "api_topaz_image_enhance_wonder3_5",
+    "image_qwen_image_layered",
+    "image_qwen_image_layered_control",
+    "index",
+    "index.ar",
+    "index.es",
+    "index.fa",
+    "index.fr",
+    "index.ja",
+    "index.ko",
+    "index.mcp",
+    "index.pt-BR",
+    "index.ru",
+    "index.schema",
+    "index.tr",
+    "index.zh",
+    "index.zh-TW",
+    "video_minimax_h3_i2v",
+    "video_minimax_h3_r2v",
+    "video_minimax_h3_t2v",
+)
+
+WORKFLOW_TEMPLATE_0_11_43_ARCHIVED_SURFACES: tuple[str, ...] = (
+    "01_get_started_text_to_image",
+    "02_qwen_Image_edit_subgraphed",
+    "03_video_wan2_2_14B_i2v_subgraphed",
+    "04_hunyuan_3d_2.1_subgraphed",
+    "05_audio_ace_step_1_t2a_song_subgraphed",
+    "api_kling_avatar2",
+    "api_ltxv_image_to_video",
+    "api_ltxv_text_to_video",
+    "api_reve_image_create",
+    "api_reve_image_edit",
+    "api_reve_image_remix",
+    "default",
+    "gsl_creator_2",
+    "gsl_starter_1_1",
+    "gsl_starter_1_2",
+    "gsl_starter_1_3",
+)
+
+WORKFLOW_TEMPLATE_0_11_43_SUPPORTED_SURFACES: tuple[str, ...] = ()
+WORKFLOW_TEMPLATE_0_11_43_DEFERRED_SURFACES: tuple[str, ...] = (
+    "image_qwen_image_layered",
+    "image_qwen_image_layered_control",
+)
+WORKFLOW_TEMPLATE_0_11_43_REFERENCE_ONLY_SURFACES: tuple[str, ...] = (
+    "index",
+    "index.ar",
+    "index.es",
+    "index.fa",
+    "index.fr",
+    "index.ja",
+    "index.ko",
+    "index.mcp",
+    "index.pt-BR",
+    "index.ru",
+    "index.schema",
+    "index.tr",
+    "index.zh",
+    "index.zh-TW",
+)
+WORKFLOW_TEMPLATE_0_11_43_OUT_OF_SCOPE_SURFACES: tuple[str, ...] = tuple(
+    surface
+    for surface in (*WORKFLOW_TEMPLATE_0_11_43_ADDED_SURFACES, *WORKFLOW_TEMPLATE_0_11_43_CHANGED_SURFACES)
+    if surface.startswith(("api_", "audio_", "video_"))
+)
+WORKFLOW_TEMPLATE_0_11_43_SUPERSEDED_SURFACES = WORKFLOW_TEMPLATE_0_11_43_ARCHIVED_SURFACES
+WORKFLOW_TEMPLATE_0_11_43_REMOVED_SURFACES: tuple[str, ...] = ()
+WORKFLOW_TEMPLATE_0_11_43_UNSUPPORTED_SURFACES: tuple[str, ...] = tuple(
+    sorted(
+        {
+            *WORKFLOW_TEMPLATE_0_11_43_DEFERRED_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_43_REFERENCE_ONLY_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_43_OUT_OF_SCOPE_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_43_SUPERSEDED_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_43_REMOVED_SURFACES,
+        }
+    )
+)

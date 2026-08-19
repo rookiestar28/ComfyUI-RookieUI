@@ -15,6 +15,15 @@ from rookieui.contracts.current_workflow_template_delta import (
     WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES,
     WORKFLOW_TEMPLATE_0_11_31_REMOVED_SURFACES,
     WORKFLOW_TEMPLATE_0_11_31_SUPPORTED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_ADDED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_CHANGED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_DEFERRED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_OUT_OF_SCOPE_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_REFERENCE_ONLY_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_REMOVED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_SUPPORTED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_SUPERSEDED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_43_UNSUPPORTED_SURFACES,
 )
 
 
@@ -86,6 +95,8 @@ class WorkflowTemplateDeltaContract:
     reference_only: tuple[str, ...]
     added: tuple[str, ...] = ()
     changed: tuple[str, ...] = ()
+    superseded: tuple[str, ...] = ()
+    out_of_scope: tuple[str, ...] = ()
 
 
 # IMPORTANT: these are separate compatibility envelopes; do not collapse them
@@ -361,4 +372,24 @@ WORKFLOW_TEMPLATE_DELTA_0_11_20_TO_0_11_31 = WorkflowTemplateDeltaContract(
     reference_only=WORKFLOW_TEMPLATE_0_11_31_REFERENCE_ONLY_SURFACES,
     added=WORKFLOW_TEMPLATE_0_11_31_ADDED_SURFACES,
     changed=WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES,
+)
+
+# The active host basis remains 0.11.31. This candidate-only contract
+# classifies every non-invariant 0.11.43 gallery surface without promotion.
+WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43 = WorkflowTemplateDeltaContract(
+    from_version="0.11.31",
+    to_version="0.11.43",
+    added_count=21,
+    removed_count=16,
+    changed_count=20,
+    unchanged_count=477,
+    source_report_sha256="c3d1d85129ebd7785b42c7b601ed6a5aa19658757ab8b3f8d10c3a639c1dd409",
+    supported=WORKFLOW_TEMPLATE_0_11_43_SUPPORTED_SURFACES,
+    deferred=WORKFLOW_TEMPLATE_0_11_43_DEFERRED_SURFACES,
+    removed=WORKFLOW_TEMPLATE_0_11_43_REMOVED_SURFACES,
+    reference_only=WORKFLOW_TEMPLATE_0_11_43_REFERENCE_ONLY_SURFACES,
+    added=WORKFLOW_TEMPLATE_0_11_43_ADDED_SURFACES,
+    changed=WORKFLOW_TEMPLATE_0_11_43_CHANGED_SURFACES,
+    superseded=WORKFLOW_TEMPLATE_0_11_43_SUPERSEDED_SURFACES,
+    out_of_scope=WORKFLOW_TEMPLATE_0_11_43_OUT_OF_SCOPE_SURFACES,
 )
