@@ -1,0 +1,268 @@
+{
+  "baseline_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+  "cases": [
+    {
+      "case_id": "core_source_basis",
+      "evidence": "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeContractTests.test_contract_source_rows_are_verified_from_pinned_git_objects",
+      "expected": "Every runtime-risk row resolves to the frozen baseline and candidate Git blobs without importing or executing reference code.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "pinned-source"
+    },
+    {
+      "case_id": "disabled_empty_noise_and_latent_normalization",
+      "evidence": "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_stock_sampler_preserves_seed_denoise_scheduler_and_latent_link",
+      "expected": "RookieUI preserves the stock KSampler latent seam and does not emit the changed custom disabled-noise path; Core retains empty-noise and latent-format normalization ownership.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "noise-latent"
+    },
+    {
+      "case_id": "img2img_inpaint_mask_latent_geometry",
+      "evidence": "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_inpaint_runtime_preserves_cropped_mask_and_latent_geometry",
+      "expected": "The RookieUI inpaint encoder preserves cropped mask geometry, latent dimensions, and deterministic seeded latent-noise behavior.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "img2img-inpaint"
+    },
+    {
+      "case_id": "controlnet_lifecycle_weights_masks",
+      "evidence": "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_controlnet_mask_protocol_executes_broadcast_effect_and_concat_geometry",
+      "expected": "Current-host lifecycle doubles preserve clone ownership, previous-control restoration, weights, guidance segments, and effect/concat mask behavior.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "controlnet"
+    },
+    {
+      "case_id": "sampler_vae_supported_graphs",
+      "evidence": "tests.test_family_profile_projection.FamilyProfileProjectionTests.test_all_shipped_profile_builders_match_candidate_graph_contract",
+      "expected": "Every shipped profile preserves its content-free encode, latent, sampler, VAE, and decode topology against the frozen Core graph contract.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "sampler-vae"
+    },
+    {
+      "case_id": "tokenizer_text_encoding_adapters",
+      "evidence": "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_tokenizer_capability_mismatch_uses_stock_tokens_without_prompt_logging",
+      "expected": "RookieUI text adapters preserve weighted and stock-token paths, fail safely on optional word-ID capability mismatch, and do not execute upstream tokenizers in the contract lane.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "tokenizer-text-encoding"
+    },
+    {
+      "case_id": "changed_graph_source_dispositions",
+      "evidence": "tests.test_current_host_graph_contract.CurrentHostGraphContractTests.test_candidate_core_graph_separates_byte_and_covered_signature_drift",
+      "expected": "All five changed graph-source artifacts retain covered signatures and receive an explicit runtime disposition without inferring incompatibility from byte drift.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "changed-graph-sources"
+    }
+  ],
+  "contract_kind": "candidate-core-runtime-semantics",
+  "schema_version": "current-host-core-runtime-contract-v1",
+  "serialization": {
+    "array_order": "declaration",
+    "encoding": "utf-8",
+    "newline_terminated": true,
+    "sort_keys": true
+  },
+  "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+  "sources": [
+    {
+      "baseline_blob": "6dbbaa959fdcaefc92cb8acedc910768f483ea6b",
+      "baseline_sha256": "efa2dec0eed7ed04da4b91cce0358267afeec9513af02b063a122d3ece093e57",
+      "case_ids": [
+        "controlnet_lifecycle_weights_masks"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/controlnet.py",
+      "source_blob": "7e35fe027ff4e755edf7650e6cbfedb9714a45a9",
+      "source_sha256": "59af4c2dd03526d9c1e532e1e20cced4b9154079e1aaa56e043d9627c1c46007"
+    },
+    {
+      "baseline_blob": "c4270022beb77c0e4a668227e50971ede1e47c64",
+      "baseline_sha256": "f13259cbd815a339a474976522eb6aae10fb16c8397f13b41e50ddd107f8caf8",
+      "case_ids": [
+        "disabled_empty_noise_and_latent_normalization"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/latent_formats.py",
+      "source_blob": "34c6d700c917951efc54ffa54124493845755df1",
+      "source_sha256": "a083b4dce84025ef95bd509471d36445a1e147234eb83903ff98b9f543d1a4ea"
+    },
+    {
+      "baseline_blob": "2be0cae5f87273c6ffbf641ae70676d0bdff97cc",
+      "baseline_sha256": "ee3485747727f9a182b9e7dd5a32a81e9429c329f2dcd248996ea0eba191faea",
+      "case_ids": [
+        "disabled_empty_noise_and_latent_normalization",
+        "sampler_vae_supported_graphs"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/sample.py",
+      "source_blob": "4ebad9666c6bd12a8b54c4ea2775d74a7712b19c",
+      "source_sha256": "d274ed5b6abf83707b52b87d25d1716f072d5444954cf23ac0ed31a3b803ee1c"
+    },
+    {
+      "baseline_blob": "a280f3bb69fc6302802a6504f282965642a92a48",
+      "baseline_sha256": "b9f5e22d0d65b5e78cd4dcc763e702369869dc92cf4371dc52bbecaf0733fe49",
+      "case_ids": [
+        "sampler_vae_supported_graphs"
+      ],
+      "disposition": "covered-workflow-contract",
+      "path": "comfy/samplers.py",
+      "source_blob": "94307c1a70b3eccab1d5499498898e0ea21ecf37",
+      "source_sha256": "a768a33b296c08055925f176e60e004a6f33fa95ecee3df6dd5583dccbc87a88"
+    },
+    {
+      "baseline_blob": "8d670106e712f042c9d05f5b5f98292e1878babb",
+      "baseline_sha256": "7efb10f22252446069a0b88f0a8bc2d94713696d9f946d7757a0981ae8101b58",
+      "case_ids": [
+        "sampler_vae_supported_graphs"
+      ],
+      "disposition": "covered-workflow-contract",
+      "path": "comfy/sd.py",
+      "source_blob": "06679c6fb9011c8a9421abdca538c8913a00fef5",
+      "source_sha256": "b86cd348e2bce34e2dfb68d0cc5443b6c3ccaac21df9b66ee715202a05912957"
+    },
+    {
+      "baseline_blob": null,
+      "baseline_sha256": null,
+      "case_ids": [
+        "tokenizer_text_encoding_adapters"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/text_encoders/bpe_tokenizer.py",
+      "source_blob": "e49e36ca0fb2d0ed14a65c2a01610f7a3e712efb",
+      "source_sha256": "1d6c0103b24d96dd2fba3da5016af449bfa3adafff9a447a4ca316197443ec1d"
+    },
+    {
+      "baseline_blob": "d5eb91dcb095b7571369337e000f7ea09159811e",
+      "baseline_sha256": "c522ad47ccdad9878f0e8ae4c219dadfc4f12409adceaa7e663571766cbbe46b",
+      "case_ids": [
+        "tokenizer_text_encoding_adapters"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/text_encoders/flux.py",
+      "source_blob": "fbdb1d13a0c3b0212dc618a838aad19eef8d93c0",
+      "source_sha256": "784de5fbf0aee15cab0182fda937adf9fc6aa1978f33ce6cb7baff7466be8f41"
+    },
+    {
+      "baseline_blob": "f5c5597ef7b855e80a4aca6f049400ad62a9b41b",
+      "baseline_sha256": "ad7d59be8f4732eee5b898591330adc875d69fcbd9987b9aa6c8473aeb423a11",
+      "case_ids": [
+        "tokenizer_text_encoding_adapters"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/text_encoders/llama.py",
+      "source_blob": "49ba5dfa93d9dbb5455919b3d9f33112dfdd9647",
+      "source_sha256": "de20f78e44a4cbd911ff7cc32a0ef74e1bcb7b202372f9e552f49ce78383d027"
+    },
+    {
+      "baseline_blob": "b1f1dbb9f471fa88b550d31485d9b412479df09d",
+      "baseline_sha256": "f6af934b3d5014c6df37bb527167d1f94e44b1309079f57d4cb2f9460729da84",
+      "case_ids": [
+        "tokenizer_text_encoding_adapters"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "comfy/text_encoders/lumina2.py",
+      "source_blob": "e449202030320649ac6d1b3f86e8cda83f5e384c",
+      "source_sha256": "9964c61b8060d18fcef25712c7e101a67b8706f6f9d6cef7b183c08471d46e0e"
+    },
+    {
+      "baseline_blob": "e81b6328b7791162f80207194f983dc0d6b4dc07",
+      "baseline_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b",
+      "case_ids": [
+        "disabled_empty_noise_and_latent_normalization",
+        "changed_graph_source_dispositions"
+      ],
+      "disposition": "not-emitted-upstream-only",
+      "path": "comfy_extras/nodes_custom_sampler.py",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    {
+      "baseline_blob": "a336ba0791d6c711daeb824f3b1e50992e79111c",
+      "baseline_sha256": "ffa70c4bb3568537ba13b368092d2599b861db7c83b1bcfa41347058b40dcba7",
+      "case_ids": [
+        "changed_graph_source_dispositions",
+        "sampler_vae_supported_graphs"
+      ],
+      "disposition": "covered-runtime-unaffected",
+      "path": "comfy_extras/nodes_model_advanced.py",
+      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+    },
+    {
+      "baseline_blob": "4d7bf7476ef003dc28eafb1ed676b808bd58a0ab",
+      "baseline_sha256": "44367a762417d88ddac58d37602f03eafb95c676a1ca3e020e24c18e123fb4e6",
+      "case_ids": [
+        "changed_graph_source_dispositions",
+        "sampler_vae_supported_graphs"
+      ],
+      "disposition": "covered-workflow-contract",
+      "path": "comfy_extras/nodes_model_patch.py",
+      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+    },
+    {
+      "baseline_blob": "5a947d5c57b32e7e8d2ed1ef364064959d841cc4",
+      "baseline_sha256": "b328e8a2dc89cfd3a93ab49c1be880a3e89ec4521eef506823753617c86c99e9",
+      "case_ids": [
+        "changed_graph_source_dispositions",
+        "tokenizer_text_encoding_adapters"
+      ],
+      "disposition": "covered-runtime-unaffected",
+      "path": "comfy_extras/nodes_textgen.py",
+      "source_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
+      "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
+    },
+    {
+      "baseline_blob": "08529d8dc414138e56d0cc6e68367f95da70f038",
+      "baseline_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087",
+      "case_ids": [
+        "disabled_empty_noise_and_latent_normalization",
+        "sampler_vae_supported_graphs",
+        "changed_graph_source_dispositions"
+      ],
+      "disposition": "executable-runtime-risk",
+      "path": "nodes.py",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    }
+  ]
+}

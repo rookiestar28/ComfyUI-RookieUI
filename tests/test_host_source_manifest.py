@@ -129,7 +129,7 @@ class HostSourceManifestTests(unittest.TestCase):
                     self.assertEqual(artifact.byte_drift, "changed")
                     self.assertEqual(
                         artifact.semantic_drift,
-                        "covered-signature-unchanged-runtime-review-pending",
+                        "covered-signature-compatible-runtime-disposition-complete",
                     )
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
@@ -139,7 +139,7 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertEqual(comparisons["core"].owner, "runtime-compatibility-alignment")
         self.assertEqual(
             comparisons["core"].semantic_drift,
-            "graph-contract-compatible-runtime-review-pending",
+            "graph-and-runtime-contract-compatible",
         )
         self.assertEqual(
             comparisons["frontend"].owner,

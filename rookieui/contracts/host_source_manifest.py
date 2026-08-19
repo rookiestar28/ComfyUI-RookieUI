@@ -120,27 +120,27 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
         ("core", "app/user_manager.py"): ("unchanged", "none", "direct-byte-hash"),
         ("core", "comfy_extras/nodes_custom_sampler.py"): (
             "changed",
-            "covered-signature-unchanged-runtime-review-pending",
+            "covered-signature-compatible-runtime-disposition-complete",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_advanced.py"): (
             "changed",
-            "covered-signature-unchanged-runtime-review-pending",
+            "covered-signature-compatible-runtime-disposition-complete",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_patch.py"): (
             "changed",
-            "covered-signature-unchanged-runtime-review-pending",
+            "covered-signature-compatible-runtime-disposition-complete",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_textgen.py"): (
             "changed",
-            "covered-signature-unchanged-runtime-review-pending",
+            "covered-signature-compatible-runtime-disposition-complete",
             "direct-byte-hash",
         ),
         ("core", "nodes.py"): (
             "changed",
-            "covered-signature-unchanged-runtime-review-pending",
+            "covered-signature-compatible-runtime-disposition-complete",
             "direct-byte-hash",
         ),
         ("core", "requirements.txt"): ("changed", "none", "version-manifest-hash"),
@@ -177,7 +177,7 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "c67885b14556cf3e4e061862925282d403d09862",
             "revision-and-component",
             "mixed",
-            "graph-contract-compatible-runtime-review-pending",
+            "graph-and-runtime-contract-compatible",
             "runtime-compatibility-alignment",
         ),
         "desktop": (
