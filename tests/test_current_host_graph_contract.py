@@ -9,6 +9,7 @@ import subprocess
 import unittest
 
 from rookieui.contracts import core_graph_contract
+from rookieui.contracts import workflow_template_supported_graph_contract as supported_graph_contract
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
     get_family_template_manifest_entry,
@@ -44,6 +45,9 @@ PROFILE_FIXTURE = "current_host_profile_sources.json"
 NODE_FIXTURE = "current_host_node_contract.json"
 CORE_GRAPH_FIXTURE = "current_host_core_graph_contract.json"
 PROFILE_GRAPH_FIXTURE = "current_host_profile_graph_contract.json"
+WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE = (
+    "current_workflow_template_supported_graph_contract.json"
+)
 CORE_REFERENCE = ROOT / "reference" / "ComfyUI"
 TEMPLATE_JSON_REFERENCE = (
     ROOT
@@ -106,6 +110,108 @@ def _literal_emitted_classes_and_nodes() -> tuple[set[str], list[tuple[str, set[
 
 
 class CurrentHostGraphContractTests(unittest.TestCase):
+    def test_workflow_template_candidate_supported_graph_contract_exists(self) -> None:
+        self.assertTrue((FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE).is_file())
+
+    def test_workflow_template_candidate_supported_graph_contract_is_exact(self) -> None:
+        contract = supported_graph_contract.load_supported_graph_contract(
+            FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
+        )
+        self.assertEqual(
+            contract.schema_version,
+            "workflow-template-supported-graph-contract-v1",
+        )
+        self.assertEqual(contract.active_workflow_templates_version, "0.11.31")
+        self.assertEqual(contract.candidate_workflow_templates_version, "0.11.43")
+        self.assertEqual(contract.active_workflow_templates_json_version, "0.1.30")
+        self.assertEqual(contract.candidate_workflow_templates_json_version, "0.1.49")
+        self.assertEqual(
+            contract.workflow_template_source_revision,
+            "f54739874c88e5a1154275c4597b3860e5a617b4",
+        )
+        self.assertEqual(contract.workflow_template_source_tag, "v0.11.43")
+        self.assertEqual(contract.active_core_revision, HOST_SOURCE_BASIS.core.revision)
+        self.assertEqual(
+            contract.candidate_core_revision,
+            "c67885b14556cf3e4e061862925282d403d09862",
+        )
+        self.assertEqual(
+            (
+                contract.profile_count,
+                contract.package_profile_count,
+                contract.core_blueprint_profile_count,
+                contract.unique_source_count,
+            ),
+            (26, 11, 15, 25),
+        )
+        self.assertEqual(
+            tuple(profile.id for profile in contract.profiles),
+            tuple(sorted(profile.id for profile in contract.profiles)),
+        )
+        self.assertTrue(all(profile.disposition == "invariant" for profile in contract.profiles))
+        self.assertTrue(
+            all(
+                profile.baseline_sha256 == profile.candidate_sha256
+                for profile in contract.profiles
+            )
+        )
+
+    def test_workflow_template_candidate_mapping_matches_manifest_and_profile_graph(self) -> None:
+        contract = supported_graph_contract.load_supported_graph_contract(
+            FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
+        )
+        by_id = {profile.id: profile for profile in contract.profiles}
+        manifest_entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
+        self.assertEqual(set(by_id), set(manifest_entries))
+        profile_graph = core_graph_contract.load_profile_graph_contract(
+            FIXTURES / PROFILE_GRAPH_FIXTURE
+        )
+        self.assertLessEqual(set(by_id), {profile.id for profile in profile_graph.profiles})
+        for profile_id, entry in manifest_entries.items():
+            locator = entry.official_template_path
+            if locator.startswith("comfyui-workflow-templates-json=="):
+                expected_source_id = locator.split(":", maxsplit=1)[1]
+                expected_kind = "workflow-template-package"
+            else:
+                expected_source_id = Path(locator).stem
+                expected_kind = "core-blueprint"
+            with self.subTest(profile_id=profile_id):
+                self.assertEqual(by_id[profile_id].source_id, expected_source_id)
+                self.assertEqual(by_id[profile_id].source_kind, expected_kind)
+                self.assertNotIn("reference", by_id[profile_id].source_id.lower())
+                self.assertNotIn("/", by_id[profile_id].source_id)
+                self.assertNotIn("\\", by_id[profile_id].source_id)
+
+    def test_workflow_template_candidate_contract_is_canonical_and_fail_closed(self) -> None:
+        path = FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
+        text = path.read_text(encoding="utf-8")
+        contract = supported_graph_contract.parse_supported_graph_contract_text(text)
+        self.assertEqual(
+            supported_graph_contract.serialize_supported_graph_contract(contract),
+            text,
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            supported_graph_contract.parse_supported_graph_contract_text(
+                '{"schema_version":"workflow-template-supported-graph-contract-v1",'
+                '"schema_version":"duplicate"}'
+            )
+        payload = json.loads(text)
+        payload["unexpected"] = True
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
+        payload = json.loads(text)
+        payload["profile_count"] += 1
+        with self.assertRaisesRegex(ValueError, "profile_count"):
+            supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
+        payload = json.loads(text)
+        payload["profiles"][0]["disposition"] = "changed"
+        with self.assertRaisesRegex(ValueError, "disposition"):
+            supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
+        payload = json.loads(text)
+        payload["profiles"][0]["source_id"] = "C:\\private\\source.json"
+        with self.assertRaisesRegex(ValueError, "source_id"):
+            supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
+
     def test_candidate_core_graph_contract_is_complete_and_provenance_bound(self) -> None:
         contract = core_graph_contract.load_core_graph_contract(
             FIXTURES / CORE_GRAPH_FIXTURE

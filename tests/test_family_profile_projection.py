@@ -8,6 +8,7 @@ import unittest
 from unittest import mock
 
 from rookieui.contracts import core_graph_contract
+from rookieui.contracts import workflow_template_supported_graph_contract
 from rookieui.contracts.family_template_manifest import (
     CURRENT_HOST_DEFERRED_PROFILE_IDS,
     FamilyTemplateManifestEntry,
@@ -69,6 +70,18 @@ CORE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_core_graph_cont
 
 
 class FamilyProfileProjectionTests(unittest.TestCase):
+    def test_candidate_supported_sources_match_non_sd_profile_projection(self) -> None:
+        contract = workflow_template_supported_graph_contract.load_supported_graph_contract()
+        supported_ids = {profile.id for profile in contract.profiles}
+        projected_ids = {
+            projection["id"]
+            for projection in build_family_profile_projection_entries(
+                list_model_family_registry_entries()
+            )
+            if projection["id"] not in {"sd15", "sdxl", "pony", "illustrious", "noob"}
+        }
+        self.assertEqual(supported_ids, projected_ids)
+
     def test_current_host_profile_graph_contract_covers_all_shipped_profiles_in_order(self) -> None:
         contract = core_graph_contract.load_profile_graph_contract(PROFILE_GRAPH_FIXTURE)
         self.assertEqual(contract.schema_version, "current-host-profile-graph-contract-v1")

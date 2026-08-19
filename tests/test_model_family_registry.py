@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from rookieui.contracts import workflow_template_supported_graph_contract
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS,
     OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
@@ -22,6 +23,17 @@ from rookieui.services.presets import build_preset_payload
 
 
 class ModelFamilyRegistryTests(unittest.TestCase):
+    def test_candidate_supported_sources_cover_every_non_sd_registry_entry(self) -> None:
+        contract = workflow_template_supported_graph_contract.load_supported_graph_contract()
+        supported_ids = {profile.id for profile in contract.profiles}
+        registry_ids = {
+            entry.id
+            for entry in list_model_family_registry_entries()
+            if entry.id not in {"sd15", "sdxl", "pony", "illustrious", "noob"}
+        }
+        self.assertEqual(supported_ids, registry_ids)
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.31")
+
     def test_registry_payload_exposes_contract_version_and_entries(self) -> None:
         payload = build_model_family_registry_payload()
 
