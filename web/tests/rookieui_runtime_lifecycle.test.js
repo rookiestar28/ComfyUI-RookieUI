@@ -53,28 +53,37 @@ function createFrameHarness() {
   };
 }
 
-function createTrackingSubject(runtimeApi, { runtimeState = createGenerationRuntimeState(), promptId = "job-current" } = {}) {
+function createTrackingSubject(
+  runtimeApi,
+  {
+    runtimeState = createGenerationRuntimeState(),
+    promptId = "job-current",
+    fetchQueueJobRequest = vi.fn(async () => ({ ok: true, data: { job: null } })),
+    fetchPromptHistoryRequest = vi.fn(async () => ({ ok: true, data: {} })),
+    setPreviewContent = vi.fn(),
+  } = {},
+) {
   const statusNode = document.createElement("p");
   statusNode.textContent = "mounted";
   const previewBox = document.createElement("div");
   const helpers = createGenerationRuntimeHelpers({
     emitFrontendDebugWarning: vi.fn(),
-    setPreviewContent: vi.fn(),
+    setPreviewContent,
     applyCrossPanePayload: vi.fn(),
     activateShellTab: vi.fn(),
   });
   const tracking = helpers.trackGenerationRuntime(
     {
       runtimeApi,
-      fetchQueueJobRequest: vi.fn(async () => ({ ok: true, data: { job: null } })),
-      fetchPromptHistoryRequest: vi.fn(async () => ({ ok: true, data: {} })),
+      fetchQueueJobRequest,
+      fetchPromptHistoryRequest,
     },
     promptId,
     statusNode,
     runtimeState,
     previewBox,
   );
-  return { runtimeState, statusNode, tracking };
+  return { runtimeState, setPreviewContent, statusNode, tracking };
 }
 
 describe("RookieUI owned runtime lifecycle", () => {
@@ -201,19 +210,134 @@ describe("RookieUI owned runtime lifecycle", () => {
 
     await Promise.resolve();
     await Promise.resolve();
+    expect(vi.getTimerCount()).toBe(1);
     runtimeApi.dispatch("progress", { prompt_id: "job-current", value: 2, max: 10, node: "1" });
     expect(frameHarness.requestAnimationFrame).toHaveBeenCalledTimes(1);
 
     runtimeApi.dispatch(eventName, { prompt_id: "job-other" });
     expect(statusNode.textContent).toBe("Waiting for queue registration...");
     expect(frameHarness.cancelAnimationFrame).not.toHaveBeenCalled();
+    expect(runtimeApi.removeEventListener).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(1);
 
     runtimeApi.dispatch(eventName, { prompt_id: "job-current" });
     expect(statusNode.textContent).toBe(expected);
     expect(frameHarness.cancelAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(7);
+    expect(vi.getTimerCount()).toBe(0);
 
     destroyGenerationRuntimeState(runtimeState);
     await tracking;
+  });
+
+  test("terminal during history resolution prevents late preview and status mutation", async () => {
+    vi.useFakeTimers();
+    const runtimeApi = createRuntimeEventTarget();
+    let resolveHistory;
+    const fetchPromptHistoryRequest = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveHistory = resolve;
+        }),
+    );
+    const fetchQueueJobRequest = vi.fn(async () => ({
+      ok: true,
+      data: { job: { id: "job-current", status: "in_progress" } },
+    }));
+    const subject = createTrackingSubject(runtimeApi, {
+      fetchPromptHistoryRequest,
+      fetchQueueJobRequest,
+    });
+
+    for (let attempt = 0; attempt < 8 && fetchPromptHistoryRequest.mock.calls.length === 0; attempt += 1) {
+      await Promise.resolve();
+    }
+    expect(fetchPromptHistoryRequest).toHaveBeenCalledTimes(1);
+    const previewWritesBeforeTerminal = subject.setPreviewContent.mock.calls.length;
+
+    runtimeApi.dispatch("execution_interrupted", { prompt_id: "job-other" });
+    expect(runtimeApi.removeEventListener).not.toHaveBeenCalled();
+    runtimeApi.dispatch("execution_interrupted", { prompt_id: "job-current" });
+    expect(subject.statusNode.textContent).toBe("Generation cancelled: job-current");
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(7);
+    expect(vi.getTimerCount()).toBe(0);
+
+    resolveHistory({
+      ok: true,
+      data: {
+        "job-current": {
+          outputs: {
+            "7": { images: [{ filename: "late-history.png", subfolder: "", type: "output" }] },
+          },
+        },
+      },
+    });
+    await subject.tracking;
+
+    expect(subject.setPreviewContent).toHaveBeenCalledTimes(previewWritesBeforeTerminal);
+    expect(subject.runtimeState.finalImageDescriptor).toBeNull();
+    expect(subject.statusNode.textContent).toBe("Generation cancelled: job-current");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  test("run replacement rejects a late final-history result without disposing successor listeners", async () => {
+    vi.useFakeTimers();
+    const runtimeApi = createRuntimeEventTarget();
+    const frameHarness = createFrameHarness();
+    const runtimeState = createGenerationRuntimeState();
+    let resolveFinalHistory;
+    const fetchPromptHistoryRequest = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveFinalHistory = resolve;
+        }),
+    );
+    const first = createTrackingSubject(runtimeApi, {
+      runtimeState,
+      fetchPromptHistoryRequest,
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    runtimeApi.dispatch("execution_success", { prompt_id: "job-current" });
+    for (let attempt = 0; attempt < 8 && fetchPromptHistoryRequest.mock.calls.length === 0; attempt += 1) {
+      await Promise.resolve();
+    }
+    expect(fetchPromptHistoryRequest).toHaveBeenCalledTimes(1);
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(7);
+    const firstPreviewWritesBeforeReplacement = first.setPreviewContent.mock.calls.length;
+
+    const replacement = createTrackingSubject(runtimeApi, { runtimeState, promptId: "job-next" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(runtimeApi.addEventListener).toHaveBeenCalledTimes(14);
+
+    resolveFinalHistory({
+      ok: true,
+      data: {
+        "job-current": {
+          outputs: {
+            "7": { images: [{ filename: "stale-final.png", subfolder: "", type: "output" }] },
+          },
+        },
+      },
+    });
+    await first.tracking;
+
+    expect(first.setPreviewContent).toHaveBeenCalledTimes(firstPreviewWritesBeforeReplacement);
+    expect(first.statusNode.textContent).toBe("Generation finished; syncing output: job-current");
+    expect(runtimeState.finalImageDescriptor).toBeNull();
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(7);
+
+    runtimeApi.dispatch("progress", { prompt_id: "job-next", value: 1, max: 2, node: "2" });
+    expect(frameHarness.requestAnimationFrame).toHaveBeenCalledTimes(1);
+    frameHarness.flushLatest();
+    expect(replacement.statusNode.textContent).toBe("in progress (50%)");
+
+    destroyGenerationRuntimeState(runtimeState);
+    await replacement.tracking;
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(14);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   test("run replacement cancels the prior frame, wait, and seven listeners before rebinding", async () => {

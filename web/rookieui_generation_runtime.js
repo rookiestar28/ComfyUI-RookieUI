@@ -485,9 +485,24 @@ function setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, 
   return true;
 }
 
-async function resolveFinalHistoryImage(bootstrapState, promptId, { attempts = 4, delayMs = 300 } = {}) {
+async function resolveFinalHistoryImage(
+  bootstrapState,
+  promptId,
+  {
+    attempts = 4,
+    delayMs = 300,
+    shouldContinue = () => true,
+    waitForDelay = (durationMs) => new Promise((resolve) => setTimeout(resolve, durationMs)),
+  } = {},
+) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (!shouldContinue()) {
+      return null;
+    }
     const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
+    if (!shouldContinue()) {
+      return null;
+    }
     if (historyResult.ok) {
       const outputImage = extractPrimaryHistoryImage(historyResult.data, promptId);
       if (outputImage) {
@@ -495,7 +510,7 @@ async function resolveFinalHistoryImage(bootstrapState, promptId, { attempts = 4
       }
     }
     if (attempt + 1 < attempts) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      await waitForDelay(delayMs);
     }
   }
   return null;
@@ -873,6 +888,16 @@ export function createGenerationRuntimeHelpers({
         const timeoutHandle = setTimeout(finish, delayMs);
         runtimeState.activeDisposers?.add?.(finish);
       });
+    const disposeActiveRunWork = () => {
+      if (runtimeState.runToken !== runToken) {
+        return;
+      }
+      // CRITICAL: terminal events must settle the current poll delay and unbind listeners immediately; waiting for the next poll permits post-terminal UI writes.
+      for (const dispose of Array.from(runtimeState.activeDisposers ?? [])) {
+        dispose();
+      }
+      runtimeState.activeDisposers?.clear?.();
+    };
 
     registerRuntimeListener("progress", (event) => {
       if (runtimeState.runToken !== runToken || terminalEventStatus) {
@@ -945,7 +970,7 @@ export function createGenerationRuntimeHelpers({
         }
         terminalEventStatus = status;
         finalStatus = status;
-        cancelPendingProgressUpdate();
+        disposeActiveRunWork();
         statusNode.textContent = appendStatusSuffix(`${message}: ${promptId}`, statusSuffix);
       });
     };
@@ -999,6 +1024,9 @@ export function createGenerationRuntimeHelpers({
         }
         if (Date.now() - lastHistoryPollAt >= 1500) {
           const historyResult = await bootstrapState.fetchPromptHistoryRequest(promptId);
+          if (runtimeState.disposed || runtimeState.runToken !== runToken || terminalEventStatus) {
+            break;
+          }
           const previewImage = extractPrimaryHistoryImage(historyResult.data, promptId);
           if (previewImage) {
             runtimeState.previewFrameSeen = true;
@@ -1009,10 +1037,7 @@ export function createGenerationRuntimeHelpers({
         await waitForRuntimeDelay(800);
       }
     } finally {
-      cancelPendingProgressUpdate();
-      runtimeState.activeDisposers?.delete?.(cancelPendingProgressUpdate);
-      unregisterRuntimeListeners();
-      runtimeState.activeDisposers?.delete?.(unregisterRuntimeListeners);
+      disposeActiveRunWork();
     }
 
     if (runtimeState.runToken !== runToken) {
@@ -1023,7 +1048,12 @@ export function createGenerationRuntimeHelpers({
       const outputImage = await resolveFinalHistoryImage(bootstrapState, promptId, {
         attempts: runtimeState.finalImageDescriptor ? 1 : 4,
         delayMs: 300,
+        shouldContinue: () => !runtimeState.disposed && runtimeState.runToken === runToken,
+        waitForDelay: waitForRuntimeDelay,
       });
+      if (runtimeState.disposed || runtimeState.runToken !== runToken) {
+        return;
+      }
       if (outputImage && setFinalGenerationPreview(runtimeState, previewBox, setPreviewContent, outputImage, bootstrapState)) {
         statusNode.textContent = appendStatusSuffix(`Completed: ${promptId}`, statusSuffix);
         return;
