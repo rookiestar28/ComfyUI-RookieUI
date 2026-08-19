@@ -103,14 +103,14 @@ class WorkflowTemplateDeltaContract:
 # into a mutable or synthetic "latest ComfyUI" version.
 HOST_SOURCE_BASIS = HostSourceBasis(
     core=CoreSourceBasis(
-        revision="6f7cd7fceaaf60d2669b554936394a7412c6fde5",
-        frontend_package_version="1.48.6",
-        workflow_templates_version="0.11.31",
-        embedded_docs_version="0.5.9",
+        revision="c67885b14556cf3e4e061862925282d403d09862",
+        frontend_package_version="1.49.6",
+        workflow_templates_version="0.11.43",
+        embedded_docs_version="0.5.10",
     ),
     frontend=FrontendSourceBasis(
-        revision="2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
-        source_version="1.50.1",
+        revision="569e65b30fbfe96743c7996e201a32bcf029a310",
+        source_version="1.52.1",
     ),
     desktop=DesktopSourceBasis(
         revision="e2d964b7456cea8423c7b9d3371c612313c06baa",
@@ -374,8 +374,8 @@ WORKFLOW_TEMPLATE_DELTA_0_11_20_TO_0_11_31 = WorkflowTemplateDeltaContract(
     changed=WORKFLOW_TEMPLATE_0_11_31_CHANGED_SURFACES,
 )
 
-# The active host basis remains 0.11.31. This candidate-only contract
-# classifies every non-invariant 0.11.43 gallery surface without promotion.
+# This immutable historical comparison classifies every non-invariant gallery
+# surface that was reviewed before 0.11.43 became the active host basis.
 WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43 = WorkflowTemplateDeltaContract(
     from_version="0.11.31",
     to_version="0.11.43",

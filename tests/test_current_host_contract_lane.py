@@ -23,8 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "tests" / "fixtures" / "current_host_risk_contract.json"
 CI_PATH = ROOT / ".github" / "workflows" / "ci.yml"
 EXPECTED_SOURCES = {
-    "core": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
-    "frontend": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
+    "core": "c67885b14556cf3e4e061862925282d403d09862",
+    "frontend": "569e65b30fbfe96743c7996e201a32bcf029a310",
     "desktop": "e2d964b7456cea8423c7b9d3371c612313c06baa",
 }
 EXPECTED_ARTIFACTS = {
@@ -129,8 +129,8 @@ class CurrentHostContractLaneTests(unittest.TestCase):
             self.assertEqual(report["verified_artifacts"], [])
 
     def test_refreshed_host_envelope_keeps_core_pinned_and_standalone_frontends_distinct(self) -> None:
-        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.48.6")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.50.1")
+        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.49.6")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.52.1")
         self.assertNotEqual(
             HOST_SOURCE_BASIS.core.frontend_package_version,
             HOST_SOURCE_BASIS.frontend.source_version,

@@ -42,7 +42,7 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.2(?!\d)", text))
                 self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.6(?!\d)", text))
-        self.assertIn("`comfyui-workflow-templates` 0.11.31", _read_text(README))
+        self.assertIn("`comfyui-workflow-templates` 0.11.43", _read_text(README))
 
     def test_readme_describes_krea_prompt_enhancement_truthfully(self) -> None:
         text = _read_text(README)

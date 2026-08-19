@@ -241,7 +241,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
         ),
         active_core_revision=_require_exact_string(
             _require_revision(payload["active_core_revision"], "active_core_revision"),
-            "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+            "c67885b14556cf3e4e061862925282d403d09862",
             "active_core_revision",
         ),
         candidate_core_revision=_require_exact_string(
@@ -254,7 +254,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
                 payload["active_workflow_templates_version"],
                 "active_workflow_templates_version",
             ),
-            "0.11.31",
+            "0.11.43",
             "active_workflow_templates_version",
         ),
         candidate_workflow_templates_version=_require_exact_string(
@@ -270,7 +270,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
                 payload["active_workflow_templates_json_version"],
                 "active_workflow_templates_json_version",
             ),
-            "0.1.30",
+            "0.1.49",
             "active_workflow_templates_json_version",
         ),
         candidate_workflow_templates_json_version=_require_exact_string(

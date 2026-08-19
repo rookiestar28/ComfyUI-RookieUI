@@ -48,7 +48,7 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertTrue(MANIFEST_PATH.is_file(), "Candidate source manifest is missing.")
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    def test_candidate_subjects_are_exact_without_promoting_active_basis(self) -> None:
+    def test_accepted_candidate_subjects_are_exact_and_match_active_basis(self) -> None:
         api = self._api()
         manifest = api.load_manifest(MANIFEST_PATH)
 
@@ -100,14 +100,14 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest.subjects["desktop"].status, "unchanged-control")
 
-        # Candidate evidence must not promote the accepted runtime envelope.
+        # The immutable candidate comparison remains the provenance for the promoted basis.
         self.assertEqual(
             HOST_SOURCE_BASIS.core.revision,
-            "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+            manifest.subjects["core"].revision,
         )
         self.assertEqual(
             HOST_SOURCE_BASIS.frontend.revision,
-            "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
+            manifest.subjects["frontend"].revision,
         )
 
     def test_artifact_inventory_and_drift_ownership_are_exact(self) -> None:

@@ -15,12 +15,12 @@ from rookieui.contracts.host_source_basis import (
 
 class HostSourceBasisTests(unittest.TestCase):
     def test_host_envelopes_remain_distinct_and_exact(self) -> None:
-        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "6f7cd7fceaaf60d2669b554936394a7412c6fde5")
-        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.48.6")
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.31")
-        self.assertEqual(HOST_SOURCE_BASIS.core.embedded_docs_version, "0.5.9")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.50.1")
+        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.49.6")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.embedded_docs_version, "0.5.10")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "569e65b30fbfe96743c7996e201a32bcf029a310")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.52.1")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.revision, "e2d964b7456cea8423c7b9d3371c612313c06baa")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.source_version, "0.9.4")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.packaged_core_version, "0.22.3")
@@ -100,7 +100,7 @@ class HostSourceBasisTests(unittest.TestCase):
                 ),
             },
         )
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.31")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
 
     def test_current_workflow_template_component_closure_is_exact(self) -> None:
         current = {
@@ -309,7 +309,7 @@ class HostSourceBasisTests(unittest.TestCase):
         self.assertEqual(len(set().union(*ledgers)), 33)
         self.assertNotIn("video_minimax_h3_t2v", set(delta.supported))
 
-    def test_candidate_workflow_surface_delta_is_complete_without_active_promotion(self) -> None:
+    def test_candidate_workflow_surface_delta_remains_exact_after_active_promotion(self) -> None:
         delta = WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43
         self.assertEqual((delta.from_version, delta.to_version), ("0.11.31", "0.11.43"))
         self.assertEqual(
@@ -341,7 +341,7 @@ class HostSourceBasisTests(unittest.TestCase):
             for right in ledgers[index + 1 :]:
                 self.assertFalse(left & right)
         self.assertEqual(len(set().union(*ledgers)), 57)
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.31")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
 
 
 if __name__ == "__main__":

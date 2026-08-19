@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import unittest
+import zipfile
 
 from rookieui.contracts import core_graph_contract
 from rookieui.contracts import workflow_template_supported_graph_contract as supported_graph_contract
@@ -49,15 +50,12 @@ WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE = (
     "current_workflow_template_supported_graph_contract.json"
 )
 CORE_REFERENCE = ROOT / "reference" / "ComfyUI"
-TEMPLATE_JSON_REFERENCE = (
+TEMPLATE_JSON_WHEEL = (
     ROOT
     / "reference"
     / "workflow_templates_artifacts"
-    / "0.11.31"
-    / "extracted"
-    / "json"
-    / "comfyui_workflow_templates_json"
-    / "templates"
+    / "0.11.43"
+    / "comfyui_workflow_templates_json-0.1.49-py3-none-any.whl"
 )
 DEFERRED_PROFILE_IDS = {
     "krea2_image_edit",
@@ -121,9 +119,9 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             contract.schema_version,
             "workflow-template-supported-graph-contract-v1",
         )
-        self.assertEqual(contract.active_workflow_templates_version, "0.11.31")
+        self.assertEqual(contract.active_workflow_templates_version, "0.11.43")
         self.assertEqual(contract.candidate_workflow_templates_version, "0.11.43")
-        self.assertEqual(contract.active_workflow_templates_json_version, "0.1.30")
+        self.assertEqual(contract.active_workflow_templates_json_version, "0.1.49")
         self.assertEqual(contract.candidate_workflow_templates_json_version, "0.1.49")
         self.assertEqual(
             contract.workflow_template_source_revision,
@@ -392,7 +390,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             fixture["workflow_templates_version"],
             HOST_SOURCE_BASIS.core.workflow_templates_version,
         )
-        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.30")
+        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.49")
         expected_profiles = fixture["profiles"]
         entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
         self.assertEqual(set(entries), set(expected_profiles))
@@ -404,22 +402,37 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 self.assertNotIn("latest", source["locator"].lower())
 
     def test_active_profile_hashes_match_local_current_sources_when_available(self) -> None:
-        if not CORE_REFERENCE.exists() and not TEMPLATE_JSON_REFERENCE.exists():
+        if not CORE_REFERENCE.exists() and not TEMPLATE_JSON_WHEEL.exists():
             return
         self.assertTrue(CORE_REFERENCE.is_dir())
-        self.assertTrue(TEMPLATE_JSON_REFERENCE.is_dir())
+        self.assertTrue(TEMPLATE_JSON_WHEEL.is_file())
         fixture = _load_fixture(PROFILE_FIXTURE)
-        for profile_id, source in fixture["profiles"].items():
-            locator = source["locator"]
-            if locator.startswith("reference/ComfyUI/"):
-                path = ROOT / locator
-            else:
-                package, filename = locator.split(":", maxsplit=1)
-                self.assertEqual(package, "comfyui-workflow-templates-json==0.1.30")
-                path = TEMPLATE_JSON_REFERENCE / filename
-            with self.subTest(profile_id=profile_id, path=path.name):
-                self.assertTrue(path.is_file())
-                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), source["sha256"])
+        # SECURITY: inspect pinned source blobs and wheel members as inert bytes only.
+        with zipfile.ZipFile(TEMPLATE_JSON_WHEEL) as template_archive:
+            for profile_id, source in fixture["profiles"].items():
+                locator = source["locator"]
+                if locator.startswith("reference/ComfyUI/"):
+                    relative_path = Path(locator).relative_to("reference/ComfyUI").as_posix()
+                    completed = subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(CORE_REFERENCE),
+                            "cat-file",
+                            "blob",
+                            f"{HOST_SOURCE_BASIS.core.revision}:{relative_path}",
+                        ],
+                        check=True,
+                        capture_output=True,
+                    )
+                    content = completed.stdout
+                else:
+                    package, filename = locator.split(":", maxsplit=1)
+                    self.assertEqual(package, "comfyui-workflow-templates-json==0.1.49")
+                    member = f"comfyui_workflow_templates_json/templates/{filename}"
+                    content = template_archive.read(member)
+                with self.subTest(profile_id=profile_id, locator=locator):
+                    self.assertEqual(hashlib.sha256(content).hexdigest(), source["sha256"])
 
     def test_unverified_profiles_fail_closed_and_remain_deferred(self) -> None:
         shipped_ids = {entry.id for entry in list_non_sd_manifest_entries()}

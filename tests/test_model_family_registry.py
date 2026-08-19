@@ -32,7 +32,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             if entry.id not in {"sd15", "sdxl", "pony", "illustrious", "noob"}
         }
         self.assertEqual(supported_ids, registry_ids)
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.31")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.43")
 
     def test_registry_payload_exposes_contract_version_and_entries(self) -> None:
         payload = build_model_family_registry_payload()
@@ -106,7 +106,7 @@ class ModelFamilyRegistryTests(unittest.TestCase):
                 self.assertEqual(presets_by_id[profile_id]["scheduler_name"], "")
 
     def test_official_template_manifest_uses_current_workflow_template_basis(self) -> None:
-        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.31")
+        self.assertEqual(OFFICIAL_TEMPLATE_SOURCE_VERSION, "0.11.43")
         entries = list_model_family_registry_entries()
         stale_source_markers = ("0.9.91", "0.9.98", "0.10.3")
         stale_entries = [
@@ -125,12 +125,12 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         self.assertEqual(source_paths["ideogram4"], "reference/ComfyUI/blueprints/Text to Image (Ideogram v4).json")
         self.assertEqual(
             source_paths["krea2_turbo"],
-            "comfyui-workflow-templates-json==0.1.30:image_krea2_turbo_t2i.json",
+            "comfyui-workflow-templates-json==0.1.49:image_krea2_turbo_t2i.json",
         )
         packaged_paths = [path for path in source_paths.values() if path.startswith("comfyui-workflow")]
         self.assertTrue(packaged_paths)
         self.assertTrue(
-            all(path.startswith("comfyui-workflow-templates-json==0.1.30:") for path in packaged_paths)
+            all(path.startswith("comfyui-workflow-templates-json==0.1.49:") for path in packaged_paths)
         )
         self.assertEqual(
             source_paths["flux2_image_edit"],
