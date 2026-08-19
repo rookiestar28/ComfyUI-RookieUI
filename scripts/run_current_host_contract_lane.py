@@ -31,17 +31,44 @@ REQUIRED_CASE_IDS = {
 }
 
 
-def _read_git_revision(source_root: Path) -> str:
+def _validate_pinned_revision(value: object) -> str:
+    revision = str(value or "").lower()
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("Pinned Git commit revision is invalid.")
+    return revision
+
+
+def _verify_pinned_git_commit(source_root: Path, revision: str) -> None:
     completed = subprocess.run(
-        ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+        ["git", "-C", str(source_root), "cat-file", "-e", f"{revision}^{{commit}}"],
         check=False,
         capture_output=True,
-        text=True,
     )
-    revision = completed.stdout.strip().lower()
-    if completed.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise ValueError("Authoritative reference revision is unavailable or invalid.")
-    return revision
+    if completed.returncode != 0:
+        raise ValueError("Pinned Git commit object is unavailable or invalid.")
+
+
+def read_pinned_git_blob(source_root: Path, revision: str, relative_path: str) -> bytes:
+    pinned_revision = _validate_pinned_revision(revision)
+    pinned_path = _validate_relative_artifact_path(relative_path)
+    if not source_root.is_dir():
+        raise ValueError("Pinned Git source root is missing.")
+    _verify_pinned_git_commit(source_root, pinned_revision)
+    completed = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(source_root),
+            "cat-file",
+            "blob",
+            f"{pinned_revision}:{pinned_path}",
+        ],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise ValueError("Pinned Git blob object is unavailable or invalid.")
+    return completed.stdout
 
 
 def _sha256_file(path: Path) -> str:
@@ -122,24 +149,41 @@ def load_and_validate_manifest(
             }
     if set(resolved_roots) != set(expected_sources):
         raise ValueError("Current-host authoritative source roots are incomplete or unexpected.")
-    read_revision = revision_reader or _read_git_revision
     for source, expected_revision in expected_sources.items():
         source_root = Path(resolved_roots[source])
         if not source_root.is_dir():
             raise ValueError(f"Authoritative {source} reference source is missing.")
-        if read_revision(source_root) != expected_revision:
+        if revision_reader is None:
+            # IMPORTANT: refreshed reference checkouts may move HEAD; the active lane
+            # remains bound to its exact accepted commit and blobs until R241 promotion.
+            _verify_pinned_git_commit(source_root, expected_revision)
+        elif revision_reader(source_root) != expected_revision:
             raise ValueError(f"Authoritative {source} reference revision mismatched the source basis.")
 
     verified_artifacts: list[dict[str, Any]] = []
     for artifact in artifacts:
         source = str(artifact["source"])
         relative_path = _validate_relative_artifact_path(artifact["path"])
-        source_root = Path(resolved_roots[source]).resolve()
-        artifact_path = (source_root / Path(*PurePosixPath(relative_path).parts)).resolve()
-        if not artifact_path.is_relative_to(source_root) or not artifact_path.is_file():
-            raise ValueError(f"Authoritative {source} source artifact is missing or escaped its root.")
-        actual_bytes = artifact_path.stat().st_size
-        actual_sha256 = _sha256_file(artifact_path)
+        source_root = Path(resolved_roots[source])
+        if revision_reader is None:
+            pinned_bytes = read_pinned_git_blob(
+                source_root,
+                expected_sources[source],
+                relative_path,
+            )
+            actual_bytes = len(pinned_bytes)
+            actual_sha256 = hashlib.sha256(pinned_bytes).hexdigest()
+        else:
+            canonical_root = source_root.resolve()
+            artifact_path = (
+                canonical_root / Path(*PurePosixPath(relative_path).parts)
+            ).resolve()
+            if not artifact_path.is_relative_to(canonical_root) or not artifact_path.is_file():
+                raise ValueError(
+                    f"Authoritative {source} source artifact is missing or escaped its root."
+                )
+            actual_bytes = artifact_path.stat().st_size
+            actual_sha256 = _sha256_file(artifact_path)
         if actual_bytes != artifact["bytes"] or actual_sha256 != artifact["sha256"]:
             raise ValueError(f"Authoritative {source} source artifact bytes or hash mismatched.")
         verified_artifacts.append(

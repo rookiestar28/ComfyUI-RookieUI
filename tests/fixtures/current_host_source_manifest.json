@@ -1,0 +1,217 @@
+{
+  "artifacts": [
+    {
+      "byte_drift": "unchanged",
+      "bytes": 20149,
+      "evidence": "direct-byte-hash",
+      "path": "app/user_manager.py",
+      "semantic_drift": "none",
+      "sha256": "28c89ca744702721839c586e9851a5abf9ff6057234be779dc1b72a2be9ef308",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 49739,
+      "evidence": "direct-byte-hash",
+      "path": "comfy_extras/nodes_custom_sampler.py",
+      "semantic_drift": "unreviewed-by-R240",
+      "sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 14962,
+      "evidence": "direct-byte-hash",
+      "path": "comfy_extras/nodes_model_advanced.py",
+      "semantic_drift": "unreviewed-by-R240",
+      "sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 42298,
+      "evidence": "direct-byte-hash",
+      "path": "comfy_extras/nodes_model_patch.py",
+      "semantic_drift": "unreviewed-by-R240",
+      "sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 23350,
+      "evidence": "direct-byte-hash",
+      "path": "comfy_extras/nodes_textgen.py",
+      "semantic_drift": "unreviewed-by-R240",
+      "sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 108038,
+      "evidence": "direct-byte-hash",
+      "path": "nodes.py",
+      "semantic_drift": "unreviewed-by-R240",
+      "sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 532,
+      "evidence": "version-manifest-hash",
+      "path": "requirements.txt",
+      "semantic_drift": "none",
+      "sha256": "dccf09fd0f14c81e7ae331172d9d4b7b4d6ed845c4f932af6d68e6e555dfeb0e",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "unchanged",
+      "bytes": 64758,
+      "evidence": "direct-byte-hash",
+      "path": "server.py",
+      "semantic_drift": "none",
+      "sha256": "74573b10465505b88b618da86059878e3a56418f84c7dae4073c8824aee35a6c",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "unchanged",
+      "bytes": 4909,
+      "evidence": "version-manifest-hash",
+      "path": "package.json",
+      "semantic_drift": "none",
+      "sha256": "6b59c06835f997e16df5164a0b167dde1ccf48c3eda303c9fa57632e754124e6",
+      "subject": "desktop"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 9855,
+      "evidence": "version-manifest-hash",
+      "path": "package.json",
+      "semantic_drift": "none",
+      "sha256": "dee9478d7a74bf24157f520b8fc5804501bbf9758f917b388d755b7496933058",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "unchanged",
+      "bytes": 766,
+      "evidence": "direct-byte-hash",
+      "path": "src/components/common/ExtensionSlot.vue",
+      "semantic_drift": "none",
+      "sha256": "f2f0e957102c8ab56830eb58caa297466f3bf8ad3b8b4096f482c03c1d8b3f3a",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "unchanged",
+      "bytes": 5835,
+      "evidence": "direct-byte-hash",
+      "path": "src/stores/workspace/sidebarTabStore.ts",
+      "semantic_drift": "none",
+      "sha256": "de4f2eb9b9d0edebafc9b0ca679f3565893b40d5a658eb37f19301d1811d2bb7",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "unchanged",
+      "bytes": 3753,
+      "evidence": "direct-byte-hash",
+      "path": "src/types/extensionTypes.ts",
+      "semantic_drift": "none",
+      "sha256": "bbd1f4b8d05fd3f49f39082b536680ba20e737cef2266220af7adfb23a87f307",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 1681,
+      "evidence": "version-manifest-hash",
+      "path": "pyproject.toml",
+      "semantic_drift": "none",
+      "sha256": "e90d72828ce8bbdf4bec69b51f998a32fccb9fc993e9c9a28ed8f3baee06ea80",
+      "subject": "workflow_templates"
+    }
+  ],
+  "captured_at": "2026-08-19T15:52:19+08:00",
+  "comparisons": [
+    {
+      "byte_drift": "mixed",
+      "from_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+      "owner": "F325/F326",
+      "semantic_drift": "unreviewed-by-R240",
+      "source_drift": "revision-and-component",
+      "subject": "core",
+      "to_revision": "c67885b14556cf3e4e061862925282d403d09862"
+    },
+    {
+      "byte_drift": "unchanged",
+      "from_revision": "e2d964b7456cea8423c7b9d3371c612313c06baa",
+      "owner": "R240",
+      "semantic_drift": "none",
+      "source_drift": "none",
+      "subject": "desktop",
+      "to_revision": "e2d964b7456cea8423c7b9d3371c612313c06baa"
+    },
+    {
+      "byte_drift": "mixed",
+      "from_revision": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
+      "owner": "F329",
+      "semantic_drift": "unreviewed-by-R240",
+      "source_drift": "revision-and-version",
+      "subject": "frontend",
+      "to_revision": "569e65b30fbfe96743c7996e201a32bcf029a310"
+    },
+    {
+      "byte_drift": "changed",
+      "from_revision": "a832a091491ce5b6341f4e4ca548b7ab536b6acd",
+      "owner": "F327/F328",
+      "semantic_drift": "unreviewed-by-R240",
+      "source_drift": "revision-and-component",
+      "subject": "workflow_templates",
+      "to_revision": "f54739874c88e5a1154275c4597b3860e5a617b4"
+    }
+  ],
+  "manifest_kind": "candidate-host-source-freeze",
+  "schema_version": "current-host-source-manifest-v3",
+  "serialization": {
+    "array_order": "subject-then-path",
+    "encoding": "UTF-8",
+    "newline_terminated": true,
+    "sort_keys": true
+  },
+  "subjects": {
+    "core": {
+      "components": {
+        "embedded_docs": "0.5.10",
+        "frontend_package": "1.49.6",
+        "workflow_templates": "0.11.43"
+      },
+      "kind": "git-host",
+      "revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "status": "candidate-frozen"
+    },
+    "desktop": {
+      "kind": "git-host-control",
+      "revision": "e2d964b7456cea8423c7b9d3371c612313c06baa",
+      "status": "unchanged-control",
+      "version": "0.9.4"
+    },
+    "frontend": {
+      "kind": "git-host",
+      "revision": "569e65b30fbfe96743c7996e201a32bcf029a310",
+      "status": "candidate-frozen",
+      "version": "1.52.1"
+    },
+    "workflow_templates": {
+      "artifact_status": "deferred-to-F327",
+      "components": {
+        "assets": "0.1.29",
+        "core": "0.3.314",
+        "json": "0.1.49",
+        "media_api": "0.3.84",
+        "media_image": "0.3.160",
+        "media_other": "0.3.229",
+        "media_video": "0.3.101",
+        "meta": "0.11.43"
+      },
+      "kind": "git-package-source",
+      "revision": "f54739874c88e5a1154275c4597b3860e5a617b4",
+      "tag": "v0.11.43"
+    }
+  }
+}

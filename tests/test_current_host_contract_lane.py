@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from rookieui.contracts.host_source_basis import HOST_SOURCE_BASIS
+from scripts import run_current_host_contract_lane as current_host_lane
 from scripts.run_current_host_contract_lane import (
     REQUIRED_CASE_IDS,
     build_lane_commands,
@@ -50,6 +52,51 @@ EXPECTED_ARTIFACTS = {
 
 
 class CurrentHostContractLaneTests(unittest.TestCase):
+    def test_pinned_git_blob_reader_ignores_moving_head_and_fails_closed(self) -> None:
+        reader = getattr(current_host_lane, "read_pinned_git_blob", None)
+        self.assertIsNotNone(reader, "Pinned Git-object reader is missing.")
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repository = Path(temporary_directory) / "source"
+            repository.mkdir()
+
+            def run_git(*arguments: str) -> str:
+                completed = subprocess.run(
+                    ["git", "-C", str(repository), *arguments],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                return completed.stdout.strip()
+
+            subprocess.run(
+                ["git", "init", "--template=", str(repository)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            run_git("config", "user.name", "RookieUI Contract Test")
+            run_git("config", "user.email", "contract-test@example.invalid")
+            pinned_content = b"pinned active bytes\n"
+            (repository / "server.py").write_bytes(pinned_content)
+            run_git("add", "server.py")
+            run_git("commit", "--no-verify", "-m", "pinned active")
+            pinned_revision = run_git("rev-parse", "HEAD")
+
+            (repository / "server.py").write_bytes(b"new moving head bytes\n")
+            run_git("add", "server.py")
+            run_git("commit", "--no-verify", "-m", "move head")
+            self.assertNotEqual(run_git("rev-parse", "HEAD"), pinned_revision)
+            (repository / "server.py").write_bytes(b"uncommitted worktree drift\n")
+
+            self.assertEqual(reader(repository, pinned_revision, "server.py"), pinned_content)
+            with self.assertRaisesRegex(ValueError, "commit"):
+                reader(repository, "0" * 40, "server.py")
+            with self.assertRaisesRegex(ValueError, "blob"):
+                reader(repository, pinned_revision, "missing.py")
+            with self.assertRaisesRegex(ValueError, "path"):
+                reader(repository, pinned_revision, "../server.py")
+
     def test_manifest_pins_exact_source_basis_and_artifacts(self) -> None:
         report = load_and_validate_manifest(MANIFEST_PATH)
         self.assertEqual(report["fixture_version"], "current-host-risk-lane-v2")
