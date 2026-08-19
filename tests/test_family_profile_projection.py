@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import dataclasses
+import json
+from pathlib import Path
+import re
 import unittest
+from unittest import mock
 
+from rookieui.contracts import core_graph_contract
 from rookieui.contracts.family_template_manifest import (
     CURRENT_HOST_DEFERRED_PROFILE_IDS,
     FamilyTemplateManifestEntry,
@@ -14,6 +19,13 @@ from rookieui.contracts.family_profile_projection import (
     validate_runtime_adapter_bindings,
 )
 from rookieui.contracts.model_family_registry import list_model_family_registry_entries
+from rookieui.contracts.models import ModelInventorySnapshot
+from rookieui.services.img2img import normalize_img2img_request
+from rookieui.services.txt2img import normalize_txt2img_request
+from rookieui.services.workflow_translation import (
+    translate_img2img_request,
+    translate_txt2img_request,
+)
 from rookieui.services.workflow_builders import non_sd_templates
 
 
@@ -51,8 +63,137 @@ EXPECTED_SHIPPED_PROFILE_IDS = (
     "z_image_turbo",
 )
 
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_profile_graph_contract.json"
+CORE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_core_graph_contract.json"
+
 
 class FamilyProfileProjectionTests(unittest.TestCase):
+    def test_current_host_profile_graph_contract_covers_all_shipped_profiles_in_order(self) -> None:
+        contract = core_graph_contract.load_profile_graph_contract(PROFILE_GRAPH_FIXTURE)
+        self.assertEqual(contract.schema_version, "current-host-profile-graph-contract-v1")
+        self.assertEqual(contract.source_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.profile_count, 31)
+        self.assertEqual(tuple(profile.id for profile in contract.profiles), EXPECTED_SHIPPED_PROFILE_IDS)
+        entries = list_model_family_registry_entries()
+        self.assertEqual(
+            tuple(profile.flow_kind for profile in contract.profiles),
+            tuple(entry.flow_kind for entry in entries),
+        )
+        for profile in contract.profiles:
+            with self.subTest(profile=profile.id):
+                self.assertGreater(profile.node_count, 0)
+                self.assertGreaterEqual(profile.edge_count, 0)
+                self.assertTrue(profile.class_types)
+                self.assertRegex(profile.topology_sha256, re.compile(r"^[0-9a-f]{64}$"))
+                self.assertEqual(tuple(sorted(profile.class_types)), profile.class_types)
+
+    def test_topology_digest_is_content_free_and_deterministic(self) -> None:
+        first = {
+            "20": {"class_type": "VAEDecode", "inputs": {"samples": ["10", 0], "vae": ["1", 0]}},
+            "10": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "model": ["1", 0],
+                    "positive": ["2", 0],
+                    "negative": ["3", 0],
+                    "latent_image": ["4", 0],
+                    "seed": 1,
+                    "steps": 20,
+                    "cfg": 7.0,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1.0,
+                },
+            },
+        }
+        second = json.loads(json.dumps(first))
+        second["10"]["inputs"].update(
+            {"seed": 999, "steps": 8, "cfg": 1.0, "sampler_name": "heun"}
+        )
+        first_row = core_graph_contract.build_profile_graph_row("synthetic", "txt2img", first)
+        second_row = core_graph_contract.build_profile_graph_row("synthetic", "txt2img", second)
+        self.assertEqual(first_row.topology_sha256, second_row.topology_sha256)
+        self.assertEqual(first_row.node_count, second_row.node_count)
+        self.assertEqual(first_row.edge_count, second_row.edge_count)
+
+    def test_all_shipped_profile_builders_match_candidate_graph_contract(self) -> None:
+        core_contract = core_graph_contract.load_core_graph_contract(CORE_GRAPH_FIXTURE)
+        profile_contract = core_graph_contract.load_profile_graph_contract(PROFILE_GRAPH_FIXTURE)
+        expected_by_id = {profile.id: profile for profile in profile_contract.profiles}
+        empty_inventory = ModelInventorySnapshot(source="fallback")
+        ideogram_inventory = ModelInventorySnapshot(
+            source="fallback",
+            diffusion_models=[
+                "synthetic/ideogram4_unconditional_fp8_scaled.safetensors",
+                "synthetic/ideogram4_fp8_scaled.safetensors",
+            ],
+            vae=["synthetic/qwen_image_vae.safetensors"],
+            text_encoders=[
+                "synthetic/qwen3vl_8b_fp8_scaled.safetensors",
+                "synthetic/qwen_3_4b.safetensors",
+            ],
+            default_vae="synthetic/qwen_image_vae.safetensors",
+            default_text_encoder="synthetic/qwen_3_4b.safetensors",
+        )
+
+        with mock.patch(
+            "rookieui.services.img2img.resolve_asset_path",
+            return_value=Path(__file__),
+        ):
+            for entry in list_model_family_registry_entries():
+                with self.subTest(profile=entry.id):
+                    if entry.flow_kind == "txt2img":
+                        inventory = (
+                            ideogram_inventory
+                            if entry.id == "ideogram4"
+                            else empty_inventory
+                        )
+                        with mock.patch(
+                            "rookieui.services.txt2img.discover_model_inventory",
+                            return_value=inventory,
+                        ):
+                            request = normalize_txt2img_request(
+                                {"profile": entry.id, "prompt": "synthetic graph contract"}
+                            )
+                        workflow = translate_txt2img_request(request).workflow
+                    elif entry.flow_kind == "edit":
+                        with mock.patch(
+                            "rookieui.services.img2img.discover_model_inventory",
+                            return_value=empty_inventory,
+                        ):
+                            request = normalize_img2img_request(
+                                {
+                                    "image_asset": "synthetic-contract-image.png",
+                                    "mode": "img2img",
+                                    "profile": entry.id,
+                                    "prompt": "synthetic graph contract",
+                                }
+                            )
+                        workflow = translate_img2img_request(request).workflow
+                    else:
+                        self.fail(f"Unsupported flow kind: {entry.flow_kind}")
+
+                    local_node_classes = frozenset(
+                        str(node.get("class_type", ""))
+                        for node in workflow.values()
+                        if isinstance(node, dict)
+                        and str(node.get("class_type", "")).startswith("RookieUI")
+                    )
+                    core_graph_contract.validate_workflow_graph(
+                        workflow,
+                        core_contract,
+                        local_node_classes=local_node_classes,
+                    )
+                    self.assertEqual(
+                        core_graph_contract.build_profile_graph_row(
+                            entry.id,
+                            entry.flow_kind,
+                            workflow,
+                        ),
+                        expected_by_id[entry.id],
+                    )
+
     def test_manifest_entry_is_frozen_and_projection_covers_every_declared_field(self) -> None:
         self.assertTrue(dataclasses.is_dataclass(FamilyTemplateManifestEntry))
         self.assertTrue(FamilyTemplateManifestEntry.__dataclass_params__.frozen)

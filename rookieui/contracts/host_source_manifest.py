@@ -120,27 +120,27 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
         ("core", "app/user_manager.py"): ("unchanged", "none", "direct-byte-hash"),
         ("core", "comfy_extras/nodes_custom_sampler.py"): (
             "changed",
-            "semantic-review-pending",
+            "covered-signature-unchanged-runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_advanced.py"): (
             "changed",
-            "semantic-review-pending",
+            "covered-signature-unchanged-runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_patch.py"): (
             "changed",
-            "semantic-review-pending",
+            "covered-signature-unchanged-runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_textgen.py"): (
             "changed",
-            "semantic-review-pending",
+            "covered-signature-unchanged-runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "nodes.py"): (
             "changed",
-            "semantic-review-pending",
+            "covered-signature-unchanged-runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "requirements.txt"): ("changed", "none", "version-manifest-hash"),
@@ -177,8 +177,8 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "c67885b14556cf3e4e061862925282d403d09862",
             "revision-and-component",
             "mixed",
-            "semantic-review-pending",
-            "core-contract-alignment",
+            "graph-contract-compatible-runtime-review-pending",
+            "runtime-compatibility-alignment",
         ),
         "desktop": (
             "e2d964b7456cea8423c7b9d3371c612313c06baa",

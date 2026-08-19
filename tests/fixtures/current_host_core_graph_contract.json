@@ -1,0 +1,2292 @@
+{
+  "baseline_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+  "classes": {
+    "BasicGuider": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "BasicScheduler": {
+      "inputs": {
+        "denoise": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "scheduler": {
+          "option_source": {
+            "kind": "runtime-registry",
+            "source": "ComfyUI scheduler registry"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "steps": {
+          "default": 20,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "CFGGuider": {
+      "inputs": {
+        "cfg": {
+          "default": 8.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "negative": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "CFGNorm": {
+      "inputs": {
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "pre_cfg": {
+          "default": false,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "strength": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "b585c560f6a77ba4bb78f1e842a24a361a7f319e",
+      "source_path": "comfy_extras/nodes_cfg.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "688a73094509efcc81bf22bf0e77b2cd8c9f1726f455ed55f6f9747dec656e99"
+    },
+    "CFGOverride": {
+      "inputs": {
+        "cfg": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "end_percent": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "start_percent": {
+          "default": 0.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "CLIPLoader": {
+      "inputs": {
+        "clip_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "device": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "default",
+              "cpu"
+            ]
+          },
+          "optional": true,
+          "type": "COMBO"
+        },
+        "type": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "stable_diffusion",
+              "stable_cascade",
+              "sd3",
+              "stable_audio",
+              "mochi",
+              "ltxv",
+              "pixart",
+              "cosmos",
+              "lumina2",
+              "wan",
+              "hidream",
+              "chroma",
+              "ace",
+              "omnigen2",
+              "qwen_image",
+              "hunyuan_image",
+              "flux2",
+              "ovis",
+              "longcat_image",
+              "cogvideox",
+              "lens",
+              "pixeldit",
+              "ideogram4",
+              "boogu",
+              "krea2",
+              "joyimage",
+              "mage",
+              "minimax"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "CLIPSetLastLayer": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "stop_at_clip_layer": {
+          "default": -1,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "CLIPTextEncode": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "text": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "CLIPTextEncodeSDXL": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "crop_h": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "crop_w": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "target_height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "target_width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "text_g": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "text_l": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "08fbbd827aa46d7c00b70a49acca92973b8155a4",
+      "source_path": "comfy_extras/nodes_clip_sdxl.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "df7f361867ab02a8dd1c1e58e6a12ef3c1211d3db64760cbf138dade08102f57"
+    },
+    "Canny": {
+      "inputs": {
+        "high_threshold": {
+          "default": 0.8,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "low_threshold": {
+          "default": 0.4,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "462f6fea0d571e904e3b9e5ff442bdd3b800777e",
+      "source_path": "comfy_extras/nodes_canny.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "5efd352d92d7749b7b9734a1676fee18f4431d44a8e9477822a7a8f38ad26051"
+    },
+    "CheckpointLoaderSimple": {
+      "inputs": {
+        "ckpt_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:checkpoints"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ComfySwitchNode": {
+      "inputs": {
+        "on_false": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MATCHTYPE"
+        },
+        "on_true": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MATCHTYPE"
+        },
+        "switch": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "BOOLEAN"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "13c1685f7d8ba95d9d5ab640f8249e0f895889d5",
+      "source_path": "comfy_extras/nodes_logic.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "2cb1ce149ce616c0b12a67962ed7b799eb398fbcdeb20dcec4c5210eb6af6df1"
+    },
+    "ConditioningCombine": {
+      "inputs": {
+        "conditioning_1": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "conditioning_2": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ConditioningSetAreaStrength": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "strength": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ConditioningSetTimestepRange": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "end": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "start": {
+          "default": 0.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ConditioningZeroOut": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ControlNetLoader": {
+      "inputs": {
+        "control_net_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:controlnet"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "DiffControlNetLoader": {
+      "inputs": {
+        "control_net_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:controlnet"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "DualCLIPLoader": {
+      "inputs": {
+        "clip_name1": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name2": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "device": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "default",
+              "cpu"
+            ]
+          },
+          "optional": true,
+          "type": "COMBO"
+        },
+        "type": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "sdxl",
+              "sd3",
+              "flux",
+              "hunyuan_video",
+              "hidream",
+              "hunyuan_image",
+              "hunyuan_video_15",
+              "kandinsky5",
+              "kandinsky5_image",
+              "ltxv",
+              "newbie",
+              "ace"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "DualModelGuider": {
+      "inputs": {
+        "cfg": {
+          "default": 4.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "model_negative": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "MODEL"
+        },
+        "negative": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "EmptyFlux2LatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "EmptyLatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "EmptySD3LatentImage": {
+      "inputs": {
+        "batch_size": {
+          "default": 1,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "40e84656bf4f6c15b60942f6eee2fd5d8181c10e",
+      "source_path": "comfy_extras/nodes_sd3.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "90a79847332fed7cc97379abbc7092116e6b1b883a7c9e933ac88167a521f693"
+    },
+    "Flux2Scheduler": {
+      "inputs": {
+        "height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "steps": {
+          "default": 20,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "FluxGuidance": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "guidance": {
+          "default": 3.5,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "FluxKVCache": {
+      "inputs": {
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "FluxKontextImageScale": {
+      "inputs": {
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "FluxKontextMultiReferenceLatentMethod": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "reference_latents_method": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "offset",
+              "index",
+              "uxo/uno",
+              "index_timestep_zero"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_path": "comfy_extras/nodes_flux.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "GetImageSize": {
+      "inputs": {
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "source_path": "comfy_extras/nodes_images.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+    },
+    "Ideogram4Scheduler": {
+      "inputs": {
+        "height": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "mu": {
+          "default": 0.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "std": {
+          "default": 1.75,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "steps": {
+          "default": 20,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "width": {
+          "default": 1024,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "4070db17c2bbf91c197b4eb5bab1189566107597",
+      "source_path": "comfy_extras/nodes_ideogram4.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "2ef584e244ecb5614b7284eacfaaab7bbdfa398f0595c32c1562d99150ebe301"
+    },
+    "ImageScale": {
+      "inputs": {
+        "crop": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "disabled",
+              "center"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "height": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "upscale_method": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "nearest-exact",
+              "bilinear",
+              "area",
+              "bicubic",
+              "lanczos"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "width": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ImageScaleToTotalPixels": {
+      "inputs": {
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "megapixels": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "resolution_steps": {
+          "default": 1,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "upscale_method": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "nearest-exact",
+              "bilinear",
+              "area",
+              "bicubic",
+              "lanczos"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "763b8a52fa84fbee9432ee116000f131c0002400",
+      "source_path": "comfy_extras/nodes_post_processing.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575"
+    },
+    "ImageStitch": {
+      "inputs": {
+        "direction": {
+          "default": "right",
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "right",
+              "down",
+              "left",
+              "up"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "image1": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "image2": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "match_image_size": {
+          "default": true,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "BOOLEAN"
+        },
+        "spacing_color": {
+          "default": "white",
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "white",
+              "black",
+              "red",
+              "green",
+              "blue"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "spacing_width": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "source_path": "comfy_extras/nodes_images.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+    },
+    "KSampler": {
+      "inputs": {
+        "cfg": {
+          "default": 8.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "denoise": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "latent_image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "LATENT"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "negative": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "positive": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "sampler_name": {
+          "option_source": {
+            "kind": "runtime-registry",
+            "source": "ComfyUI sampler registry"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "scheduler": {
+          "option_source": {
+            "kind": "runtime-registry",
+            "source": "ComfyUI scheduler registry"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "seed": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "steps": {
+          "default": 20,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "KSamplerSelect": {
+      "inputs": {
+        "sampler_name": {
+          "option_source": {
+            "kind": "runtime-registry",
+            "source": "ComfyUI sampler registry"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "LatentUpscale": {
+      "inputs": {
+        "crop": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "disabled",
+              "center"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "height": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "samples": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "LATENT"
+        },
+        "upscale_method": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "nearest-exact",
+              "bilinear",
+              "area",
+              "bicubic",
+              "bislerp"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "width": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "LatentUpscaleBy": {
+      "inputs": {
+        "samples": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "LATENT"
+        },
+        "scale_by": {
+          "default": 1.5,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "upscale_method": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "nearest-exact",
+              "bilinear",
+              "area",
+              "bicubic",
+              "bislerp"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "LoraLoader": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "lora_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:loras"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "strength_clip": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "strength_model": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "LoraLoaderModelOnly": {
+      "inputs": {
+        "lora_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:loras"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "strength_model": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "ModelPatchLoader": {
+      "inputs": {
+        "name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:model_patches"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_path": "comfy_extras/nodes_model_patch.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+    },
+    "ModelSamplingAuraFlow": {
+      "inputs": {
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "shift": {
+          "default": 1.73,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_path": "comfy_extras/nodes_model_advanced.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+    },
+    "ModelSamplingSD3": {
+      "inputs": {
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "shift": {
+          "default": 3.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_path": "comfy_extras/nodes_model_advanced.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+    },
+    "PrimitiveBoolean": {
+      "inputs": {
+        "value": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "BOOLEAN"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "35761863ff49fba89af08f02314354f92770bc91",
+      "source_path": "comfy_extras/nodes_primitive.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
+    },
+    "PrimitiveStringMultiline": {
+      "inputs": {
+        "value": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "35761863ff49fba89af08f02314354f92770bc91",
+      "source_path": "comfy_extras/nodes_primitive.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
+    },
+    "QuadrupleCLIPLoader": {
+      "inputs": {
+        "clip_name1": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name2": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name3": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "clip_name4": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:text_encoders"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "65248561bd60fddb00230d5b53dd077236a9a884",
+      "source_path": "comfy_extras/nodes_hidream.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "727fe71d9afa086a0d2613639f9546019c650449cfa04d1b98d8abf8de611a89"
+    },
+    "QwenImageDiffsynthControlnet": {
+      "inputs": {
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "mask": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "MASK"
+        },
+        "model": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL"
+        },
+        "model_patch": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "MODEL_PATCH"
+        },
+        "strength": {
+          "default": 1.0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "FLOAT"
+        },
+        "vae": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "VAE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_path": "comfy_extras/nodes_model_patch.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+    },
+    "RandomNoise": {
+      "inputs": {
+        "noise_seed": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "ReferenceLatent": {
+      "inputs": {
+        "conditioning": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONDITIONING"
+        },
+        "latent": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "LATENT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "d0d20ae7a404aa91b6cf9bb823194a7ed2de0699",
+      "source_path": "comfy_extras/nodes_edit_model.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "8fe4edaa13707df052ddf883fade1190f7b68416d54c7026cefefd489a13ee7e"
+    },
+    "SamplerCustomAdvanced": {
+      "inputs": {
+        "guider": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "GUIDER"
+        },
+        "latent_image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "LATENT"
+        },
+        "noise": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "NOISE"
+        },
+        "sampler": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "SAMPLER"
+        },
+        "sigmas": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "SIGMAS"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_path": "comfy_extras/nodes_custom_sampler.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "SetUnionControlNetType": {
+      "inputs": {
+        "control_net": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CONTROL_NET"
+        },
+        "type": {
+          "option_source": {
+            "kind": "runtime-registry",
+            "source": "ComfyUI union ControlNet type registry"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "eb476f49713eb2048af159d36db4b7119ee89a6f",
+      "source_path": "comfy_extras/nodes_controlnet.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "197972863ab797c8b1e1137db99fbbbdf2c9d6668d57cb6fa4413ed993b6ae59"
+    },
+    "StringReplace": {
+      "inputs": {
+        "find": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "replace": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "string": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "21929ae630e7043b138a63838258a418c192d922",
+      "source_path": "comfy_extras/nodes_string.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1"
+    },
+    "T5TokenizerOptions": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "min_length": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "min_padding": {
+          "default": 0,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "c8091b7a4d7d620d1435c5eaef77fc00e2c7925f",
+      "source_path": "comfy_extras/nodes_cond.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "ee78f3f890c97c20dc4de1f5f4445b0cfbcd4e9e2cc3d61a77f2b55a5682d075"
+    },
+    "TextEncodeQwenImageEdit": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "prompt": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "vae": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "VAE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
+      "source_path": "comfy_extras/nodes_qwen.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
+    },
+    "TextEncodeQwenImageEditPlus": {
+      "inputs": {
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image1": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "image2": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "image3": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "prompt": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "vae": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "VAE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
+      "source_path": "comfy_extras/nodes_qwen.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
+    },
+    "TextGenerate": {
+      "inputs": {
+        "audio": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "AUDIO"
+        },
+        "clip": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "CLIP"
+        },
+        "image": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        },
+        "max_length": {
+          "default": 512,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "INT"
+        },
+        "prompt": {
+          "default": "",
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "STRING"
+        },
+        "sampling_mode": {
+          "option_source": {
+            "kind": "dynamic",
+            "source": "ComfyUI text-generation sampling schema"
+          },
+          "optional": false,
+          "type": "DYNAMICCOMBO"
+        },
+        "thinking": {
+          "default": false,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "use_default_template": {
+          "default": true,
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "BOOLEAN"
+        },
+        "video": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": true,
+          "type": "IMAGE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
+      "source_path": "comfy_extras/nodes_textgen.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
+    },
+    "UNETLoader": {
+      "inputs": {
+        "unet_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:diffusion_models"
+          },
+          "optional": false,
+          "type": "COMBO"
+        },
+        "weight_dtype": {
+          "option_source": {
+            "kind": "literal",
+            "values": [
+              "default",
+              "fp8_e4m3fn",
+              "fp8_e4m3fn_fast",
+              "fp8_e5m2"
+            ]
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "VAEDecode": {
+      "inputs": {
+        "samples": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "LATENT"
+        },
+        "vae": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "VAE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "VAEEncode": {
+      "inputs": {
+        "pixels": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "IMAGE"
+        },
+        "vae": {
+          "option_source": {
+            "kind": "not-applicable"
+          },
+          "optional": false,
+          "type": "VAE"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    },
+    "VAELoader": {
+      "inputs": {
+        "vae_name": {
+          "option_source": {
+            "kind": "filesystem",
+            "source": "ComfyUI folder registry:vae"
+          },
+          "optional": false,
+          "type": "COMBO"
+        }
+      },
+      "signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_path": "nodes.py",
+      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    }
+  },
+  "inventory": {
+    "changed_class_count": 35,
+    "changed_source_file_count": 5,
+    "class_count": 59,
+    "classified_option_count": 35,
+    "input_count": 185,
+    "source_file_count": 21
+  },
+  "schema_version": "current-host-core-graph-contract-v1",
+  "source_files": {
+    "comfy_extras/nodes_canny.py": {
+      "baseline_blob": "462f6fea0d571e904e3b9e5ff442bdd3b800777e",
+      "byte_drift": "unchanged",
+      "classes": [
+        "Canny"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "462f6fea0d571e904e3b9e5ff442bdd3b800777e",
+      "source_sha256": "5efd352d92d7749b7b9734a1676fee18f4431d44a8e9477822a7a8f38ad26051"
+    },
+    "comfy_extras/nodes_cfg.py": {
+      "baseline_blob": "b585c560f6a77ba4bb78f1e842a24a361a7f319e",
+      "byte_drift": "unchanged",
+      "classes": [
+        "CFGNorm"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "b585c560f6a77ba4bb78f1e842a24a361a7f319e",
+      "source_sha256": "688a73094509efcc81bf22bf0e77b2cd8c9f1726f455ed55f6f9747dec656e99"
+    },
+    "comfy_extras/nodes_clip_sdxl.py": {
+      "baseline_blob": "08fbbd827aa46d7c00b70a49acca92973b8155a4",
+      "byte_drift": "unchanged",
+      "classes": [
+        "CLIPTextEncodeSDXL"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "08fbbd827aa46d7c00b70a49acca92973b8155a4",
+      "source_sha256": "df7f361867ab02a8dd1c1e58e6a12ef3c1211d3db64760cbf138dade08102f57"
+    },
+    "comfy_extras/nodes_cond.py": {
+      "baseline_blob": "c8091b7a4d7d620d1435c5eaef77fc00e2c7925f",
+      "byte_drift": "unchanged",
+      "classes": [
+        "T5TokenizerOptions"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "c8091b7a4d7d620d1435c5eaef77fc00e2c7925f",
+      "source_sha256": "ee78f3f890c97c20dc4de1f5f4445b0cfbcd4e9e2cc3d61a77f2b55a5682d075"
+    },
+    "comfy_extras/nodes_controlnet.py": {
+      "baseline_blob": "eb476f49713eb2048af159d36db4b7119ee89a6f",
+      "byte_drift": "unchanged",
+      "classes": [
+        "SetUnionControlNetType"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "eb476f49713eb2048af159d36db4b7119ee89a6f",
+      "source_sha256": "197972863ab797c8b1e1137db99fbbbdf2c9d6668d57cb6fa4413ed993b6ae59"
+    },
+    "comfy_extras/nodes_custom_sampler.py": {
+      "baseline_blob": "e81b6328b7791162f80207194f983dc0d6b4dc07",
+      "byte_drift": "changed",
+      "classes": [
+        "BasicGuider",
+        "BasicScheduler",
+        "CFGGuider",
+        "CFGOverride",
+        "DualModelGuider",
+        "KSamplerSelect",
+        "RandomNoise",
+        "SamplerCustomAdvanced"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
+    },
+    "comfy_extras/nodes_edit_model.py": {
+      "baseline_blob": "d0d20ae7a404aa91b6cf9bb823194a7ed2de0699",
+      "byte_drift": "unchanged",
+      "classes": [
+        "ReferenceLatent"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "d0d20ae7a404aa91b6cf9bb823194a7ed2de0699",
+      "source_sha256": "8fe4edaa13707df052ddf883fade1190f7b68416d54c7026cefefd489a13ee7e"
+    },
+    "comfy_extras/nodes_flux.py": {
+      "baseline_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "byte_drift": "unchanged",
+      "classes": [
+        "EmptyFlux2LatentImage",
+        "Flux2Scheduler",
+        "FluxGuidance",
+        "FluxKVCache",
+        "FluxKontextImageScale",
+        "FluxKontextMultiReferenceLatentMethod"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
+      "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
+    },
+    "comfy_extras/nodes_hidream.py": {
+      "baseline_blob": "65248561bd60fddb00230d5b53dd077236a9a884",
+      "byte_drift": "unchanged",
+      "classes": [
+        "QuadrupleCLIPLoader"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "65248561bd60fddb00230d5b53dd077236a9a884",
+      "source_sha256": "727fe71d9afa086a0d2613639f9546019c650449cfa04d1b98d8abf8de611a89"
+    },
+    "comfy_extras/nodes_ideogram4.py": {
+      "baseline_blob": "4070db17c2bbf91c197b4eb5bab1189566107597",
+      "byte_drift": "unchanged",
+      "classes": [
+        "Ideogram4Scheduler"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "4070db17c2bbf91c197b4eb5bab1189566107597",
+      "source_sha256": "2ef584e244ecb5614b7284eacfaaab7bbdfa398f0595c32c1562d99150ebe301"
+    },
+    "comfy_extras/nodes_images.py": {
+      "baseline_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "byte_drift": "unchanged",
+      "classes": [
+        "GetImageSize",
+        "ImageStitch"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+    },
+    "comfy_extras/nodes_logic.py": {
+      "baseline_blob": "13c1685f7d8ba95d9d5ab640f8249e0f895889d5",
+      "byte_drift": "unchanged",
+      "classes": [
+        "ComfySwitchNode"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "13c1685f7d8ba95d9d5ab640f8249e0f895889d5",
+      "source_sha256": "2cb1ce149ce616c0b12a67962ed7b799eb398fbcdeb20dcec4c5210eb6af6df1"
+    },
+    "comfy_extras/nodes_model_advanced.py": {
+      "baseline_blob": "a336ba0791d6c711daeb824f3b1e50992e79111c",
+      "byte_drift": "changed",
+      "classes": [
+        "ModelSamplingAuraFlow",
+        "ModelSamplingSD3"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+    },
+    "comfy_extras/nodes_model_patch.py": {
+      "baseline_blob": "4d7bf7476ef003dc28eafb1ed676b808bd58a0ab",
+      "byte_drift": "changed",
+      "classes": [
+        "ModelPatchLoader",
+        "QwenImageDiffsynthControlnet"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+    },
+    "comfy_extras/nodes_post_processing.py": {
+      "baseline_blob": "763b8a52fa84fbee9432ee116000f131c0002400",
+      "byte_drift": "unchanged",
+      "classes": [
+        "ImageScaleToTotalPixels"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "763b8a52fa84fbee9432ee116000f131c0002400",
+      "source_sha256": "96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575"
+    },
+    "comfy_extras/nodes_primitive.py": {
+      "baseline_blob": "35761863ff49fba89af08f02314354f92770bc91",
+      "byte_drift": "unchanged",
+      "classes": [
+        "PrimitiveBoolean",
+        "PrimitiveStringMultiline"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "35761863ff49fba89af08f02314354f92770bc91",
+      "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
+    },
+    "comfy_extras/nodes_qwen.py": {
+      "baseline_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
+      "byte_drift": "unchanged",
+      "classes": [
+        "TextEncodeQwenImageEdit",
+        "TextEncodeQwenImageEditPlus"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
+      "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
+    },
+    "comfy_extras/nodes_sd3.py": {
+      "baseline_blob": "40e84656bf4f6c15b60942f6eee2fd5d8181c10e",
+      "byte_drift": "unchanged",
+      "classes": [
+        "EmptySD3LatentImage"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "40e84656bf4f6c15b60942f6eee2fd5d8181c10e",
+      "source_sha256": "90a79847332fed7cc97379abbc7092116e6b1b883a7c9e933ac88167a521f693"
+    },
+    "comfy_extras/nodes_string.py": {
+      "baseline_blob": "21929ae630e7043b138a63838258a418c192d922",
+      "byte_drift": "unchanged",
+      "classes": [
+        "StringReplace"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "21929ae630e7043b138a63838258a418c192d922",
+      "source_sha256": "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1"
+    },
+    "comfy_extras/nodes_textgen.py": {
+      "baseline_blob": "5a947d5c57b32e7e8d2ed1ef364064959d841cc4",
+      "byte_drift": "changed",
+      "classes": [
+        "TextGenerate"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
+      "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
+    },
+    "nodes.py": {
+      "baseline_blob": "08529d8dc414138e56d0cc6e68367f95da70f038",
+      "byte_drift": "changed",
+      "classes": [
+        "CLIPLoader",
+        "CLIPSetLastLayer",
+        "CLIPTextEncode",
+        "CheckpointLoaderSimple",
+        "ConditioningCombine",
+        "ConditioningSetAreaStrength",
+        "ConditioningSetTimestepRange",
+        "ConditioningZeroOut",
+        "ControlNetLoader",
+        "DiffControlNetLoader",
+        "DualCLIPLoader",
+        "EmptyLatentImage",
+        "ImageScale",
+        "KSampler",
+        "LatentUpscale",
+        "LatentUpscaleBy",
+        "LoraLoader",
+        "LoraLoaderModelOnly",
+        "UNETLoader",
+        "VAEDecode",
+        "VAEEncode",
+        "VAELoader"
+      ],
+      "covered_signature_drift": "unchanged",
+      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+    }
+  },
+  "source_revision": "c67885b14556cf3e4e061862925282d403d09862"
+}

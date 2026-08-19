@@ -14,7 +14,7 @@
       "bytes": 49739,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_custom_sampler.py",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "covered-signature-unchanged-runtime-review-pending",
       "sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe",
       "subject": "core"
     },
@@ -23,7 +23,7 @@
       "bytes": 14962,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_advanced.py",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "covered-signature-unchanged-runtime-review-pending",
       "sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9",
       "subject": "core"
     },
@@ -32,7 +32,7 @@
       "bytes": 42298,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_patch.py",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "covered-signature-unchanged-runtime-review-pending",
       "sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21",
       "subject": "core"
     },
@@ -41,7 +41,7 @@
       "bytes": 23350,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_textgen.py",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "covered-signature-unchanged-runtime-review-pending",
       "sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7",
       "subject": "core"
     },
@@ -50,7 +50,7 @@
       "bytes": 108038,
       "evidence": "direct-byte-hash",
       "path": "nodes.py",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "covered-signature-unchanged-runtime-review-pending",
       "sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9",
       "subject": "core"
     },
@@ -132,8 +132,8 @@
     {
       "byte_drift": "mixed",
       "from_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
-      "owner": "core-contract-alignment",
-      "semantic_drift": "semantic-review-pending",
+      "owner": "runtime-compatibility-alignment",
+      "semantic_drift": "graph-contract-compatible-runtime-review-pending",
       "source_drift": "revision-and-component",
       "subject": "core",
       "to_revision": "c67885b14556cf3e4e061862925282d403d09862"

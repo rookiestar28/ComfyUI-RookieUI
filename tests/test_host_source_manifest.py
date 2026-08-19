@@ -127,13 +127,20 @@ class HostSourceManifestTests(unittest.TestCase):
                 self.assertRegex(artifact.sha256, re.compile(r"^[0-9a-f]{64}$"))
                 if artifact.subject == "core" and artifact.path in changed_core_paths:
                     self.assertEqual(artifact.byte_drift, "changed")
-                    self.assertEqual(artifact.semantic_drift, "semantic-review-pending")
+                    self.assertEqual(
+                        artifact.semantic_drift,
+                        "covered-signature-unchanged-runtime-review-pending",
+                    )
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
 
         comparisons = {comparison.subject: comparison for comparison in manifest.comparisons}
         self.assertEqual(set(comparisons), {"core", "frontend", "workflow_templates", "desktop"})
-        self.assertEqual(comparisons["core"].owner, "core-contract-alignment")
+        self.assertEqual(comparisons["core"].owner, "runtime-compatibility-alignment")
+        self.assertEqual(
+            comparisons["core"].semantic_drift,
+            "graph-contract-compatible-runtime-review-pending",
+        )
         self.assertEqual(
             comparisons["frontend"].owner,
             "frontend-compatibility-alignment",

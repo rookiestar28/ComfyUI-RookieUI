@@ -4,8 +4,11 @@ import ast
 import hashlib
 import json
 from pathlib import Path
+import re
+import subprocess
 import unittest
 
+from rookieui.contracts import core_graph_contract
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
     get_family_template_manifest_entry,
@@ -39,6 +42,8 @@ LOCAL_NODE_CLASSES = {
 }
 PROFILE_FIXTURE = "current_host_profile_sources.json"
 NODE_FIXTURE = "current_host_node_contract.json"
+CORE_GRAPH_FIXTURE = "current_host_core_graph_contract.json"
+PROFILE_GRAPH_FIXTURE = "current_host_profile_graph_contract.json"
 CORE_REFERENCE = ROOT / "reference" / "ComfyUI"
 TEMPLATE_JSON_REFERENCE = (
     ROOT
@@ -101,6 +106,178 @@ def _literal_emitted_classes_and_nodes() -> tuple[set[str], list[tuple[str, set[
 
 
 class CurrentHostGraphContractTests(unittest.TestCase):
+    def test_candidate_core_graph_contract_is_complete_and_provenance_bound(self) -> None:
+        contract = core_graph_contract.load_core_graph_contract(
+            FIXTURES / CORE_GRAPH_FIXTURE
+        )
+
+        self.assertEqual(contract.schema_version, "current-host-core-graph-contract-v1")
+        self.assertEqual(contract.baseline_revision, "6f7cd7fceaaf60d2669b554936394a7412c6fde5")
+        self.assertEqual(contract.source_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.inventory.source_file_count, 21)
+        self.assertEqual(contract.inventory.class_count, 59)
+        self.assertEqual(contract.inventory.input_count, 185)
+        self.assertEqual(contract.inventory.changed_source_file_count, 5)
+        self.assertEqual(contract.inventory.changed_class_count, 35)
+        self.assertEqual(len(contract.source_files), 21)
+        self.assertEqual(len(contract.classes), 59)
+        self.assertEqual(
+            sum(len(class_contract.inputs) for class_contract in contract.classes.values()),
+            185,
+        )
+        self.assertIn("CLIPTextEncode", contract.classes)
+        self.assertIn("CLIPTextEncodeSDXL", contract.classes)
+
+        for class_type, class_contract in contract.classes.items():
+            with self.subTest(class_type=class_type):
+                self.assertEqual(class_contract.source_revision, contract.source_revision)
+                self.assertRegex(class_contract.source_blob, re.compile(r"^[0-9a-f]{40}$"))
+                self.assertRegex(class_contract.source_sha256, re.compile(r"^[0-9a-f]{64}$"))
+                self.assertIn(class_contract.source_path, contract.source_files)
+                self.assertIn(
+                    class_type,
+                    contract.source_files[class_contract.source_path].classes,
+                )
+
+    def test_candidate_core_graph_separates_byte_and_covered_signature_drift(self) -> None:
+        contract = core_graph_contract.load_core_graph_contract(
+            FIXTURES / CORE_GRAPH_FIXTURE
+        )
+        changed_counts = {
+            "nodes.py": 22,
+            "comfy_extras/nodes_custom_sampler.py": 8,
+            "comfy_extras/nodes_model_advanced.py": 2,
+            "comfy_extras/nodes_model_patch.py": 2,
+            "comfy_extras/nodes_textgen.py": 1,
+        }
+        changed_paths = {
+            path
+            for path, source in contract.source_files.items()
+            if source.byte_drift == "changed"
+        }
+        self.assertEqual(changed_paths, set(changed_counts))
+        for path, expected_class_count in changed_counts.items():
+            with self.subTest(path=path):
+                source = contract.source_files[path]
+                self.assertEqual(source.covered_signature_drift, "unchanged")
+                self.assertEqual(len(source.classes), expected_class_count)
+                self.assertTrue(
+                    all(contract.classes[name].signature_drift == "unchanged" for name in source.classes)
+                )
+        self.assertEqual(
+            sum(len(contract.source_files[path].classes) for path in changed_paths),
+            35,
+        )
+
+    def test_candidate_core_graph_classifies_every_option_source_without_ambient_values(self) -> None:
+        contract = core_graph_contract.load_core_graph_contract(
+            FIXTURES / CORE_GRAPH_FIXTURE
+        )
+        allowed_kinds = {
+            "not-applicable",
+            "literal",
+            "runtime-registry",
+            "filesystem",
+            "dynamic",
+        }
+        option_inputs = []
+        for class_type, class_contract in contract.classes.items():
+            for input_name, input_contract in class_contract.inputs.items():
+                with self.subTest(class_type=class_type, input_name=input_name):
+                    self.assertIn(input_contract.option_source.kind, allowed_kinds)
+                    if input_contract.type in {"COMBO", "DYNAMICCOMBO"}:
+                        option_inputs.append(input_contract)
+                        self.assertNotEqual(input_contract.option_source.kind, "not-applicable")
+                    else:
+                        self.assertEqual(input_contract.option_source.kind, "not-applicable")
+                    if input_contract.option_source.kind == "literal":
+                        self.assertTrue(input_contract.option_source.values)
+                    else:
+                        self.assertEqual(input_contract.option_source.values, ())
+        self.assertEqual(len(option_inputs), 35)
+        self.assertEqual(contract.inventory.classified_option_count, 35)
+
+    def test_candidate_contract_serialization_is_canonical_and_strict(self) -> None:
+        graph_path = FIXTURES / CORE_GRAPH_FIXTURE
+        profile_path = FIXTURES / PROFILE_GRAPH_FIXTURE
+        graph_text = graph_path.read_text(encoding="utf-8")
+        profile_text = profile_path.read_text(encoding="utf-8")
+        self.assertEqual(
+            core_graph_contract.serialize_core_graph_contract(
+                core_graph_contract.parse_core_graph_contract_text(graph_text)
+            ),
+            graph_text,
+        )
+        self.assertEqual(
+            core_graph_contract.serialize_profile_graph_contract(
+                core_graph_contract.parse_profile_graph_contract_text(profile_text)
+            ),
+            profile_text,
+        )
+        self.assertTrue(graph_text.endswith("\n"))
+        self.assertTrue(profile_text.endswith("\n"))
+
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            core_graph_contract.parse_core_graph_contract_text(
+                '{"schema_version":"current-host-core-graph-contract-v1",'
+                '"schema_version":"duplicate"}'
+            )
+        payload = json.loads(graph_text)
+        payload["unexpected"] = True
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            core_graph_contract.parse_core_graph_contract_text(json.dumps(payload))
+
+    def test_candidate_contract_rejects_unknown_node_input_and_literal_enum(self) -> None:
+        contract = core_graph_contract.load_core_graph_contract(
+            FIXTURES / CORE_GRAPH_FIXTURE
+        )
+        valid = {
+            "1": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "model": ["0", 0],
+                    "positive": ["0", 0],
+                    "negative": ["0", 0],
+                    "latent_image": ["0", 0],
+                    "seed": 1,
+                    "steps": 20,
+                    "cfg": 7.0,
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "denoise": 1.0,
+                },
+            },
+            "2": {
+                "class_type": "ImageScale",
+                "inputs": {
+                    "image": ["0", 0],
+                    "upscale_method": "bilinear",
+                    "width": 512,
+                    "height": 512,
+                    "crop": "disabled",
+                },
+            },
+        }
+        core_graph_contract.validate_workflow_graph(valid, contract)
+
+        unknown_node = json.loads(json.dumps(valid))
+        unknown_node["1"]["class_type"] = "UnknownCoreNode"
+        with self.assertRaisesRegex(ValueError, "unknown node"):
+            core_graph_contract.validate_workflow_graph(unknown_node, contract)
+
+        unknown_input = json.loads(json.dumps(valid))
+        unknown_input["1"]["inputs"]["surprise"] = True
+        with self.assertRaisesRegex(ValueError, "unknown input"):
+            core_graph_contract.validate_workflow_graph(unknown_input, contract)
+
+        invalid_enum = json.loads(json.dumps(valid))
+        invalid_enum["2"]["inputs"]["crop"] = "not-a-crop-mode"
+        with self.assertRaisesRegex(ValueError, "literal option"):
+            core_graph_contract.validate_workflow_graph(invalid_enum, contract)
+
+        round_trip = json.loads(json.dumps(valid, sort_keys=True))
+        self.assertEqual(round_trip, valid)
+
     def test_active_profile_fixture_matches_current_host_sources(self) -> None:
         self.assertFalse((FIXTURES / "comfyui_0_11_6_profile_sources.json").exists())
         fixture = _load_fixture(PROFILE_FIXTURE)
@@ -208,7 +385,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         }
         self.assertEqual(set(BUILDER_PATHS), expected_paths)
 
-    def test_active_node_provenance_matches_local_current_core_when_available(self) -> None:
+    def test_active_node_provenance_matches_pinned_active_core_when_available(self) -> None:
         if not CORE_REFERENCE.exists():
             return
         fixture = _load_fixture(NODE_FIXTURE)
@@ -217,10 +394,26 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             source_path = contract["source_path"]
             self.assertFalse(Path(source_path).is_absolute())
             self.assertNotIn("..", Path(source_path).parts)
-            path = CORE_REFERENCE / source_path
             with self.subTest(class_type=class_type, source_path=source_path):
-                self.assertTrue(path.is_file())
-                source_hashes.setdefault(source_path, hashlib.sha256(path.read_bytes()).hexdigest())
+                if source_path not in source_hashes:
+                    # SECURITY: read the accepted active source as an inert Git object; never import or execute reference code.
+                    result = subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(CORE_REFERENCE),
+                            "show",
+                            f"{HOST_SOURCE_BASIS.core.revision}:{source_path}",
+                        ],
+                        check=False,
+                        capture_output=True,
+                    )
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        msg=f"Pinned active Core object is unavailable: {source_path}",
+                    )
+                    source_hashes[source_path] = hashlib.sha256(result.stdout).hexdigest()
                 self.assertEqual(source_hashes[source_path], contract["source_sha256"])
 
     def test_source_sensitive_ideogram_scheduler_defaults_are_current(self) -> None:

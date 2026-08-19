@@ -1,0 +1,496 @@
+{
+  "profile_count": 31,
+  "profiles": [
+    {
+      "class_types": [
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUIA1111CLIPTextEncode",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "sd15",
+      "node_count": 7,
+      "topology_sha256": "647ed914eac4d2f8ff5db0213edcb40f9375c639194778063e7ed2ceb5264991"
+    },
+    {
+      "class_types": [
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUIA1111CLIPTextEncodeSDXL",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "sdxl",
+      "node_count": 7,
+      "topology_sha256": "2958d56bbe441a22fe3ff9601acd0ac3c13a549956745dfbf3fd3cb7465f642e"
+    },
+    {
+      "class_types": [
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUIA1111CLIPTextEncodeSDXL",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "pony",
+      "node_count": 7,
+      "topology_sha256": "2958d56bbe441a22fe3ff9601acd0ac3c13a549956745dfbf3fd3cb7465f642e"
+    },
+    {
+      "class_types": [
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUIA1111CLIPTextEncodeSDXL",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "illustrious",
+      "node_count": 7,
+      "topology_sha256": "2958d56bbe441a22fe3ff9601acd0ac3c13a549956745dfbf3fd3cb7465f642e"
+    },
+    {
+      "class_types": [
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUIA1111CLIPTextEncodeSDXL",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "noob",
+      "node_count": 7,
+      "topology_sha256": "2958d56bbe441a22fe3ff9601acd0ac3c13a549956745dfbf3fd3cb7465f642e"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "anima",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "chroma",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "ernie_image",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "ernie_image_turbo",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "flux",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "flux_krea_dev",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "flux2_dev",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CFGOverride",
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "ConditioningZeroOut",
+        "DualModelGuider",
+        "EmptyFlux2LatentImage",
+        "Ideogram4Scheduler",
+        "KSamplerSelect",
+        "RandomNoise",
+        "RookieUISaveImageWithMetadata",
+        "SamplerCustomAdvanced",
+        "UNETLoader",
+        "VAEDecode",
+        "VAELoader"
+      ],
+      "edge_count": 15,
+      "flow_kind": "txt2img",
+      "id": "ideogram4",
+      "node_count": 15,
+      "topology_sha256": "03ff834d77a675dae2e0b2d3bf4312199f417d9dc53b62d0be583258757d2e00"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "krea2_turbo",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "klein_4b",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "klein_9b",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "hidream_i1_dev_fp8",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "hidream_i1_fast",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "hidream_i1_full",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "longcat_image",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "qwen_image",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "qwen_image_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "qwen_image_edit_2511",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "firered_image_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "firered_image_edit_lightning",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "flux_kontext_dev_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "flux2_image_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "klein_9b_kv_image_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "ImageScale",
+        "KSampler",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode",
+        "VAEEncode"
+      ],
+      "edge_count": 12,
+      "flow_kind": "edit",
+      "id": "longcat_image_edit",
+      "node_count": 9,
+      "topology_sha256": "a6ab2c8745c4d98fe6c8a3e94628a9b11621f83dc9168eb92c616f4fb27632c1"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "z_image",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    },
+    {
+      "class_types": [
+        "CLIPTextEncodeSDXL",
+        "CheckpointLoaderSimple",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "VAEDecode"
+      ],
+      "edge_count": 9,
+      "flow_kind": "txt2img",
+      "id": "z_image_turbo",
+      "node_count": 7,
+      "topology_sha256": "0dab591bca903337b5b2a63803f1e54d414453c574bf11a9875e644edc3ba1c8"
+    }
+  ],
+  "schema_version": "current-host-profile-graph-contract-v1",
+  "source_revision": "c67885b14556cf3e4e061862925282d403d09862"
+}
