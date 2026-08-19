@@ -109,7 +109,7 @@ _EXPECTED_SUBJECTS: Mapping[str, Mapping[str, object]] = MappingProxyType(
                     "media_video": "0.3.101",
                     "meta": "0.11.43",
                 },
-                "artifact_status": "deferred-to-F327",
+                "artifact_status": "artifact-verification-pending",
             }
         ),
     }
@@ -120,27 +120,27 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
         ("core", "app/user_manager.py"): ("unchanged", "none", "direct-byte-hash"),
         ("core", "comfy_extras/nodes_custom_sampler.py"): (
             "changed",
-            "unreviewed-by-R240",
+            "semantic-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_advanced.py"): (
             "changed",
-            "unreviewed-by-R240",
+            "semantic-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_patch.py"): (
             "changed",
-            "unreviewed-by-R240",
+            "semantic-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_textgen.py"): (
             "changed",
-            "unreviewed-by-R240",
+            "semantic-review-pending",
             "direct-byte-hash",
         ),
         ("core", "nodes.py"): (
             "changed",
-            "unreviewed-by-R240",
+            "semantic-review-pending",
             "direct-byte-hash",
         ),
         ("core", "requirements.txt"): ("changed", "none", "version-manifest-hash"),
@@ -177,8 +177,8 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "c67885b14556cf3e4e061862925282d403d09862",
             "revision-and-component",
             "mixed",
-            "unreviewed-by-R240",
-            "F325/F326",
+            "semantic-review-pending",
+            "core-contract-alignment",
         ),
         "desktop": (
             "e2d964b7456cea8423c7b9d3371c612313c06baa",
@@ -186,23 +186,23 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "none",
             "unchanged",
             "none",
-            "R240",
+            "source-freeze",
         ),
         "frontend": (
             "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
             "569e65b30fbfe96743c7996e201a32bcf029a310",
             "revision-and-version",
             "mixed",
-            "unreviewed-by-R240",
-            "F329",
+            "semantic-review-pending",
+            "frontend-compatibility-alignment",
         ),
         "workflow_templates": (
             "a832a091491ce5b6341f4e4ca548b7ab536b6acd",
             "f54739874c88e5a1154275c4597b3860e5a617b4",
             "revision-and-component",
             "changed",
-            "unreviewed-by-R240",
-            "F327/F328",
+            "semantic-review-pending",
+            "workflow-template-alignment",
         ),
     }
 )
@@ -323,7 +323,7 @@ def _require_version(value: object, context: str) -> str:
 
 def _require_exact_value(value: object, expected: object, context: str) -> None:
     if value != expected:
-        raise ValueError(f"{context} must equal the frozen R240 value.")
+        raise ValueError(f"{context} must equal the frozen candidate value.")
 
 
 def _parse_timestamp(value: object) -> str:

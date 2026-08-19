@@ -155,7 +155,7 @@ def load_and_validate_manifest(
             raise ValueError(f"Authoritative {source} reference source is missing.")
         if revision_reader is None:
             # IMPORTANT: refreshed reference checkouts may move HEAD; the active lane
-            # remains bound to its exact accepted commit and blobs until R241 promotion.
+            # remains bound to its exact accepted commit and blobs until source promotion.
             _verify_pinned_git_commit(source_root, expected_revision)
         elif revision_reader(source_root) != expected_revision:
             raise ValueError(f"Authoritative {source} reference revision mismatched the source basis.")

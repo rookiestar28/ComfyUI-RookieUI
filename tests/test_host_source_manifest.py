@@ -38,12 +38,12 @@ class HostSourceManifestTests(unittest.TestCase):
     def _api(self):
         self.assertIsNotNone(
             importlib.util.find_spec(MODULE_NAME),
-            "R240 candidate source-manifest contract is missing.",
+            "Candidate source-manifest contract is missing.",
         )
         return importlib.import_module(MODULE_NAME)
 
     def _payload(self) -> dict[str, object]:
-        self.assertTrue(MANIFEST_PATH.is_file(), "R240 candidate source manifest is missing.")
+        self.assertTrue(MANIFEST_PATH.is_file(), "Candidate source manifest is missing.")
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     def test_candidate_subjects_are_exact_without_promoting_active_basis(self) -> None:
@@ -90,7 +90,7 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(
             manifest.subjects["workflow_templates"].artifact_status,
-            "deferred-to-F327",
+            "artifact-verification-pending",
         )
         self.assertEqual(
             manifest.subjects["desktop"].revision,
@@ -98,7 +98,7 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest.subjects["desktop"].status, "unchanged-control")
 
-        # R241, not R240, owns promotion of the accepted runtime envelope.
+        # Candidate evidence must not promote the accepted runtime envelope.
         self.assertEqual(
             HOST_SOURCE_BASIS.core.revision,
             "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
@@ -127,15 +127,22 @@ class HostSourceManifestTests(unittest.TestCase):
                 self.assertRegex(artifact.sha256, re.compile(r"^[0-9a-f]{64}$"))
                 if artifact.subject == "core" and artifact.path in changed_core_paths:
                     self.assertEqual(artifact.byte_drift, "changed")
-                    self.assertEqual(artifact.semantic_drift, "unreviewed-by-R240")
+                    self.assertEqual(artifact.semantic_drift, "semantic-review-pending")
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
 
         comparisons = {comparison.subject: comparison for comparison in manifest.comparisons}
         self.assertEqual(set(comparisons), {"core", "frontend", "workflow_templates", "desktop"})
-        self.assertEqual(comparisons["core"].owner, "F325/F326")
-        self.assertEqual(comparisons["frontend"].owner, "F329")
-        self.assertEqual(comparisons["workflow_templates"].owner, "F327/F328")
+        self.assertEqual(comparisons["core"].owner, "core-contract-alignment")
+        self.assertEqual(
+            comparisons["frontend"].owner,
+            "frontend-compatibility-alignment",
+        )
+        self.assertEqual(
+            comparisons["workflow_templates"].owner,
+            "workflow-template-alignment",
+        )
+        self.assertEqual(comparisons["desktop"].owner, "source-freeze")
         self.assertEqual(comparisons["desktop"].source_drift, "none")
 
     def test_canonical_serialization_round_trip_is_byte_stable(self) -> None:
@@ -145,6 +152,11 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertEqual(api.serialize_manifest(manifest), original)
         self.assertTrue(original.endswith("\n"))
         self.assertFalse(original.endswith("\n\n"))
+
+    def test_canonical_public_manifest_has_no_internal_item_code_tokens(self) -> None:
+        item_code_shape = re.compile(r"\b[A-Z][A-Z0-9-]*[0-9]{3,}\b")
+        manifest_text = MANIFEST_PATH.read_text(encoding="utf-8")
+        self.assertIsNone(item_code_shape.search(manifest_text))
 
     def test_parser_rejects_duplicate_and_unknown_members(self) -> None:
         api = self._api()
