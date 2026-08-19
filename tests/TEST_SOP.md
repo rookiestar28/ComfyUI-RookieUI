@@ -1,5 +1,24 @@
 # Test SOP
 
+<!-- CURRENT-TEST-GOVERNANCE:START -->
+## Current Change-Governance Authority
+
+This section supersedes narrower documentation exceptions, platform-selection rules, and Hosted CI
+acceptance wording elsewhere in this file.
+
+- Pure text/documentation changes and version-field-only `pyproject.toml` updates do not require
+  planning, a roadmap item, records/logs, independent review, a documentation test contract, E2E,
+  or the full repository gate. Use proportionate text/TOML/metadata checks only when useful.
+- Dependency, build, tool-configuration, entry-point, runtime-compatibility, or other
+  behavior-bearing `pyproject.toml` changes are not version-only fast-path changes.
+- For non-exempt work, a passing Windows Full Gate is the authoritative repository-wide test
+  result. Neither push nor Hosted CI is required, and acceptance evidence does not need to bind to a
+  pushed commit. Linux/WSL and Hosted CI runs are optional diagnostics unless the current item
+  explicitly requires platform-specific evidence.
+- Required item-scoped security, live-host, provider, migration, release, or publication checks
+  remain additive.
+<!-- CURRENT-TEST-GOVERNANCE:END -->
+
 This document is the source-of-truth local verification workflow for **ComfyUI-RookieUI**.
 Use it before push and before marking any implementation as accepted.
 
@@ -48,9 +67,11 @@ For bugfix/hotfix work, acceptance evidence must include:
 2. post-fix targeted regression evidence
 3. final full-gate evidence
 
-### Documentation-only Exception
+### Documentation/Version Fast-Path
 
-If all touched files are documentation/planning text only (no code/tests/scripts/config/runtime changes), full test execution is optional.
+Pure text/documentation changes and version-field-only `pyproject.toml` updates do not require the
+full test workflow. A `pyproject.toml` change that affects dependencies, build or tool behavior,
+entry points, runtime compatibility, or other behavior-bearing metadata does not qualify.
 
 ## Prerequisites
 

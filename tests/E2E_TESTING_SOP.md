@@ -1,5 +1,17 @@
 # E2E Testing SOP
 
+<!-- CURRENT-TEST-GOVERNANCE:START -->
+## Current Governance Scope
+
+A change limited to pure text/documentation files, a version-field-only `pyproject.toml` update, or
+both does not enter this E2E workflow and requires no planning, roadmap item, record/log,
+independent review, documentation test contract, browser installation, or full gate. Behavior-
+bearing metadata changes do not qualify. For non-exempt work, applicable E2E runs through the
+authoritative Windows Full Gate. Hosted CI repetitions are optional diagnostics and are not
+acceptance prerequisites or pushed-commit evidence. Explicit item-scoped live/supported-host checks
+remain separate when required.
+<!-- CURRENT-TEST-GOVERNANCE:END -->
+
 This SOP defines the verified Playwright workflow for this repository.
 
 ## Scope

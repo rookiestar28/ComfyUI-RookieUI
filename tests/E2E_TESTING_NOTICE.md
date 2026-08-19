@@ -1,5 +1,17 @@
 All frontend E2E tests must follow `tests/E2E_TESTING_SOP.md`.
 
+<!-- CURRENT-TEST-GOVERNANCE:START -->
+## Current Governance Scope
+
+A change limited to pure text/documentation files, a version-field-only `pyproject.toml` update, or
+both does not enter this E2E workflow and requires no planning, roadmap item, record/log,
+independent review, documentation test contract, browser installation, or full gate. Behavior-
+bearing metadata changes do not qualify. For non-exempt work, applicable E2E runs through the
+authoritative Windows Full Gate. Hosted CI repetitions are optional diagnostics and are not
+acceptance prerequisites or pushed-commit evidence. Explicit item-scoped live/supported-host checks
+remain separate when required.
+<!-- CURRENT-TEST-GOVERNANCE:END -->
+
 Mandatory testing-design rule:
 
 - E2E tests must be designed to reproduce real user-visible failures and catch bugs early, not merely to pass validation.
@@ -8,8 +20,8 @@ Mandatory testing-design rule:
 
 Exception:
 
-- strictly documentation-only changes do not require entering the E2E workflow
-- once code/tests/scripts/config/runtime files change, this exception does not apply
+- pure text/documentation changes and version-field-only `pyproject.toml` updates do not enter the E2E workflow
+- once code/tests/scripts/config/runtime files change, or `pyproject.toml` changes behavior-bearing metadata, this exception does not apply
 
 Scope note:
 

@@ -25,6 +25,28 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Current-host contracts and workflow support refresh (stability/compatibility)</strong></summary>
+
+- Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template basis, with exact source, graph, node, profile, and runtime contracts for the supported host surface.
+- Current-host validation now checks pinned source artifacts and supported workflow graphs together, so host node inputs, graph topology, queue/runtime semantics, and packaged-template drift are detected explicitly.
+- Upstream workflow-template additions, changes, and archived entries are classified separately from RookieUI support, preventing newly observed templates from being advertised before a matching UI and runtime path exists.
+- Frontend dependency locking now carries the patched `nanoid` advisory resolution while preserving frozen-install validation.
+
+</details>
+
+<details>
+
+<summary><strong>Generation progress and terminal lifecycle hardening (stability/UX)</strong></summary>
+
+- Generation tracking now consumes prompt-scoped host progress, preview, success, error, and interruption events without allowing events from another queued job to update the active sidebar.
+- Progress bursts are coalesced to the latest animation-frame update, reducing unnecessary sidebar rendering during active generation.
+- Terminal events immediately stop pending polling, listeners, progress writes, and stale preview updates; starting a replacement run also releases the previous run's timers and blob previews.
+- When generation advances without live preview frames, RookieUI now reports that host preview may be disabled instead of leaving a silent placeholder.
+
+</details>
+
+<details>
+
 <summary><strong>Current-host ControlNet execution alignment (new functionality/stability)</strong></summary>
 
 - Generic Stable Diffusion ControlNet now follows the current ComfyUI clone and multi-device lifecycle while preserving chained and single-device behavior.
@@ -566,7 +588,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Hero `Generate` rail with compact action icons
 - Family-aware preset behavior with SD-family parity lanes plus official non-SD template-backed preset/profile lanes
 - Progress text and queue/history integration in sidebar flow
-- Live preview panel with runtime updates and flicker-mitigated rendering
+- Live preview panel with prompt-scoped host events, coalesced progress updates, terminal-state handling, and flicker-mitigated rendering
 - Fullscreen preview viewer for generated results, with direct surface activation and zoom-only inspection
 - Preview quick actions for output handoff to `Img2Img`, `Inpaint`, `Extras`, and `PNG Info`, using completed output artifacts and metadata when available
 - Host-aware sidebar registration with stale-tab cleanup on current ComfyUI frontends and a legacy launcher fallback for older hosts
@@ -890,6 +912,7 @@ Behavior and compatibility:
 - The custom-node package declares its web asset directory through current ComfyUI package metadata while retaining the legacy `WEB_DIRECTORY` export used by existing hosts.
 - RookieUI route registration is composed from focused domain specifications, preserving canonical and compatibility aliases while keeping collision handling and multi-user fail-closed checks at the guarded runtime boundary.
 - Family/profile capabilities and fallback metadata are projected from the canonical manifest so backend builders and frontend selectors describe the same supported surface.
+- Generation runtime tracking binds progress, preview, and terminal events to the active prompt, and releases polling/listeners immediately when a run completes, fails, is interrupted, or is replaced.
 - Host model discovery uses ComfyUI `folder_paths` keys rather than scanning arbitrary filesystem locations directly.
 - Z-Image ControlNet capability discovery uses the host `model_patches` catalog and reports those files separately from generic ControlNet model folders.
 
