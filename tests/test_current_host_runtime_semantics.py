@@ -335,6 +335,17 @@ class CurrentHostCoreRuntimeBehaviorTests(unittest.TestCase):
         self.assertTrue(np.all(masked_image[:, 0, 0, :] == 0.0))
         self.assertTrue(np.all(masked_image[:, 0, 1, :] == 1.0))
 
+    def test_controlnet_mask_protocol_rejects_non_tensor_control_output(self) -> None:
+        torch = _FakeTorch()
+        source_mask = _tensor([[[1.0, 0.0], [0.0, 1.0]]])
+
+        with mock.patch.object(controlnet_mask_runtime, "torch", torch):
+            with self.assertRaisesRegex(ValueError, r"rank 4 \[B,C,H,W\]"):
+                controlnet_mask_runtime.apply_effect_mask_to_control(
+                    {"input": [1.0], "middle": [], "output": []},
+                    source_mask,
+                )
+
     def test_tokenizer_capability_mismatch_uses_stock_tokens_without_prompt_logging(self) -> None:
         class _StockOnlyClip:
             def __init__(self) -> None:
