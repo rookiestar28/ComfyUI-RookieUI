@@ -28,6 +28,8 @@ EXPECTED_ARTIFACT_KEYS = (
     ("desktop", "package.json"),
     ("frontend", "package.json"),
     ("frontend", "src/components/common/ExtensionSlot.vue"),
+    ("frontend", "src/schemas/apiSchema.ts"),
+    ("frontend", "src/stores/executionStore.ts"),
     ("frontend", "src/stores/workspace/sidebarTabStore.ts"),
     ("frontend", "src/types/extensionTypes.ts"),
     ("workflow_templates", "pyproject.toml"),
@@ -131,6 +133,12 @@ class HostSourceManifestTests(unittest.TestCase):
                         artifact.semantic_drift,
                         "covered-signature-compatible-runtime-disposition-complete",
                     )
+                elif artifact.subject == "frontend" and artifact.path == "src/stores/executionStore.ts":
+                    self.assertEqual(artifact.byte_drift, "changed")
+                    self.assertEqual(
+                        artifact.semantic_drift,
+                        "runtime-event-contract-aligned",
+                    )
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
 
@@ -144,6 +152,10 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertEqual(
             comparisons["frontend"].owner,
             "frontend-compatibility-alignment",
+        )
+        self.assertEqual(
+            comparisons["frontend"].semantic_drift,
+            "sidebar-and-runtime-event-compatible",
         )
         self.assertEqual(
             comparisons["workflow_templates"].owner,
@@ -268,7 +280,7 @@ class HostSourceManifestTests(unittest.TestCase):
                 revision_reader=revision_reader,
             )
             self.assertEqual(report.status, "verified")
-            self.assertEqual(len(report.artifacts), 14)
+            self.assertEqual(len(report.artifacts), 16)
 
             with self.subTest("revision mismatch"):
                 with self.assertRaisesRegex(ValueError, "revision"):
@@ -305,7 +317,7 @@ class HostSourceManifestTests(unittest.TestCase):
         report = api.verify_source_artifacts(manifest)
         self.assertIn(report.status, {"verified", "unavailable-fixture-only"})
         if report.status == "verified":
-            self.assertEqual(len(report.artifacts), 14)
+            self.assertEqual(len(report.artifacts), 16)
         else:
             self.assertEqual(report.artifacts, ())
 

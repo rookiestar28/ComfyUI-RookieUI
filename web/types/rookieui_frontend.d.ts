@@ -47,11 +47,63 @@ export interface RookieUIFeatureBootstrapRegistryEntry {
   compose?: (loadedState: Record<string, any>) => unknown;
 }
 
+export type RookieUIRuntimeJobId = string;
+export type RookieUIRuntimeNodeId = string | number;
+
+export interface RookieUIRuntimeProgressEvent {
+  value: number;
+  max: number;
+  prompt_id: RookieUIRuntimeJobId;
+  node: RookieUIRuntimeNodeId;
+}
+
+export interface RookieUIRuntimeNodeProgressState {
+  value: number;
+  max: number;
+  state: "pending" | "running" | "finished" | "error";
+  node_id: RookieUIRuntimeNodeId;
+  prompt_id: RookieUIRuntimeJobId;
+  display_node_id?: RookieUIRuntimeNodeId;
+  parent_node_id?: RookieUIRuntimeNodeId;
+  real_node_id?: RookieUIRuntimeNodeId;
+}
+
+export interface RookieUIRuntimeProgressStateEvent {
+  prompt_id: RookieUIRuntimeJobId;
+  nodes: Record<string, RookieUIRuntimeNodeProgressState>;
+}
+
+export interface RookieUIRuntimeTerminalEvent {
+  prompt_id: RookieUIRuntimeJobId;
+  [key: string]: unknown;
+}
+
+export interface RookieUIRuntimeEventMap {
+  progress: RookieUIRuntimeProgressEvent;
+  progress_state: RookieUIRuntimeProgressStateEvent;
+  b_preview_with_metadata: unknown;
+  b_preview: unknown;
+  execution_success: RookieUIRuntimeTerminalEvent;
+  execution_error: RookieUIRuntimeTerminalEvent;
+  execution_interrupted: RookieUIRuntimeTerminalEvent;
+}
+
+export type RookieUIRuntimeEventListener<TEvent extends keyof RookieUIRuntimeEventMap> = (
+  event: CustomEvent<RookieUIRuntimeEventMap[TEvent]>,
+) => void;
+
 export interface RookieUIExtensionRuntimeApi {
   clientId?: string;
   fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;
-  addEventListener?: (...args: unknown[]) => void;
-  removeEventListener?: (...args: unknown[]) => void;
+  apiURL?: (route: string) => string;
+  addEventListener?: <TEvent extends keyof RookieUIRuntimeEventMap>(
+    eventName: TEvent,
+    listener: RookieUIRuntimeEventListener<TEvent>,
+  ) => void;
+  removeEventListener?: <TEvent extends keyof RookieUIRuntimeEventMap>(
+    eventName: TEvent,
+    listener: RookieUIRuntimeEventListener<TEvent>,
+  ) => void;
 }
 
 export interface RookieUIExtensionApp {

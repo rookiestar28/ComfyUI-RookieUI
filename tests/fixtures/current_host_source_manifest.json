@@ -101,6 +101,24 @@
     },
     {
       "byte_drift": "unchanged",
+      "bytes": 18823,
+      "evidence": "direct-byte-hash",
+      "path": "src/schemas/apiSchema.ts",
+      "semantic_drift": "none",
+      "sha256": "bd2d304950f552e1ed1f731ea79357e326d156aa0010b512a3dd8a74895fb133",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 33200,
+      "evidence": "direct-byte-hash",
+      "path": "src/stores/executionStore.ts",
+      "semantic_drift": "runtime-event-contract-aligned",
+      "sha256": "888f385ff7612fabc492b03aba61a5ace48f42badc21019b0e00fed7a9a1eb7e",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "unchanged",
       "bytes": 5835,
       "evidence": "direct-byte-hash",
       "path": "src/stores/workspace/sidebarTabStore.ts",
@@ -127,7 +145,7 @@
       "subject": "workflow_templates"
     }
   ],
-  "captured_at": "2026-08-19T15:52:19+08:00",
+  "captured_at": "2026-08-19T22:19:33+08:00",
   "comparisons": [
     {
       "byte_drift": "mixed",
@@ -151,7 +169,7 @@
       "byte_drift": "mixed",
       "from_revision": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
       "owner": "frontend-compatibility-alignment",
-      "semantic_drift": "semantic-review-pending",
+      "semantic_drift": "sidebar-and-runtime-event-compatible",
       "source_drift": "revision-and-version",
       "subject": "frontend",
       "to_revision": "569e65b30fbfe96743c7996e201a32bcf029a310"

@@ -33,6 +33,73 @@ test("submits txt2img through the ComfyUI runtime API resolver when root API pat
   expect(requestCapture.rootFetchPaths).toEqual([]);
 });
 
+test("renders matching runtime progress and metadata preview then tears down on interruption", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1&runtimeEventScenario=1");
+  await page.locator("#rookieui-prompt").fill("content-free-e2e-token");
+  await page.locator("#rookieui-txt2img-submit").click();
+  await page.locator("#rookieui-prompt").fill("");
+  await expect(page.locator("#rookieui-txt2img-status")).toHaveText("in progress");
+  await expect.poll(() => page.evaluate(() => window.__ROOKIEUI_E2E_RUNTIME__.listenerCount())).toBe(7);
+
+  await page.evaluate(() => {
+    window.__ROOKIEUI_E2E_RUNTIME__.dispatch("progress_state", {
+      prompt_id: "e2e-prompt-123",
+      nodes: {
+        "7": {
+          prompt_id: "e2e-prompt-123",
+          node_id: "7",
+          state: "running",
+          value: 7,
+          max: 10,
+        },
+      },
+    });
+  });
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("in progress (70%)");
+
+  await page.evaluate(() => {
+    const runtime = window.__ROOKIEUI_E2E_RUNTIME__;
+    const bytes = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZqZsAAAAASUVORK5CYII="),
+      (character) => character.charCodeAt(0),
+    );
+    runtime.dispatch("b_preview_with_metadata", {
+      jobId: "e2e-prompt-123",
+      blob: new Blob([bytes], { type: "image/png" }),
+    });
+  });
+  const previewImage = page.locator("#rookieui-txt2img-preview img");
+  await expect(previewImage).toHaveAttribute("src", /^blob:/);
+  const matchingPreviewUrl = await previewImage.getAttribute("src");
+
+  await page.evaluate(() => {
+    const bytes = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZqZsAAAAASUVORK5CYII="),
+      (character) => character.charCodeAt(0),
+    );
+    window.__ROOKIEUI_E2E_RUNTIME__.dispatch("b_preview_with_metadata", {
+      jobId: "e2e-other-job",
+      blob: new Blob([bytes], { type: "image/png" }),
+    });
+  });
+  await expect(previewImage).toHaveAttribute("src", matchingPreviewUrl);
+
+  await page.evaluate(() => {
+    window.__ROOKIEUI_E2E_RUNTIME__.dispatch("execution_interrupted", {
+      prompt_id: "e2e-prompt-123",
+      node_id: "7",
+      node_type: "SyntheticNode",
+      executed: [],
+    });
+  });
+  await expect(page.locator("#rookieui-txt2img-status")).toHaveText("Generation cancelled: e2e-prompt-123");
+  await expect.poll(() => page.evaluate(() => window.__ROOKIEUI_E2E_RUNTIME__.listenerCount())).toBe(0);
+
+  const runtimeVisual = await page.locator("#mock-sidebar-tabs").screenshot();
+  await testInfo.attach("runtime-event-interruption", { body: runtimeVisual, contentType: "image/png" });
+});
+
 test("keeps txt2img Generate clickable when host submit listeners intercept the form event", async ({ page }) => {
   await page.goto("test-harness.html?runtimeApiFetch=1&rejectRootApiFetch=1");
   await expect(page.locator("#rookieui-root")).toContainText('"clientId":"e2e-runtime-api-client"');

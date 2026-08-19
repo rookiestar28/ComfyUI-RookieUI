@@ -152,6 +152,16 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
             "none",
             "direct-byte-hash",
         ),
+        ("frontend", "src/schemas/apiSchema.ts"): (
+            "unchanged",
+            "none",
+            "direct-byte-hash",
+        ),
+        ("frontend", "src/stores/executionStore.ts"): (
+            "changed",
+            "runtime-event-contract-aligned",
+            "direct-byte-hash",
+        ),
         ("frontend", "src/stores/workspace/sidebarTabStore.ts"): (
             "unchanged",
             "none",
@@ -193,7 +203,7 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "569e65b30fbfe96743c7996e201a32bcf029a310",
             "revision-and-version",
             "mixed",
-            "semantic-review-pending",
+            "sidebar-and-runtime-event-compatible",
             "frontend-compatibility-alignment",
         ),
         "workflow_templates": (

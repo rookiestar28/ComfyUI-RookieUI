@@ -4,7 +4,7 @@ import {
   DEFAULT_PRIMARY_MODEL_CATEGORY_BY_FAMILY,
 } from "../../web/rookieui_api.js";
 import { registerRookieUIBootstrapExtension } from "../../web/rookieui_extension.js";
-import { createMockComfyUIApp } from "./mocks/comfyui-app.js";
+import { createMockComfyUIApp, createMockComfyUIRuntimeApi } from "./mocks/comfyui-app.js";
 
 const params = new URLSearchParams(window.location.search);
 const surface = params.get("surface") === "desktop" ? "desktop" : "standalone-web";
@@ -12,6 +12,7 @@ const sidebar = params.get("sidebar") !== "0";
 const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
 const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 const rejectRookieModels = params.get("rejectRookieModels") === "1";
+const runtimeEventScenario = params.get("runtimeEventScenario") === "1";
 const requestedImg2ImgDelayMs = Number(params.get("img2imgDelayMs") ?? 0);
 const img2imgDelayMs = Number.isFinite(requestedImg2ImgDelayMs)
   ? Math.max(0, Math.min(5000, Math.trunc(requestedImg2ImgDelayMs)))
@@ -911,9 +912,9 @@ async function handleE2EFetch(url, options = {}) {
         queue_remaining: 0,
         job: {
           id: promptId,
-          status: "completed",
-          output_filenames: ["history-image.png"],
-          reusable_outputs: ["history-image.png"],
+          status: runtimeEventScenario ? "in_progress" : "completed",
+          output_filenames: runtimeEventScenario ? [] : ["history-image.png"],
+          reusable_outputs: runtimeEventScenario ? [] : ["history-image.png"],
         },
       }),
       {
@@ -926,15 +927,19 @@ async function handleE2EFetch(url, options = {}) {
   if (route.startsWith("/history/")) {
     const promptId = route.split("/").pop();
     return new Response(
-      JSON.stringify({
-        [promptId]: {
-          outputs: {
-            "7": {
-              images: [{ filename: "history-image.png", subfolder: "", type: "output" }],
+      JSON.stringify(
+        runtimeEventScenario
+          ? {}
+          : {
+              [promptId]: {
+                outputs: {
+                  "7": {
+                    images: [{ filename: "history-image.png", subfolder: "", type: "output" }],
+                  },
+                },
+              },
             },
-          },
-        },
-      }),
+      ),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -1217,23 +1222,29 @@ window.fetch = async (url, options = {}) => {
   return handleE2EFetch(url, options);
 };
 
+const e2eRuntimeApi = runtimeApiFetch
+  ? createMockComfyUIRuntimeApi({
+      clientId: "e2e-runtime-api-client",
+      fetchApi: (route, options = {}) => {
+        const networkPath = apiURL(route);
+        window.__ROOKIEUI_E2E_REQUESTS__.fetchApiRoutes.push(route);
+        window.__ROOKIEUI_E2E_REQUESTS__.fetchApiNetworkPaths.push(networkPath);
+        return handleE2EFetch(networkPath, options);
+      },
+    })
+  : null;
+
 const app = createMockComfyUIApp({
   sidebar,
-  api: runtimeApiFetch
-    ? {
-        clientId: "e2e-runtime-api-client",
-        addEventListener() {},
-        removeEventListener() {},
-        fetchApi: (route, options = {}) => {
-          const networkPath = apiURL(route);
-          window.__ROOKIEUI_E2E_REQUESTS__.fetchApiRoutes.push(route);
-          window.__ROOKIEUI_E2E_REQUESTS__.fetchApiNetworkPaths.push(networkPath);
-          return handleE2EFetch(networkPath, options);
-        },
-      }
-    : null,
+  api: e2eRuntimeApi,
 });
 window.__ROOKIEUI_E2E_APP__ = app;
+window.__ROOKIEUI_E2E_RUNTIME__ = e2eRuntimeApi
+  ? {
+      dispatch: (eventName, detail) => e2eRuntimeApi.dispatch(eventName, detail),
+      listenerCount: () => e2eRuntimeApi.listenerCount(),
+    }
+  : null;
 if (params.get("lifecycleSentinel") === "1") {
   Object.assign(document.querySelector(".sidebar-content-container").style, {
     minWidth: "211px", width: "377px", flexBasis: "13px",

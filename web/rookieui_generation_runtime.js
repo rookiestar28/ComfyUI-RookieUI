@@ -776,6 +776,15 @@ export function createGenerationRuntimeHelpers({
     if (!runtimeState || !promptId || runtimeState.disposed) {
       return;
     }
+    for (const dispose of runtimeState.activeDisposers ?? []) {
+      dispose();
+    }
+    runtimeState.activeDisposers?.clear?.();
+    if (String(runtimeState.previewUrl ?? "").startsWith("blob:")) {
+      URL.revokeObjectURL(runtimeState.previewUrl);
+    }
+    runtimeState.previewUrl = "";
+    setPreviewContent(previewBox, "", runtimeState.previewPlaceholder);
     const runToken = runtimeState.runToken + 1;
     runtimeState.runToken = runToken;
     runtimeState.progressValue = null;
@@ -789,6 +798,54 @@ export function createGenerationRuntimeHelpers({
 
     const runtimeApi = resolveRuntimeApi(bootstrapState);
     const listeners = [];
+    let finalStatus = "pending";
+    let terminalEventStatus = "";
+    let pendingProgressUpdate = null;
+    let progressFrameHandle = null;
+    const cancelPendingProgressUpdate = () => {
+      pendingProgressUpdate = null;
+      if (progressFrameHandle !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(progressFrameHandle);
+      }
+      progressFrameHandle = null;
+    };
+    runtimeState.activeDisposers?.add?.(cancelPendingProgressUpdate);
+    const applyProgressUpdate = (progressUpdate) => {
+      if (
+        runtimeState.disposed ||
+        runtimeState.runToken !== runToken ||
+        terminalEventStatus ||
+        !progressUpdate
+      ) {
+        return;
+      }
+      runtimeState.progressValue = progressUpdate.value;
+      runtimeState.progressMax = progressUpdate.max;
+      runtimeState.progressSeen = true;
+      statusNode.textContent = appendStatusSuffix(
+        formatGenerationProgress("in_progress", runtimeState.progressValue, runtimeState.progressMax),
+        statusSuffix,
+      );
+    };
+    const queueProgressUpdate = (progressUpdate) => {
+      pendingProgressUpdate = progressUpdate;
+      if (progressFrameHandle !== null) {
+        return;
+      }
+      if (typeof requestAnimationFrame !== "function") {
+        const update = pendingProgressUpdate;
+        pendingProgressUpdate = null;
+        applyProgressUpdate(update);
+        return;
+      }
+      // IMPORTANT: Frontend 1.52 coalesces both progress lanes per frame; direct DOM writes here reintroduce burst-driven sidebar churn.
+      progressFrameHandle = requestAnimationFrame(() => {
+        progressFrameHandle = null;
+        const update = pendingProgressUpdate;
+        pendingProgressUpdate = null;
+        applyProgressUpdate(update);
+      });
+    };
     const registerRuntimeListener = (eventName, handler) => {
       if (!runtimeApi?.addEventListener) {
         return;
@@ -797,10 +854,9 @@ export function createGenerationRuntimeHelpers({
       listeners.push([eventName, handler]);
     };
     const unregisterRuntimeListeners = () => {
-      if (!runtimeApi?.removeEventListener) {
-        return;
+      if (runtimeApi?.removeEventListener) {
+        listeners.forEach(([eventName, handler]) => runtimeApi.removeEventListener(eventName, handler));
       }
-      listeners.forEach(([eventName, handler]) => runtimeApi.removeEventListener(eventName, handler));
       listeners.length = 0;
     };
     runtimeState.activeDisposers?.add?.(unregisterRuntimeListeners);
@@ -819,23 +875,42 @@ export function createGenerationRuntimeHelpers({
       });
 
     registerRuntimeListener("progress", (event) => {
-      if (runtimeState.runToken !== runToken) {
+      if (runtimeState.runToken !== runToken || terminalEventStatus) {
         return;
       }
       const detail = event?.detail ?? {};
-      if (detail.prompt_id && detail.prompt_id !== promptId) {
+      if (extractRuntimePromptId(detail) !== promptId) {
         return;
       }
-      runtimeState.progressValue = typeof detail.value === "number" ? detail.value : runtimeState.progressValue;
-      runtimeState.progressMax = typeof detail.max === "number" ? detail.max : runtimeState.progressMax;
-      runtimeState.progressSeen = true;
-      statusNode.textContent = appendStatusSuffix(
-        formatGenerationProgress("in_progress", runtimeState.progressValue, runtimeState.progressMax),
-        statusSuffix,
+      if (!Number.isFinite(detail.value) || !Number.isFinite(detail.max) || detail.max <= 0) {
+        return;
+      }
+      queueProgressUpdate({ value: detail.value, max: detail.max });
+    });
+    registerRuntimeListener("progress_state", (event) => {
+      if (runtimeState.runToken !== runToken || terminalEventStatus) {
+        return;
+      }
+      const detail = event?.detail ?? {};
+      if (extractRuntimePromptId(detail) !== promptId || !detail.nodes || typeof detail.nodes !== "object") {
+        return;
+      }
+      const runningState = Object.values(detail.nodes).find(
+        (nodeState) =>
+          nodeState &&
+          typeof nodeState === "object" &&
+          nodeState.state === "running" &&
+          Number.isFinite(nodeState.value) &&
+          Number.isFinite(nodeState.max) &&
+          nodeState.max > 0,
       );
+      if (!runningState) {
+        return;
+      }
+      queueProgressUpdate({ value: runningState.value, max: runningState.max });
     });
     const applyPreviewEvent = (event) => {
-      if (runtimeState.runToken !== runToken) {
+      if (runtimeState.runToken !== runToken || terminalEventStatus) {
         return;
       }
       const detail = event?.detail ?? {};
@@ -860,16 +935,39 @@ export function createGenerationRuntimeHelpers({
     registerRuntimeListener("b_preview_with_metadata", applyPreviewEvent);
     registerRuntimeListener("b_preview", applyPreviewEvent);
 
+    const registerTerminalListener = (eventName, status, message) => {
+      registerRuntimeListener(eventName, (event) => {
+        if (runtimeState.runToken !== runToken || terminalEventStatus) {
+          return;
+        }
+        if (extractRuntimePromptId(event?.detail ?? {}) !== promptId) {
+          return;
+        }
+        terminalEventStatus = status;
+        finalStatus = status;
+        cancelPendingProgressUpdate();
+        statusNode.textContent = appendStatusSuffix(`${message}: ${promptId}`, statusSuffix);
+      });
+    };
+    registerTerminalListener("execution_success", "completed", "Generation finished; syncing output");
+    registerTerminalListener("execution_error", "failed", "Generation failed");
+    registerTerminalListener("execution_interrupted", "cancelled", "Generation cancelled");
+
     const startTime = Date.now();
     const maxDurationMs = 5 * 60 * 1000;
     let lastHistoryPollAt = 0;
-    let finalStatus = "pending";
     try {
       while (!runtimeState.disposed && runtimeState.runToken === runToken && Date.now() - startTime < maxDurationMs) {
+        if (terminalEventStatus) {
+          break;
+        }
         const scopedClientId = resolveActiveClientId(bootstrapState);
         const jobResult = await bootstrapState.fetchQueueJobRequest(promptId, scopedClientId);
         if (runtimeState.disposed || runtimeState.runToken !== runToken) {
           return;
+        }
+        if (terminalEventStatus) {
+          break;
         }
         if (!jobResult.ok) {
           statusNode.textContent = appendStatusSuffix("Waiting for queue sync...", statusSuffix);
@@ -911,6 +1009,8 @@ export function createGenerationRuntimeHelpers({
         await waitForRuntimeDelay(800);
       }
     } finally {
+      cancelPendingProgressUpdate();
+      runtimeState.activeDisposers?.delete?.(cancelPendingProgressUpdate);
       unregisterRuntimeListeners();
       runtimeState.activeDisposers?.delete?.(unregisterRuntimeListeners);
     }
