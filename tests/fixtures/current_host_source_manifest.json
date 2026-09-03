@@ -10,48 +10,66 @@
       "subject": "core"
     },
     {
-      "byte_drift": "changed",
+      "byte_drift": "unchanged",
       "bytes": 49739,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_custom_sampler.py",
-      "semantic_drift": "covered-signature-compatible-runtime-disposition-complete",
+      "semantic_drift": "none",
       "sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe",
       "subject": "core"
     },
     {
       "byte_drift": "changed",
-      "bytes": 14962,
+      "bytes": 73045,
+      "evidence": "pinned-git-blob-hash",
+      "path": "comfy_extras/nodes_images.py",
+      "semantic_drift": "graph-review-pending",
+      "sha256": "8f55ec8bf579c40176a1836067b873ef7c2ce437ea95a07fdbabe83cdf6c4223",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 15871,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_advanced.py",
-      "semantic_drift": "covered-signature-compatible-runtime-disposition-complete",
-      "sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9",
+      "semantic_drift": "runtime-review-pending",
+      "sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09",
       "subject": "core"
     },
     {
       "byte_drift": "changed",
-      "bytes": 42298,
+      "bytes": 44785,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_patch.py",
-      "semantic_drift": "covered-signature-compatible-runtime-disposition-complete",
-      "sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21",
+      "semantic_drift": "runtime-review-pending",
+      "sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c",
       "subject": "core"
     },
     {
-      "byte_drift": "changed",
+      "byte_drift": "unchanged",
       "bytes": 23350,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_textgen.py",
-      "semantic_drift": "covered-signature-compatible-runtime-disposition-complete",
+      "semantic_drift": "none",
       "sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7",
       "subject": "core"
     },
     {
       "byte_drift": "changed",
-      "bytes": 108038,
+      "bytes": 61543,
+      "evidence": "pinned-git-blob-hash",
+      "path": "execution.py",
+      "semantic_drift": "runtime-review-pending",
+      "sha256": "60e8333ec976e8723bba3aa854993963e2edfa21d62f2446fc68b8ea7ca7c480",
+      "subject": "core"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 108193,
       "evidence": "direct-byte-hash",
       "path": "nodes.py",
-      "semantic_drift": "covered-signature-compatible-runtime-disposition-complete",
-      "sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9",
+      "semantic_drift": "graph-review-pending",
+      "sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6",
       "subject": "core"
     },
     {
@@ -60,7 +78,7 @@
       "evidence": "version-manifest-hash",
       "path": "requirements.txt",
       "semantic_drift": "none",
-      "sha256": "dccf09fd0f14c81e7ae331172d9d4b7b4d6ed845c4f932af6d68e6e555dfeb0e",
+      "sha256": "40f1398128730708aea1ec4d291128571052d866bd81eb631370c27875529d9a",
       "subject": "core"
     },
     {
@@ -83,11 +101,11 @@
     },
     {
       "byte_drift": "changed",
-      "bytes": 9855,
+      "bytes": 12139,
       "evidence": "version-manifest-hash",
       "path": "package.json",
       "semantic_drift": "none",
-      "sha256": "dee9478d7a74bf24157f520b8fc5804501bbf9758f917b388d755b7496933058",
+      "sha256": "cd9bd73ba585633987690e0b9fa32e755c76c54d36f3d2a2a65c7edbb6f28b01",
       "subject": "frontend"
     },
     {
@@ -100,21 +118,30 @@
       "subject": "frontend"
     },
     {
-      "byte_drift": "unchanged",
-      "bytes": 18823,
+      "byte_drift": "changed",
+      "bytes": 18830,
       "evidence": "direct-byte-hash",
       "path": "src/schemas/apiSchema.ts",
-      "semantic_drift": "none",
-      "sha256": "bd2d304950f552e1ed1f731ea79357e326d156aa0010b512a3dd8a74895fb133",
+      "semantic_drift": "frontend-review-pending",
+      "sha256": "67fb3845ecfbc9ed964d17e274f17daaa3e3a5f16723d0af933c0dde78c6ce1e",
       "subject": "frontend"
     },
     {
       "byte_drift": "changed",
-      "bytes": 33200,
+      "bytes": 52263,
+      "evidence": "pinned-git-blob-hash",
+      "path": "src/scripts/api.ts",
+      "semantic_drift": "frontend-review-pending",
+      "sha256": "83a14ae190015005660b53970e8fb9b5f46e048f632607976bd371d0c6fcf914",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "changed",
+      "bytes": 36654,
       "evidence": "direct-byte-hash",
       "path": "src/stores/executionStore.ts",
-      "semantic_drift": "runtime-event-contract-aligned",
-      "sha256": "888f385ff7612fabc492b03aba61a5ace48f42badc21019b0e00fed7a9a1eb7e",
+      "semantic_drift": "frontend-review-pending",
+      "sha256": "94d9309c8d24d689e7e0b4f230525e7589e9817fd592975c42399a9ef0720573",
       "subject": "frontend"
     },
     {
@@ -141,20 +168,20 @@
       "evidence": "version-manifest-hash",
       "path": "pyproject.toml",
       "semantic_drift": "none",
-      "sha256": "e90d72828ce8bbdf4bec69b51f998a32fccb9fc993e9c9a28ed8f3baee06ea80",
+      "sha256": "d70603c86698dcdcbd7d84e6e4dd6d8f363ec7f49e960cf85c784e9fb30fbd66",
       "subject": "workflow_templates"
     }
   ],
-  "captured_at": "2026-08-19T22:19:33+08:00",
+  "captured_at": "2026-09-04T01:19:18+08:00",
   "comparisons": [
     {
       "byte_drift": "mixed",
-      "from_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
-      "owner": "runtime-compatibility-alignment",
-      "semantic_drift": "graph-and-runtime-contract-compatible",
+      "from_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "owner": "core-contract-rebaseline",
+      "semantic_drift": "graph-and-runtime-review-pending",
       "source_drift": "revision-and-component",
       "subject": "core",
-      "to_revision": "c67885b14556cf3e4e061862925282d403d09862"
+      "to_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a"
     },
     {
       "byte_drift": "unchanged",
@@ -167,25 +194,25 @@
     },
     {
       "byte_drift": "mixed",
-      "from_revision": "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
-      "owner": "frontend-compatibility-alignment",
-      "semantic_drift": "sidebar-and-runtime-event-compatible",
+      "from_revision": "569e65b30fbfe96743c7996e201a32bcf029a310",
+      "owner": "frontend-host-integration-alignment",
+      "semantic_drift": "sidebar-and-runtime-review-pending",
       "source_drift": "revision-and-version",
       "subject": "frontend",
-      "to_revision": "569e65b30fbfe96743c7996e201a32bcf029a310"
+      "to_revision": "8f3b1569e4241ebbb5a9333da2bd09465947c40c"
     },
     {
       "byte_drift": "changed",
-      "from_revision": "a832a091491ce5b6341f4e4ca548b7ab536b6acd",
+      "from_revision": "f54739874c88e5a1154275c4597b3860e5a617b4",
       "owner": "workflow-template-alignment",
       "semantic_drift": "semantic-review-pending",
       "source_drift": "revision-and-component",
       "subject": "workflow_templates",
-      "to_revision": "f54739874c88e5a1154275c4597b3860e5a617b4"
+      "to_revision": "b0bcdb274878ea3c5cf46fed3819faa05b920707"
     }
   ],
   "manifest_kind": "candidate-host-source-freeze",
-  "schema_version": "current-host-source-manifest-v3",
+  "schema_version": "current-host-source-manifest-v4",
   "serialization": {
     "array_order": "subject-then-path",
     "encoding": "UTF-8",
@@ -196,11 +223,11 @@
     "core": {
       "components": {
         "embedded_docs": "0.5.10",
-        "frontend_package": "1.49.6",
-        "workflow_templates": "0.11.43"
+        "frontend_package": "1.51.9",
+        "workflow_templates": "0.11.54"
       },
       "kind": "git-host",
-      "revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "status": "candidate-frozen"
     },
     "desktop": {
@@ -211,25 +238,25 @@
     },
     "frontend": {
       "kind": "git-host",
-      "revision": "569e65b30fbfe96743c7996e201a32bcf029a310",
+      "revision": "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
       "status": "candidate-frozen",
-      "version": "1.52.1"
+      "version": "1.54.1"
     },
     "workflow_templates": {
-      "artifact_status": "artifact-verification-pending",
+      "artifact_status": "artifact-checksum-verified",
       "components": {
-        "assets": "0.1.29",
-        "core": "0.3.314",
-        "json": "0.1.49",
+        "assets": "0.1.38",
+        "core": "0.3.331",
+        "json": "0.1.66",
         "media_api": "0.3.84",
         "media_image": "0.3.160",
         "media_other": "0.3.229",
         "media_video": "0.3.101",
-        "meta": "0.11.43"
+        "meta": "0.11.54"
       },
       "kind": "git-package-source",
-      "revision": "f54739874c88e5a1154275c4597b3860e5a617b4",
-      "tag": "v0.11.43"
+      "revision": "b0bcdb274878ea3c5cf46fed3819faa05b920707",
+      "tag": "v0.11.54"
     }
   }
 }

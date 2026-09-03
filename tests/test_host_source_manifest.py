@@ -5,6 +5,7 @@ import importlib
 import importlib.util
 import json
 import re
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,9 +20,11 @@ MODULE_NAME = "rookieui.contracts.host_source_manifest"
 EXPECTED_ARTIFACT_KEYS = (
     ("core", "app/user_manager.py"),
     ("core", "comfy_extras/nodes_custom_sampler.py"),
+    ("core", "comfy_extras/nodes_images.py"),
     ("core", "comfy_extras/nodes_model_advanced.py"),
     ("core", "comfy_extras/nodes_model_patch.py"),
     ("core", "comfy_extras/nodes_textgen.py"),
+    ("core", "execution.py"),
     ("core", "nodes.py"),
     ("core", "requirements.txt"),
     ("core", "server.py"),
@@ -29,6 +32,7 @@ EXPECTED_ARTIFACT_KEYS = (
     ("frontend", "package.json"),
     ("frontend", "src/components/common/ExtensionSlot.vue"),
     ("frontend", "src/schemas/apiSchema.ts"),
+    ("frontend", "src/scripts/api.ts"),
     ("frontend", "src/stores/executionStore.ts"),
     ("frontend", "src/stores/workspace/sidebarTabStore.ts"),
     ("frontend", "src/types/extensionTypes.ts"),
@@ -48,51 +52,51 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertTrue(MANIFEST_PATH.is_file(), "Candidate source manifest is missing.")
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    def test_accepted_candidate_subjects_are_exact_and_match_active_basis(self) -> None:
+    def test_refreshed_candidate_subjects_are_exact_and_do_not_promote_active_basis(self) -> None:
         api = self._api()
         manifest = api.load_manifest(MANIFEST_PATH)
 
-        self.assertEqual(manifest.schema_version, "current-host-source-manifest-v3")
+        self.assertEqual(manifest.schema_version, "current-host-source-manifest-v4")
         self.assertEqual(manifest.manifest_kind, "candidate-host-source-freeze")
         self.assertEqual(set(manifest.subjects), {"core", "frontend", "workflow_templates", "desktop"})
         self.assertEqual(
             manifest.subjects["core"].revision,
-            "c67885b14556cf3e4e061862925282d403d09862",
+            "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
         )
         self.assertEqual(
             dict(manifest.subjects["core"].components),
             {
                 "embedded_docs": "0.5.10",
-                "frontend_package": "1.49.6",
-                "workflow_templates": "0.11.43",
+                "frontend_package": "1.51.9",
+                "workflow_templates": "0.11.54",
             },
         )
         self.assertEqual(
             manifest.subjects["frontend"].revision,
-            "569e65b30fbfe96743c7996e201a32bcf029a310",
+            "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
         )
-        self.assertEqual(manifest.subjects["frontend"].version, "1.52.1")
+        self.assertEqual(manifest.subjects["frontend"].version, "1.54.1")
         self.assertEqual(
             manifest.subjects["workflow_templates"].revision,
-            "f54739874c88e5a1154275c4597b3860e5a617b4",
+            "b0bcdb274878ea3c5cf46fed3819faa05b920707",
         )
-        self.assertEqual(manifest.subjects["workflow_templates"].tag, "v0.11.43")
+        self.assertEqual(manifest.subjects["workflow_templates"].tag, "v0.11.54")
         self.assertEqual(
             dict(manifest.subjects["workflow_templates"].components),
             {
-                "assets": "0.1.29",
-                "core": "0.3.314",
-                "json": "0.1.49",
+                "assets": "0.1.38",
+                "core": "0.3.331",
+                "json": "0.1.66",
                 "media_api": "0.3.84",
                 "media_image": "0.3.160",
                 "media_other": "0.3.229",
                 "media_video": "0.3.101",
-                "meta": "0.11.43",
+                "meta": "0.11.54",
             },
         )
         self.assertEqual(
             manifest.subjects["workflow_templates"].artifact_status,
-            "artifact-verification-pending",
+            "artifact-checksum-verified",
         )
         self.assertEqual(
             manifest.subjects["desktop"].revision,
@@ -100,15 +104,16 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest.subjects["desktop"].status, "unchanged-control")
 
-        # The immutable candidate comparison remains the provenance for the promoted basis.
-        self.assertEqual(
+        # R242 freezes a candidate only; R243 owns active-basis promotion.
+        self.assertNotEqual(
             HOST_SOURCE_BASIS.core.revision,
             manifest.subjects["core"].revision,
         )
-        self.assertEqual(
+        self.assertNotEqual(
             HOST_SOURCE_BASIS.frontend.revision,
             manifest.subjects["frontend"].revision,
         )
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
 
     def test_artifact_inventory_and_drift_ownership_are_exact(self) -> None:
         api = self._api()
@@ -118,10 +123,10 @@ class HostSourceManifestTests(unittest.TestCase):
 
         changed_core_paths = {
             "nodes.py",
-            "comfy_extras/nodes_custom_sampler.py",
+            "comfy_extras/nodes_images.py",
             "comfy_extras/nodes_model_advanced.py",
             "comfy_extras/nodes_model_patch.py",
-            "comfy_extras/nodes_textgen.py",
+            "execution.py",
         }
         for artifact in manifest.artifacts:
             with self.subTest(subject=artifact.subject, path=artifact.path):
@@ -129,33 +134,37 @@ class HostSourceManifestTests(unittest.TestCase):
                 self.assertRegex(artifact.sha256, re.compile(r"^[0-9a-f]{64}$"))
                 if artifact.subject == "core" and artifact.path in changed_core_paths:
                     self.assertEqual(artifact.byte_drift, "changed")
-                    self.assertEqual(
+                    self.assertIn(
                         artifact.semantic_drift,
-                        "covered-signature-compatible-runtime-disposition-complete",
+                        {"graph-review-pending", "runtime-review-pending"},
                     )
-                elif artifact.subject == "frontend" and artifact.path == "src/stores/executionStore.ts":
+                elif artifact.subject == "frontend" and artifact.path in {
+                    "src/schemas/apiSchema.ts",
+                    "src/scripts/api.ts",
+                    "src/stores/executionStore.ts",
+                }:
                     self.assertEqual(artifact.byte_drift, "changed")
                     self.assertEqual(
                         artifact.semantic_drift,
-                        "runtime-event-contract-aligned",
+                        "frontend-review-pending",
                     )
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
 
         comparisons = {comparison.subject: comparison for comparison in manifest.comparisons}
         self.assertEqual(set(comparisons), {"core", "frontend", "workflow_templates", "desktop"})
-        self.assertEqual(comparisons["core"].owner, "runtime-compatibility-alignment")
+        self.assertEqual(comparisons["core"].owner, "core-contract-rebaseline")
         self.assertEqual(
             comparisons["core"].semantic_drift,
-            "graph-and-runtime-contract-compatible",
+            "graph-and-runtime-review-pending",
         )
         self.assertEqual(
             comparisons["frontend"].owner,
-            "frontend-compatibility-alignment",
+            "frontend-host-integration-alignment",
         )
         self.assertEqual(
             comparisons["frontend"].semantic_drift,
-            "sidebar-and-runtime-event-compatible",
+            "sidebar-and-runtime-review-pending",
         )
         self.assertEqual(
             comparisons["workflow_templates"].owner,
@@ -179,7 +188,7 @@ class HostSourceManifestTests(unittest.TestCase):
 
     def test_parser_rejects_duplicate_and_unknown_members(self) -> None:
         api = self._api()
-        duplicate = '{"schema_version":"current-host-source-manifest-v3","schema_version":"x"}'
+        duplicate = '{"schema_version":"current-host-source-manifest-v4","schema_version":"x"}'
         with self.assertRaisesRegex(ValueError, "duplicate"):
             api.parse_manifest_text(duplicate)
 
@@ -280,7 +289,7 @@ class HostSourceManifestTests(unittest.TestCase):
                 revision_reader=revision_reader,
             )
             self.assertEqual(report.status, "verified")
-            self.assertEqual(len(report.artifacts), 16)
+            self.assertEqual(len(report.artifacts), 19)
 
             with self.subTest("revision mismatch"):
                 with self.assertRaisesRegex(ValueError, "revision"):
@@ -317,9 +326,47 @@ class HostSourceManifestTests(unittest.TestCase):
         report = api.verify_source_artifacts(manifest)
         self.assertIn(report.status, {"verified", "unavailable-fixture-only"})
         if report.status == "verified":
-            self.assertEqual(len(report.artifacts), 16)
+            self.assertEqual(len(report.artifacts), 19)
         else:
             self.assertEqual(report.artifacts, ())
+
+    def test_pinned_git_blob_reader_ignores_dirty_worktree_bytes(self) -> None:
+        api = self._api()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            repo = Path(temporary_directory)
+            subprocess.run(
+                ["git", "init", "--template=", str(repo)],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.name", "Synthetic Test"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.email", "synthetic@example.invalid"],
+                check=True,
+            )
+            source = repo / "contract.txt"
+            source.write_bytes(b"committed contract\n")
+            subprocess.run(["git", "-C", str(repo), "add", "contract.txt"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "-m", "test: freeze contract"],
+                check=True,
+                capture_output=True,
+            )
+            revision = subprocess.run(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            source.write_bytes(b"ambient drift\n")
+
+            self.assertEqual(
+                api._read_git_blob(repo, revision, "contract.txt"),
+                b"committed contract\n",
+            )
 
 
 if __name__ == "__main__":

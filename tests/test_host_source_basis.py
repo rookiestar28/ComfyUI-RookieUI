@@ -102,6 +102,82 @@ class HostSourceBasisTests(unittest.TestCase):
         )
         self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
 
+    def test_workflow_template_0_11_54_candidate_artifact_closure_is_exact_without_promotion(
+        self,
+    ) -> None:
+        artifact = WORKFLOW_TEMPLATE_ARTIFACTS["0.11.54"]
+        self.assertEqual(
+            (artifact.filename, artifact.sha256),
+            (
+                "comfyui_workflow_templates-0.11.54-py3-none-any.whl",
+                "d0ce23e868f353ae32c1c62a2b2925b68036dd2fe049df2231cc1f026af6956e",
+            ),
+        )
+        components = {
+            item.package: (item.version, item.sha256)
+            for item in WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS
+            if item.basis_version == "0.11.54"
+        }
+        self.assertEqual(
+            components,
+            {
+                "comfyui-workflow-templates-core": (
+                    "0.3.331",
+                    "c7fd7ef680f591e6e15e1157361f6cc185ab01fb3ff3cd2123bb69c74db2c304",
+                ),
+                "comfyui-workflow-templates-json": (
+                    "0.1.66",
+                    "e579760ce1b71200ed5a05a52373dee88931f47d413c13f5767096f24941d40a",
+                ),
+                "comfyui-workflow-templates-media-assets-01": (
+                    "0.1.38",
+                    "25bc3a891140d018d9fbb924f19336a2fc6ca607e84eba92ca647f77861deed9",
+                ),
+                "comfyui-workflow-templates-media-api": (
+                    "0.3.84",
+                    "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+                ),
+                "comfyui-workflow-templates-media-image": (
+                    "0.3.160",
+                    "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+                ),
+                "comfyui-workflow-templates-media-other": (
+                    "0.3.229",
+                    "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+                ),
+                "comfyui-workflow-templates-media-video": (
+                    "0.3.101",
+                    "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+                ),
+            },
+        )
+        distributions_contract = getattr(
+            source_basis,
+            "WORKFLOW_TEMPLATE_DISTRIBUTION_ARTIFACTS",
+            None,
+        )
+        self.assertIsNotNone(distributions_contract)
+        distributions = {
+            (item.package, item.filename): (item.version, item.bytes, item.sha256)
+            for item in distributions_contract
+            if item.basis_version == "0.11.54"
+        }
+        self.assertEqual(len(distributions), 9)
+        self.assertEqual(
+            distributions[
+                (
+                    "comfyui-workflow-templates",
+                    "comfyui_workflow_templates-0.11.54.tar.gz",
+                )
+            ],
+            (
+                "0.11.54",
+                18755,
+                "ab237d681231d46e252f53229cb341619b42a4d0b760eed4badf91763b47aab6",
+            ),
+        )
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+
     def test_current_workflow_template_component_closure_is_exact(self) -> None:
         current = {
             artifact.package: (artifact.version, artifact.sha256)

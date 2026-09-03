@@ -72,6 +72,16 @@ class WorkflowTemplateComponentArtifact:
 
 
 @dataclass(frozen=True)
+class WorkflowTemplateDistributionArtifact:
+    basis_version: str
+    package: str
+    version: str
+    filename: str
+    bytes: int
+    sha256: str
+
+
+@dataclass(frozen=True)
 class WorkflowTemplateSurfaceDelta:
     added: tuple[str, ...]
     changed: tuple[str, ...]
@@ -146,6 +156,11 @@ WORKFLOW_TEMPLATE_ARTIFACTS: Mapping[str, WorkflowTemplateArtifact] = MappingPro
             version="0.11.43",
             filename="comfyui_workflow_templates-0.11.43-py3-none-any.whl",
             sha256="1c66f6f395b3f54e72d50a79d6f4864bf91c71b548fae676d93e7b16bbca7ab6",
+        ),
+        "0.11.54": WorkflowTemplateArtifact(
+            version="0.11.54",
+            filename="comfyui_workflow_templates-0.11.54-py3-none-any.whl",
+            sha256="d0ce23e868f353ae32c1c62a2b2925b68036dd2fe049df2231cc1f026af6956e",
         ),
     }
 )
@@ -311,6 +326,125 @@ WORKFLOW_TEMPLATE_COMPONENT_ARTIFACTS: tuple[WorkflowTemplateComponentArtifact, 
         "0.11.43",
         "comfyui-workflow-templates-media-video",
         "0.3.101",
+        "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-core",
+        "0.3.331",
+        "c7fd7ef680f591e6e15e1157361f6cc185ab01fb3ff3cd2123bb69c74db2c304",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-json",
+        "0.1.66",
+        "e579760ce1b71200ed5a05a52373dee88931f47d413c13f5767096f24941d40a",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-assets-01",
+        "0.1.38",
+        "25bc3a891140d018d9fbb924f19336a2fc6ca607e84eba92ca647f77861deed9",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-api",
+        "0.3.84",
+        "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-image",
+        "0.3.160",
+        "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-other",
+        "0.3.229",
+        "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+    ),
+    WorkflowTemplateComponentArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-video",
+        "0.3.101",
+        "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
+    ),
+)
+
+WORKFLOW_TEMPLATE_DISTRIBUTION_ARTIFACTS: tuple[
+    WorkflowTemplateDistributionArtifact, ...
+] = (
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates",
+        "0.11.54",
+        "comfyui_workflow_templates-0.11.54-py3-none-any.whl",
+        10854,
+        "d0ce23e868f353ae32c1c62a2b2925b68036dd2fe049df2231cc1f026af6956e",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates",
+        "0.11.54",
+        "comfyui_workflow_templates-0.11.54.tar.gz",
+        18755,
+        "ab237d681231d46e252f53229cb341619b42a4d0b760eed4badf91763b47aab6",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-core",
+        "0.3.331",
+        "comfyui_workflow_templates_core-0.3.331-py3-none-any.whl",
+        72395,
+        "c7fd7ef680f591e6e15e1157361f6cc185ab01fb3ff3cd2123bb69c74db2c304",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-json",
+        "0.1.66",
+        "comfyui_workflow_templates_json-0.1.66-py3-none-any.whl",
+        3305529,
+        "e579760ce1b71200ed5a05a52373dee88931f47d413c13f5767096f24941d40a",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-assets-01",
+        "0.1.38",
+        "comfyui_workflow_templates_media_assets_01-0.1.38-py3-none-any.whl",
+        78382250,
+        "25bc3a891140d018d9fbb924f19336a2fc6ca607e84eba92ca647f77861deed9",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-api",
+        "0.3.84",
+        "comfyui_workflow_templates_media_api-0.3.84-py3-none-any.whl",
+        100148800,
+        "c2d6a5999ac39e4f37f47ae231c92557defe5addb2cc6ab5c11410b4d5a2910a",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-image",
+        "0.3.160",
+        "comfyui_workflow_templates_media_image-0.3.160-py3-none-any.whl",
+        89401690,
+        "d4a5c5541c7088f6adb1c7da41f5d7c1c14a037eda6a61cd8b4b76c251faaa93",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-other",
+        "0.3.229",
+        "comfyui_workflow_templates_media_other-0.3.229-py3-none-any.whl",
+        89097925,
+        "ce3d98fa9d84b914c335fe5c9bc903cfefbe1932b1bc3cb6baef7f371b4bd435",
+    ),
+    WorkflowTemplateDistributionArtifact(
+        "0.11.54",
+        "comfyui-workflow-templates-media-video",
+        "0.3.101",
+        "comfyui_workflow_templates_media_video-0.3.101-py3-none-any.whl",
+        104342671,
         "6270fd61c8c3931b6f0031abac7d4c90ced624de6c7918bff85b89e6c3d7493c",
     ),
 )

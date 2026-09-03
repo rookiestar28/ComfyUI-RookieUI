@@ -22,7 +22,7 @@ DEFAULT_SOURCE_ROOTS: Mapping[str, Path] = MappingProxyType(
     }
 )
 
-SCHEMA_VERSION = "current-host-source-manifest-v3"
+SCHEMA_VERSION = "current-host-source-manifest-v4"
 MANIFEST_KIND = "candidate-host-source-freeze"
 
 _REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -69,11 +69,11 @@ _EXPECTED_SUBJECTS: Mapping[str, Mapping[str, object]] = MappingProxyType(
         "core": MappingProxyType(
             {
                 "kind": "git-host",
-                "revision": "c67885b14556cf3e4e061862925282d403d09862",
+                "revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
                 "components": {
                     "embedded_docs": "0.5.10",
-                    "frontend_package": "1.49.6",
-                    "workflow_templates": "0.11.43",
+                    "frontend_package": "1.51.9",
+                    "workflow_templates": "0.11.54",
                 },
                 "status": "candidate-frozen",
             }
@@ -89,27 +89,27 @@ _EXPECTED_SUBJECTS: Mapping[str, Mapping[str, object]] = MappingProxyType(
         "frontend": MappingProxyType(
             {
                 "kind": "git-host",
-                "revision": "569e65b30fbfe96743c7996e201a32bcf029a310",
-                "version": "1.52.1",
+                "revision": "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
+                "version": "1.54.1",
                 "status": "candidate-frozen",
             }
         ),
         "workflow_templates": MappingProxyType(
             {
                 "kind": "git-package-source",
-                "revision": "f54739874c88e5a1154275c4597b3860e5a617b4",
-                "tag": "v0.11.43",
+                "revision": "b0bcdb274878ea3c5cf46fed3819faa05b920707",
+                "tag": "v0.11.54",
                 "components": {
-                    "assets": "0.1.29",
-                    "core": "0.3.314",
-                    "json": "0.1.49",
+                    "assets": "0.1.38",
+                    "core": "0.3.331",
+                    "json": "0.1.66",
                     "media_api": "0.3.84",
                     "media_image": "0.3.160",
                     "media_other": "0.3.229",
                     "media_video": "0.3.101",
-                    "meta": "0.11.43",
+                    "meta": "0.11.54",
                 },
-                "artifact_status": "artifact-verification-pending",
+                "artifact_status": "artifact-checksum-verified",
             }
         ),
     }
@@ -119,28 +119,38 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
     {
         ("core", "app/user_manager.py"): ("unchanged", "none", "direct-byte-hash"),
         ("core", "comfy_extras/nodes_custom_sampler.py"): (
-            "changed",
-            "covered-signature-compatible-runtime-disposition-complete",
+            "unchanged",
+            "none",
             "direct-byte-hash",
+        ),
+        ("core", "comfy_extras/nodes_images.py"): (
+            "changed",
+            "graph-review-pending",
+            "pinned-git-blob-hash",
         ),
         ("core", "comfy_extras/nodes_model_advanced.py"): (
             "changed",
-            "covered-signature-compatible-runtime-disposition-complete",
+            "runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_patch.py"): (
             "changed",
-            "covered-signature-compatible-runtime-disposition-complete",
+            "runtime-review-pending",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_textgen.py"): (
-            "changed",
-            "covered-signature-compatible-runtime-disposition-complete",
+            "unchanged",
+            "none",
             "direct-byte-hash",
+        ),
+        ("core", "execution.py"): (
+            "changed",
+            "runtime-review-pending",
+            "pinned-git-blob-hash",
         ),
         ("core", "nodes.py"): (
             "changed",
-            "covered-signature-compatible-runtime-disposition-complete",
+            "graph-review-pending",
             "direct-byte-hash",
         ),
         ("core", "requirements.txt"): ("changed", "none", "version-manifest-hash"),
@@ -153,13 +163,18 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
             "direct-byte-hash",
         ),
         ("frontend", "src/schemas/apiSchema.ts"): (
-            "unchanged",
-            "none",
+            "changed",
+            "frontend-review-pending",
             "direct-byte-hash",
+        ),
+        ("frontend", "src/scripts/api.ts"): (
+            "changed",
+            "frontend-review-pending",
+            "pinned-git-blob-hash",
         ),
         ("frontend", "src/stores/executionStore.ts"): (
             "changed",
-            "runtime-event-contract-aligned",
+            "frontend-review-pending",
             "direct-byte-hash",
         ),
         ("frontend", "src/stores/workspace/sidebarTabStore.ts"): (
@@ -183,12 +198,12 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
 _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = MappingProxyType(
     {
         "core": (
-            "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
             "c67885b14556cf3e4e061862925282d403d09862",
+            "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
             "revision-and-component",
             "mixed",
-            "graph-and-runtime-contract-compatible",
-            "runtime-compatibility-alignment",
+            "graph-and-runtime-review-pending",
+            "core-contract-rebaseline",
         ),
         "desktop": (
             "e2d964b7456cea8423c7b9d3371c612313c06baa",
@@ -199,16 +214,16 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "source-freeze",
         ),
         "frontend": (
-            "2c2ae612769bef6a8a05f197a97c08a8e5c88e9d",
             "569e65b30fbfe96743c7996e201a32bcf029a310",
+            "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
             "revision-and-version",
             "mixed",
-            "sidebar-and-runtime-event-compatible",
-            "frontend-compatibility-alignment",
+            "sidebar-and-runtime-review-pending",
+            "frontend-host-integration-alignment",
         ),
         "workflow_templates": (
-            "a832a091491ce5b6341f4e4ca548b7ab536b6acd",
             "f54739874c88e5a1154275c4597b3860e5a617b4",
+            "b0bcdb274878ea3c5cf46fed3819faa05b920707",
             "revision-and-component",
             "changed",
             "semantic-review-pending",
@@ -482,7 +497,7 @@ def _parse_artifacts(value: object) -> tuple[SourceArtifact, ...]:
     expected_keys = tuple(sorted(_EXPECTED_ARTIFACT_POLICIES))
     actual_keys = tuple((artifact.subject, artifact.path) for artifact in artifacts)
     if actual_keys != expected_keys:
-        raise ValueError("artifact inventory must contain the exact sorted fourteen-row set.")
+        raise ValueError("artifact inventory must contain the exact sorted nineteen-row set.")
     return tuple(artifacts)
 
 
@@ -650,6 +665,17 @@ def _read_git_revision(source_root: Path, revision_expression: str = "HEAD") -> 
     return revision
 
 
+def _read_git_blob(source_root: Path, revision: str, source_path: str) -> bytes:
+    completed = subprocess.run(
+        ["git", "-C", str(source_root), "cat-file", "blob", f"{revision}:{source_path}"],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise ValueError("Authoritative pinned source artifact is unavailable.")
+    return completed.stdout
+
+
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -676,6 +702,7 @@ def verify_source_artifacts(
             return SourceVerificationReport("unavailable-fixture-only", ())
 
     canonical_roots: dict[str, Path] = {}
+    use_pinned_git_objects = revision_reader is None
     for name in sorted(_SUBJECT_NAMES):
         source_root = Path(resolved_roots[name])
         if not source_root.is_dir():
@@ -685,14 +712,37 @@ def verify_source_artifacts(
         if revision_reader is not None:
             actual_revision = revision_reader(source_root)
         else:
-            revision_expression = "v0.11.43^{commit}" if name == "workflow_templates" else "HEAD"
-            actual_revision = _read_git_revision(source_root, revision_expression)
+            expected_revision = manifest.subjects[name].revision
+            actual_revision = _read_git_revision(source_root, f"{expected_revision}^{{commit}}")
         if actual_revision != manifest.subjects[name].revision:
             raise ValueError(f"Authoritative {name} reference revision mismatched.")
 
     verified: list[VerifiedSourceArtifact] = []
     for artifact in manifest.artifacts:
         source_root = canonical_roots[artifact.subject]
+        if use_pinned_git_objects:
+            # CRITICAL: exact-source verification must read the manifest revision's blob;
+            # ambient reference worktrees may be newer or dirty and would falsify the freeze.
+            payload = _read_git_blob(
+                source_root,
+                manifest.subjects[artifact.subject].revision,
+                artifact.path,
+            )
+            actual_bytes = len(payload)
+            actual_sha256 = hashlib.sha256(payload).hexdigest()
+            if actual_bytes != artifact.bytes or actual_sha256 != artifact.sha256:
+                raise ValueError(
+                    f"Authoritative {artifact.subject} source artifact byte/hash mismatch."
+                )
+            verified.append(
+                VerifiedSourceArtifact(
+                    subject=artifact.subject,
+                    path=artifact.path,
+                    bytes=actual_bytes,
+                    sha256=actual_sha256,
+                )
+            )
+            continue
         artifact_path = source_root.joinpath(*PurePosixPath(artifact.path).parts)
         try:
             resolved_artifact = artifact_path.resolve(strict=True)
