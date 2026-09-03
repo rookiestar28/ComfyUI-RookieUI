@@ -26,9 +26,12 @@ _DISPOSITIONS = {
 _RATIONALE_DISPOSITIONS = {
     "audio-runtime-not-shipped": "out-of-scope",
     "catalog-metadata-not-runtime": "reference-only",
+    "example-template-not-runtime": "reference-only",
     "image-product-scope-not-shipped": "deferred",
     "provider-runtime-not-shipped": "out-of-scope",
+    "three-d-runtime-not-shipped": "out-of-scope",
     "upstream-archived-surface": "superseded",
+    "utility-runtime-not-shipped": "out-of-scope",
     "video-runtime-not-shipped": "out-of-scope",
 }
 _REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -258,24 +261,24 @@ def parse_surface_disposition_contract(value: object) -> SurfaceDispositionContr
         )
     }
     expected_counts = {
-        "added_count": 21,
-        "archived_count": 16,
-        "changed_count": 20,
-        "entry_count": 57,
-        "new_member_count": 518,
-        "old_member_count": 513,
-        "removed_count": 16,
+        "added_count": 31,
+        "archived_count": 2,
+        "changed_count": 48,
+        "entry_count": 81,
+        "new_member_count": 547,
+        "old_member_count": 518,
+        "removed_count": 2,
         "supported_package_profile_count": 11,
         "supported_package_source_count": 11,
-        "unchanged_count": 477,
-        "union_count": 534,
+        "unchanged_count": 468,
+        "union_count": 549,
     }
     if counts != expected_counts:
         raise ValueError("surface disposition aggregate counts are not exact.")
     actual_kind_counts = {
         kind: sum(entry.change_kind == kind for entry in entries) for kind in _CHANGE_KINDS
     }
-    if actual_kind_counts != {"added": 21, "archived": 16, "changed": 20, "removed": 0}:
+    if actual_kind_counts != {"added": 31, "archived": 2, "changed": 48, "removed": 0}:
         raise ValueError("entry change-kind counts do not match the exact delta.")
 
     raw_disposition_counts = _require_mapping(
@@ -293,11 +296,11 @@ def parse_surface_disposition_contract(value: object) -> SurfaceDispositionContr
     if disposition_counts != actual_disposition_counts:
         raise ValueError("disposition_counts does not match entries.")
     if disposition_counts != {
-        "deferred": 2,
-        "out-of-scope": 25,
-        "reference-only": 14,
+        "deferred": 1,
+        "out-of-scope": 62,
+        "reference-only": 16,
         "removed": 0,
-        "superseded": 16,
+        "superseded": 2,
         "supported": 0,
     }:
         raise ValueError("surface dispositions are not the accepted exact classification.")
@@ -306,39 +309,39 @@ def parse_surface_disposition_contract(value: object) -> SurfaceDispositionContr
         schema_version=_require_exact_string(
             payload["schema_version"], SCHEMA_VERSION, "schema_version"
         ),
-        from_version=_require_exact_string(payload["from_version"], "0.11.31", "from_version"),
-        to_version=_require_exact_string(payload["to_version"], "0.11.43", "to_version"),
+        from_version=_require_exact_string(payload["from_version"], "0.11.43", "from_version"),
+        to_version=_require_exact_string(payload["to_version"], "0.11.54", "to_version"),
         from_json_version=_require_exact_string(
-            payload["from_json_version"], "0.1.30", "from_json_version"
+            payload["from_json_version"], "0.1.49", "from_json_version"
         ),
         to_json_version=_require_exact_string(
-            payload["to_json_version"], "0.1.49", "to_json_version"
+            payload["to_json_version"], "0.1.66", "to_json_version"
         ),
         from_revision=_require_exact_string(
             _require_pattern(payload["from_revision"], _REVISION_PATTERN, "from_revision"),
-            "a832a091491ce5b6341f4e4ca548b7ab536b6acd",
+            "f54739874c88e5a1154275c4597b3860e5a617b4",
             "from_revision",
         ),
         to_revision=_require_exact_string(
             _require_pattern(payload["to_revision"], _REVISION_PATTERN, "to_revision"),
-            "f54739874c88e5a1154275c4597b3860e5a617b4",
+            "b0bcdb274878ea3c5cf46fed3819faa05b920707",
             "to_revision",
         ),
         old_wheel_sha256=_require_exact_string(
             _require_pattern(payload["old_wheel_sha256"], _SHA256_PATTERN, "old_wheel_sha256"),
-            "61ba5b43f2acd74b3db9395e9a4138f171a75f4a304fb3fc0fd8d77051beeaf9",
+            "4f9f472f02d13f5f57d6af8d7d83ea062409c3d3cfe4c301d379eaadf9caabb3",
             "old_wheel_sha256",
         ),
         new_wheel_sha256=_require_exact_string(
             _require_pattern(payload["new_wheel_sha256"], _SHA256_PATTERN, "new_wheel_sha256"),
-            "4f9f472f02d13f5f57d6af8d7d83ea062409c3d3cfe4c301d379eaadf9caabb3",
+            "e579760ce1b71200ed5a05a52373dee88931f47d413c13f5767096f24941d40a",
             "new_wheel_sha256",
         ),
         source_report_sha256=_require_exact_string(
             _require_pattern(
                 payload["source_report_sha256"], _SHA256_PATTERN, "source_report_sha256"
             ),
-            "c3d1d85129ebd7785b42c7b601ed6a5aa19658757ab8b3f8d10c3a639c1dd409",
+            "5a1535308fda8bc2bc204556c7a87a7f9f9e3e09e4cbbd3a85631ebb2fd54f16",
             "source_report_sha256",
         ),
         old_member_count=counts["old_member_count"],

@@ -5,7 +5,9 @@ import json
 import unittest
 
 from rookieui.contracts import workflow_template_surface_disposition_contract as contract_module
-from rookieui.contracts.host_source_basis import WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43
+from rookieui.contracts import current_workflow_template_delta as delta_module
+from rookieui.contracts import workflow_template_member_delta_contract as member_delta_module
+from rookieui.contracts import workflow_template_supported_graph_contract as supported_graph_module
 
 
 class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
@@ -18,11 +20,11 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
         contract = contract_module.load_surface_disposition_contract()
 
         self.assertEqual(contract.schema_version, contract_module.SCHEMA_VERSION)
-        self.assertEqual((contract.from_version, contract.to_version), ("0.11.31", "0.11.43"))
-        self.assertEqual((contract.from_json_version, contract.to_json_version), ("0.1.30", "0.1.49"))
+        self.assertEqual((contract.from_version, contract.to_version), ("0.11.43", "0.11.54"))
+        self.assertEqual((contract.from_json_version, contract.to_json_version), ("0.1.49", "0.1.66"))
         self.assertEqual(
             (contract.old_member_count, contract.new_member_count, contract.union_count),
-            (513, 518, 534),
+            (518, 547, 549),
         )
         self.assertEqual(
             (
@@ -33,16 +35,16 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
                 contract.unchanged_count,
                 contract.entry_count,
             ),
-            (21, 20, 16, 16, 477, 57),
+            (31, 48, 2, 2, 468, 81),
         )
         self.assertEqual(
             dict(contract.disposition_counts),
             {
-                "deferred": 2,
-                "out-of-scope": 25,
-                "reference-only": 14,
+                "deferred": 1,
+                "out-of-scope": 62,
+                "reference-only": 16,
                 "removed": 0,
-                "superseded": 16,
+                "superseded": 2,
                 "supported": 0,
             },
         )
@@ -53,18 +55,26 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
         entries = {entry.id: entry for entry in contract.entries}
 
         self.assertEqual(
-            (entries["api_qwen3_t2i"].change_kind, entries["api_qwen3_t2i"].disposition),
+            (entries["api_bfl_flux_video_upscale"].change_kind, entries["api_bfl_flux_video_upscale"].disposition),
             ("added", "out-of-scope"),
         )
         self.assertEqual(
-            (entries["image_qwen_image_layered"].change_kind, entries["image_qwen_image_layered"].disposition),
-            ("changed", "deferred"),
+            (entries["image_sdxl_simple"].change_kind, entries["image_sdxl_simple"].disposition),
+            ("added", "deferred"),
         )
         self.assertEqual(
             (entries["index.zh-TW"].change_kind, entries["index.zh-TW"].disposition),
             ("changed", "reference-only"),
         )
-        archived = entries["01_get_started_text_to_image"]
+        self.assertEqual(
+            (entries["3d_pixal3d_trellis2_image_to_model"].disposition, entries["3d_pixal3d_trellis2_image_to_model"].rationale),
+            ("out-of-scope", "three-d-runtime-not-shipped"),
+        )
+        self.assertEqual(
+            (entries["templates-car_product"].disposition, entries["templates-car_product"].rationale),
+            ("reference-only", "example-template-not-runtime"),
+        )
+        archived = entries["api_veo2_i2v"]
         self.assertEqual((archived.change_kind, archived.disposition), ("archived", "superseded"))
         self.assertEqual(archived.old_sha256, archived.archived_sha256)
         self.assertIsNone(archived.new_sha256)
@@ -72,8 +82,6 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
 
     def test_contract_and_aggregate_ledgers_are_exactly_reconciled(self) -> None:
         contract = contract_module.load_surface_disposition_contract()
-        delta = WORKFLOW_TEMPLATE_DELTA_0_11_31_TO_0_11_43
-
         by_kind = {
             kind: {entry.id for entry in contract.entries if entry.change_kind == kind}
             for kind in ("added", "archived", "changed", "removed")
@@ -84,16 +92,58 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
             }
             for disposition in contract.disposition_counts
         }
-        self.assertEqual(by_kind["added"], set(delta.added))
-        self.assertEqual(by_kind["changed"], set(delta.changed))
-        self.assertEqual(by_kind["archived"], set(delta.superseded))
-        self.assertEqual(by_kind["removed"], set(delta.removed))
-        self.assertEqual(by_disposition["supported"], set(delta.supported))
-        self.assertEqual(by_disposition["deferred"], set(delta.deferred))
-        self.assertEqual(by_disposition["reference-only"], set(delta.reference_only))
-        self.assertEqual(by_disposition["superseded"], set(delta.superseded))
-        self.assertEqual(by_disposition["out-of-scope"], set(delta.out_of_scope))
-        self.assertEqual(by_disposition["removed"], set(delta.removed))
+        self.assertEqual(by_kind["added"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_ADDED_SURFACES))
+        self.assertEqual(by_kind["changed"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_CHANGED_SURFACES))
+        self.assertEqual(by_kind["archived"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_SUPERSEDED_SURFACES))
+        self.assertEqual(by_kind["removed"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_REMOVED_SURFACES))
+        self.assertEqual(by_disposition["supported"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_SUPPORTED_SURFACES))
+        self.assertEqual(by_disposition["deferred"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_DEFERRED_SURFACES))
+        self.assertEqual(by_disposition["reference-only"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_REFERENCE_ONLY_SURFACES))
+        self.assertEqual(by_disposition["superseded"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_SUPERSEDED_SURFACES))
+        self.assertEqual(by_disposition["out-of-scope"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_OUT_OF_SCOPE_SURFACES))
+        self.assertEqual(by_disposition["removed"], set(delta_module.WORKFLOW_TEMPLATE_0_11_54_REMOVED_SURFACES))
+
+    def test_contract_exactly_matches_f333_member_delta_and_supported_graph(self) -> None:
+        contract = contract_module.load_surface_disposition_contract()
+        member_delta = member_delta_module.load_member_delta_contract()
+        supported_graph = supported_graph_module.load_supported_graph_contract()
+
+        def surface_id(member: str) -> str:
+            self.assertTrue(member.startswith("templates/") and member.endswith(".json"))
+            return member.removeprefix("templates/").removesuffix(".json")
+
+        entries = {entry.id: entry for entry in contract.entries}
+        self.assertEqual(
+            {entry.id for entry in contract.entries if entry.change_kind == "added"},
+            {surface_id(member) for member in member_delta.added_members},
+        )
+        self.assertEqual(
+            {entry.id for entry in contract.entries if entry.change_kind == "changed"},
+            {surface_id(member) for member in member_delta.changed_members},
+        )
+        self.assertEqual(
+            {entry.id for entry in contract.entries if entry.change_kind in {"archived", "removed"}},
+            {surface_id(member) for member in member_delta.removed_members},
+        )
+        non_invariant = {
+            surface_id(member)
+            for member in (
+                *member_delta.added_members,
+                *member_delta.changed_members,
+                *member_delta.removed_members,
+            )
+        }
+        self.assertEqual(set(entries), non_invariant)
+
+        package_sources = {
+            profile.source_id.removesuffix(".json")
+            for profile in supported_graph.profiles
+            if profile.source_kind == "workflow-template-package"
+        }
+        self.assertEqual(len(package_sources), 11)
+        self.assertTrue(package_sources.isdisjoint(non_invariant))
+        self.assertEqual(supported_graph.profile_count, 26)
+        self.assertEqual(supported_graph.unique_source_count, 25)
 
     def test_contract_rejects_unknown_duplicate_unsorted_and_invariant_entries(self) -> None:
         unknown = dict(self.payload)
@@ -130,7 +180,7 @@ class WorkflowTemplateSurfaceDispositionContractTests(unittest.TestCase):
 
         duplicate_member_text = contract_module.DEFAULT_CONTRACT_PATH.read_text(
             encoding="utf-8"
-        ).replace('  "added_count": 21,', '  "added_count": 21,\n  "added_count": 21,', 1)
+        ).replace('  "added_count": 31,', '  "added_count": 31,\n  "added_count": 31,', 1)
         with self.assertRaises(ValueError):
             contract_module.parse_surface_disposition_contract_text(duplicate_member_text)
 

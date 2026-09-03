@@ -363,3 +363,134 @@ WORKFLOW_TEMPLATE_0_11_43_UNSUPPORTED_SURFACES: tuple[str, ...] = tuple(
         }
     )
 )
+
+# Generated from the exact inert 0.11.43 -> 0.11.54 active-gallery
+# filename/content inventory. Artifact presence never implies runtime support.
+WORKFLOW_TEMPLATE_0_11_54_ADDED_SURFACES: tuple[str, ...] = (
+    "3d_pixal3d_trellis2_image_to_model",
+    "api_bfl_flux_video_upscale",
+    "api_bria_eraser",
+    "api_bria_expand_image",
+    "api_bria_genfill",
+    "api_bytedance_vcube_video_enhance",
+    "api_fishaudio_speech_to_text",
+    "api_fishaudio_text_to_speech",
+    "api_fishaudio_voice_clone_tts",
+    "api_google_gemini_omni_flash_1_1_edit",
+    "api_google_gemini_omni_flash_1_1_extend",
+    "api_google_gemini_omni_flash_1_1_i2v",
+    "api_google_gemini_omni_flash_1_1_r2v",
+    "api_google_gemini_omni_flash_1_1_t2v",
+    "api_google_nano_banana2_image_edit_continuation",
+    "api_meshy7_image_to_model",
+    "api_meshy7_text_to_model",
+    "api_minimax_h3_max_flf2v",
+    "api_minimax_h3_max_i2v",
+    "api_minimax_h3_max_r2v",
+    "api_minimax_h3_max_t2v",
+    "api_pixverse6_i2v",
+    "api_pixverse6_r2v",
+    "api_pixverse6_t2v",
+    "api_wan3_0_i2v",
+    "api_wan3_0_r2v",
+    "api_wan3_0_t2v",
+    "image_sdxl_simple",
+    "utility_bria_increase_resolution",
+    "utility_sam3d_body",
+    "video_minimax_h3_i2v_continuation",
+)
+
+WORKFLOW_TEMPLATE_0_11_54_CHANGED_SURFACES: tuple[str, ...] = (
+    "api_bfl_flux2_max_sofa_swap",
+    "api_bytedance_seedream4",
+    "api_bytedance_seedream_5_0_lite_image_edit",
+    "api_bytedance_seedream_5_0_lite_t2i",
+    "api_bytedance_seedream_5_0_pro_image_edit",
+    "api_bytedance_seedream_5_0_pro_t2i",
+    "api_elevenlabs_speech_to_speech",
+    "api_elevenlabs_text_to_dialogue",
+    "api_elevenlabs_text_to_sound_effects",
+    "api_elevenlabs_text_to_speech",
+    "api_elevenlabs_voice_isolation",
+    "api_google_gemini_omni_flash_t2v",
+    "api_grok_image_edit",
+    "api_meshy_image_to_model",
+    "api_meshy_multi_image_to_model",
+    "api_meshy_text_to_model",
+    "api_openai_image_1_i2i",
+    "api_openai_image_1_inpaint",
+    "api_openai_image_1_t2i",
+    "api_seedance2_0_mini_r2v",
+    "api_seedance2_0_r2v",
+    "audio_ace_step1_5_xl_base",
+    "audio_ace_step1_5_xl_turbo",
+    "audio_ace_step_1_5_split_llm",
+    "audio_stable_audio_3_medium",
+    "audio_stable_audio_3_medium_base",
+    "index.ar",
+    "index.es",
+    "index.fa",
+    "index.fr",
+    "index.ja",
+    "index",
+    "index.ko",
+    "index.mcp",
+    "index.pt-BR",
+    "index.ru",
+    "index.schema",
+    "index.tr",
+    "index.zh-TW",
+    "index.zh",
+    "index_logo",
+    "templates-car_product",
+    "video_ltx2_5_flf2v",
+    "video_ltx2_5_i2v",
+    "video_ltx2_5_t2v",
+    "video_minimax_h3_i2v",
+    "video_minimax_h3_r2v",
+    "video_minimax_h3_t2v",
+)
+
+WORKFLOW_TEMPLATE_0_11_54_SUPPORTED_SURFACES: tuple[str, ...] = ()
+WORKFLOW_TEMPLATE_0_11_54_DEFERRED_SURFACES: tuple[str, ...] = (
+    "image_sdxl_simple",
+)
+WORKFLOW_TEMPLATE_0_11_54_REFERENCE_ONLY_SURFACES: tuple[str, ...] = (
+    "index",
+    "index.ar",
+    "index.es",
+    "index.fa",
+    "index.fr",
+    "index.ja",
+    "index.ko",
+    "index.mcp",
+    "index.pt-BR",
+    "index.ru",
+    "index.schema",
+    "index.tr",
+    "index.zh",
+    "index.zh-TW",
+    "index_logo",
+    "templates-car_product",
+)
+WORKFLOW_TEMPLATE_0_11_54_SUPERSEDED_SURFACES: tuple[str, ...] = (
+    "api_veo2_i2v",
+    "api_veo3",
+)
+WORKFLOW_TEMPLATE_0_11_54_REMOVED_SURFACES: tuple[str, ...] = ()
+WORKFLOW_TEMPLATE_0_11_54_OUT_OF_SCOPE_SURFACES: tuple[str, ...] = tuple(
+    surface
+    for surface in (*WORKFLOW_TEMPLATE_0_11_54_ADDED_SURFACES, *WORKFLOW_TEMPLATE_0_11_54_CHANGED_SURFACES)
+    if surface.startswith(("3d_", "api_", "audio_", "utility_", "video_"))
+)
+WORKFLOW_TEMPLATE_0_11_54_UNSUPPORTED_SURFACES: tuple[str, ...] = tuple(
+    sorted(
+        {
+            *WORKFLOW_TEMPLATE_0_11_54_DEFERRED_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_54_REFERENCE_ONLY_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_54_OUT_OF_SCOPE_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_54_SUPERSEDED_SURFACES,
+            *WORKFLOW_TEMPLATE_0_11_54_REMOVED_SURFACES,
+        }
+    )
+)
