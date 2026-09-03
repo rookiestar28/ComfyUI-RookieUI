@@ -198,6 +198,75 @@ describe("RookieUI owned runtime lifecycle", () => {
     expect(frameHarness.cancelAnimationFrame).not.toHaveBeenCalled();
   });
 
+  test("rejects the paired legacy preview when metadata attributes the same blob to another job", async () => {
+    const runtimeApi = createRuntimeEventTarget();
+    const originalCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:cross-job-leak");
+    const subject = createTrackingSubject(runtimeApi);
+
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      const writesBeforePreview = subject.setPreviewContent.mock.calls.length;
+      const otherJobBlob = new Blob(["synthetic-preview"], { type: "image/png" });
+
+      // Frontend 1.54 dispatches the metadata event and then the legacy event
+      // with the exact same Blob for backward compatibility.
+      runtimeApi.dispatch("b_preview_with_metadata", {
+        jobId: "job-other",
+        blob: otherJobBlob,
+      });
+      runtimeApi.dispatch("b_preview", otherJobBlob);
+
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+      expect(subject.setPreviewContent).toHaveBeenCalledTimes(writesBeforePreview);
+      expect(subject.runtimeState.previewFrameSeen).toBe(false);
+    } finally {
+      destroyGenerationRuntimeState(subject.runtimeState);
+      await subject.tracking;
+      URL.createObjectURL = originalCreateObjectURL;
+    }
+  });
+
+  test("ignores malformed runtime events while preserving standalone legacy previews", async () => {
+    const runtimeApi = createRuntimeEventTarget();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = vi.fn(() => "blob:standalone-legacy-preview");
+    URL.revokeObjectURL = vi.fn();
+    const frameHarness = createFrameHarness();
+    const subject = createTrackingSubject(runtimeApi);
+
+    try {
+      await Promise.resolve();
+      await Promise.resolve();
+      const initialStatus = subject.statusNode.textContent;
+      const writesBeforePreview = subject.setPreviewContent.mock.calls.length;
+
+      runtimeApi.dispatch("progress", { prompt_id: "job-current", value: Number.NaN, max: 10 });
+      runtimeApi.dispatch("progress_state", { prompt_id: "job-current", nodes: null });
+      runtimeApi.dispatch("b_preview_with_metadata", {
+        blob: new Blob(["missing-job-id"], { type: "image/png" }),
+      });
+      runtimeApi.dispatch("execution_success", {});
+      runtimeApi.dispatch("unknown_runtime_event", { prompt_id: "job-current" });
+
+      expect(frameHarness.requestAnimationFrame).not.toHaveBeenCalled();
+      expect(URL.createObjectURL).not.toHaveBeenCalled();
+      expect(subject.setPreviewContent).toHaveBeenCalledTimes(writesBeforePreview);
+      expect(subject.statusNode.textContent).toBe(initialStatus);
+
+      runtimeApi.dispatch("b_preview", new Blob(["legacy-only"], { type: "image/png" }));
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      expect(subject.runtimeState.previewFrameSeen).toBe(true);
+    } finally {
+      destroyGenerationRuntimeState(subject.runtimeState);
+      await subject.tracking;
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    }
+  });
+
   test.each([
     ["execution_success", "Generation finished; syncing output: job-current"],
     ["execution_error", "Generation failed: job-current"],

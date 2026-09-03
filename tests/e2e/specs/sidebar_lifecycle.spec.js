@@ -37,3 +37,34 @@ test("restores host layout and durable pane state across sidebar destroy/remount
   expect(remountedBox?.width).toBeCloseTo(mountedBox?.width ?? 0, 0);
   expect(remountedBox?.height).toBeCloseTo(mountedBox?.height ?? 0, 0);
 });
+
+test("keeps RookieUI recoverable while the host action toolbar is hidden and inert", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("test-harness.html?lifecycleSentinel=1&agentSelection=1");
+
+  const toolbar = page.locator("#mock-side-toolbar");
+  const mount = page.locator("#mock-sidebar-tabs");
+  await expect(toolbar).toHaveAttribute("inert", "");
+  await expect(toolbar).toHaveAttribute("aria-hidden", "true");
+  await expect(toolbar).toHaveCSS("pointer-events", "none");
+  await expect(page.locator("#rookieui-shell-title")).toBeVisible();
+
+  await page.locator("#rookieui-tab-img2img").click();
+  await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  await page.evaluate(() => window.__ROOKIEUI_E2E_APP__.extensionManager.activeSidebarTab.destroy());
+  await expect(mount).toBeEmpty();
+  await expect(toolbar).toHaveAttribute("inert", "");
+
+  await page.evaluate(() => {
+    window.__ROOKIEUI_E2E_APP__.extensionManager.activeSidebarTab.render(
+      document.getElementById("mock-sidebar-tabs"),
+    );
+  });
+  await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  await expect(page.locator("#rookieui-shell-title")).toBeVisible();
+  const agentSelectionVisual = await mount.screenshot();
+  await testInfo.attach("sidebar-agent-selection-remount", {
+    body: agentSelectionVisual,
+    contentType: "image/png",
+  });
+});

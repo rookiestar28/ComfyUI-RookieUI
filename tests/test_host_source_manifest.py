@@ -31,6 +31,7 @@ EXPECTED_ARTIFACT_KEYS = (
     ("desktop", "package.json"),
     ("frontend", "package.json"),
     ("frontend", "src/components/common/ExtensionSlot.vue"),
+    ("frontend", "src/components/sidebar/SideToolbar.vue"),
     ("frontend", "src/schemas/apiSchema.ts"),
     ("frontend", "src/scripts/api.ts"),
     ("frontend", "src/stores/executionStore.ts"),
@@ -143,6 +144,7 @@ class HostSourceManifestTests(unittest.TestCase):
                     self.assertEqual(artifact.byte_drift, "changed")
                     self.assertEqual(artifact.semantic_drift, expected_core_semantic_drift[artifact.path])
                 elif artifact.subject == "frontend" and artifact.path in {
+                    "src/components/sidebar/SideToolbar.vue",
                     "src/schemas/apiSchema.ts",
                     "src/scripts/api.ts",
                     "src/stores/executionStore.ts",
@@ -150,7 +152,12 @@ class HostSourceManifestTests(unittest.TestCase):
                     self.assertEqual(artifact.byte_drift, "changed")
                     self.assertEqual(
                         artifact.semantic_drift,
-                        "frontend-review-pending",
+                        {
+                            "src/components/sidebar/SideToolbar.vue": "toolbar-visibility-compatible",
+                            "src/schemas/apiSchema.ts": "api-schema-compatible",
+                            "src/scripts/api.ts": "event-dispatch-compatible",
+                            "src/stores/executionStore.ts": "workflow-isolation-compatible",
+                        }[artifact.path],
                     )
                 else:
                     self.assertEqual(artifact.semantic_drift, "none")
@@ -168,7 +175,7 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(
             comparisons["frontend"].semantic_drift,
-            "sidebar-and-runtime-review-pending",
+            "sidebar-and-runtime-compatible",
         )
         self.assertEqual(
             comparisons["workflow_templates"].owner,
@@ -293,7 +300,7 @@ class HostSourceManifestTests(unittest.TestCase):
                 revision_reader=revision_reader,
             )
             self.assertEqual(report.status, "verified")
-            self.assertEqual(len(report.artifacts), 19)
+            self.assertEqual(len(report.artifacts), 20)
 
             with self.subTest("revision mismatch"):
                 with self.assertRaisesRegex(ValueError, "revision"):
@@ -330,7 +337,7 @@ class HostSourceManifestTests(unittest.TestCase):
         report = api.verify_source_artifacts(manifest)
         self.assertIn(report.status, {"verified", "unavailable-fixture-only"})
         if report.status == "verified":
-            self.assertEqual(len(report.artifacts), 19)
+            self.assertEqual(len(report.artifacts), 20)
         else:
             self.assertEqual(report.artifacts, ())
 

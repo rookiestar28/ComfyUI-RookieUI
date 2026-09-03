@@ -162,19 +162,24 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
             "none",
             "direct-byte-hash",
         ),
+        ("frontend", "src/components/sidebar/SideToolbar.vue"): (
+            "changed",
+            "toolbar-visibility-compatible",
+            "direct-byte-hash",
+        ),
         ("frontend", "src/schemas/apiSchema.ts"): (
             "changed",
-            "frontend-review-pending",
+            "api-schema-compatible",
             "direct-byte-hash",
         ),
         ("frontend", "src/scripts/api.ts"): (
             "changed",
-            "frontend-review-pending",
+            "event-dispatch-compatible",
             "pinned-git-blob-hash",
         ),
         ("frontend", "src/stores/executionStore.ts"): (
             "changed",
-            "frontend-review-pending",
+            "workflow-isolation-compatible",
             "direct-byte-hash",
         ),
         ("frontend", "src/stores/workspace/sidebarTabStore.ts"): (
@@ -218,7 +223,7 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
             "revision-and-version",
             "mixed",
-            "sidebar-and-runtime-review-pending",
+            "sidebar-and-runtime-compatible",
             "frontend-host-integration-alignment",
         ),
         "workflow_templates": (

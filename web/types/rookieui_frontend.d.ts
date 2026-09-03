@@ -78,11 +78,20 @@ export interface RookieUIRuntimeTerminalEvent {
   [key: string]: unknown;
 }
 
+export interface RookieUIRuntimeMetadataPreviewEvent {
+  blob: Blob;
+  nodeId: string;
+  parentNodeId: string;
+  displayNodeId: string;
+  realNodeId: string;
+  jobId: RookieUIRuntimeJobId;
+}
+
 export interface RookieUIRuntimeEventMap {
   progress: RookieUIRuntimeProgressEvent;
   progress_state: RookieUIRuntimeProgressStateEvent;
-  b_preview_with_metadata: unknown;
-  b_preview: unknown;
+  b_preview_with_metadata: RookieUIRuntimeMetadataPreviewEvent;
+  b_preview: Blob;
   execution_success: RookieUIRuntimeTerminalEvent;
   execution_error: RookieUIRuntimeTerminalEvent;
   execution_interrupted: RookieUIRuntimeTerminalEvent;

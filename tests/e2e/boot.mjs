@@ -1256,6 +1256,16 @@ if (params.get("lifecycleSentinel") === "1") {
     minWidth: "19px", width: "29px", flexBasis: "31px",
   });
 }
+if (params.get("agentSelection") === "1") {
+  const toolbar = document.createElement("aside");
+  toolbar.id = "mock-side-toolbar";
+  toolbar.setAttribute("inert", "");
+  toolbar.setAttribute("aria-hidden", "true");
+  toolbar.style.maxWidth = "0px";
+  toolbar.style.opacity = "0";
+  toolbar.style.pointerEvents = "none";
+  document.querySelector("main")?.prepend(toolbar);
+}
 await registerRookieUIBootstrapExtension({
   app,
   windowRef: window,

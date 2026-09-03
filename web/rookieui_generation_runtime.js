@@ -817,6 +817,7 @@ export function createGenerationRuntimeHelpers({
     let terminalEventStatus = "";
     let pendingProgressUpdate = null;
     let progressFrameHandle = null;
+    const metadataPreviewBlobs = new WeakSet();
     const cancelPendingProgressUpdate = () => {
       pendingProgressUpdate = null;
       if (progressFrameHandle !== null && typeof cancelAnimationFrame === "function") {
@@ -934,17 +935,8 @@ export function createGenerationRuntimeHelpers({
       }
       queueProgressUpdate({ value: runningState.value, max: runningState.max });
     });
-    const applyPreviewEvent = (event) => {
+    const applyPreviewBlob = (blob) => {
       if (runtimeState.runToken !== runToken || terminalEventStatus) {
-        return;
-      }
-      const detail = event?.detail ?? {};
-      const eventPromptId = extractRuntimePromptId(detail);
-      if (eventPromptId && eventPromptId !== promptId) {
-        return;
-      }
-      const blob = extractPreviewBlob(detail);
-      if (!blob) {
         return;
       }
       const now = Date.now();
@@ -956,9 +948,34 @@ export function createGenerationRuntimeHelpers({
       const previewUrl = URL.createObjectURL(blob);
       setGenerationPreview(runtimeState, previewBox, setPreviewContent, previewUrl, runtimeState.previewPlaceholder);
     };
+    const applyMetadataPreviewEvent = (event) => {
+      const detail = event?.detail ?? {};
+      const blob = extractPreviewBlob(detail);
+      if (!blob) {
+        return;
+      }
+      // CRITICAL: Frontend 1.54 emits this same Blob again through the identifier-less legacy lane; remember its identity so a rejected wrong-job frame cannot re-enter there.
+      metadataPreviewBlobs.add(blob);
+      if (extractRuntimePromptId(detail) !== promptId) {
+        return;
+      }
+      applyPreviewBlob(blob);
+    };
+    const applyLegacyPreviewEvent = (event) => {
+      const detail = event?.detail ?? {};
+      const blob = extractPreviewBlob(detail);
+      if (!blob || metadataPreviewBlobs.has(blob)) {
+        return;
+      }
+      const eventPromptId = extractRuntimePromptId(detail);
+      if (eventPromptId && eventPromptId !== promptId) {
+        return;
+      }
+      applyPreviewBlob(blob);
+    };
     // IMPORTANT: host event names differ across Comfy surfaces; keep both listeners for stable in-sidebar preview updates.
-    registerRuntimeListener("b_preview_with_metadata", applyPreviewEvent);
-    registerRuntimeListener("b_preview", applyPreviewEvent);
+    registerRuntimeListener("b_preview_with_metadata", applyMetadataPreviewEvent);
+    registerRuntimeListener("b_preview", applyLegacyPreviewEvent);
 
     const registerTerminalListener = (eventName, status, message) => {
       registerRuntimeListener(eventName, (event) => {

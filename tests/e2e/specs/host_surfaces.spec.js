@@ -73,15 +73,20 @@ test("renders matching runtime progress and metadata preview then tears down on 
   await expect(previewImage).toHaveAttribute("src", /^blob:/);
   const matchingPreviewUrl = await previewImage.getAttribute("src");
 
+  await page.waitForTimeout(150);
   await page.evaluate(() => {
     const bytes = Uint8Array.from(
       atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZqZsAAAAASUVORK5CYII="),
       (character) => character.charCodeAt(0),
     );
+    const pairedBlob = new Blob([bytes], { type: "image/png" });
     window.__ROOKIEUI_E2E_RUNTIME__.dispatch("b_preview_with_metadata", {
       jobId: "e2e-other-job",
-      blob: new Blob([bytes], { type: "image/png" }),
+      blob: pairedBlob,
     });
+    // Frontend 1.54 follows the metadata event with a legacy preview event
+    // carrying the same Blob instance.
+    window.__ROOKIEUI_E2E_RUNTIME__.dispatch("b_preview", pairedBlob);
   });
   await expect(previewImage).toHaveAttribute("src", matchingPreviewUrl);
 

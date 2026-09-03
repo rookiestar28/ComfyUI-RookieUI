@@ -119,10 +119,19 @@
     },
     {
       "byte_drift": "changed",
+      "bytes": 10347,
+      "evidence": "direct-byte-hash",
+      "path": "src/components/sidebar/SideToolbar.vue",
+      "semantic_drift": "toolbar-visibility-compatible",
+      "sha256": "9403b541268cd4bf163240edb65cf117e2f36b0fb8f17f0f6e894701b23d562b",
+      "subject": "frontend"
+    },
+    {
+      "byte_drift": "changed",
       "bytes": 18830,
       "evidence": "direct-byte-hash",
       "path": "src/schemas/apiSchema.ts",
-      "semantic_drift": "frontend-review-pending",
+      "semantic_drift": "api-schema-compatible",
       "sha256": "67fb3845ecfbc9ed964d17e274f17daaa3e3a5f16723d0af933c0dde78c6ce1e",
       "subject": "frontend"
     },
@@ -131,7 +140,7 @@
       "bytes": 52263,
       "evidence": "pinned-git-blob-hash",
       "path": "src/scripts/api.ts",
-      "semantic_drift": "frontend-review-pending",
+      "semantic_drift": "event-dispatch-compatible",
       "sha256": "83a14ae190015005660b53970e8fb9b5f46e048f632607976bd371d0c6fcf914",
       "subject": "frontend"
     },
@@ -140,7 +149,7 @@
       "bytes": 36654,
       "evidence": "direct-byte-hash",
       "path": "src/stores/executionStore.ts",
-      "semantic_drift": "frontend-review-pending",
+      "semantic_drift": "workflow-isolation-compatible",
       "sha256": "94d9309c8d24d689e7e0b4f230525e7589e9817fd592975c42399a9ef0720573",
       "subject": "frontend"
     },
@@ -172,7 +181,7 @@
       "subject": "workflow_templates"
     }
   ],
-  "captured_at": "2026-09-04T01:19:18+08:00",
+  "captured_at": "2026-09-04T03:01:01+08:00",
   "comparisons": [
     {
       "byte_drift": "mixed",
@@ -196,7 +205,7 @@
       "byte_drift": "mixed",
       "from_revision": "569e65b30fbfe96743c7996e201a32bcf029a310",
       "owner": "frontend-host-integration-alignment",
-      "semantic_drift": "sidebar-and-runtime-review-pending",
+      "semantic_drift": "sidebar-and-runtime-compatible",
       "source_drift": "revision-and-version",
       "subject": "frontend",
       "to_revision": "8f3b1569e4241ebbb5a9333da2bd09465947c40c"
