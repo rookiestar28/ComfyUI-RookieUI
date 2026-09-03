@@ -53,7 +53,7 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertTrue(MANIFEST_PATH.is_file(), "Candidate source manifest is missing.")
         return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    def test_refreshed_candidate_subjects_are_exact_and_do_not_promote_active_basis(self) -> None:
+    def test_accepted_candidate_subjects_are_exact_and_match_active_basis(self) -> None:
         api = self._api()
         manifest = api.load_manifest(MANIFEST_PATH)
 
@@ -105,16 +105,16 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest.subjects["desktop"].status, "unchanged-control")
 
-        # This manifest freezes a candidate only; final closure owns active-basis promotion.
-        self.assertNotEqual(
+        # The immutable candidate comparison remains provenance for the promoted basis.
+        self.assertEqual(
             HOST_SOURCE_BASIS.core.revision,
             manifest.subjects["core"].revision,
         )
-        self.assertNotEqual(
+        self.assertEqual(
             HOST_SOURCE_BASIS.frontend.revision,
             manifest.subjects["frontend"].revision,
         )
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.54")
 
     def test_artifact_inventory_and_drift_ownership_are_exact(self) -> None:
         api = self._api()

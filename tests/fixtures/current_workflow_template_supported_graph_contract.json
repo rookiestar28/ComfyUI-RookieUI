@@ -1,7 +1,7 @@
 {
-  "active_core_revision": "c67885b14556cf3e4e061862925282d403d09862",
-  "active_workflow_templates_json_version": "0.1.49",
-  "active_workflow_templates_version": "0.11.43",
+  "active_core_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+  "active_workflow_templates_json_version": "0.1.66",
+  "active_workflow_templates_version": "0.11.54",
   "candidate_core_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
   "candidate_workflow_templates_json_version": "0.1.66",
   "candidate_workflow_templates_version": "0.11.54",

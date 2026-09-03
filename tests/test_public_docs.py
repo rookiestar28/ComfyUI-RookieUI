@@ -7,7 +7,7 @@ import unittest
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_GALLERY_JSON_DEFERRED_SURFACE_MARKERS,
     OFFICIAL_TEMPLATE_GALLERY_JSON_REMOVED_MARKERS,
-    OFFICIAL_TEMPLATE_0_11_43_UNSUPPORTED_SURFACE_MARKERS,
+    OFFICIAL_TEMPLATE_0_11_54_UNSUPPORTED_SURFACE_MARKERS,
 )
 from rookieui.contracts.model_family_registry import list_model_family_registry_entries
 from rookieui.services.presets import build_preset_payload
@@ -42,7 +42,7 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.2(?!\d)", text))
                 self.assertIsNone(re.search(r"`comfyui-workflow-templates` 0\.11\.6(?!\d)", text))
-        self.assertIn("`comfyui-workflow-templates` 0.11.43", _read_text(README))
+        self.assertIn("`comfyui-workflow-templates` 0.11.54", _read_text(README))
 
     def test_readme_describes_krea_prompt_enhancement_truthfully(self) -> None:
         text = _read_text(README)
@@ -113,16 +113,16 @@ class PublicDocsTruthfulnessTests(unittest.TestCase):
         self.assertIn("api_ideogram_v3_t2i", unsupported_gallery_ids)
         self.assertFalse(unsupported_gallery_ids & supported_ids)
 
-    def test_candidate_gallery_dispositions_remain_unsupported_and_internal(self) -> None:
-        unsupported_gallery_ids = set(OFFICIAL_TEMPLATE_0_11_43_UNSUPPORTED_SURFACE_MARKERS)
+    def test_accepted_gallery_dispositions_remain_unsupported_and_internal(self) -> None:
+        unsupported_gallery_ids = set(OFFICIAL_TEMPLATE_0_11_54_UNSUPPORTED_SURFACE_MARKERS)
         supported_ids = {entry.id for entry in list_model_family_registry_entries()}
         supported_ids.update(preset["id"] for preset in build_preset_payload()["presets"])
 
-        self.assertEqual(len(unsupported_gallery_ids), 57)
-        self.assertIn("api_qwen3_t2i", unsupported_gallery_ids)
-        self.assertIn("audio_minimax_music_3", unsupported_gallery_ids)
-        self.assertIn("video_wan_animate2", unsupported_gallery_ids)
-        self.assertIn("image_qwen_image_layered", unsupported_gallery_ids)
+        self.assertEqual(len(unsupported_gallery_ids), 81)
+        self.assertIn("api_minimax_h3_max_t2v", unsupported_gallery_ids)
+        self.assertIn("3d_pixal3d_trellis2_image_to_model", unsupported_gallery_ids)
+        self.assertIn("video_minimax_h3_i2v_continuation", unsupported_gallery_ids)
+        self.assertIn("image_sdxl_simple", unsupported_gallery_ids)
         self.assertFalse(unsupported_gallery_ids & supported_ids)
         for path in _public_doc_paths():
             text = _read_text(path)

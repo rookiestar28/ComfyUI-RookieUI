@@ -15,12 +15,12 @@ from rookieui.contracts.host_source_basis import (
 
 class HostSourceBasisTests(unittest.TestCase):
     def test_host_envelopes_remain_distinct_and_exact(self) -> None:
-        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "c67885b14556cf3e4e061862925282d403d09862")
-        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.49.6")
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
+        self.assertEqual(HOST_SOURCE_BASIS.core.frontend_package_version, "1.51.9")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.54")
         self.assertEqual(HOST_SOURCE_BASIS.core.embedded_docs_version, "0.5.10")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "569e65b30fbfe96743c7996e201a32bcf029a310")
-        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.52.1")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.revision, "8f3b1569e4241ebbb5a9333da2bd09465947c40c")
+        self.assertEqual(HOST_SOURCE_BASIS.frontend.source_version, "1.54.1")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.revision, "e2d964b7456cea8423c7b9d3371c612313c06baa")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.source_version, "0.9.4")
         self.assertEqual(HOST_SOURCE_BASIS.desktop.packaged_core_version, "0.22.3")
@@ -53,7 +53,7 @@ class HostSourceBasisTests(unittest.TestCase):
                 self.assertEqual(len(artifact.sha256), 64)
                 self.assertNotIn("latest", artifact.filename.lower())
 
-    def test_workflow_template_0_11_43_candidate_artifact_closure_is_exact(self) -> None:
+    def test_workflow_template_0_11_43_historical_artifact_closure_is_exact(self) -> None:
         artifact = WORKFLOW_TEMPLATE_ARTIFACTS["0.11.43"]
         self.assertEqual(
             (artifact.filename, artifact.sha256),
@@ -100,9 +100,9 @@ class HostSourceBasisTests(unittest.TestCase):
                 ),
             },
         )
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.54")
 
-    def test_workflow_template_0_11_54_candidate_artifact_closure_is_exact_without_promotion(
+    def test_workflow_template_0_11_54_artifact_closure_matches_active_promotion(
         self,
     ) -> None:
         artifact = WORKFLOW_TEMPLATE_ARTIFACTS["0.11.54"]
@@ -176,7 +176,7 @@ class HostSourceBasisTests(unittest.TestCase):
                 "ab237d681231d46e252f53229cb341619b42a4d0b760eed4badf91763b47aab6",
             ),
         )
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.54")
 
     def test_current_workflow_template_component_closure_is_exact(self) -> None:
         current = {
@@ -417,7 +417,7 @@ class HostSourceBasisTests(unittest.TestCase):
             for right in ledgers[index + 1 :]:
                 self.assertFalse(left & right)
         self.assertEqual(len(set().union(*ledgers)), 57)
-        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.43")
+        self.assertEqual(HOST_SOURCE_BASIS.core.workflow_templates_version, "0.11.54")
 
 
 if __name__ == "__main__":

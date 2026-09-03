@@ -24,6 +24,7 @@ from rookieui.contracts.current_workflow_template_delta import (
     WORKFLOW_TEMPLATE_0_11_43_SUPPORTED_SURFACES,
     WORKFLOW_TEMPLATE_0_11_43_SUPERSEDED_SURFACES,
     WORKFLOW_TEMPLATE_0_11_43_UNSUPPORTED_SURFACES,
+    WORKFLOW_TEMPLATE_0_11_54_UNSUPPORTED_SURFACES,
 )
 
 
@@ -113,14 +114,14 @@ class WorkflowTemplateDeltaContract:
 # into a mutable or synthetic "latest ComfyUI" version.
 HOST_SOURCE_BASIS = HostSourceBasis(
     core=CoreSourceBasis(
-        revision="c67885b14556cf3e4e061862925282d403d09862",
-        frontend_package_version="1.49.6",
-        workflow_templates_version="0.11.43",
+        revision="30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+        frontend_package_version="1.51.9",
+        workflow_templates_version="0.11.54",
         embedded_docs_version="0.5.10",
     ),
     frontend=FrontendSourceBasis(
-        revision="569e65b30fbfe96743c7996e201a32bcf029a310",
-        source_version="1.52.1",
+        revision="8f3b1569e4241ebbb5a9333da2bd09465947c40c",
+        source_version="1.54.1",
     ),
     desktop=DesktopSourceBasis(
         revision="e2d964b7456cea8423c7b9d3371c612313c06baa",

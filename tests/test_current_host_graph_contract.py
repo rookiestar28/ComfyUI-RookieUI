@@ -54,8 +54,8 @@ TEMPLATE_JSON_WHEEL = (
     ROOT
     / "reference"
     / "workflow_templates_artifacts"
-    / "0.11.43"
-    / "comfyui_workflow_templates_json-0.1.49-py3-none-any.whl"
+    / "0.11.54"
+    / "comfyui_workflow_templates_json-0.1.66-py3-none-any.whl"
 )
 CANDIDATE_TEMPLATE_JSON_WHEEL = (
     ROOT
@@ -126,9 +126,9 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             contract.schema_version,
             "workflow-template-supported-graph-contract-v2",
         )
-        self.assertEqual(contract.active_workflow_templates_version, "0.11.43")
+        self.assertEqual(contract.active_workflow_templates_version, "0.11.54")
         self.assertEqual(contract.candidate_workflow_templates_version, "0.11.54")
-        self.assertEqual(contract.active_workflow_templates_json_version, "0.1.49")
+        self.assertEqual(contract.active_workflow_templates_json_version, "0.1.66")
         self.assertEqual(contract.candidate_workflow_templates_json_version, "0.1.66")
         self.assertEqual(
             contract.workflow_template_source_revision,
@@ -546,7 +546,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             fixture["workflow_templates_version"],
             HOST_SOURCE_BASIS.core.workflow_templates_version,
         )
-        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.49")
+        self.assertEqual(fixture["workflow_templates_json_version"], "0.1.66")
         expected_profiles = fixture["profiles"]
         entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
         self.assertEqual(set(entries), set(expected_profiles))
@@ -584,7 +584,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                     content = completed.stdout
                 else:
                     package, filename = locator.split(":", maxsplit=1)
-                    self.assertEqual(package, "comfyui-workflow-templates-json==0.1.49")
+                    self.assertEqual(package, "comfyui-workflow-templates-json==0.1.66")
                     member = f"comfyui_workflow_templates_json/templates/{filename}"
                     content = template_archive.read(member)
                 with self.subTest(profile_id=profile_id, locator=locator):
