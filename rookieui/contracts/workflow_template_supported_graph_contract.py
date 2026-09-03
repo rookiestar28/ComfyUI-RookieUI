@@ -12,7 +12,7 @@ DEFAULT_SUPPORTED_GRAPH_CONTRACT_PATH = (
     ROOT / "tests" / "fixtures" / "current_workflow_template_supported_graph_contract.json"
 )
 
-SCHEMA_VERSION = "workflow-template-supported-graph-contract-v1"
+SCHEMA_VERSION = "workflow-template-supported-graph-contract-v2"
 _SOURCE_KINDS = {"core-blueprint", "workflow-template-package"}
 _DISPOSITIONS = {"invariant", "migrated"}
 _REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -36,11 +36,14 @@ _TOP_LEVEL_FIELDS = {
 }
 _PROFILE_FIELDS = {
     "baseline_sha256",
+    "byte_disposition",
     "candidate_sha256",
-    "disposition",
+    "content_disposition",
+    "emitted_topology_sha256",
     "id",
     "source_id",
     "source_kind",
+    "topology_disposition",
 }
 
 
@@ -51,7 +54,10 @@ class SupportedGraphProfile:
     source_id: str
     baseline_sha256: str
     candidate_sha256: str
-    disposition: str
+    byte_disposition: str
+    content_disposition: str
+    topology_disposition: str
+    emitted_topology_sha256: str
 
 
 @dataclass(frozen=True)
@@ -173,20 +179,31 @@ def _parse_profile(value: object, index: int) -> SupportedGraphProfile:
     candidate_sha256 = _require_sha256(
         payload["candidate_sha256"], f"{context}.candidate_sha256"
     )
-    disposition = _require_string(payload["disposition"], f"{context}.disposition")
-    if disposition not in _DISPOSITIONS:
+    dispositions = {
+        name: _require_string(payload[name], f"{context}.{name}")
+        for name in ("byte_disposition", "content_disposition", "topology_disposition")
+    }
+    if any(value not in _DISPOSITIONS for value in dispositions.values()):
         raise ValueError(f"{context}.disposition is invalid.")
-    if disposition == "invariant" and baseline_sha256 != candidate_sha256:
-        raise ValueError(f"{context}.disposition invariant requires equal hashes.")
-    if disposition == "migrated" and baseline_sha256 == candidate_sha256:
-        raise ValueError(f"{context}.disposition migrated requires changed content.")
+    if dispositions["byte_disposition"] == "invariant" and baseline_sha256 != candidate_sha256:
+        raise ValueError(f"{context}.byte_disposition invariant requires equal hashes.")
+    if dispositions["byte_disposition"] == "migrated" and baseline_sha256 == candidate_sha256:
+        raise ValueError(f"{context}.byte_disposition migrated requires changed content.")
+    if dispositions["content_disposition"] == "invariant" and dispositions["topology_disposition"] != "invariant":
+        raise ValueError(f"{context}.content invariance requires topology invariance.")
+    emitted_topology_sha256 = _require_sha256(
+        payload["emitted_topology_sha256"], f"{context}.emitted_topology_sha256"
+    )
     return SupportedGraphProfile(
         id=profile_id,
         source_kind=source_kind,
         source_id=source_id,
         baseline_sha256=baseline_sha256,
         candidate_sha256=candidate_sha256,
-        disposition=disposition,
+        byte_disposition=dispositions["byte_disposition"],
+        content_disposition=dispositions["content_disposition"],
+        topology_disposition=dispositions["topology_disposition"],
+        emitted_topology_sha256=emitted_topology_sha256,
     )
 
 
@@ -246,7 +263,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
         ),
         candidate_core_revision=_require_exact_string(
             _require_revision(payload["candidate_core_revision"], "candidate_core_revision"),
-            "c67885b14556cf3e4e061862925282d403d09862",
+            "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
             "candidate_core_revision",
         ),
         active_workflow_templates_version=_require_exact_string(
@@ -262,7 +279,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
                 payload["candidate_workflow_templates_version"],
                 "candidate_workflow_templates_version",
             ),
-            "0.11.43",
+            "0.11.54",
             "candidate_workflow_templates_version",
         ),
         active_workflow_templates_json_version=_require_exact_string(
@@ -278,7 +295,7 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
                 payload["candidate_workflow_templates_json_version"],
                 "candidate_workflow_templates_json_version",
             ),
-            "0.1.49",
+            "0.1.66",
             "candidate_workflow_templates_json_version",
         ),
         workflow_template_source_revision=_require_exact_string(
@@ -286,12 +303,12 @@ def parse_supported_graph_contract_text(text: str) -> SupportedGraphContract:
                 payload["workflow_template_source_revision"],
                 "workflow_template_source_revision",
             ),
-            "f54739874c88e5a1154275c4597b3860e5a617b4",
+            "b0bcdb274878ea3c5cf46fed3819faa05b920707",
             "workflow_template_source_revision",
         ),
         workflow_template_source_tag=_require_exact_string(
             payload["workflow_template_source_tag"],
-            "v0.11.43",
+            "v0.11.54",
             "workflow_template_source_tag",
         ),
         profile_count=profile_count,

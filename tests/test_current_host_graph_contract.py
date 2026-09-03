@@ -57,6 +57,13 @@ TEMPLATE_JSON_WHEEL = (
     / "0.11.43"
     / "comfyui_workflow_templates_json-0.1.49-py3-none-any.whl"
 )
+CANDIDATE_TEMPLATE_JSON_WHEEL = (
+    ROOT
+    / "reference"
+    / "workflow_templates_artifacts"
+    / "0.11.54"
+    / "comfyui_workflow_templates_json-0.1.66-py3-none-any.whl"
+)
 DEFERRED_PROFILE_IDS = {
     "krea2_image_edit",
     "krea2_style_reference",
@@ -117,21 +124,21 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         self.assertEqual(
             contract.schema_version,
-            "workflow-template-supported-graph-contract-v1",
+            "workflow-template-supported-graph-contract-v2",
         )
         self.assertEqual(contract.active_workflow_templates_version, "0.11.43")
-        self.assertEqual(contract.candidate_workflow_templates_version, "0.11.43")
+        self.assertEqual(contract.candidate_workflow_templates_version, "0.11.54")
         self.assertEqual(contract.active_workflow_templates_json_version, "0.1.49")
-        self.assertEqual(contract.candidate_workflow_templates_json_version, "0.1.49")
+        self.assertEqual(contract.candidate_workflow_templates_json_version, "0.1.66")
         self.assertEqual(
             contract.workflow_template_source_revision,
-            "f54739874c88e5a1154275c4597b3860e5a617b4",
+            "b0bcdb274878ea3c5cf46fed3819faa05b920707",
         )
-        self.assertEqual(contract.workflow_template_source_tag, "v0.11.43")
+        self.assertEqual(contract.workflow_template_source_tag, "v0.11.54")
         self.assertEqual(contract.active_core_revision, HOST_SOURCE_BASIS.core.revision)
         self.assertEqual(
             contract.candidate_core_revision,
-            "c67885b14556cf3e4e061862925282d403d09862",
+            "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
         )
         self.assertEqual(
             (
@@ -146,7 +153,10 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             tuple(profile.id for profile in contract.profiles),
             tuple(sorted(profile.id for profile in contract.profiles)),
         )
-        self.assertTrue(all(profile.disposition == "invariant" for profile in contract.profiles))
+        self.assertTrue(all(profile.byte_disposition == "invariant" for profile in contract.profiles))
+        self.assertTrue(all(profile.content_disposition == "invariant" for profile in contract.profiles))
+        self.assertTrue(all(profile.topology_disposition == "invariant" for profile in contract.profiles))
+        self.assertTrue(all(len(profile.emitted_topology_sha256) == 64 for profile in contract.profiles))
         self.assertTrue(
             all(
                 profile.baseline_sha256 == profile.candidate_sha256
@@ -180,6 +190,48 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 self.assertNotIn("/", by_id[profile_id].source_id)
                 self.assertNotIn("\\", by_id[profile_id].source_id)
 
+    def test_workflow_template_candidate_sources_match_pinned_inert_bytes(self) -> None:
+        if not CORE_REFERENCE.is_dir() or not CANDIDATE_TEMPLATE_JSON_WHEEL.is_file():
+            return
+        contract = supported_graph_contract.load_supported_graph_contract(
+            FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
+        )
+        entries = {entry.id: entry for entry in list_non_sd_manifest_entries()}
+        profile_graph = core_graph_contract.load_profile_graph_contract(
+            FIXTURES / PROFILE_GRAPH_FIXTURE
+        )
+        topology_by_id = {profile.id: profile.topology_sha256 for profile in profile_graph.profiles}
+        with zipfile.ZipFile(CANDIDATE_TEMPLATE_JSON_WHEEL) as archive:
+            for profile in contract.profiles:
+                if profile.source_kind == "workflow-template-package":
+                    member = (
+                        "comfyui_workflow_templates_json/templates/"
+                        f"{profile.source_id}"
+                    )
+                    content = archive.read(member)
+                else:
+                    locator = entries[profile.id].official_template_path
+                    relative_path = Path(locator).relative_to("reference/ComfyUI").as_posix()
+                    content = subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(CORE_REFERENCE),
+                            "cat-file",
+                            "blob",
+                            f"{contract.candidate_core_revision}:{relative_path}",
+                        ],
+                        check=True,
+                        capture_output=True,
+                    ).stdout
+                with self.subTest(profile_id=profile.id):
+                    # SECURITY: only pinned archive/Git bytes are read; no upstream code executes.
+                    self.assertEqual(hashlib.sha256(content).hexdigest(), profile.candidate_sha256)
+                    self.assertEqual(
+                        profile.emitted_topology_sha256,
+                        topology_by_id[profile.id],
+                    )
+
     def test_workflow_template_candidate_contract_is_canonical_and_fail_closed(self) -> None:
         path = FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
         text = path.read_text(encoding="utf-8")
@@ -190,7 +242,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "duplicate"):
             supported_graph_contract.parse_supported_graph_contract_text(
-                '{"schema_version":"workflow-template-supported-graph-contract-v1",'
+                '{"schema_version":"workflow-template-supported-graph-contract-v2",'
                 '"schema_version":"duplicate"}'
             )
         payload = json.loads(text)
@@ -202,7 +254,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "profile_count"):
             supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
         payload = json.loads(text)
-        payload["profiles"][0]["disposition"] = "changed"
+        payload["profiles"][0]["topology_disposition"] = "changed"
         with self.assertRaisesRegex(ValueError, "disposition"):
             supported_graph_contract.parse_supported_graph_contract_text(json.dumps(payload))
         payload = json.loads(text)
