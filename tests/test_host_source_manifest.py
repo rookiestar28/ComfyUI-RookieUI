@@ -104,7 +104,7 @@ class HostSourceManifestTests(unittest.TestCase):
         )
         self.assertEqual(manifest.subjects["desktop"].status, "unchanged-control")
 
-        # R242 freezes a candidate only; R243 owns active-basis promotion.
+        # This manifest freezes a candidate only; final closure owns active-basis promotion.
         self.assertNotEqual(
             HOST_SOURCE_BASIS.core.revision,
             manifest.subjects["core"].revision,
