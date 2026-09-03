@@ -85,7 +85,7 @@ class FamilyProfileProjectionTests(unittest.TestCase):
     def test_current_host_profile_graph_contract_covers_all_shipped_profiles_in_order(self) -> None:
         contract = core_graph_contract.load_profile_graph_contract(PROFILE_GRAPH_FIXTURE)
         self.assertEqual(contract.schema_version, "current-host-profile-graph-contract-v1")
-        self.assertEqual(contract.source_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.source_revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
         self.assertEqual(contract.profile_count, 31)
         self.assertEqual(tuple(profile.id for profile in contract.profiles), EXPECTED_SHIPPED_PROFILE_IDS)
         entries = list_model_family_registry_entries()

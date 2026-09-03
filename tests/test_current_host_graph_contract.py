@@ -215,14 +215,15 @@ class CurrentHostGraphContractTests(unittest.TestCase):
             FIXTURES / CORE_GRAPH_FIXTURE
         )
 
-        self.assertEqual(contract.schema_version, "current-host-core-graph-contract-v1")
-        self.assertEqual(contract.baseline_revision, "6f7cd7fceaaf60d2669b554936394a7412c6fde5")
-        self.assertEqual(contract.source_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.schema_version, "current-host-core-graph-contract-v2")
+        self.assertEqual(contract.baseline_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.source_revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
         self.assertEqual(contract.inventory.source_file_count, 21)
         self.assertEqual(contract.inventory.class_count, 59)
         self.assertEqual(contract.inventory.input_count, 185)
-        self.assertEqual(contract.inventory.changed_source_file_count, 5)
-        self.assertEqual(contract.inventory.changed_class_count, 35)
+        self.assertEqual(contract.inventory.output_count, 65)
+        self.assertEqual(contract.inventory.changed_source_file_count, 4)
+        self.assertEqual(contract.inventory.changed_class_count, 28)
         self.assertEqual(len(contract.source_files), 21)
         self.assertEqual(len(contract.classes), 59)
         self.assertEqual(
@@ -242,6 +243,51 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                     class_type,
                     contract.source_files[class_contract.source_path].classes,
                 )
+                self.assertTrue(class_contract.category)
+                self.assertTrue(class_contract.function)
+                self.assertTrue(class_contract.outputs)
+                self.assertIs(type(class_contract.output_node), bool)
+                self.assertTrue(
+                    all(
+                        type(input_contract.is_list) is bool
+                        for input_contract in class_contract.inputs.values()
+                    )
+                )
+                for output in class_contract.outputs:
+                    self.assertTrue(output.type)
+                    self.assertIs(type(output.is_list), bool)
+
+        self.assertEqual(
+            sum(len(class_contract.outputs) for class_contract in contract.classes.values()),
+            65,
+        )
+        self.assertEqual(contract.classes["KSampler"].function, "sample")
+        self.assertEqual(contract.classes["KSampler"].category, "model/sampling")
+        self.assertEqual(contract.classes["KSampler"].outputs[0].type, "LATENT")
+        self.assertEqual(contract.classes["Canny"].function, "execute")
+        self.assertEqual(contract.classes["Canny"].outputs[0].type, "IMAGE")
+        self.assertEqual(
+            tuple(output.name for output in contract.classes["GetImageSize"].outputs),
+            ("width", "height", "batch_size"),
+        )
+        self.assertTrue(
+            all(
+                not input_contract.is_list
+                for value in contract.classes.values()
+                for input_contract in value.inputs.values()
+            )
+        )
+        self.assertTrue(
+            all(
+                not output.is_list
+                for value in contract.classes.values()
+                for output in value.outputs
+            )
+        )
+        self.assertTrue(all(not value.output_node for value in contract.classes.values()))
+        self.assertTrue(
+            all(value.signature_drift == "unchanged" for value in contract.classes.values())
+        )
 
     def test_candidate_core_graph_separates_byte_and_covered_signature_drift(self) -> None:
         contract = core_graph_contract.load_core_graph_contract(
@@ -249,10 +295,9 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         changed_counts = {
             "nodes.py": 22,
-            "comfy_extras/nodes_custom_sampler.py": 8,
+            "comfy_extras/nodes_images.py": 2,
             "comfy_extras/nodes_model_advanced.py": 2,
             "comfy_extras/nodes_model_patch.py": 2,
-            "comfy_extras/nodes_textgen.py": 1,
         }
         changed_paths = {
             path
@@ -270,8 +315,57 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                 )
         self.assertEqual(
             sum(len(contract.source_files[path].classes) for path in changed_paths),
-            35,
+            28,
         )
+
+    def test_candidate_core_graph_provenance_matches_pinned_git_objects(self) -> None:
+        if not CORE_REFERENCE.is_dir():
+            return
+        contract = core_graph_contract.load_core_graph_contract(
+            FIXTURES / CORE_GRAPH_FIXTURE
+        )
+        for path, source in contract.source_files.items():
+            with self.subTest(path=path):
+                # SECURITY: compare inert pinned Git objects; never import or execute Core.
+                baseline_blob = subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(CORE_REFERENCE),
+                        "rev-parse",
+                        f"{contract.baseline_revision}:{path}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                candidate_blob = subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(CORE_REFERENCE),
+                        "rev-parse",
+                        f"{contract.source_revision}:{path}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                content = subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(CORE_REFERENCE),
+                        "cat-file",
+                        "blob",
+                        f"{contract.source_revision}:{path}",
+                    ],
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                self.assertEqual(baseline_blob, source.baseline_blob)
+                self.assertEqual(candidate_blob, source.source_blob)
+                self.assertEqual(hashlib.sha256(content).hexdigest(), source.source_sha256)
 
     def test_candidate_core_graph_classifies_every_option_source_without_ambient_values(self) -> None:
         contract = core_graph_contract.load_core_graph_contract(
@@ -323,12 +417,22 @@ class CurrentHostGraphContractTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "duplicate"):
             core_graph_contract.parse_core_graph_contract_text(
-                '{"schema_version":"current-host-core-graph-contract-v1",'
+                '{"schema_version":"current-host-core-graph-contract-v2",'
                 '"schema_version":"duplicate"}'
             )
         payload = json.loads(graph_text)
         payload["unexpected"] = True
         with self.assertRaisesRegex(ValueError, "unknown"):
+            core_graph_contract.parse_core_graph_contract_text(json.dumps(payload))
+
+        payload = json.loads(graph_text)
+        payload["classes"]["KSampler"].pop("function", None)
+        with self.assertRaisesRegex(ValueError, "missing fields"):
+            core_graph_contract.parse_core_graph_contract_text(json.dumps(payload))
+
+        payload = json.loads(graph_text)
+        payload["classes"]["KSampler"]["outputs"][0]["is_list"] = "false"
+        with self.assertRaisesRegex(ValueError, "is_list"):
             core_graph_contract.parse_core_graph_contract_text(json.dumps(payload))
 
     def test_candidate_contract_rejects_unknown_node_input_and_literal_enum(self) -> None:

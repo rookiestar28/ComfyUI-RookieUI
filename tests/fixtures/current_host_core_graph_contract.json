@@ -1,9 +1,12 @@
 {
-  "baseline_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+  "baseline_revision": "c67885b14556cf3e4e061862925282d403d09862",
   "classes": {
     "BasicGuider": {
+      "category": "model/sampling/guiders",
+      "function": "execute",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -11,6 +14,7 @@
           "type": "CONDITIONING"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -18,16 +22,26 @@
           "type": "MODEL"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "GUIDER"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "BasicScheduler": {
+      "category": "model/sampling/schedulers",
+      "function": "execute",
       "inputs": {
         "denoise": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -35,6 +49,7 @@
           "type": "FLOAT"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -42,6 +57,7 @@
           "type": "MODEL"
         },
         "scheduler": {
+          "is_list": false,
           "option_source": {
             "kind": "runtime-registry",
             "source": "ComfyUI scheduler registry"
@@ -51,6 +67,7 @@
         },
         "steps": {
           "default": 20,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -58,16 +75,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "SIGMAS"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "CFGGuider": {
+      "category": "model/sampling/guiders",
+      "function": "execute",
       "inputs": {
         "cfg": {
           "default": 8.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -75,6 +102,7 @@
           "type": "FLOAT"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -82,6 +110,7 @@
           "type": "MODEL"
         },
         "negative": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -89,6 +118,7 @@
           "type": "CONDITIONING"
         },
         "positive": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -96,15 +126,25 @@
           "type": "CONDITIONING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "GUIDER"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "CFGNorm": {
+      "category": "advanced/guidance",
+      "function": "execute",
       "inputs": {
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -113,6 +153,7 @@
         },
         "pre_cfg": {
           "default": false,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -121,6 +162,7 @@
         },
         "strength": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -128,16 +170,27 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "name": "patched_model",
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "b585c560f6a77ba4bb78f1e842a24a361a7f319e",
       "source_path": "comfy_extras/nodes_cfg.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "688a73094509efcc81bf22bf0e77b2cd8c9f1726f455ed55f6f9747dec656e99"
     },
     "CFGOverride": {
+      "category": "model/sampling/guiders",
+      "function": "execute",
       "inputs": {
         "cfg": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -146,6 +199,7 @@
         },
         "end_percent": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -153,6 +207,7 @@
           "type": "FLOAT"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -161,6 +216,7 @@
         },
         "start_percent": {
           "default": 0.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -168,15 +224,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "CLIPLoader": {
+      "category": "model/loaders",
+      "function": "load_clip",
       "inputs": {
         "clip_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -185,6 +251,7 @@
           "type": "COMBO"
         },
         "device": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -196,6 +263,7 @@
           "type": "COMBO"
         },
         "type": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -233,15 +301,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "CLIPSetLastLayer": {
+      "category": "model/conditioning",
+      "function": "set_last_layer",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -250,6 +328,7 @@
         },
         "stop_at_clip_layer": {
           "default": -1,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -257,15 +336,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "CLIPTextEncode": {
+      "category": "model/conditioning",
+      "function": "encode",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -273,6 +362,7 @@
           "type": "CLIP"
         },
         "text": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -280,15 +370,25 @@
           "type": "STRING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "C_O_N_D_I_T_I_O_N_I_N_G"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "CLIPTextEncodeSDXL": {
+      "category": "model/conditioning/stable diffusion",
+      "function": "execute",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -297,6 +397,7 @@
         },
         "crop_h": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -305,6 +406,7 @@
         },
         "crop_w": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -313,6 +415,7 @@
         },
         "height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -321,6 +424,7 @@
         },
         "target_height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -329,6 +433,7 @@
         },
         "target_width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -336,6 +441,7 @@
           "type": "INT"
         },
         "text_g": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -343,6 +449,7 @@
           "type": "STRING"
         },
         "text_l": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -351,6 +458,7 @@
         },
         "width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -358,16 +466,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "08fbbd827aa46d7c00b70a49acca92973b8155a4",
       "source_path": "comfy_extras/nodes_clip_sdxl.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "df7f361867ab02a8dd1c1e58e6a12ef3c1211d3db64760cbf138dade08102f57"
     },
     "Canny": {
+      "category": "image/filters",
+      "function": "execute",
       "inputs": {
         "high_threshold": {
           "default": 0.8,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -375,6 +493,7 @@
           "type": "FLOAT"
         },
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -383,6 +502,7 @@
         },
         "low_threshold": {
           "default": 0.4,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -390,15 +510,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "462f6fea0d571e904e3b9e5ff442bdd3b800777e",
       "source_path": "comfy_extras/nodes_canny.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "5efd352d92d7749b7b9734a1676fee18f4431d44a8e9477822a7a8f38ad26051"
     },
     "CheckpointLoaderSimple": {
+      "category": "model/loaders",
+      "function": "load_checkpoint",
       "inputs": {
         "ckpt_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:checkpoints"
@@ -407,15 +537,33 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        },
+        {
+          "is_list": false,
+          "type": "CLIP"
+        },
+        {
+          "is_list": false,
+          "type": "VAE"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ComfySwitchNode": {
+      "category": "utilities/logic",
+      "function": "execute",
       "inputs": {
         "on_false": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -423,6 +571,7 @@
           "type": "MATCHTYPE"
         },
         "on_true": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -430,6 +579,7 @@
           "type": "MATCHTYPE"
         },
         "switch": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -437,15 +587,26 @@
           "type": "BOOLEAN"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "name": "output",
+          "type": "MATCHTYPE"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "13c1685f7d8ba95d9d5ab640f8249e0f895889d5",
       "source_path": "comfy_extras/nodes_logic.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "2cb1ce149ce616c0b12a67962ed7b799eb398fbcdeb20dcec4c5210eb6af6df1"
     },
     "ConditioningCombine": {
+      "category": "model/conditioning/transform",
+      "function": "combine",
       "inputs": {
         "conditioning_1": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -453,6 +614,7 @@
           "type": "CONDITIONING"
         },
         "conditioning_2": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -460,15 +622,25 @@
           "type": "CONDITIONING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ConditioningSetAreaStrength": {
+      "category": "model/conditioning/transform",
+      "function": "append",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -477,6 +649,7 @@
         },
         "strength": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -484,15 +657,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ConditioningSetTimestepRange": {
+      "category": "model/conditioning/transform",
+      "function": "set_range",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -501,6 +684,7 @@
         },
         "end": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -509,6 +693,7 @@
         },
         "start": {
           "default": 0.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -516,15 +701,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ConditioningZeroOut": {
+      "category": "model/conditioning/transform",
+      "function": "zero_out",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -532,15 +727,25 @@
           "type": "CONDITIONING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ControlNetLoader": {
+      "category": "model/loaders",
+      "function": "load_controlnet",
       "inputs": {
         "control_net_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:controlnet"
@@ -549,15 +754,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONTROL_NET"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "DiffControlNetLoader": {
+      "category": "model/loaders",
+      "function": "load_controlnet",
       "inputs": {
         "control_net_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:controlnet"
@@ -566,6 +781,7 @@
           "type": "COMBO"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -573,15 +789,25 @@
           "type": "MODEL"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONTROL_NET"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "DualCLIPLoader": {
+      "category": "model/loaders",
+      "function": "load_clip",
       "inputs": {
         "clip_name1": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -590,6 +816,7 @@
           "type": "COMBO"
         },
         "clip_name2": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -598,6 +825,7 @@
           "type": "COMBO"
         },
         "device": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -609,6 +837,7 @@
           "type": "COMBO"
         },
         "type": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -630,16 +859,26 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "DualModelGuider": {
+      "category": "model/sampling/guiders",
+      "function": "execute",
       "inputs": {
         "cfg": {
           "default": 4.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -647,6 +886,7 @@
           "type": "FLOAT"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -654,6 +894,7 @@
           "type": "MODEL"
         },
         "model_negative": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -661,6 +902,7 @@
           "type": "MODEL"
         },
         "negative": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -668,6 +910,7 @@
           "type": "CONDITIONING"
         },
         "positive": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -675,16 +918,26 @@
           "type": "CONDITIONING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "GUIDER"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "EmptyFlux2LatentImage": {
+      "category": "model/latent/flux",
+      "function": "execute",
       "inputs": {
         "batch_size": {
           "default": 1,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -693,6 +946,7 @@
         },
         "height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -701,6 +955,7 @@
         },
         "width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -708,16 +963,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "EmptyLatentImage": {
+      "category": "model/latent",
+      "function": "generate",
       "inputs": {
         "batch_size": {
           "default": 1,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -726,6 +991,7 @@
         },
         "height": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -734,6 +1000,7 @@
         },
         "width": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -741,16 +1008,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "EmptySD3LatentImage": {
+      "category": "model/latent/stable diffusion",
+      "function": "execute",
       "inputs": {
         "batch_size": {
           "default": 1,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -759,6 +1036,7 @@
         },
         "height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -767,6 +1045,7 @@
         },
         "width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -774,16 +1053,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "40e84656bf4f6c15b60942f6eee2fd5d8181c10e",
       "source_path": "comfy_extras/nodes_sd3.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "90a79847332fed7cc97379abbc7092116e6b1b883a7c9e933ac88167a521f693"
     },
     "Flux2Scheduler": {
+      "category": "model/sampling/schedulers",
+      "function": "execute",
       "inputs": {
         "height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -792,6 +1081,7 @@
         },
         "steps": {
           "default": 20,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -800,6 +1090,7 @@
         },
         "width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -807,15 +1098,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "SIGMAS"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxGuidance": {
+      "category": "model/conditioning/flux",
+      "function": "execute",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -824,6 +1125,7 @@
         },
         "guidance": {
           "default": 3.5,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -831,15 +1133,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKVCache": {
+      "category": "experimental",
+      "function": "execute",
       "inputs": {
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -847,15 +1159,25 @@
           "type": "MODEL"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKontextImageScale": {
+      "category": "model/conditioning/flux",
+      "function": "execute",
       "inputs": {
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -863,15 +1185,25 @@
           "type": "IMAGE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "FluxKontextMultiReferenceLatentMethod": {
+      "category": "model/conditioning/flux",
+      "function": "execute",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -879,6 +1211,7 @@
           "type": "CONDITIONING"
         },
         "reference_latents_method": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -892,15 +1225,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "e9986c9e7227c4217029961addaed447b0a66b2c",
       "source_path": "comfy_extras/nodes_flux.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "71c9d804a9acfb7a828fecb8fcc4b93e28f4417f0c4259a68910f4027059741f"
     },
     "GetImageSize": {
+      "category": "image",
+      "function": "execute",
       "inputs": {
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -908,16 +1251,37 @@
           "type": "IMAGE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "name": "width",
+          "type": "INT"
+        },
+        {
+          "is_list": false,
+          "name": "height",
+          "type": "INT"
+        },
+        {
+          "is_list": false,
+          "name": "batch_size",
+          "type": "INT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "source_blob": "ecbf44682a3435167145e97dde79fcd9b96bf3a4",
       "source_path": "comfy_extras/nodes_images.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "8f55ec8bf579c40176a1836067b873ef7c2ce437ea95a07fdbabe83cdf6c4223"
     },
     "Ideogram4Scheduler": {
+      "category": "model/sampling/schedulers",
+      "function": "execute",
       "inputs": {
         "height": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -926,6 +1290,7 @@
         },
         "mu": {
           "default": 0.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -934,6 +1299,7 @@
         },
         "std": {
           "default": 1.75,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -942,6 +1308,7 @@
         },
         "steps": {
           "default": 20,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -950,6 +1317,7 @@
         },
         "width": {
           "default": 1024,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -957,15 +1325,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "SIGMAS"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "4070db17c2bbf91c197b4eb5bab1189566107597",
       "source_path": "comfy_extras/nodes_ideogram4.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "2ef584e244ecb5614b7284eacfaaab7bbdfa398f0595c32c1562d99150ebe301"
     },
     "ImageScale": {
+      "category": "image/upscaling",
+      "function": "upscale",
       "inputs": {
         "crop": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -978,6 +1356,7 @@
         },
         "height": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -985,6 +1364,7 @@
           "type": "INT"
         },
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -992,6 +1372,7 @@
           "type": "IMAGE"
         },
         "upscale_method": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1007,6 +1388,7 @@
         },
         "width": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1014,15 +1396,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ImageScaleToTotalPixels": {
+      "category": "image/upscaling",
+      "function": "execute",
       "inputs": {
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1031,6 +1423,7 @@
         },
         "megapixels": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1039,6 +1432,7 @@
         },
         "resolution_steps": {
           "default": 1,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1046,6 +1440,7 @@
           "type": "INT"
         },
         "upscale_method": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1060,16 +1455,26 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "763b8a52fa84fbee9432ee116000f131c0002400",
       "source_path": "comfy_extras/nodes_post_processing.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "96ec39e8d0e9fe9a70b332f97f994d507e1fa223a26699a3c9c9fbeedacf6575"
     },
     "ImageStitch": {
+      "category": "image/transform",
+      "function": "execute",
       "inputs": {
         "direction": {
           "default": "right",
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1083,6 +1488,7 @@
           "type": "COMBO"
         },
         "image1": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1090,6 +1496,7 @@
           "type": "IMAGE"
         },
         "image2": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1098,6 +1505,7 @@
         },
         "match_image_size": {
           "default": true,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1106,6 +1514,7 @@
         },
         "spacing_color": {
           "default": "white",
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1121,6 +1530,7 @@
         },
         "spacing_width": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1128,16 +1538,26 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
+      "source_blob": "ecbf44682a3435167145e97dde79fcd9b96bf3a4",
       "source_path": "comfy_extras/nodes_images.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "8f55ec8bf579c40176a1836067b873ef7c2ce437ea95a07fdbabe83cdf6c4223"
     },
     "KSampler": {
+      "category": "model/sampling",
+      "function": "sample",
       "inputs": {
         "cfg": {
           "default": 8.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1146,6 +1566,7 @@
         },
         "denoise": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1153,6 +1574,7 @@
           "type": "FLOAT"
         },
         "latent_image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1160,6 +1582,7 @@
           "type": "LATENT"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1167,6 +1590,7 @@
           "type": "MODEL"
         },
         "negative": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1174,6 +1598,7 @@
           "type": "CONDITIONING"
         },
         "positive": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1181,6 +1606,7 @@
           "type": "CONDITIONING"
         },
         "sampler_name": {
+          "is_list": false,
           "option_source": {
             "kind": "runtime-registry",
             "source": "ComfyUI sampler registry"
@@ -1189,6 +1615,7 @@
           "type": "COMBO"
         },
         "scheduler": {
+          "is_list": false,
           "option_source": {
             "kind": "runtime-registry",
             "source": "ComfyUI scheduler registry"
@@ -1198,6 +1625,7 @@
         },
         "seed": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1206,6 +1634,7 @@
         },
         "steps": {
           "default": 20,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1213,15 +1642,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "KSamplerSelect": {
+      "category": "model/sampling/samplers",
+      "function": "execute",
       "inputs": {
         "sampler_name": {
+          "is_list": false,
           "option_source": {
             "kind": "runtime-registry",
             "source": "ComfyUI sampler registry"
@@ -1230,15 +1669,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "SAMPLER"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "LatentUpscale": {
+      "category": "model/latent",
+      "function": "upscale",
       "inputs": {
         "crop": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1251,6 +1700,7 @@
         },
         "height": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1258,6 +1708,7 @@
           "type": "INT"
         },
         "samples": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1265,6 +1716,7 @@
           "type": "LATENT"
         },
         "upscale_method": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1280,6 +1732,7 @@
         },
         "width": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1287,15 +1740,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "LatentUpscaleBy": {
+      "category": "model/latent",
+      "function": "upscale",
       "inputs": {
         "samples": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1304,6 +1767,7 @@
         },
         "scale_by": {
           "default": 1.5,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1311,6 +1775,7 @@
           "type": "FLOAT"
         },
         "upscale_method": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1325,15 +1790,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "LoraLoader": {
+      "category": "model/loaders",
+      "function": "load_lora",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1341,6 +1816,7 @@
           "type": "CLIP"
         },
         "lora_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:loras"
@@ -1349,6 +1825,7 @@
           "type": "COMBO"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1357,6 +1834,7 @@
         },
         "strength_clip": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1365,6 +1843,7 @@
         },
         "strength_model": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1372,15 +1851,29 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        },
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "LoraLoaderModelOnly": {
+      "category": "model/loaders",
+      "function": "load_lora_model_only",
       "inputs": {
         "lora_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:loras"
@@ -1389,6 +1882,7 @@
           "type": "COMBO"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1397,6 +1891,7 @@
         },
         "strength_model": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1404,15 +1899,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "ModelPatchLoader": {
+      "category": "model/loaders",
+      "function": "load_model_patch",
       "inputs": {
         "name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:model_patches"
@@ -1421,15 +1926,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL_PATCH"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_blob": "5ce3bb25ab65e6a5cbaabfe6cda9a900d6cbe513",
       "source_path": "comfy_extras/nodes_model_patch.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c"
     },
     "ModelSamplingAuraFlow": {
+      "category": "model/patch",
+      "function": "patch_aura",
       "inputs": {
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1438,6 +1953,7 @@
         },
         "shift": {
           "default": 1.73,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1445,15 +1961,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_blob": "c73b0ba12399aae862406c56d0bb3e32393df00c",
       "source_path": "comfy_extras/nodes_model_advanced.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09"
     },
     "ModelSamplingSD3": {
+      "category": "model/patch/stable diffusion",
+      "function": "patch",
       "inputs": {
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1462,6 +1988,7 @@
         },
         "shift": {
           "default": 3.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1469,15 +1996,25 @@
           "type": "FLOAT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "source_blob": "c73b0ba12399aae862406c56d0bb3e32393df00c",
       "source_path": "comfy_extras/nodes_model_advanced.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09"
     },
     "PrimitiveBoolean": {
+      "category": "utilities/primitive",
+      "function": "execute",
       "inputs": {
         "value": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1485,15 +2022,25 @@
           "type": "BOOLEAN"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "BOOLEAN"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "35761863ff49fba89af08f02314354f92770bc91",
       "source_path": "comfy_extras/nodes_primitive.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
     },
     "PrimitiveStringMultiline": {
+      "category": "utilities/primitive",
+      "function": "execute",
       "inputs": {
         "value": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1501,15 +2048,25 @@
           "type": "STRING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "STRING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "35761863ff49fba89af08f02314354f92770bc91",
       "source_path": "comfy_extras/nodes_primitive.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "ee3882214ebdd0d20c8061691075cebb1642c303e162f6d22ae525d75aa59b2d"
     },
     "QuadrupleCLIPLoader": {
+      "category": "model/loaders",
+      "function": "execute",
       "inputs": {
         "clip_name1": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -1518,6 +2075,7 @@
           "type": "COMBO"
         },
         "clip_name2": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -1526,6 +2084,7 @@
           "type": "COMBO"
         },
         "clip_name3": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -1534,6 +2093,7 @@
           "type": "COMBO"
         },
         "clip_name4": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:text_encoders"
@@ -1542,15 +2102,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "65248561bd60fddb00230d5b53dd077236a9a884",
       "source_path": "comfy_extras/nodes_hidream.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "727fe71d9afa086a0d2613639f9546019c650449cfa04d1b98d8abf8de611a89"
     },
     "QwenImageDiffsynthControlnet": {
+      "category": "model/patch/qwen",
+      "function": "diffsynth_controlnet",
       "inputs": {
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1558,6 +2128,7 @@
           "type": "IMAGE"
         },
         "mask": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1565,6 +2136,7 @@
           "type": "MASK"
         },
         "model": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1572,6 +2144,7 @@
           "type": "MODEL"
         },
         "model_patch": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1580,6 +2153,7 @@
         },
         "strength": {
           "default": 1.0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1587,6 +2161,7 @@
           "type": "FLOAT"
         },
         "vae": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1594,16 +2169,26 @@
           "type": "VAE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "source_blob": "5ce3bb25ab65e6a5cbaabfe6cda9a900d6cbe513",
       "source_path": "comfy_extras/nodes_model_patch.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c"
     },
     "RandomNoise": {
+      "category": "model/sampling/noise",
+      "function": "execute",
       "inputs": {
         "noise_seed": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1611,15 +2196,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "NOISE"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "ReferenceLatent": {
+      "category": "model/conditioning",
+      "function": "execute",
       "inputs": {
         "conditioning": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1627,6 +2222,7 @@
           "type": "CONDITIONING"
         },
         "latent": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1634,15 +2230,25 @@
           "type": "LATENT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "d0d20ae7a404aa91b6cf9bb823194a7ed2de0699",
       "source_path": "comfy_extras/nodes_edit_model.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "8fe4edaa13707df052ddf883fade1190f7b68416d54c7026cefefd489a13ee7e"
     },
     "SamplerCustomAdvanced": {
+      "category": "model/sampling/custom",
+      "function": "execute",
       "inputs": {
         "guider": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1650,6 +2256,7 @@
           "type": "GUIDER"
         },
         "latent_image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1657,6 +2264,7 @@
           "type": "LATENT"
         },
         "noise": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1664,6 +2272,7 @@
           "type": "NOISE"
         },
         "sampler": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1671,6 +2280,7 @@
           "type": "SAMPLER"
         },
         "sigmas": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1678,15 +2288,31 @@
           "type": "SIGMAS"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "name": "output",
+          "type": "LATENT"
+        },
+        {
+          "is_list": false,
+          "name": "denoised_output",
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_path": "comfy_extras/nodes_custom_sampler.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     "SetUnionControlNetType": {
+      "category": "model/conditioning/controlnet",
+      "function": "execute",
       "inputs": {
         "control_net": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1694,6 +2320,7 @@
           "type": "CONTROL_NET"
         },
         "type": {
+          "is_list": false,
           "option_source": {
             "kind": "runtime-registry",
             "source": "ComfyUI union ControlNet type registry"
@@ -1702,15 +2329,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONTROL_NET"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "eb476f49713eb2048af159d36db4b7119ee89a6f",
       "source_path": "comfy_extras/nodes_controlnet.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "197972863ab797c8b1e1137db99fbbbdf2c9d6668d57cb6fa4413ed993b6ae59"
     },
     "StringReplace": {
+      "category": "text",
+      "function": "execute",
       "inputs": {
         "find": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1718,6 +2355,7 @@
           "type": "STRING"
         },
         "replace": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1725,6 +2363,7 @@
           "type": "STRING"
         },
         "string": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1732,15 +2371,25 @@
           "type": "STRING"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "STRING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "21929ae630e7043b138a63838258a418c192d922",
       "source_path": "comfy_extras/nodes_string.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1"
     },
     "T5TokenizerOptions": {
+      "category": "model/conditioning",
+      "function": "execute",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1749,6 +2398,7 @@
         },
         "min_length": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1757,6 +2407,7 @@
         },
         "min_padding": {
           "default": 0,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1764,15 +2415,25 @@
           "type": "INT"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CLIP"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "c8091b7a4d7d620d1435c5eaef77fc00e2c7925f",
       "source_path": "comfy_extras/nodes_cond.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "ee78f3f890c97c20dc4de1f5f4445b0cfbcd4e9e2cc3d61a77f2b55a5682d075"
     },
     "TextEncodeQwenImageEdit": {
+      "category": "model/conditioning/qwen image",
+      "function": "execute",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1780,6 +2441,7 @@
           "type": "CLIP"
         },
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1787,6 +2449,7 @@
           "type": "IMAGE"
         },
         "prompt": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1794,6 +2457,7 @@
           "type": "STRING"
         },
         "vae": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1801,15 +2465,25 @@
           "type": "VAE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
       "source_path": "comfy_extras/nodes_qwen.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
     },
     "TextEncodeQwenImageEditPlus": {
+      "category": "model/conditioning/qwen image",
+      "function": "execute",
       "inputs": {
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1817,6 +2491,7 @@
           "type": "CLIP"
         },
         "image1": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1824,6 +2499,7 @@
           "type": "IMAGE"
         },
         "image2": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1831,6 +2507,7 @@
           "type": "IMAGE"
         },
         "image3": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1838,6 +2515,7 @@
           "type": "IMAGE"
         },
         "prompt": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1845,6 +2523,7 @@
           "type": "STRING"
         },
         "vae": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1852,15 +2531,25 @@
           "type": "VAE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "CONDITIONING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "4960774db03c63ff96b365ac2de067c2e63c5947",
       "source_path": "comfy_extras/nodes_qwen.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "b8d18d9f897c4bd5a4b2651b30643bed277f1808e033c9c376dc21025fed00a5"
     },
     "TextGenerate": {
+      "category": "text",
+      "function": "execute",
       "inputs": {
         "audio": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1868,6 +2557,7 @@
           "type": "AUDIO"
         },
         "clip": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1875,6 +2565,7 @@
           "type": "CLIP"
         },
         "image": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1883,6 +2574,7 @@
         },
         "max_length": {
           "default": 512,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1891,6 +2583,7 @@
         },
         "prompt": {
           "default": "",
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1898,6 +2591,7 @@
           "type": "STRING"
         },
         "sampling_mode": {
+          "is_list": false,
           "option_source": {
             "kind": "dynamic",
             "source": "ComfyUI text-generation sampling schema"
@@ -1907,6 +2601,7 @@
         },
         "thinking": {
           "default": false,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1915,6 +2610,7 @@
         },
         "use_default_template": {
           "default": true,
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1922,6 +2618,7 @@
           "type": "BOOLEAN"
         },
         "video": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1929,15 +2626,26 @@
           "type": "IMAGE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "name": "generated_text",
+          "type": "STRING"
+        }
+      ],
       "signature_drift": "unchanged",
       "source_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
       "source_path": "comfy_extras/nodes_textgen.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
       "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
     },
     "UNETLoader": {
+      "category": "model/loaders",
+      "function": "load_unet",
       "inputs": {
         "unet_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:diffusion_models"
@@ -1946,6 +2654,7 @@
           "type": "COMBO"
         },
         "weight_dtype": {
+          "is_list": false,
           "option_source": {
             "kind": "literal",
             "values": [
@@ -1959,15 +2668,25 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "MODEL"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "VAEDecode": {
+      "category": "model/latent",
+      "function": "decode",
       "inputs": {
         "samples": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1975,6 +2694,7 @@
           "type": "LATENT"
         },
         "vae": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1982,15 +2702,25 @@
           "type": "VAE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "IMAGE"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "VAEEncode": {
+      "category": "model/latent",
+      "function": "encode",
       "inputs": {
         "pixels": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -1998,6 +2728,7 @@
           "type": "IMAGE"
         },
         "vae": {
+          "is_list": false,
           "option_source": {
             "kind": "not-applicable"
           },
@@ -2005,15 +2736,25 @@
           "type": "VAE"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "LATENT"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     },
     "VAELoader": {
+      "category": "model/loaders",
+      "function": "load_vae",
       "inputs": {
         "vae_name": {
+          "is_list": false,
           "option_source": {
             "kind": "filesystem",
             "source": "ComfyUI folder registry:vae"
@@ -2022,22 +2763,30 @@
           "type": "COMBO"
         }
       },
+      "output_node": false,
+      "outputs": [
+        {
+          "is_list": false,
+          "type": "VAE"
+        }
+      ],
       "signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
       "source_path": "nodes.py",
-      "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     }
   },
   "inventory": {
-    "changed_class_count": 35,
-    "changed_source_file_count": 5,
+    "changed_class_count": 28,
+    "changed_source_file_count": 4,
     "class_count": 59,
     "classified_option_count": 35,
     "input_count": 185,
+    "output_count": 65,
     "source_file_count": 21
   },
-  "schema_version": "current-host-core-graph-contract-v1",
+  "schema_version": "current-host-core-graph-contract-v2",
   "source_files": {
     "comfy_extras/nodes_canny.py": {
       "baseline_blob": "462f6fea0d571e904e3b9e5ff442bdd3b800777e",
@@ -2090,8 +2839,8 @@
       "source_sha256": "197972863ab797c8b1e1137db99fbbbdf2c9d6668d57cb6fa4413ed993b6ae59"
     },
     "comfy_extras/nodes_custom_sampler.py": {
-      "baseline_blob": "e81b6328b7791162f80207194f983dc0d6b4dc07",
-      "byte_drift": "changed",
+      "baseline_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "byte_drift": "unchanged",
       "classes": [
         "BasicGuider",
         "BasicScheduler",
@@ -2153,14 +2902,14 @@
     },
     "comfy_extras/nodes_images.py": {
       "baseline_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
-      "byte_drift": "unchanged",
+      "byte_drift": "changed",
       "classes": [
         "GetImageSize",
         "ImageStitch"
       ],
       "covered_signature_drift": "unchanged",
-      "source_blob": "7011d9c13c463ac3020fb8d08f24374c361d3509",
-      "source_sha256": "579524837b94f5d4d48d4e56a8fded9ea6f988e5f27ed172915eec284ca00af2"
+      "source_blob": "ecbf44682a3435167145e97dde79fcd9b96bf3a4",
+      "source_sha256": "8f55ec8bf579c40176a1836067b873ef7c2ce437ea95a07fdbabe83cdf6c4223"
     },
     "comfy_extras/nodes_logic.py": {
       "baseline_blob": "13c1685f7d8ba95d9d5ab640f8249e0f895889d5",
@@ -2173,26 +2922,26 @@
       "source_sha256": "2cb1ce149ce616c0b12a67962ed7b799eb398fbcdeb20dcec4c5210eb6af6df1"
     },
     "comfy_extras/nodes_model_advanced.py": {
-      "baseline_blob": "a336ba0791d6c711daeb824f3b1e50992e79111c",
+      "baseline_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
       "byte_drift": "changed",
       "classes": [
         "ModelSamplingAuraFlow",
         "ModelSamplingSD3"
       ],
       "covered_signature_drift": "unchanged",
-      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
-      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+      "source_blob": "c73b0ba12399aae862406c56d0bb3e32393df00c",
+      "source_sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09"
     },
     "comfy_extras/nodes_model_patch.py": {
-      "baseline_blob": "4d7bf7476ef003dc28eafb1ed676b808bd58a0ab",
+      "baseline_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
       "byte_drift": "changed",
       "classes": [
         "ModelPatchLoader",
         "QwenImageDiffsynthControlnet"
       ],
       "covered_signature_drift": "unchanged",
-      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
-      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+      "source_blob": "5ce3bb25ab65e6a5cbaabfe6cda9a900d6cbe513",
+      "source_sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c"
     },
     "comfy_extras/nodes_post_processing.py": {
       "baseline_blob": "763b8a52fa84fbee9432ee116000f131c0002400",
@@ -2247,8 +2996,8 @@
       "source_sha256": "bb01963178f28efc6e3a9578aecb89f53f8265e89c0518da92ec21c4955e85f1"
     },
     "comfy_extras/nodes_textgen.py": {
-      "baseline_blob": "5a947d5c57b32e7e8d2ed1ef364064959d841cc4",
-      "byte_drift": "changed",
+      "baseline_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
+      "byte_drift": "unchanged",
       "classes": [
         "TextGenerate"
       ],
@@ -2257,7 +3006,7 @@
       "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
     },
     "nodes.py": {
-      "baseline_blob": "08529d8dc414138e56d0cc6e68367f95da70f038",
+      "baseline_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
       "byte_drift": "changed",
       "classes": [
         "CLIPLoader",
@@ -2284,9 +3033,9 @@
         "VAELoader"
       ],
       "covered_signature_drift": "unchanged",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     }
   },
-  "source_revision": "c67885b14556cf3e4e061862925282d403d09862"
+  "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a"
 }

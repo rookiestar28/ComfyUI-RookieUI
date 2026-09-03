@@ -17,7 +17,7 @@ DEFAULT_PROFILE_GRAPH_CONTRACT_PATH = (
     ROOT / "tests" / "fixtures" / "current_host_profile_graph_contract.json"
 )
 
-CORE_SCHEMA_VERSION = "current-host-core-graph-contract-v1"
+CORE_SCHEMA_VERSION = "current-host-core-graph-contract-v2"
 PROFILE_SCHEMA_VERSION = "current-host-profile-graph-contract-v1"
 
 JSONScalar: TypeAlias = str | int | float | bool | None
@@ -46,6 +46,7 @@ _INVENTORY_FIELDS = {
     "class_count",
     "classified_option_count",
     "input_count",
+    "output_count",
     "source_file_count",
 }
 _SOURCE_FILE_FIELDS = {
@@ -57,15 +58,21 @@ _SOURCE_FILE_FIELDS = {
     "source_sha256",
 }
 _CLASS_FIELDS = {
+    "category",
+    "function",
     "inputs",
+    "output_node",
+    "outputs",
     "signature_drift",
     "source_blob",
     "source_path",
     "source_revision",
     "source_sha256",
 }
-_INPUT_REQUIRED_FIELDS = {"optional", "option_source", "type"}
+_INPUT_REQUIRED_FIELDS = {"is_list", "optional", "option_source", "type"}
 _INPUT_ALLOWED_FIELDS = _INPUT_REQUIRED_FIELDS | {"default"}
+_OUTPUT_REQUIRED_FIELDS = {"is_list", "type"}
+_OUTPUT_ALLOWED_FIELDS = _OUTPUT_REQUIRED_FIELDS | {"name"}
 _PROFILE_TOP_LEVEL_FIELDS = {
     "profile_count",
     "profiles",
@@ -106,8 +113,16 @@ class CoreInputContract:
     optional: bool
     type: str
     option_source: OptionSource
+    is_list: bool
     has_default: bool = False
     default: JSONScalar = None
+
+
+@dataclass(frozen=True)
+class CoreOutputContract:
+    type: str
+    is_list: bool
+    name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -117,7 +132,11 @@ class CoreClassContract:
     source_blob: str
     source_sha256: str
     signature_drift: str
+    category: str
+    function: str
+    output_node: bool
     inputs: Mapping[str, CoreInputContract]
+    outputs: tuple[CoreOutputContract, ...]
 
 
 @dataclass(frozen=True)
@@ -135,6 +154,7 @@ class CoreGraphInventory:
     source_file_count: int
     class_count: int
     input_count: int
+    output_count: int
     changed_source_file_count: int
     changed_class_count: int
     classified_option_count: int
@@ -221,6 +241,12 @@ def _require_count(value: object, context: str) -> int:
     return value
 
 
+def _require_bool(value: object, context: str) -> bool:
+    if type(value) is not bool:
+        raise ValueError(f"{context} must be a boolean.")
+    return value
+
+
 def _require_relative_path(value: object, context: str) -> str:
     path = _require_string(value, context)
     normalized = PurePosixPath(path)
@@ -284,8 +310,27 @@ def _parse_input(value: object, context: str) -> CoreInputContract:
         optional=optional,
         type=input_type,
         option_source=option_source,
+        is_list=_require_bool(payload["is_list"], f"{context} is_list"),
         has_default=has_default,
         default=default,
+    )
+
+
+def _parse_output(value: object, context: str) -> CoreOutputContract:
+    payload = _require_mapping(value, context)
+    unknown = set(payload) - _OUTPUT_ALLOWED_FIELDS
+    missing = _OUTPUT_REQUIRED_FIELDS - set(payload)
+    if unknown:
+        raise ValueError(f"{context} contains unknown fields: {', '.join(sorted(unknown))}")
+    if missing:
+        raise ValueError(f"{context} is missing fields: {', '.join(sorted(missing))}")
+    name = payload.get("name")
+    if name is not None:
+        name = _require_string(name, f"{context} name")
+    return CoreOutputContract(
+        type=_require_string(payload["type"], f"{context} type"),
+        is_list=_require_bool(payload["is_list"], f"{context} is_list"),
+        name=name,
     )
 
 
@@ -296,6 +341,7 @@ def _parse_inventory(value: object) -> CoreGraphInventory:
         source_file_count=_require_count(payload["source_file_count"], "source_file_count"),
         class_count=_require_count(payload["class_count"], "class_count"),
         input_count=_require_count(payload["input_count"], "input_count"),
+        output_count=_require_count(payload["output_count"], "output_count"),
         changed_source_file_count=_require_count(
             payload["changed_source_file_count"], "changed_source_file_count"
         ),
@@ -369,6 +415,13 @@ def parse_core_graph_contract_text(text: str) -> CoreGraphContract:
                 for name, value in raw_inputs.items()
             }
         )
+        raw_outputs = class_value["outputs"]
+        if not isinstance(raw_outputs, list) or not raw_outputs:
+            raise ValueError(f"class {class_type} outputs must be a non-empty array.")
+        outputs = tuple(
+            _parse_output(value, f"class {class_type} output {index}")
+            for index, value in enumerate(raw_outputs)
+        )
         signature_drift = _require_string(
             class_value["signature_drift"], f"class {class_type} signature_drift"
         )
@@ -384,7 +437,17 @@ def parse_core_graph_contract_text(text: str) -> CoreGraphContract:
                 class_value["source_sha256"], f"class {class_type} source_sha256"
             ),
             signature_drift=signature_drift,
+            category=_require_string(
+                class_value["category"], f"class {class_type} category"
+            ),
+            function=_require_string(
+                class_value["function"], f"class {class_type} function"
+            ),
+            output_node=_require_bool(
+                class_value["output_node"], f"class {class_type} output_node"
+            ),
             inputs=inputs,
+            outputs=outputs,
         )
 
     contract = CoreGraphContract(
@@ -402,6 +465,7 @@ def parse_core_graph_contract_text(text: str) -> CoreGraphContract:
 def _validate_core_graph_consistency(contract: CoreGraphContract) -> None:
     inventory = contract.inventory
     input_count = sum(len(value.inputs) for value in contract.classes.values())
+    output_count = sum(len(value.outputs) for value in contract.classes.values())
     changed_sources = tuple(
         value for value in contract.source_files.values() if value.byte_drift == "changed"
     )
@@ -419,6 +483,7 @@ def _validate_core_graph_consistency(contract: CoreGraphContract) -> None:
         len(contract.source_files),
         len(contract.classes),
         input_count,
+        output_count,
         len(changed_sources),
         len(changed_classes),
         option_count,
@@ -427,6 +492,7 @@ def _validate_core_graph_consistency(contract: CoreGraphContract) -> None:
         inventory.source_file_count,
         inventory.class_count,
         inventory.input_count,
+        inventory.output_count,
         inventory.changed_source_file_count,
         inventory.changed_class_count,
         inventory.classified_option_count,
@@ -466,15 +532,27 @@ def _core_graph_payload(contract: CoreGraphContract) -> dict[str, object]:
         "baseline_revision": contract.baseline_revision,
         "classes": {
             class_type: {
+                "category": class_value.category,
+                "function": class_value.function,
                 "inputs": {
                     name: {
                         **({"default": value.default} if value.has_default else {}),
+                        "is_list": value.is_list,
                         "optional": value.optional,
                         "option_source": _option_source_payload(value.option_source),
                         "type": value.type,
                     }
                     for name, value in class_value.inputs.items()
                 },
+                "output_node": class_value.output_node,
+                "outputs": [
+                    {
+                        "is_list": value.is_list,
+                        **({"name": value.name} if value.name is not None else {}),
+                        "type": value.type,
+                    }
+                    for value in class_value.outputs
+                ],
                 "signature_drift": class_value.signature_drift,
                 "source_blob": class_value.source_blob,
                 "source_path": class_value.source_path,
@@ -489,6 +567,7 @@ def _core_graph_payload(contract: CoreGraphContract) -> dict[str, object]:
             "class_count": contract.inventory.class_count,
             "classified_option_count": contract.inventory.classified_option_count,
             "input_count": contract.inventory.input_count,
+            "output_count": contract.inventory.output_count,
             "source_file_count": contract.inventory.source_file_count,
         },
         "schema_version": contract.schema_version,
