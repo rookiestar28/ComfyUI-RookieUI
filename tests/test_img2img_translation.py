@@ -151,6 +151,21 @@ class Img2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.dtype_profile, "automatic")
         self.assertEqual(request.lora_name, "")
 
+    def test_normalize_img2img_request_rejects_unknown_live_sampler(self) -> None:
+        host_module = mock.Mock()
+        host_module.KSampler.SAMPLERS = ("euler_ancestral", "cfgpp_ud10_ab")
+        with mock.patch(
+            "rookieui.services.compatibility._load_comfy_samplers_module",
+            return_value=host_module,
+        ):
+            with self.assertRaisesRegex(ValueError, "Unsupported RookieUI sampler"):
+                normalize_img2img_request(
+                    {
+                        "prompt": "city skyline",
+                        "image_asset": "input-image",
+                        "sampler_name": "not a sampler",
+                    }
+                )
     def test_normalize_img2img_request_applies_hires_defaults_when_enabled(self) -> None:
         request = normalize_img2img_request(
             {

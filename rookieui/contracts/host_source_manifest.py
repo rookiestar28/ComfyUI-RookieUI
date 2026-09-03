@@ -125,17 +125,17 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
         ),
         ("core", "comfy_extras/nodes_images.py"): (
             "changed",
-            "graph-review-pending",
+            "graph-contract-compatible",
             "pinned-git-blob-hash",
         ),
         ("core", "comfy_extras/nodes_model_advanced.py"): (
             "changed",
-            "runtime-review-pending",
+            "runtime-contract-compatible",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_model_patch.py"): (
             "changed",
-            "runtime-review-pending",
+            "runtime-contract-compatible",
             "direct-byte-hash",
         ),
         ("core", "comfy_extras/nodes_textgen.py"): (
@@ -145,12 +145,12 @@ _EXPECTED_ARTIFACT_POLICIES: Mapping[tuple[str, str], tuple[str, str, str]] = Ma
         ),
         ("core", "execution.py"): (
             "changed",
-            "runtime-review-pending",
+            "runtime-contract-compatible",
             "pinned-git-blob-hash",
         ),
         ("core", "nodes.py"): (
             "changed",
-            "graph-review-pending",
+            "graph-contract-compatible",
             "direct-byte-hash",
         ),
         ("core", "requirements.txt"): ("changed", "none", "version-manifest-hash"),
@@ -202,7 +202,7 @@ _EXPECTED_COMPARISONS: Mapping[str, tuple[str, str, str, str, str, str]] = Mappi
             "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
             "revision-and-component",
             "mixed",
-            "graph-and-runtime-review-pending",
+            "graph-and-runtime-contract-compatible",
             "core-contract-rebaseline",
         ),
         "desktop": (

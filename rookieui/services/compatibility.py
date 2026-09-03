@@ -23,6 +23,7 @@ _FALLBACK_SAMPLERS = [
     "uni_pc",
 ]
 _SAMPLER_TITLE_OVERRIDES = {
+    "cfgpp_ud10_ab": "CFGPP UD10 AB",
     "euler": "Euler",
     "euler_ancestral": "Euler a",
     "heun": "Heun",
@@ -65,6 +66,21 @@ def _titleize_sampler_id(sampler_id: str) -> str:
     if sampler_id in _SAMPLER_TITLE_OVERRIDES:
         return _SAMPLER_TITLE_OVERRIDES[sampler_id]
     return " ".join(part.upper() if part.isalpha() and len(part) <= 3 else part.title() for part in sampler_id.split("_"))
+
+
+def validate_sampler_name(sampler_name: str) -> str:
+    comfy_samplers = _load_comfy_samplers_module()
+    if comfy_samplers is None:
+        return sampler_name
+
+    live_values = getattr(getattr(comfy_samplers, "KSampler", None), "SAMPLERS", None)
+    if not isinstance(live_values, (list, tuple)) or not live_values:
+        raise ValueError("RookieUI host sampler registry is unavailable.")
+    supported = {str(value).strip() for value in live_values if str(value).strip()}
+    # CRITICAL: Core silently substitutes its first sampler for an unknown id; reject here while the live registry is authoritative.
+    if sampler_name not in supported:
+        raise ValueError(f"Unsupported RookieUI sampler: {sampler_name}")
+    return sampler_name
 
 
 def _build_sampler_catalog() -> list[SamplerCatalogEntry]:

@@ -23,7 +23,7 @@
       "bytes": 73045,
       "evidence": "pinned-git-blob-hash",
       "path": "comfy_extras/nodes_images.py",
-      "semantic_drift": "graph-review-pending",
+      "semantic_drift": "graph-contract-compatible",
       "sha256": "8f55ec8bf579c40176a1836067b873ef7c2ce437ea95a07fdbabe83cdf6c4223",
       "subject": "core"
     },
@@ -32,7 +32,7 @@
       "bytes": 15871,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_advanced.py",
-      "semantic_drift": "runtime-review-pending",
+      "semantic_drift": "runtime-contract-compatible",
       "sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09",
       "subject": "core"
     },
@@ -41,7 +41,7 @@
       "bytes": 44785,
       "evidence": "direct-byte-hash",
       "path": "comfy_extras/nodes_model_patch.py",
-      "semantic_drift": "runtime-review-pending",
+      "semantic_drift": "runtime-contract-compatible",
       "sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c",
       "subject": "core"
     },
@@ -59,7 +59,7 @@
       "bytes": 61543,
       "evidence": "pinned-git-blob-hash",
       "path": "execution.py",
-      "semantic_drift": "runtime-review-pending",
+      "semantic_drift": "runtime-contract-compatible",
       "sha256": "60e8333ec976e8723bba3aa854993963e2edfa21d62f2446fc68b8ea7ca7c480",
       "subject": "core"
     },
@@ -68,7 +68,7 @@
       "bytes": 108193,
       "evidence": "direct-byte-hash",
       "path": "nodes.py",
-      "semantic_drift": "graph-review-pending",
+      "semantic_drift": "graph-contract-compatible",
       "sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6",
       "subject": "core"
     },
@@ -178,7 +178,7 @@
       "byte_drift": "mixed",
       "from_revision": "c67885b14556cf3e4e061862925282d403d09862",
       "owner": "core-contract-rebaseline",
-      "semantic_drift": "graph-and-runtime-review-pending",
+      "semantic_drift": "graph-and-runtime-contract-compatible",
       "source_drift": "revision-and-component",
       "subject": "core",
       "to_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a"

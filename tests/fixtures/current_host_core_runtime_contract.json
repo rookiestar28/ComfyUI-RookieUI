@@ -1,5 +1,5 @@
 {
-  "baseline_revision": "6f7cd7fceaaf60d2669b554936394a7412c6fde5",
+  "baseline_revision": "c67885b14556cf3e4e061862925282d403d09862",
   "cases": [
     {
       "case_id": "core_source_basis",
@@ -54,6 +54,19 @@
       "surface": "controlnet"
     },
     {
+      "case_id": "sampler_registry_projection",
+      "evidence": "tests.test_compatibility.CompatibilityCatalogTests.test_live_sampler_registry_projects_new_sampler_without_fallback_expansion",
+      "expected": "RookieUI projects the live Core sampler registry, passes through the new sampler, rejects unknown live values before Core substitution, and leaves the no-host fallback unchanged.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "sampler-registry"
+    },
+    {
       "case_id": "sampler_vae_supported_graphs",
       "evidence": "tests.test_family_profile_projection.FamilyProfileProjectionTests.test_all_shipped_profile_builders_match_candidate_graph_contract",
       "expected": "Every shipped profile preserves its content-free encode, latent, sampler, VAE, and decode topology against the frozen Core graph contract.",
@@ -80,6 +93,19 @@
       "surface": "tokenizer-text-encoding"
     },
     {
+      "case_id": "execution_status_memory_pressure",
+      "evidence": "tests.test_queue_snapshot.QueueSnapshotTests.test_history_statuses_fail_closed_across_execution_and_memory_outcomes",
+      "expected": "RookieUI preserves success, error, interruption, and memory-pressure history truth while malformed host status fails closed without exposing message payloads.",
+      "forbidden_side_effects": [
+        "reference-execution",
+        "prompt-or-provider-payload-logging",
+        "private-path-or-locator-disclosure",
+        "silent-unsupported-substitution",
+        "persistent-runtime-state-mutation"
+      ],
+      "surface": "execution-memory"
+    },
+    {
       "case_id": "changed_graph_source_dispositions",
       "evidence": "tests.test_current_host_graph_contract.CurrentHostGraphContractTests.test_candidate_core_graph_separates_byte_and_covered_signature_drift",
       "expected": "All five changed graph-source artifacts retain covered signatures and receive an explicit runtime disposition without inferring incompatibility from byte drift.",
@@ -94,166 +120,204 @@
     }
   ],
   "contract_kind": "candidate-core-runtime-semantics",
-  "schema_version": "current-host-core-runtime-contract-v1",
+  "schema_version": "current-host-core-runtime-contract-v2",
   "serialization": {
     "array_order": "declaration",
     "encoding": "utf-8",
     "newline_terminated": true,
     "sort_keys": true
   },
-  "source_revision": "c67885b14556cf3e4e061862925282d403d09862",
+  "source_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
   "sources": [
     {
-      "baseline_blob": "6dbbaa959fdcaefc92cb8acedc910768f483ea6b",
-      "baseline_sha256": "efa2dec0eed7ed04da4b91cce0358267afeec9513af02b063a122d3ece093e57",
+      "baseline_blob": "7e35fe027ff4e755edf7650e6cbfedb9714a45a9",
+      "baseline_sha256": "59af4c2dd03526d9c1e532e1e20cced4b9154079e1aaa56e043d9627c1c46007",
       "case_ids": [
         "controlnet_lifecycle_weights_masks"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/controlnet.py",
+      "reachability": "shipped-runtime-path",
       "source_blob": "7e35fe027ff4e755edf7650e6cbfedb9714a45a9",
       "source_sha256": "59af4c2dd03526d9c1e532e1e20cced4b9154079e1aaa56e043d9627c1c46007"
     },
     {
-      "baseline_blob": "c4270022beb77c0e4a668227e50971ede1e47c64",
-      "baseline_sha256": "f13259cbd815a339a474976522eb6aae10fb16c8397f13b41e50ddd107f8caf8",
+      "baseline_blob": "34c6d700c917951efc54ffa54124493845755df1",
+      "baseline_sha256": "a083b4dce84025ef95bd509471d36445a1e147234eb83903ff98b9f543d1a4ea",
       "case_ids": [
         "disabled_empty_noise_and_latent_normalization"
       ],
-      "disposition": "executable-runtime-risk",
+      "disposition": "covered-runtime-unaffected",
       "path": "comfy/latent_formats.py",
-      "source_blob": "34c6d700c917951efc54ffa54124493845755df1",
-      "source_sha256": "a083b4dce84025ef95bd509471d36445a1e147234eb83903ff98b9f543d1a4ea"
+      "reachability": "shipped-runtime-path",
+      "source_blob": "6a60a7630a5dd49b6c07beec9d629f4e5e639d15",
+      "source_sha256": "a37809a0139ee492b7246dac4fb8adcd0b6428591b2d929d73b5747f5c6860d7"
     },
     {
-      "baseline_blob": "2be0cae5f87273c6ffbf641ae70676d0bdff97cc",
-      "baseline_sha256": "ee3485747727f9a182b9e7dd5a32a81e9429c329f2dcd248996ea0eba191faea",
+      "baseline_blob": "4ebad9666c6bd12a8b54c4ea2775d74a7712b19c",
+      "baseline_sha256": "d274ed5b6abf83707b52b87d25d1716f072d5444954cf23ac0ed31a3b803ee1c",
       "case_ids": [
         "disabled_empty_noise_and_latent_normalization",
         "sampler_vae_supported_graphs"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/sample.py",
+      "reachability": "shipped-runtime-path",
       "source_blob": "4ebad9666c6bd12a8b54c4ea2775d74a7712b19c",
       "source_sha256": "d274ed5b6abf83707b52b87d25d1716f072d5444954cf23ac0ed31a3b803ee1c"
     },
     {
-      "baseline_blob": "a280f3bb69fc6302802a6504f282965642a92a48",
-      "baseline_sha256": "b9f5e22d0d65b5e78cd4dcc763e702369869dc92cf4371dc52bbecaf0733fe49",
+      "baseline_blob": "94307c1a70b3eccab1d5499498898e0ea21ecf37",
+      "baseline_sha256": "a768a33b296c08055925f176e60e004a6f33fa95ecee3df6dd5583dccbc87a88",
       "case_ids": [
+        "sampler_registry_projection",
         "sampler_vae_supported_graphs"
       ],
       "disposition": "covered-workflow-contract",
       "path": "comfy/samplers.py",
-      "source_blob": "94307c1a70b3eccab1d5499498898e0ea21ecf37",
-      "source_sha256": "a768a33b296c08055925f176e60e004a6f33fa95ecee3df6dd5583dccbc87a88"
+      "reachability": "live-host-registry",
+      "source_blob": "17f7bb8babdeec605586cc08df2ab1c4f1c92fd4",
+      "source_sha256": "f2c264ca9d394612f828e3ffe167c856a278a10e1711b269f0ba65dccb66393f"
     },
     {
-      "baseline_blob": "8d670106e712f042c9d05f5b5f98292e1878babb",
-      "baseline_sha256": "7efb10f22252446069a0b88f0a8bc2d94713696d9f946d7757a0981ae8101b58",
+      "baseline_blob": "06679c6fb9011c8a9421abdca538c8913a00fef5",
+      "baseline_sha256": "b86cd348e2bce34e2dfb68d0cc5443b6c3ccaac21df9b66ee715202a05912957",
       "case_ids": [
         "sampler_vae_supported_graphs"
       ],
       "disposition": "covered-workflow-contract",
       "path": "comfy/sd.py",
-      "source_blob": "06679c6fb9011c8a9421abdca538c8913a00fef5",
-      "source_sha256": "b86cd348e2bce34e2dfb68d0cc5443b6c3ccaac21df9b66ee715202a05912957"
+      "reachability": "shipped-runtime-path",
+      "source_blob": "a73607cb061cc1aadab2052d0390f7656cca84f3",
+      "source_sha256": "35ce040db161945c4a3f41bc435c30922b3bad7143f996896fbe5293c99d4f31"
     },
     {
       "baseline_blob": null,
       "baseline_sha256": null,
       "case_ids": [
+        "execution_status_memory_pressure"
+      ],
+      "disposition": "covered-workflow-contract",
+      "path": "comfy/system_memory.py",
+      "reachability": "host-execution-boundary",
+      "source_blob": "63de575f8568543f7d343b8e7d1940e5fb6371de",
+      "source_sha256": "bcf52ba6b425be3bdd79a93d2978dbce0dff9edda3e93f86664a50174e7c7325"
+    },
+    {
+      "baseline_blob": "e49e36ca0fb2d0ed14a65c2a01610f7a3e712efb",
+      "baseline_sha256": "1d6c0103b24d96dd2fba3da5016af449bfa3adafff9a447a4ca316197443ec1d",
+      "case_ids": [
         "tokenizer_text_encoding_adapters"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/text_encoders/bpe_tokenizer.py",
+      "reachability": "adapter-boundary",
       "source_blob": "e49e36ca0fb2d0ed14a65c2a01610f7a3e712efb",
       "source_sha256": "1d6c0103b24d96dd2fba3da5016af449bfa3adafff9a447a4ca316197443ec1d"
     },
     {
-      "baseline_blob": "d5eb91dcb095b7571369337e000f7ea09159811e",
-      "baseline_sha256": "c522ad47ccdad9878f0e8ae4c219dadfc4f12409adceaa7e663571766cbbe46b",
+      "baseline_blob": "fbdb1d13a0c3b0212dc618a838aad19eef8d93c0",
+      "baseline_sha256": "784de5fbf0aee15cab0182fda937adf9fc6aa1978f33ce6cb7baff7466be8f41",
       "case_ids": [
         "tokenizer_text_encoding_adapters"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/text_encoders/flux.py",
+      "reachability": "adapter-boundary",
       "source_blob": "fbdb1d13a0c3b0212dc618a838aad19eef8d93c0",
       "source_sha256": "784de5fbf0aee15cab0182fda937adf9fc6aa1978f33ce6cb7baff7466be8f41"
     },
     {
-      "baseline_blob": "f5c5597ef7b855e80a4aca6f049400ad62a9b41b",
-      "baseline_sha256": "ad7d59be8f4732eee5b898591330adc875d69fcbd9987b9aa6c8473aeb423a11",
+      "baseline_blob": "49ba5dfa93d9dbb5455919b3d9f33112dfdd9647",
+      "baseline_sha256": "de20f78e44a4cbd911ff7cc32a0ef74e1bcb7b202372f9e552f49ce78383d027",
       "case_ids": [
         "tokenizer_text_encoding_adapters"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/text_encoders/llama.py",
+      "reachability": "adapter-boundary",
       "source_blob": "49ba5dfa93d9dbb5455919b3d9f33112dfdd9647",
       "source_sha256": "de20f78e44a4cbd911ff7cc32a0ef74e1bcb7b202372f9e552f49ce78383d027"
     },
     {
-      "baseline_blob": "b1f1dbb9f471fa88b550d31485d9b412479df09d",
-      "baseline_sha256": "f6af934b3d5014c6df37bb527167d1f94e44b1309079f57d4cb2f9460729da84",
+      "baseline_blob": "e449202030320649ac6d1b3f86e8cda83f5e384c",
+      "baseline_sha256": "9964c61b8060d18fcef25712c7e101a67b8706f6f9d6cef7b183c08471d46e0e",
       "case_ids": [
         "tokenizer_text_encoding_adapters"
       ],
       "disposition": "executable-runtime-risk",
       "path": "comfy/text_encoders/lumina2.py",
+      "reachability": "adapter-boundary",
       "source_blob": "e449202030320649ac6d1b3f86e8cda83f5e384c",
       "source_sha256": "9964c61b8060d18fcef25712c7e101a67b8706f6f9d6cef7b183c08471d46e0e"
     },
     {
-      "baseline_blob": "e81b6328b7791162f80207194f983dc0d6b4dc07",
-      "baseline_sha256": "3fb59bf45aaf19b2f87099b559c789f94716a90088c6c4ac8a85c53b3c99c59b",
+      "baseline_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
+      "baseline_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe",
       "case_ids": [
         "disabled_empty_noise_and_latent_normalization",
         "changed_graph_source_dispositions"
       ],
       "disposition": "not-emitted-upstream-only",
       "path": "comfy_extras/nodes_custom_sampler.py",
+      "reachability": "upstream-only",
       "source_blob": "c73a8f6dcc0183e1b46a9525b1212590c45ecd77",
       "source_sha256": "b0ba1521c72475e06fed15db004274ed7c8bb2bf73f1d58849faf6f9f9d264fe"
     },
     {
-      "baseline_blob": "a336ba0791d6c711daeb824f3b1e50992e79111c",
-      "baseline_sha256": "ffa70c4bb3568537ba13b368092d2599b861db7c83b1bcfa41347058b40dcba7",
+      "baseline_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
+      "baseline_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9",
       "case_ids": [
         "changed_graph_source_dispositions",
         "sampler_vae_supported_graphs"
       ],
       "disposition": "covered-runtime-unaffected",
       "path": "comfy_extras/nodes_model_advanced.py",
-      "source_blob": "21ea8214814da07c50d821a339abd5d436c490fc",
-      "source_sha256": "96fdabbb43456062e8afd4d8f4dac60f5d09c27393b1b45345158626e61dabf9"
+      "reachability": "shipped-runtime-path",
+      "source_blob": "c73b0ba12399aae862406c56d0bb3e32393df00c",
+      "source_sha256": "46de8e11873a00b7938737e77bdde3579a2236f54799174ab45ed80f8a10ae09"
     },
     {
-      "baseline_blob": "4d7bf7476ef003dc28eafb1ed676b808bd58a0ab",
-      "baseline_sha256": "44367a762417d88ddac58d37602f03eafb95c676a1ca3e020e24c18e123fb4e6",
+      "baseline_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
+      "baseline_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21",
       "case_ids": [
         "changed_graph_source_dispositions",
         "sampler_vae_supported_graphs"
       ],
       "disposition": "covered-workflow-contract",
       "path": "comfy_extras/nodes_model_patch.py",
-      "source_blob": "d811129328a4b00807ed92f57465fda21b45d0c7",
-      "source_sha256": "060393d2e420b4651826df08b8e88211ca2174508b3f28a755b7571999179a21"
+      "reachability": "shipped-runtime-path",
+      "source_blob": "5ce3bb25ab65e6a5cbaabfe6cda9a900d6cbe513",
+      "source_sha256": "a059351facbb31895bf7be3f0155daaef87772bb8f4de3b001cff9bb88f3784c"
     },
     {
-      "baseline_blob": "5a947d5c57b32e7e8d2ed1ef364064959d841cc4",
-      "baseline_sha256": "b328e8a2dc89cfd3a93ab49c1be880a3e89ec4521eef506823753617c86c99e9",
+      "baseline_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
+      "baseline_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7",
       "case_ids": [
         "changed_graph_source_dispositions",
         "tokenizer_text_encoding_adapters"
       ],
       "disposition": "covered-runtime-unaffected",
       "path": "comfy_extras/nodes_textgen.py",
+      "reachability": "upstream-only",
       "source_blob": "ef5858a7dd6a88fa307c1feb2f8df08faa99a5ff",
       "source_sha256": "1813182f0b50545adfb51a4aace23d3cd86de312a287edf3aebc8ec84df1fde7"
     },
     {
-      "baseline_blob": "08529d8dc414138e56d0cc6e68367f95da70f038",
-      "baseline_sha256": "b422aaadfee12c807815c364bfbd3c56d6aa33f4ccdf4a2423f43e73240dc087",
+      "baseline_blob": "0b858969d09762a378ef662a49f2800e0253e902",
+      "baseline_sha256": "dcac4074826ac9121624ad113f6027684650579da626e24a4011617aae5f3fc0",
+      "case_ids": [
+        "execution_status_memory_pressure"
+      ],
+      "disposition": "covered-workflow-contract",
+      "path": "execution.py",
+      "reachability": "host-execution-boundary",
+      "source_blob": "62f3d7c52b5b791ec70fe77b62f072423db2fb52",
+      "source_sha256": "60e8333ec976e8723bba3aa854993963e2edfa21d62f2446fc68b8ea7ca7c480"
+    },
+    {
+      "baseline_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
+      "baseline_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9",
       "case_ids": [
         "disabled_empty_noise_and_latent_normalization",
         "sampler_vae_supported_graphs",
@@ -261,8 +325,9 @@
       ],
       "disposition": "executable-runtime-risk",
       "path": "nodes.py",
-      "source_blob": "fa3a779495557e9aeedfc506efcc0ce8e61d6971",
-      "source_sha256": "9f9162cc9ec180baad14c082fc61a781fed53baf325046d9853757e4ebd0c4e9"
+      "reachability": "host-registry-bootstrap",
+      "source_blob": "b27a21463dbae9a25d18cf596ef8721099cadcff",
+      "source_sha256": "5068f3532233f2a14b21a61dc122123aa90dc12c0ddb6fdc513bee2c889162f6"
     }
   ]
 }

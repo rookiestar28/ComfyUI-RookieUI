@@ -119,12 +119,14 @@ class CurrentHostCoreRuntimeContractTests(unittest.TestCase):
     def test_contract_identity_cases_sources_and_serialization_are_exact(self) -> None:
         contract = core_runtime_contract.load_core_runtime_contract(CONTRACT_PATH)
 
-        self.assertEqual(contract.schema_version, "current-host-core-runtime-contract-v1")
+        self.assertEqual(contract.schema_version, "current-host-core-runtime-contract-v2")
         self.assertEqual(contract.contract_kind, "candidate-core-runtime-semantics")
-        self.assertEqual(contract.baseline_revision, "6f7cd7fceaaf60d2669b554936394a7412c6fde5")
-        self.assertEqual(contract.source_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.baseline_revision, "c67885b14556cf3e4e061862925282d403d09862")
+        self.assertEqual(contract.source_revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
         self.assertEqual(tuple(case.case_id for case in contract.cases), core_runtime_contract.REQUIRED_CASE_IDS)
         self.assertEqual(tuple(source.path for source in contract.sources), core_runtime_contract.REQUIRED_SOURCE_PATHS)
+        self.assertEqual(len(contract.sources), 16)
+        self.assertTrue(all(source.reachability for source in contract.sources))
         self.assertEqual(
             core_runtime_contract.serialize_core_runtime_contract(contract),
             CONTRACT_PATH.read_text(encoding="utf-8"),
@@ -142,6 +144,31 @@ class CurrentHostCoreRuntimeContractTests(unittest.TestCase):
         else:
             self.assertEqual(report.status, "unavailable-fixture-only")
             self.assertEqual(report.sources, ())
+
+    def test_candidate_sampler_memory_and_new_model_branches_are_bound_to_static_source(self) -> None:
+        if not core_runtime_contract.DEFAULT_SOURCE_ROOT.is_dir():
+            self.skipTest("Pinned Core reference envelope is unavailable.")
+
+        read = core_runtime_contract.read_pinned_runtime_source
+        candidate = core_runtime_contract.SOURCE_REVISION
+        sampler_source = read(candidate, "comfy/samplers.py").decode("utf-8")
+        execution_source = read(candidate, "execution.py").decode("utf-8")
+        memory_source = read(candidate, "comfy/system_memory.py").decode("utf-8")
+        latent_source = read(candidate, "comfy/latent_formats.py").decode("utf-8")
+        vae_source = read(candidate, "comfy/sd.py").decode("utf-8")
+        advanced_source = read(candidate, "comfy_extras/nodes_model_advanced.py").decode("utf-8")
+        patch_source = read(candidate, "comfy_extras/nodes_model_patch.py").decode("utf-8")
+
+        self.assertIn('"cfgpp_ud10_ab"', sampler_source)
+        self.assertIn("import comfy.system_memory", execution_source)
+        self.assertIn("comfy.system_memory.virtual_memory_available()", execution_source)
+        self.assertNotIn("psutil.virtual_memory().available", execution_source)
+        self.assertIn("def virtual_memory_available():", memory_source)
+        self.assertIn('sys.platform.startswith("linux")', memory_source)
+        self.assertIn("class Trellis2SLAT", latent_source)
+        self.assertIn("comfy.ldm.trellis2.vae.ShapeVae", vae_source)
+        self.assertIn("is_flow = isinstance", advanced_source)
+        self.assertIn("is_minimax_h3_fun_state_dict", patch_source)
 
     def test_contract_evidence_targets_resolve_and_public_projection_is_content_free(self) -> None:
         contract = core_runtime_contract.load_core_runtime_contract(CONTRACT_PATH)
@@ -188,6 +215,15 @@ class CurrentHostCoreRuntimeContractTests(unittest.TestCase):
                     **payload,
                     "sources": [
                         {**payload["sources"][0], "case_ids": ["unknown-case"]},
+                        *payload["sources"][1:],
+                    ],
+                }
+            ),
+            "unknown-reachability": json.dumps(
+                {
+                    **payload,
+                    "sources": [
+                        {**payload["sources"][0], "reachability": "implicit"},
                         *payload["sources"][1:],
                     ],
                 }

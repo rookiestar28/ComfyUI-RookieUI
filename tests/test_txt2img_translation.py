@@ -101,6 +101,23 @@ class Txt2ImgTranslationTests(unittest.TestCase):
         self.assertEqual(request.dtype_profile, "automatic")
         self.assertEqual(request.lora_name, "")
 
+    def test_normalize_txt2img_request_uses_live_sampler_registry_without_silent_substitution(self) -> None:
+        host_module = mock.Mock()
+        host_module.KSampler.SAMPLERS = ("euler_ancestral", "cfgpp_ud10_ab")
+        with mock.patch(
+            "rookieui.services.compatibility._load_comfy_samplers_module",
+            return_value=host_module,
+        ):
+            request = normalize_txt2img_request(
+                {"prompt": "city skyline", "sampler_name": "cfgpp ud10 ab"}
+            )
+            with self.assertRaisesRegex(ValueError, "Unsupported RookieUI sampler"):
+                normalize_txt2img_request(
+                    {"prompt": "city skyline", "sampler_name": "not a sampler"}
+                )
+
+        self.assertEqual(request.sampler_name, "cfgpp_ud10_ab")
+
     def test_normalize_txt2img_request_accepts_supported_dtype_profile(self) -> None:
         request = normalize_txt2img_request(
             {

@@ -7,7 +7,7 @@ from unittest import mock
 
 from rookieui.api import routes
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
-from rookieui.services.queue_snapshot import build_queue_snapshot
+from rookieui.services.queue_snapshot import _map_history_status, build_queue_snapshot
 
 
 class _FakePromptQueue:
@@ -142,6 +142,26 @@ class _FakeJsonRequest:
 
 
 class QueueSnapshotTests(unittest.TestCase):
+    def test_history_statuses_fail_closed_across_execution_and_memory_outcomes(self) -> None:
+        self.assertEqual(_map_history_status({"status_str": "success", "messages": []}), "completed")
+        self.assertEqual(
+            _map_history_status(
+                {
+                    "status_str": "error",
+                    "messages": [["execution_error", {"exception_type": "OutOfMemoryError"}]],
+                }
+            ),
+            "failed",
+        )
+        self.assertEqual(
+            _map_history_status(
+                {"status_str": "error", "messages": [["execution_interrupted", {"node_id": "7"}]]}
+            ),
+            "cancelled",
+        )
+        self.assertEqual(_map_history_status({}), "failed")
+        self.assertEqual(_map_history_status({"status_str": "running"}), "failed")
+
     def test_build_queue_snapshot_returns_fallback_without_host(self) -> None:
         payload = build_queue_snapshot(None)
 

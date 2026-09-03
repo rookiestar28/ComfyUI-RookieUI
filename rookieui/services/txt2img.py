@@ -27,6 +27,7 @@ from rookieui.services.parity_matrix import (
     get_parity_profile,
     normalize_sampler_name,
 )
+from rookieui.services.compatibility import validate_sampler_name
 from rookieui.services.coercion import (
     coerce_bool as _coerce_bool,
     coerce_float as _coerce_float,
@@ -390,7 +391,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     if not sampler_input:
         applied_defaults.append("sampler_name")
         sampler_input = profile.default_sampler
-    sampler_name = normalize_sampler_name(sampler_input)
+    sampler_name = validate_sampler_name(normalize_sampler_name(sampler_input))
 
     scheduler_input = normalize_option_label(request.scheduler_name, "scheduler_name")
     scheduler_resolution = resolve_effective_scheduler(

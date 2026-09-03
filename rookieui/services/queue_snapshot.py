@@ -58,7 +58,8 @@ def _map_history_status(status_info: dict[str, object]) -> str:
             if isinstance(entry, (list, tuple)) and entry and entry[0] == "execution_interrupted":
                 return "cancelled"
         return "failed"
-    return "completed"
+    # CRITICAL: unknown or malformed host history must not become a false completed job.
+    return "failed"
 
 
 def _extract_output_filenames(outputs: dict[str, object]) -> tuple[list[str], list[str]]:

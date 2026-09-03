@@ -14,18 +14,20 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONTRACT_PATH = ROOT / "tests" / "fixtures" / "current_host_core_runtime_contract.json"
 DEFAULT_SOURCE_ROOT = ROOT / "reference" / "ComfyUI"
 
-SCHEMA_VERSION = "current-host-core-runtime-contract-v1"
+SCHEMA_VERSION = "current-host-core-runtime-contract-v2"
 CONTRACT_KIND = "candidate-core-runtime-semantics"
-BASELINE_REVISION = "6f7cd7fceaaf60d2669b554936394a7412c6fde5"
-SOURCE_REVISION = "c67885b14556cf3e4e061862925282d403d09862"
+BASELINE_REVISION = "c67885b14556cf3e4e061862925282d403d09862"
+SOURCE_REVISION = "30bdda1ef13a3a34fce2cd2fec633f15d832122a"
 
 REQUIRED_CASE_IDS = (
     "core_source_basis",
     "disabled_empty_noise_and_latent_normalization",
     "img2img_inpaint_mask_latent_geometry",
     "controlnet_lifecycle_weights_masks",
+    "sampler_registry_projection",
     "sampler_vae_supported_graphs",
     "tokenizer_text_encoding_adapters",
+    "execution_status_memory_pressure",
     "changed_graph_source_dispositions",
 )
 
@@ -35,6 +37,7 @@ REQUIRED_SOURCE_PATHS = (
     "comfy/sample.py",
     "comfy/samplers.py",
     "comfy/sd.py",
+    "comfy/system_memory.py",
     "comfy/text_encoders/bpe_tokenizer.py",
     "comfy/text_encoders/flux.py",
     "comfy/text_encoders/llama.py",
@@ -43,6 +46,7 @@ REQUIRED_SOURCE_PATHS = (
     "comfy_extras/nodes_model_advanced.py",
     "comfy_extras/nodes_model_patch.py",
     "comfy_extras/nodes_textgen.py",
+    "execution.py",
     "nodes.py",
 )
 
@@ -61,17 +65,29 @@ _SOURCE_DISPOSITIONS = {
     "not-emitted-upstream-only",
 }
 
-_EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, tuple[str, ...]]] = MappingProxyType(
+_SOURCE_REACHABILITY = {
+    "adapter-boundary",
+    "host-execution-boundary",
+    "host-registry-bootstrap",
+    "live-host-registry",
+    "shipped-runtime-path",
+    "upstream-only",
+}
+
+_EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, str, tuple[str, ...]]] = MappingProxyType(
     {
         "comfy/controlnet.py": (
+            "shipped-runtime-path",
             "executable-runtime-risk",
             ("controlnet_lifecycle_weights_masks",),
         ),
         "comfy/latent_formats.py": (
-            "executable-runtime-risk",
+            "shipped-runtime-path",
+            "covered-runtime-unaffected",
             ("disabled_empty_noise_and_latent_normalization",),
         ),
         "comfy/sample.py": (
+            "shipped-runtime-path",
             "executable-runtime-risk",
             (
                 "disabled_empty_noise_and_latent_normalization",
@@ -79,30 +95,42 @@ _EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, tuple[str, ...]]] = MappingPr
             ),
         ),
         "comfy/samplers.py": (
+            "live-host-registry",
             "covered-workflow-contract",
-            ("sampler_vae_supported_graphs",),
+            ("sampler_registry_projection", "sampler_vae_supported_graphs"),
         ),
         "comfy/sd.py": (
+            "shipped-runtime-path",
             "covered-workflow-contract",
             ("sampler_vae_supported_graphs",),
         ),
+        "comfy/system_memory.py": (
+            "host-execution-boundary",
+            "covered-workflow-contract",
+            ("execution_status_memory_pressure",),
+        ),
         "comfy/text_encoders/bpe_tokenizer.py": (
+            "adapter-boundary",
             "executable-runtime-risk",
             ("tokenizer_text_encoding_adapters",),
         ),
         "comfy/text_encoders/flux.py": (
+            "adapter-boundary",
             "executable-runtime-risk",
             ("tokenizer_text_encoding_adapters",),
         ),
         "comfy/text_encoders/llama.py": (
+            "adapter-boundary",
             "executable-runtime-risk",
             ("tokenizer_text_encoding_adapters",),
         ),
         "comfy/text_encoders/lumina2.py": (
+            "adapter-boundary",
             "executable-runtime-risk",
             ("tokenizer_text_encoding_adapters",),
         ),
         "comfy_extras/nodes_custom_sampler.py": (
+            "upstream-only",
             "not-emitted-upstream-only",
             (
                 "disabled_empty_noise_and_latent_normalization",
@@ -110,6 +138,7 @@ _EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, tuple[str, ...]]] = MappingPr
             ),
         ),
         "comfy_extras/nodes_model_advanced.py": (
+            "shipped-runtime-path",
             "covered-runtime-unaffected",
             (
                 "changed_graph_source_dispositions",
@@ -117,6 +146,7 @@ _EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, tuple[str, ...]]] = MappingPr
             ),
         ),
         "comfy_extras/nodes_model_patch.py": (
+            "shipped-runtime-path",
             "covered-workflow-contract",
             (
                 "changed_graph_source_dispositions",
@@ -124,13 +154,20 @@ _EXPECTED_SOURCE_POLICIES: Mapping[str, tuple[str, tuple[str, ...]]] = MappingPr
             ),
         ),
         "comfy_extras/nodes_textgen.py": (
+            "upstream-only",
             "covered-runtime-unaffected",
             (
                 "changed_graph_source_dispositions",
                 "tokenizer_text_encoding_adapters",
             ),
         ),
+        "execution.py": (
+            "host-execution-boundary",
+            "covered-workflow-contract",
+            ("execution_status_memory_pressure",),
+        ),
         "nodes.py": (
+            "host-registry-bootstrap",
             "executable-runtime-risk",
             (
                 "disabled_empty_noise_and_latent_normalization",
@@ -163,6 +200,11 @@ _EXPECTED_CASES: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_controlnet_mask_protocol_executes_broadcast_effect_and_concat_geometry",
             "Current-host lifecycle doubles preserve clone ownership, previous-control restoration, weights, guidance segments, and effect/concat mask behavior.",
         ),
+        "sampler_registry_projection": (
+            "sampler-registry",
+            "tests.test_compatibility.CompatibilityCatalogTests.test_live_sampler_registry_projects_new_sampler_without_fallback_expansion",
+            "RookieUI projects the live Core sampler registry, passes through the new sampler, rejects unknown live values before Core substitution, and leaves the no-host fallback unchanged.",
+        ),
         "sampler_vae_supported_graphs": (
             "sampler-vae",
             "tests.test_family_profile_projection.FamilyProfileProjectionTests.test_all_shipped_profile_builders_match_candidate_graph_contract",
@@ -172,6 +214,11 @@ _EXPECTED_CASES: Mapping[str, tuple[str, str, str]] = MappingProxyType(
             "tokenizer-text-encoding",
             "tests.test_current_host_runtime_semantics.CurrentHostCoreRuntimeBehaviorTests.test_tokenizer_capability_mismatch_uses_stock_tokens_without_prompt_logging",
             "RookieUI text adapters preserve weighted and stock-token paths, fail safely on optional word-ID capability mismatch, and do not execute upstream tokenizers in the contract lane.",
+        ),
+        "execution_status_memory_pressure": (
+            "execution-memory",
+            "tests.test_queue_snapshot.QueueSnapshotTests.test_history_statuses_fail_closed_across_execution_and_memory_outcomes",
+            "RookieUI preserves success, error, interruption, and memory-pressure history truth while malformed host status fails closed without exposing message payloads.",
         ),
         "changed_graph_source_dispositions": (
             "changed-graph-sources",
@@ -196,6 +243,7 @@ _SOURCE_FIELDS = {
     "case_ids",
     "disposition",
     "path",
+    "reachability",
     "source_blob",
     "source_sha256",
 }
@@ -223,6 +271,7 @@ class RuntimeSource:
     baseline_sha256: str | None
     source_blob: str
     source_sha256: str
+    reachability: str
     disposition: str
     case_ids: tuple[str, ...]
 
@@ -379,11 +428,14 @@ def parse_core_runtime_contract_text(text: str) -> CoreRuntimeContract:
             raise ValueError(f"source[{index}] baseline blob and SHA-256 must both be present or null.")
         source_blob = _revision(source["source_blob"], f"source[{index}].source_blob")
         source_sha256 = _sha256(source["source_sha256"], f"source[{index}].source_sha256")
+        reachability = _string(source["reachability"], f"source[{index}].reachability")
         disposition = _string(source["disposition"], f"source[{index}].disposition")
         case_ids = _string_tuple(source["case_ids"], f"source[{index}].case_ids")
+        if reachability not in _SOURCE_REACHABILITY:
+            raise ValueError(f"source[{index}] reachability is unsupported.")
         if disposition not in _SOURCE_DISPOSITIONS:
             raise ValueError(f"source[{index}] disposition is unsupported.")
-        if (disposition, case_ids) != _EXPECTED_SOURCE_POLICIES.get(path):
+        if (reachability, disposition, case_ids) != _EXPECTED_SOURCE_POLICIES.get(path):
             raise ValueError(f"source[{index}] policy is not the frozen runtime disposition.")
         sources.append(
             RuntimeSource(
@@ -392,6 +444,7 @@ def parse_core_runtime_contract_text(text: str) -> CoreRuntimeContract:
                 baseline_sha256=baseline_sha256,
                 source_blob=source_blob,
                 source_sha256=source_sha256,
+                reachability=reachability,
                 disposition=disposition,
                 case_ids=case_ids,
             )
@@ -477,6 +530,7 @@ def _payload(contract: CoreRuntimeContract) -> dict[str, object]:
                 "case_ids": list(source.case_ids),
                 "disposition": source.disposition,
                 "path": source.path,
+                "reachability": source.reachability,
                 "source_blob": source.source_blob,
                 "source_sha256": source.source_sha256,
             }
@@ -513,6 +567,24 @@ def _read_object(source_root: Path, revision: str, path: str) -> tuple[str | Non
     if blob.returncode != 0:
         raise ValueError("Pinned Core source blob is unavailable.")
     return object_id, blob.stdout
+
+
+def read_pinned_runtime_source(
+    revision: str,
+    path: str,
+    *,
+    source_root: Path = DEFAULT_SOURCE_ROOT,
+) -> bytes:
+    validated_revision = _revision(revision, "revision")
+    validated_path = _relative_path(path, "path")
+    if validated_revision not in {BASELINE_REVISION, SOURCE_REVISION}:
+        raise ValueError("Revision is outside the frozen Core runtime candidate pair.")
+    if validated_path not in REQUIRED_SOURCE_PATHS:
+        raise ValueError("Path is outside the frozen Core runtime source inventory.")
+    _, content = _read_object(source_root, validated_revision, validated_path)
+    if content is None:
+        raise ValueError("Pinned Core runtime source is unavailable.")
+    return content
 
 
 def verify_core_runtime_sources(

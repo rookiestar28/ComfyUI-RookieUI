@@ -128,16 +128,20 @@ class HostSourceManifestTests(unittest.TestCase):
             "comfy_extras/nodes_model_patch.py",
             "execution.py",
         }
+        expected_core_semantic_drift = {
+            "nodes.py": "graph-contract-compatible",
+            "comfy_extras/nodes_images.py": "graph-contract-compatible",
+            "comfy_extras/nodes_model_advanced.py": "runtime-contract-compatible",
+            "comfy_extras/nodes_model_patch.py": "runtime-contract-compatible",
+            "execution.py": "runtime-contract-compatible",
+        }
         for artifact in manifest.artifacts:
             with self.subTest(subject=artifact.subject, path=artifact.path):
                 self.assertGreater(artifact.bytes, 0)
                 self.assertRegex(artifact.sha256, re.compile(r"^[0-9a-f]{64}$"))
                 if artifact.subject == "core" and artifact.path in changed_core_paths:
                     self.assertEqual(artifact.byte_drift, "changed")
-                    self.assertIn(
-                        artifact.semantic_drift,
-                        {"graph-review-pending", "runtime-review-pending"},
-                    )
+                    self.assertEqual(artifact.semantic_drift, expected_core_semantic_drift[artifact.path])
                 elif artifact.subject == "frontend" and artifact.path in {
                     "src/schemas/apiSchema.ts",
                     "src/scripts/api.ts",
@@ -156,7 +160,7 @@ class HostSourceManifestTests(unittest.TestCase):
         self.assertEqual(comparisons["core"].owner, "core-contract-rebaseline")
         self.assertEqual(
             comparisons["core"].semantic_drift,
-            "graph-and-runtime-review-pending",
+            "graph-and-runtime-contract-compatible",
         )
         self.assertEqual(
             comparisons["frontend"].owner,
