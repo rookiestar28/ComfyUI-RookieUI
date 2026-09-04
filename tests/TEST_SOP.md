@@ -125,11 +125,21 @@ Enable repository-managed hooks once:
 git config core.hooksPath .githooks
 ```
 
-After that, every `git push` will run:
+After that, every `git push` sends Git's immutable ref-update stream through:
 
 ```bash
-bash scripts/pre_push_checks.sh
+bash scripts/pre_push_checks.sh --hook <remote-name> <remote-location>
 ```
+
+The hook is change-aware:
+
+- documentation-only existing-ref updates run pushed-range whitespace checks and the public-release-boundary check against every pushed commit;
+- source, script, test, configuration, workflow, manifest, or unknown paths run the comprehensive gate;
+- the hook runs `npm run audit:ci` when root `package.json`, `package-lock.json`, or `npm-shrinkwrap.json` changes;
+- new refs fail closed to the comprehensive audited path, and delete-only updates are no-op;
+- explicit Full Gate entry points are never classified from push scope and always run the complete audit.
+
+To invoke the Linux/WSL Full Gate directly, use `bash scripts/run_full_tests_linux.sh`; do not call hook mode manually with invented ref metadata.
 
 ## Manual Staged Workflow (CI-parity)
 
@@ -191,10 +201,13 @@ ROOKIEUI_LIVE_BASE_URL=http://127.0.0.1:8188 python scripts/run_host_embedded_e2
   against the exact `package-lock.json` version before testing. A missing or stale
   install is repaired with `npm ci` and verified again; package-marker existence is
   not sufficient validation.
-- After dependency identity is established, full-test wrappers run
+- After dependency identity is established, explicit full-test wrappers run
   `npm run audit:ci`. The complete production/dev and direct/transitive graph is
   reported; high or critical advisories fail validation. Do not omit dependency
   classes, disable audit, force a resolution, or convert an audit failure to success.
+- The Git hook may skip only this network advisory lookup when its validated existing-ref
+  range contains no root Node dependency metadata. This optimization is not a Full Gate
+  result and does not change acceptance, CI, release, or dependency-bearing push policy.
 - Do not mix global and venv-installed `pre-commit` accidentally.
 - Node must be 18+ before `npm test`.
 - On Windows, prefer repo-local `PRE_COMMIT_HOME` to avoid cache lock issues.

@@ -9,6 +9,43 @@ cd "$ROOT_DIR"
 
 echo "[pre-push] repo: $ROOT_DIR"
 
+RUN_MODE="${1:---full-gate}"
+HOOK_UPDATES_FILE=""
+CLASSIFICATION_FILE=""
+
+cleanup_scope_files() {
+  if [ -n "${HOOK_UPDATES_FILE:-}" ]; then
+    rm -f "$HOOK_UPDATES_FILE"
+  fi
+  if [ -n "${CLASSIFICATION_FILE:-}" ]; then
+    rm -f "$CLASSIFICATION_FILE"
+  fi
+}
+
+trap cleanup_scope_files EXIT
+
+case "$RUN_MODE" in
+  --hook)
+    if [ "$#" -ne 3 ]; then
+      echo "[pre-push] ERROR: --hook requires the Git-provided remote name and location." >&2
+      exit 1
+    fi
+    mkdir -p "$ROOT_DIR/.tmp"
+    HOOK_UPDATES_FILE="$(mktemp "$ROOT_DIR/.tmp/pre-push-updates.XXXXXX")"
+    cat >"$HOOK_UPDATES_FILE"
+    ;;
+  --full-gate)
+    if [ "$#" -gt 1 ]; then
+      echo "[pre-push] ERROR: --full-gate does not accept additional arguments." >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "[pre-push] ERROR: unsupported mode: $RUN_MODE" >&2
+    exit 1
+    ;;
+esac
+
 UNAME_S="$(uname -s || true)"
 case "$UNAME_S" in
   MINGW*|MSYS*|CYGWIN*)
@@ -241,11 +278,99 @@ assert_node_version() {
 }
 
 require_cmd git
-require_cmd node
-require_cmd npm
 
 VENV_DIR="$(select_venv_dir)"
 VENV_PY="$(bootstrap_venv)"
+
+mkdir -p "$ROOT_DIR/.tmp"
+CLASSIFICATION_FILE="$(mktemp "$ROOT_DIR/.tmp/pre-push-classification.XXXXXX")"
+if [ "$RUN_MODE" = "--hook" ]; then
+  "$VENV_PY" scripts/pre_push_scope.py \
+    --repo "$ROOT_DIR" --hook-updates "$HOOK_UPDATES_FILE" >"$CLASSIFICATION_FILE"
+else
+  "$VENV_PY" scripts/pre_push_scope.py \
+    --repo "$ROOT_DIR" --full-gate >"$CLASSIFICATION_FILE"
+fi
+
+PUSH_SCOPE=""
+AUDIT_REQUIRED=""
+PUSH_RANGES=()
+PUSH_COMMITS=()
+while IFS=$'\t' read -r record value extra; do
+  case "$record" in
+    scope)
+      if [[ "$value" != "noop" && "$value" != "docs" && "$value" != "comprehensive" ]] || [ -n "$extra" ]; then
+        echo "[pre-push] ERROR: invalid scope classifier output." >&2
+        exit 1
+      fi
+      PUSH_SCOPE="$value"
+      ;;
+    audit)
+      if [[ "$value" != "audit" && "$value" != "no-audit" ]] || [ -n "$extra" ]; then
+        echo "[pre-push] ERROR: invalid audit classifier output." >&2
+        exit 1
+      fi
+      AUDIT_REQUIRED="$value"
+      ;;
+    range)
+      if [[ ! "$value" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || [[ ! "$extra" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]]; then
+        echo "[pre-push] ERROR: invalid range classifier output." >&2
+        exit 1
+      fi
+      PUSH_RANGES+=("$value $extra")
+      ;;
+    commit)
+      if [[ ! "$value" =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || [ -n "$extra" ]; then
+        echo "[pre-push] ERROR: invalid commit classifier output." >&2
+        exit 1
+      fi
+      PUSH_COMMITS+=("$value")
+      ;;
+    *)
+      echo "[pre-push] ERROR: unknown scope classifier record: $record" >&2
+      exit 1
+      ;;
+  esac
+done <"$CLASSIFICATION_FILE"
+
+if [ -z "$PUSH_SCOPE" ] || [ -z "$AUDIT_REQUIRED" ]; then
+  echo "[pre-push] ERROR: incomplete scope classifier output." >&2
+  exit 1
+fi
+
+echo "[pre-push] scope: $PUSH_SCOPE; advisory: $AUDIT_REQUIRED"
+
+if [ "$PUSH_SCOPE" = "noop" ]; then
+  echo "[pre-push] PASS: delete-only push has no local tree to validate."
+  exit 0
+fi
+
+run_pushed_range_checks() {
+  local pair base local_sha
+  for pair in "${PUSH_RANGES[@]}"; do
+    read -r base local_sha <<<"$pair"
+    git diff --check "$base" "$local_sha" --
+  done
+}
+
+run_public_boundary_checks() {
+  local commit
+  for commit in "${PUSH_COMMITS[@]}"; do
+    "$VENV_PY" scripts/check_public_release_boundary.py --tree-ish "$commit"
+  done
+}
+
+if [ "$PUSH_SCOPE" = "docs" ]; then
+  echo "[pre-push] Docs 1/2: pushed-range whitespace validation"
+  run_pushed_range_checks
+  echo "[pre-push] Docs 2/2: public release boundary (pushed commits)"
+  run_public_boundary_checks
+  echo "[pre-push] PASS: documentation-only push checks completed; dependency audit not applicable."
+  exit 0
+fi
+
+require_cmd node
+require_cmd npm
 
 # CRITICAL: always run pre-commit from project venv to avoid global PATH drift.
 if ! "$VENV_PY" -m pre_commit --version >/dev/null 2>&1; then
@@ -273,8 +398,12 @@ echo "[pre-push] Playwright harness port: $ROOKIEUI_E2E_PORT"
 echo "[pre-push] Step 1/10: supply-chain hardening scan"
 "$VENV_PY" scripts/check_supply_chain_hardening.py --root "$ROOT_DIR"
 
-echo "[pre-push] Step 2/10: dependency advisory gate"
-npm run audit:ci
+if [ "$AUDIT_REQUIRED" = "audit" ]; then
+  echo "[pre-push] Step 2/10: dependency advisory gate"
+  npm run audit:ci
+else
+  echo "[pre-push] Step 2/10: dependency advisory gate skipped (pushed range does not change root Node dependency metadata)"
+fi
 
 echo "[pre-push] Step 3/10: detect-secrets"
 "$VENV_PY" -m pre_commit run detect-secrets --all-files
@@ -292,8 +421,9 @@ if precommit_changed_repo_state; then
 fi
 cleanup_precommit_snapshots
 
-echo "[pre-push] Step 5/10: public release boundary (committed HEAD)"
-"$VENV_PY" scripts/check_public_release_boundary.py --tree-ish HEAD
+echo "[pre-push] Step 5/10: pushed-range and public release boundary checks"
+run_pushed_range_checks
+run_public_boundary_checks
 
 echo "[pre-push] Step 6/10: semantic architecture conformance"
 "$VENV_PY" scripts/check_architecture_conformance.py

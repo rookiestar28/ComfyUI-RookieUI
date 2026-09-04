@@ -33,12 +33,9 @@ class DependencyAdvisoryPolicyTests(unittest.TestCase):
             "npm audit --audit-level=high",
         )
 
-    def test_full_wrappers_run_advisory_gate_before_frontend_tests(self):
-        wrapper_paths = (
-            "scripts/run_full_tests_windows.ps1",
-            "scripts/pre_push_checks.sh",
-        )
-        for path in wrapper_paths:
+    def test_explicit_full_gates_run_advisory_gate_before_frontend_tests(self):
+        execution_paths = ("scripts/run_full_tests_windows.ps1", "scripts/pre_push_checks.sh")
+        for path in execution_paths:
             with self.subTest(path=path):
                 text = (ROOT / path).read_text(encoding="utf-8")
                 audit_index = text.index("npm run audit:ci")
@@ -50,7 +47,22 @@ class DependencyAdvisoryPolicyTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("bash scripts/run_full_tests_linux.sh", ci_text)
-        self.assertIn("bash scripts/pre_push_checks.sh", linux_text)
+        self.assertIn("bash scripts/pre_push_checks.sh --full-gate", linux_text)
+
+        bash_text = (ROOT / "scripts/pre_push_checks.sh").read_text(encoding="utf-8")
+        scope_text = (ROOT / "scripts/pre_push_scope.py").read_text(encoding="utf-8")
+        self.assertIn('if [ "$AUDIT_REQUIRED" = "audit" ]', bash_text)
+        self.assertIn("full_gate_decision", scope_text)
+        self.assertIn("GateDecision(\"comprehensive\", True", scope_text)
+
+    def test_hook_audit_trigger_is_limited_to_root_node_dependency_metadata(self):
+        scope_text = (ROOT / "scripts/pre_push_scope.py").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '{"package.json", "package-lock.json", "npm-shrinkwrap.json"}',
+            scope_text,
+        )
+        self.assertNotIn("requirements.txt\", \"package.json", scope_text)
 
     def test_audit_commands_forbid_policy_bypasses(self):
         forbidden = (

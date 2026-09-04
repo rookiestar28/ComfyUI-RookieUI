@@ -4,4 +4,4 @@ set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-bash scripts/pre_push_checks.sh
+bash scripts/pre_push_checks.sh --hook "$@"

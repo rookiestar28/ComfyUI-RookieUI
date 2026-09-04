@@ -175,9 +175,11 @@ class PublicReleaseBoundaryTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         windows_wrapper = (root / "scripts" / "run_full_tests_windows.ps1").read_text(encoding="utf-8")
         linux_wrapper = (root / "scripts" / "pre_push_checks.sh").read_text(encoding="utf-8")
+        linux_entry = (root / "scripts" / "run_full_tests_linux.sh").read_text(encoding="utf-8")
 
         self.assertIn("check_public_release_boundary.py --tree-ish HEAD", windows_wrapper)
-        self.assertIn("check_public_release_boundary.py --tree-ish HEAD", linux_wrapper)
+        self.assertIn('check_public_release_boundary.py --tree-ish "$commit"', linux_wrapper)
+        self.assertIn("scripts/pre_push_checks.sh --full-gate", linux_entry)
 
     def test_worktree_index_and_committed_tree_states_do_not_bleed(self) -> None:
         root = self._new_repo()
