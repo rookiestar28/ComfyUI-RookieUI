@@ -25,11 +25,13 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
-<summary><strong>Current-host contracts and workflow support refresh (stability/compatibility)</strong></summary>
+<summary><strong>ComfyUI Core 0.34 and Frontend 1.54 compatibility refresh (stability/compatibility)</strong></summary>
 
-- Refreshed the tested ComfyUI Core, frontend, Desktop, and official workflow-template basis, with exact source, graph, node, profile, and runtime contracts for the supported host surface.
-- Current-host validation now checks pinned source artifacts and supported workflow graphs together, so host node inputs, graph topology, queue/runtime semantics, and packaged-template drift are detected explicitly.
+- Refreshed the tested host basis to ComfyUI Core 0.34, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54 while keeping the Desktop compatibility snapshot separate.
+- Current-host validation now checks pinned source artifacts and supported workflow graphs together, including node inputs/outputs, graph topology, queue/runtime semantics, and packaged-template drift.
 - Upstream workflow-template additions, changes, and archived entries are classified separately from RookieUI support, preventing newly observed templates from being advertised before a matching UI and runtime path exists.
+- Sampler selection now follows the active host registry and rejects unknown values before ComfyUI can substitute another sampler; malformed or unknown queue-history states are reported as failed instead of completed.
+- Frontend preview handling now isolates the metadata and legacy preview channels used by Frontend 1.54, preventing a rejected frame from another queued job from re-entering through the compatibility event.
 - Frontend dependency locking now carries the patched `nanoid` advisory resolution while preserving frozen-install validation.
 
 </details>
@@ -906,13 +908,15 @@ Behavior and compatibility:
 ### ComfyUI Host Compatibility
 
 - Compatibility is validated against separate tested ComfyUI Core, frontend, Desktop, and workflow-template source snapshots rather than inferred from one mutable "latest ComfyUI" version.
+- The current tested source envelope covers ComfyUI Core 0.34, its bundled frontend 1.51.9, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54; this is a pinned compatibility basis rather than a blanket claim for every future host build.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
 - The custom-node package declares its web asset directory through current ComfyUI package metadata while retaining the legacy `WEB_DIRECTORY` export used by existing hosts.
 - RookieUI route registration is composed from focused domain specifications, preserving canonical and compatibility aliases while keeping collision handling and multi-user fail-closed checks at the guarded runtime boundary.
 - Family/profile capabilities and fallback metadata are projected from the canonical manifest so backend builders and frontend selectors describe the same supported surface.
-- Generation runtime tracking binds progress, preview, and terminal events to the active prompt, and releases polling/listeners immediately when a run completes, fails, is interrupted, or is replaced.
+- Generation runtime tracking binds progress, preview, and terminal events to the active prompt, filters paired metadata/legacy preview events from other jobs, and releases polling/listeners immediately when a run completes, fails, is interrupted, or is replaced.
+- When the active host exposes an authoritative sampler registry, RookieUI rejects unknown sampler values before queue submission; malformed or unknown queue-history states fail closed instead of being shown as completed.
 - Host model discovery uses ComfyUI `folder_paths` keys rather than scanning arbitrary filesystem locations directly.
 - Z-Image ControlNet capability discovery uses the host `model_patches` catalog and reports those files separately from generic ControlNet model folders.
 
