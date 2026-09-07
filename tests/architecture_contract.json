@@ -209,7 +209,7 @@
     "scripts/run_full_tests_linux.sh",
     "scripts/run_full_tests_windows.ps1",
     "tests/test_host_source_basis.py",
-    "web/tests/rookieui_frontend_architecture.test.js"
+    "tests/frontend/rookieui_frontend_architecture.test.js"
   ],
   "required_enforcement_artifacts": [
     "scripts/architecture_conformance.py",

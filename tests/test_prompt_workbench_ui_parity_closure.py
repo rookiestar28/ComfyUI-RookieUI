@@ -10,7 +10,7 @@ from rookieui.contracts.prompt_workbench_ui_parity import build_prompt_workbench
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_SHELL = ROOT / "web" / "sidebar_tabs" / "rookieui_prompt_workbench_shell.js"
 FRONTEND_CSS = ROOT / "web" / "rookieui_panes.css"
-FRONTEND_UNIT = ROOT / "web" / "tests" / "rookieui_prompt_workbench_shell.test.js"
+FRONTEND_UNIT = ROOT / "tests" / "frontend" / "rookieui_prompt_workbench_shell.test.js"
 VISUAL_SPEC = ROOT / "tests" / "e2e" / "specs" / "prompt_workbench_ui_parity.spec.js"
 
 

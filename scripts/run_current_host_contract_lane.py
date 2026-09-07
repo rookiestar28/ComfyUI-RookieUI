@@ -222,8 +222,8 @@ def build_lane_commands(root: Path = ROOT) -> list[list[str]]:
             "--",
             "vitest",
             "run",
-            "web/tests/rookieui_runtime_lifecycle.test.js",
-            "web/tests/rookieui_sidebar_lifecycle.test.js",
+            "tests/frontend/rookieui_runtime_lifecycle.test.js",
+            "tests/frontend/rookieui_sidebar_lifecycle.test.js",
         ],
         [npm, "exec", "--", "playwright", "test", "tests/e2e/specs/sidebar_lifecycle.spec.js"],
     ]
@@ -254,8 +254,8 @@ def _command_id(command: list[str]) -> str | None:
     if joined.startswith("npm exec -- vitest run ") and all(
         required in joined
         for required in (
-            "web/tests/rookieui_runtime_lifecycle.test.js",
-            "web/tests/rookieui_sidebar_lifecycle.test.js",
+            "tests/frontend/rookieui_runtime_lifecycle.test.js",
+            "tests/frontend/rookieui_sidebar_lifecycle.test.js",
         )
     ):
         return "frontend-lifecycle-contracts"
