@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -255,6 +256,45 @@ class PrePushScopeTests(unittest.TestCase):
         self.assertIn(f"range\t{self.initial}\t{local}", lines)
         self.assertIn(f"commit\t{local}", lines)
         self.assertNotIn("README.md", "\n".join(lines))
+
+    def test_subprocess_stream_is_lf_terminated_for_the_shell_parser(self) -> None:
+        """The bash runner reads this stream with `read`, which does not strip carriage returns.
+
+        IMPORTANT: this runs the script as a subprocess and inspects raw bytes on purpose.
+        Every other check here calls format_decision in-process and compares splitlines(),
+        which is indifferent to the line terminator. That is exactly how a CRLF stream reached
+        the shell parser and made every Windows push fail with `invalid scope classifier
+        output`, while the whole suite stayed green.
+        """
+        local = self._commit("src/app.py", "VALUE = 2\n", "behavior")
+        updates = self.repo / "hook-updates.txt"
+        updates.write_text(self._update(local, self.initial), encoding="utf-8")
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(MODULE_PATH),
+                "--repo",
+                str(self.repo),
+                "--hook-updates",
+                str(updates),
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        raw = completed.stdout
+        self.assertNotIn(
+            b"\r",
+            raw,
+            "classifier stdout carries a carriage return; the shell parser reads the scope "
+            f"value as e.g. 'comprehensive\\r' and rejects it. Raw bytes: {raw!r}",
+        )
+
+        records = [line.split(b"\t") for line in raw.split(b"\n") if line]
+        self.assertEqual(records[0], [b"scope", b"comprehensive"])
+        self.assertEqual(records[1], [b"audit", b"no-audit"])
+        self.assertTrue(raw.endswith(b"\n"))
 
 
 class PrePushWrapperContractTests(unittest.TestCase):

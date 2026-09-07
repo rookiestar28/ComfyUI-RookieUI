@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import re
 import subprocess
+import sys
 from typing import NamedTuple, Sequence
 
 
@@ -261,7 +262,14 @@ def main() -> int:
     except (OSError, PushScopeError) as exc:
         parser.exit(2, f"pre-push scope error: {exc}\n")
 
-    print(format_decision(decision), end="")
+    # IMPORTANT: write bytes rather than print. This stream is a machine contract parsed by a
+    # bash `read` loop in scripts/pre_push_checks.sh, and `read` does not strip a carriage
+    # return. Printing through text-mode stdout emits CRLF on Windows, which hands the parser
+    # a scope value with a trailing CR and fails every push before the gate does any work.
+    # Restoring print() reintroduces that on one platform only, invisibly to review and to
+    # any test that compares the formatter's return value instead of the bytes on the pipe.
+    sys.stdout.buffer.write(format_decision(decision).encode("utf-8"))
+    sys.stdout.buffer.flush()
     return 0
 
 
