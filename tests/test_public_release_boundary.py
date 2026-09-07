@@ -98,7 +98,7 @@ class PublicReleaseBoundaryTests(unittest.TestCase):
         )
         self.assertLess(workflow.index("Run required current-host contract lane"), workflow.index("Verify public release boundary"))
         self.assertIn(".venv/bin/python scripts/check_public_release_boundary.py", workflow)
-        self.assertIn("needs: full-test-gate", workflow)
+        self.assertIn("needs: [full-test-gate, release-version]", workflow)
 
     def test_historical_tree_detects_forbidden_content_without_checkout(self) -> None:
         root = self._new_repo()

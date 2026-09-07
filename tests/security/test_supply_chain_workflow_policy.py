@@ -40,7 +40,7 @@ class TestSupplyChainWorkflowPolicy(unittest.TestCase):
         text = read_workflow("ci.yml")
         publish_job = read_job_block(text, "publish-node")
 
-        self.assertIn("needs: full-test-gate", publish_job)
+        self.assertIn("needs: [full-test-gate, release-version]", publish_job)
         self.assertIn("github.event_name == 'push'", publish_job)
         self.assertIn("github.ref == 'refs/heads/main'", publish_job)
         self.assertIn(
@@ -50,6 +50,29 @@ class TestSupplyChainWorkflowPolicy(unittest.TestCase):
         self.assertNotIn("always()", publish_job)
         self.assertNotIn("actions/download-artifact", publish_job)
         self.assertNotRegex(publish_job, re.compile(r"^\s+ref:\s", re.MULTILINE))
+
+    def test_registry_publish_requires_an_exact_project_version_transition(self):
+        text = read_workflow("ci.yml")
+        release_job = read_job_block(text, "release-version")
+        publish_job = read_job_block(text, "publish-node")
+
+        self.assertIn("outputs:", release_job)
+        self.assertIn(
+            "should_publish: ${{ steps.version_gate.outputs.should_publish }}",
+            release_job,
+        )
+        self.assertIn("fetch-depth: 0", release_job)
+        self.assertIn("python-version: \"3.11\"", release_job)
+        self.assertIn("BASE_SHA: ${{ github.event.before }}", release_job)
+        self.assertIn("HEAD_SHA: ${{ github.sha }}", release_job)
+        self.assertIn("--base \"$BASE_SHA\"", release_job)
+        self.assertIn("--head \"$HEAD_SHA\"", release_job)
+        self.assertIn("--github-output \"$GITHUB_OUTPUT\"", release_job)
+        self.assertIn(
+            "needs.release-version.outputs.should_publish == 'true'",
+            publish_job,
+        )
+        self.assertNotIn("REGISTRY_ACCESS_TOKEN", release_job)
 
     def test_ci_publish_job_pins_token_bearing_action_and_limits_permissions(self):
         publish_job = read_job_block(read_workflow("ci.yml"), "publish-node")

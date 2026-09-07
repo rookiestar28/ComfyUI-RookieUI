@@ -336,7 +336,10 @@ class CurrentHostContractLaneTests(unittest.TestCase):
         self.assertIn(lane_marker, workflow)
         self.assertLess(workflow.index(full_marker), workflow.index(lane_marker))
         self.assertIn(".venv/bin/python scripts/run_current_host_contract_lane.py", workflow)
-        self.assertRegex(workflow, re.compile(r"publish-node:[\s\S]+needs: full-test-gate"))
+        self.assertRegex(
+            workflow,
+            re.compile(r"publish-node:[\s\S]+needs: \[full-test-gate, release-version\]"),
+        )
 
 
 if __name__ == "__main__":
