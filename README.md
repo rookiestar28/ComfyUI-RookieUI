@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Frontend test files no longer shipped to browsers (stability/performance)</strong></summary>
+
+- The frontend test suite no longer lives inside the directory this pack registers with ComfyUI. ComfyUI publishes every JavaScript file beneath a registered web directory and its frontend imports all of them, so those files were previously fetched and executed by every browser on every page load, where they failed to resolve their test-runner imports.
+- Files served by this pack dropped from 114 to 73, all of them runtime modules. The wasted requests, the console errors they produced, and the exposure of the internal test layout to anyone reading the extension listing are all removed.
+- A guard now fails if any test file or test directory reappears under the served directory. It reads the registered directory name from the package rather than assuming it, so changing that declaration cannot move the served tree out from under the check.
+- The registered directory name is unchanged, so existing installations keep resolving the same extension path. The shipped module set and its cache-busting revision token are untouched.
+
+</details>
+
+<details>
+
 <summary><strong>ComfyUI Core 0.34 and Frontend 1.54 compatibility refresh (stability/compatibility)</strong></summary>
 
 - Refreshed the tested host basis to ComfyUI Core 0.34, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54 while keeping the Desktop compatibility snapshot separate.
