@@ -340,6 +340,34 @@ class HostQualificationCaseTests(unittest.TestCase):
             self.assertEqual(submitted[0]["main_reference_index"], 0)
             self.assertEqual(row["semantic_checklist"], list(qualification.SEMANTIC_CHECKLISTS["Q21-EDIT-2-REF"]))
 
+    def test_negative_rows_are_rejected_by_real_normalization_before_enqueue(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            config = load(Path(folder))
+            host = FakeHost(config)
+            row = qualification._new_row("Q21-NEGATIVE")
+            patches = host.patches() + [mock.patch.object(qualification, "_get_json",
+                                                          return_value={"clip": [ENCODER], "text_encoders": [ENCODER]})]
+            for patch in patches:
+                patch.start()
+            try:
+                qualification._run_negative_case(config, row)
+            finally:
+                for patch in reversed(patches):
+                    patch.stop()
+            self.assertEqual(row["status"], "PASS", row.get("error_code"))
+            self.assertEqual(len(row["rejections"]), 9)
+            self.assertFalse(host.jobs)
+            self.assertTrue(all(not payload.get("dry_run") for _, payload in host.posts))
+
+    def test_negative_row_fails_closed_when_a_bad_request_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            config = load(Path(folder))
+            with mock.patch.object(qualification, "_get_json", return_value={"clip": [], "text_encoders": []}), \
+                    mock.patch.object(qualification, "_post_json", return_value=(200, {"mode": "queued"})), \
+                    mock.patch.object(qualification, "_client_job_count", return_value=1):
+                with self.assertRaisesRegex(qualification.QualificationError, "negative_wrong_diffusion_role"):
+                    qualification._run_negative_case(config, qualification._new_row("Q21-NEGATIVE"))
+
     def test_transfer_accepts_rookieui_a1111_infotext_and_binds_exact_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
