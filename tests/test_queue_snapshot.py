@@ -196,6 +196,39 @@ class QueueSnapshotTests(unittest.TestCase):
         self.assertNotIn("other-client-pending", job_ids)
         self.assertNotIn("other-client-history", job_ids)
 
+    def test_fresh_and_cached_asset_history_keep_the_same_public_projection(self) -> None:
+        class _HistoryQueue:
+            def get_current_queue_volatile(self) -> tuple[list[object], list[object]]:
+                return [], []
+
+            def get_history(self, max_items: int | None = None, offset: int = 0) -> dict[str, object]:
+                _ = max_items, offset
+                history: dict[str, object] = {}
+                for label, asset_id in (("fresh", None), ("cached", "internal-asset-id")):
+                    image = {"filename": "shared.png", "type": "output", "subfolder": ""}
+                    if asset_id is not None:
+                        image["id"] = asset_id
+                    history[label] = {
+                        "prompt": (
+                            1, label, {"prompt_body": "do-not-expose"},
+                            {"rookieui_origin": "rookieui", "client_id": "browser-1"},
+                        ),
+                        "outputs": {"7": {"images": [image]}},
+                        "status": {"status_str": "success", "messages": []},
+                    }
+                return history
+
+        server = _FakePromptServer()
+        server.prompt_queue = _HistoryQueue()
+        jobs = build_queue_snapshot(server, client_id="browser-1")["jobs"]
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(
+            [(job["status"], job["output_filenames"], job["reusable_outputs"]) for job in jobs],
+            [("completed", ["shared.png"], ["shared.png"])] * 2,
+        )
+        self.assertNotIn("internal-asset-id", str(jobs))
+        self.assertNotIn("do-not-expose", str(jobs))
+
     def test_queue_route_returns_snapshot_payload(self) -> None:
         with mock.patch.object(
             routes,

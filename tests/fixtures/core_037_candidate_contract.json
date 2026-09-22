@@ -1,0 +1,170 @@
+{
+  "accepted_revision": "30bdda1ef13a3a34fce2cd2fec633f15d832122a",
+  "blueprint_profiles": [
+    {
+      "accepted_sha256": "faed4db4e059b427d958e13e81886cb8ea5a3215f520c22a492226cd95e108b9",
+      "candidate_sha256": "ec4dde0805dbbd7a442c9e5434aa92c0dfc0a7d8818570b46f59c391f260ee51",
+      "path": "blueprints/Text to Image (Anima).json",
+      "profile": "anima"
+    },
+    {
+      "accepted_sha256": "d1345365a467949fa0343359dc85207c603b11c868c2b6c19f56419c429f9164",
+      "candidate_sha256": "e39bde265f479dba2999d1722217d63158e0da037eea7ae308788f07747d2e7a",
+      "path": "blueprints/Text to Image (Ernie Image).json",
+      "profile": "ernie_image"
+    },
+    {
+      "accepted_sha256": "9a0f5fd620f7d2345d268efc3598ded10d8ba50d5dcd4de5a7b58b6a3ec64f54",
+      "candidate_sha256": "7c9fdfe1ee760dacc49194d295b7b9d951949d804c7d3b3ba3c29d64fe7cf045",
+      "path": "blueprints/Text to Image (Ernie Image Turbo).json",
+      "profile": "ernie_image_turbo"
+    },
+    {
+      "accepted_sha256": "47a00d7a9b4c632d8bf4f9964bdd96c4c6cb73e698813ee53ed69ddc1415a85f",
+      "candidate_sha256": "a528983426e61156d558da6c746ba6e401340dbcbcff4a2e9a530fc661972d38",
+      "path": "blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "profile": "firered_image_edit"
+    },
+    {
+      "accepted_sha256": "47a00d7a9b4c632d8bf4f9964bdd96c4c6cb73e698813ee53ed69ddc1415a85f",
+      "candidate_sha256": "a528983426e61156d558da6c746ba6e401340dbcbcff4a2e9a530fc661972d38",
+      "path": "blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "profile": "firered_image_edit_lightning"
+    },
+    {
+      "accepted_sha256": "2b5bf2013cce0f35698cc1c0c33519939f9cce1a1fa86447404a493956c09d97",
+      "candidate_sha256": "d77c8ff4a8d2af64f085319ba2c8bc18bf119e8731eea75ea32656b706c9e169",
+      "path": "blueprints/Text to Image (Flux.1 Dev).json",
+      "profile": "flux"
+    },
+    {
+      "accepted_sha256": "4f617884f5267865d06c9a75d49bcb9f1c4434aec520cc6816470fe6ffdfffe4",
+      "candidate_sha256": "a8738e78ea9000621d1a77beba05e20cd779559751bf77674913f09dbd183206",
+      "path": "blueprints/Text to Image (Flux.2 Dev).json",
+      "profile": "flux2_dev"
+    },
+    {
+      "accepted_sha256": "e77d90bcb77f3ae0f50df6b3b1ebd6ab7d591688794be9f477a8a76151309453",
+      "candidate_sha256": "69f4d7e8c88e4d17797ca8cd3476a25d4a19051403a1b4536e99517f3c29dffb",
+      "path": "blueprints/Image Edit (Flux.2 Dev).json",
+      "profile": "flux2_image_edit"
+    },
+    {
+      "accepted_sha256": "761bdbe35d73a73cf7225e348e7a3d5c8e744adbd1323df63c045fce72014829",
+      "candidate_sha256": "4e0bf19e4978b698c8e79695528f5780fc49b4279c26ca99232093fa0948be8f",
+      "path": "blueprints/Text to Image (Flux.1 Krea Dev).json",
+      "profile": "flux_krea_dev"
+    },
+    {
+      "accepted_sha256": "678339dee269399d3d7dd250feed084e19ec4f62fced7c7f915820085b1c372c",
+      "candidate_sha256": "3bf04919d5a87a9872363a80fe9638d5d41001980b94e4058f10208602689210",
+      "path": "blueprints/Text to Image (Ideogram v4).json",
+      "profile": "ideogram4"
+    },
+    {
+      "accepted_sha256": "3ca7b848a5a2612448a4821ef2b99fb8af4ee89658e34107926c5d72a9e113f7",
+      "candidate_sha256": "820104ccdc0804e68a34444564dd4da7a8c6ce2bd1b2d0be37122b43b6ef73cd",
+      "path": "blueprints/Image Edit (LongCat Image Edit).json",
+      "profile": "longcat_image_edit"
+    },
+    {
+      "accepted_sha256": "91e6b10aa9cc6aa4e5749ea7ad1075e416f25945f02e45bb07507ffc5cb61ebf",
+      "candidate_sha256": "60900b3da6d7cedabfecc6984a0c0b641d4d7170a1ff076b858e8c6fa3ee1c92",
+      "path": "blueprints/Text to Image (Qwen-Image 2512).json",
+      "profile": "qwen_image"
+    },
+    {
+      "accepted_sha256": "f4a0476d2274087b1b66ed82e0270f3958597ce08c01bf0a39d145174ec6cd83",
+      "candidate_sha256": "f5339d66f11772e28b2c16c47f1ab3d638c88fc0b8d5379ce9f285ad43f6ede9",
+      "path": "blueprints/Image Edit (Qwen 2511).json",
+      "profile": "qwen_image_edit_2511"
+    },
+    {
+      "accepted_sha256": "da9c03bcd8282aaf1e5a44ab13805886268bdb67c2907cc7e5ed6c4bc169c252",
+      "candidate_sha256": "f2ab24adb9e35186797f06f282691baeb36cd58c0244f4986cc8e0879612b334",
+      "path": "blueprints/Text to Image (Z-Image-Base).json",
+      "profile": "z_image"
+    },
+    {
+      "accepted_sha256": "75ffbb281d213694cde74d994e1fbdbcd3c747d0cb73971bf3c571f810465a4b",
+      "candidate_sha256": "b3029adb874cfc80b33fa974698f331054cf17ddc2bfbadf90b031abae84d30c",
+      "path": "blueprints/Text to Image (Z-Image-Turbo).json",
+      "profile": "z_image_turbo"
+    }
+  ],
+  "candidate_revision": "e638023d54497dbe0579565e5de4bb7076899592",
+  "components": {
+    "embedded_docs": "0.5.12",
+    "frontend_package": "1.53.6",
+    "workflow_templates": "0.11.66"
+  },
+  "core_version": "0.37.0",
+  "qwen_encoder_inputs": [
+    "clip",
+    "prompt",
+    "negative_prompt",
+    "vae",
+    "resolution",
+    "images"
+  ],
+  "qwen_encoder_outputs": [
+    "CONDITIONING",
+    "CONDITIONING",
+    "LATENT"
+  ],
+  "qwen_latent_channels": 64,
+  "qwen_latent_stride": 16,
+  "qwen_reference_slots": 16,
+  "qwen_resolution_default": 1024,
+  "qwen_resolution_max": 4096,
+  "qwen_resolution_min": 0,
+  "qwen_resolution_step": 32,
+  "schema_version": "core-037-candidate-v1",
+  "source_artifacts": [
+    {
+      "bytes": 47555,
+      "path": "comfy/controlnet.py",
+      "sha256": "a6ba079a2b0cb497679a4f63a9f84c891b99198603e88ab62e1541baec6c5b74"
+    },
+    {
+      "bytes": 5007,
+      "path": "comfy/sample.py",
+      "sha256": "d274ed5b6abf83707b52b87d25d1716f072d5444954cf23ac0ed31a3b803ee1c"
+    },
+    {
+      "bytes": 16995,
+      "path": "comfy_extras/nodes_model_advanced.py",
+      "sha256": "59bcf2c72de0f931383b74c9be5b6fc2ced06a315277d34631ae5ac9ac90fa91"
+    },
+    {
+      "bytes": 11872,
+      "path": "comfy_extras/nodes_qwen.py",
+      "sha256": "54ce02aa9e167c0b497ce026ac6b558f539427d2d1ed4fc1fcc2ec8e6bc529da"
+    },
+    {
+      "bytes": 128,
+      "path": "comfyui_version.py",
+      "sha256": "5e326d15caa431382c5f369ee4489b7d8c5954a90deb7809bf35a368a63d58b8"
+    },
+    {
+      "bytes": 63423,
+      "path": "execution.py",
+      "sha256": "c9ef8ea11b8cb7aa80d05f670ca457211869d27623991b66d0014fb9b33fb246"
+    },
+    {
+      "bytes": 108670,
+      "path": "nodes.py",
+      "sha256": "1af4a41e1d844550a836cf1d1b00fad85d3d0aefaf435743431a8f1598643e22"
+    },
+    {
+      "bytes": 520,
+      "path": "requirements.txt",
+      "sha256": "9d019bcdd5f04ea2fa695bdfcc6d7aa346cd6d13f6d0a1e69803118342d8cf1f"
+    },
+    {
+      "bytes": 64778,
+      "path": "server.py",
+      "sha256": "2118a18b95583869491fbf1ae33b3a279d92d64af23a244ec254ee5f2150957c"
+    }
+  ]
+}
