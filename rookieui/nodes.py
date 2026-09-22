@@ -321,7 +321,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
         )
 
 
-def _load_image_with_alpha(path):
+def _load_image_with_alpha(path, *, preserve_alpha=False, first_frame_only=False):
     _require_runtime_dependencies()
     img = Image.open(path)
     output_images = []
@@ -335,6 +335,7 @@ def _load_image_with_alpha(path):
         if frame.mode == "I":
             frame = frame.point(lambda value: value * (1 / 255))
         rgb_frame = frame.convert("RGB")
+        image_frame = frame.convert("RGBA") if preserve_alpha else rgb_frame
 
         if width is None:
             width, height = rgb_frame.size
@@ -342,7 +343,8 @@ def _load_image_with_alpha(path):
         if rgb_frame.size != (width, height):
             continue
 
-        image_array = np.array(rgb_frame).astype(np.float32) / 255.0
+        # IMPORTANT: the default IMAGE stays RGB with a separate inverse-alpha MASK; only an explicit opt-in may pass RGBA to four-channel VAE consumers.
+        image_array = np.array(image_frame).astype(np.float32) / 255.0
         image_tensor = torch.from_numpy(image_array)[None,]
         if "A" in frame.getbands():
             mask_array = np.array(frame.getchannel("A")).astype(np.float32) / 255.0
@@ -354,7 +356,7 @@ def _load_image_with_alpha(path):
             mask_tensor = torch.zeros((64, 64), dtype=torch.float32, device="cpu")
         output_images.append(image_tensor.to(dtype=dtype))
         output_masks.append(mask_tensor.unsqueeze(0).to(dtype=dtype))
-        if img.format == "MPO":
+        if first_frame_only or img.format == "MPO":
             break
 
     if len(output_images) > 1:
@@ -369,19 +371,27 @@ class RookieUILoadAssetImage:
             "required": {
                 "asset_handle": ("STRING", {"default": ""}),
             },
+            "optional": {
+                "preserve_alpha": ("BOOLEAN", {"default": False}),
+                "first_frame_only": ("BOOLEAN", {"default": False}),
+            },
         }
 
     CATEGORY = "RookieUI/assets"
     RETURN_TYPES = ("IMAGE", "MASK")
     FUNCTION = "load_asset"
 
-    def load_asset(self, asset_handle):
+    def load_asset(self, asset_handle, preserve_alpha=False, first_frame_only=False):
         _require_runtime_dependencies()
+        if type(preserve_alpha) is not bool or type(first_frame_only) is not bool:
+            raise ValueError("preserve_alpha and first_frame_only must be booleans.")
         path = resolve_asset_path(asset_handle)
-        return _load_image_with_alpha(path)
+        return _load_image_with_alpha(path, preserve_alpha=preserve_alpha, first_frame_only=first_frame_only)
 
     @classmethod
-    def VALIDATE_INPUTS(cls, asset_handle):
+    def VALIDATE_INPUTS(cls, asset_handle, preserve_alpha=False, first_frame_only=False):
+        if type(preserve_alpha) is not bool or type(first_frame_only) is not bool:
+            return "preserve_alpha and first_frame_only must be booleans."
         try:
             resolve_asset_path(asset_handle)
         except ValueError as exc:
@@ -389,11 +399,14 @@ class RookieUILoadAssetImage:
         return True
 
     @classmethod
-    def IS_CHANGED(cls, asset_handle):
+    def IS_CHANGED(cls, asset_handle, preserve_alpha=False, first_frame_only=False):
         path = resolve_asset_path(asset_handle)
         digest = hashlib.sha256()
         with path.open("rb") as stream:
             digest.update(stream.read())
+        # IMPORTANT: widget changes must invalidate the node cache even if the underlying image bytes are unchanged.
+        if preserve_alpha or first_frame_only:
+            digest.update(f"|rgba={preserve_alpha}|first={first_frame_only}".encode("ascii"))
         return digest.hexdigest()
 
 

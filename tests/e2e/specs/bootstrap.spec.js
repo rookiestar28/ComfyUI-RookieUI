@@ -17,7 +17,8 @@ const E2E_VAE_OPTIONS = [
 ];
 const E2E_PREVIEW_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZrY4AAAAASUVORK5CYII=";
-const E2E_FINAL_OUTPUT_DATA_URL = "data:image/png;base64,ZmluYWwtb3V0cHV0";
+const E2E_FINAL_OUTPUT_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGNkZGJmYGZmbgAAANUAkaVBWMMAAAAASUVORK5CYII=";
 
 async function setTxt2ImgPreviewImage(page, src = E2E_PREVIEW_DATA_URL) {
   await page.evaluate((imageSrc) => {

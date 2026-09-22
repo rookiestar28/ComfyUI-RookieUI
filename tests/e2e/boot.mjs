@@ -341,7 +341,11 @@ async function handleE2EFetch(url, options = {}) {
   const route = normalizeE2EApiRoute(url);
   const routeUrl = new URL(String(route), window.location.origin);
   if (routeUrl.pathname.endsWith("/view")) {
-    return new Response(new Blob(["final-output"], { type: "image/png" }), {
+    const rgbaPng = Uint8Array.from(
+      atob("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGNkZGJmYGZmbgAAANUAkaVBWMMAAAAASUVORK5CYII="),
+      (character) => character.charCodeAt(0),
+    );
+    return new Response(new Blob([rgbaPng], { type: "image/png" }), {
       status: 200,
       headers: { "Content-Type": "image/png" },
     });

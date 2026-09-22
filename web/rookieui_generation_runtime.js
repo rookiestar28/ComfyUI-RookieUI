@@ -684,7 +684,7 @@ export function createGenerationRuntimeHelpers({
     runtimeState,
     statusNode,
     previewBox = null,
-    { inspectPngInfoRequest = null, mode = "img2img", label = "Img2Img" } = {},
+    { inspectPngInfoRequest = null, mode = "img2img", label = "Img2Img", requireOriginalImageData = false } = {},
   ) => {
     const { previewUrl, imageDataUrl, fallbackAsset } = await resolvePreviewImagePayload(runtimeState, previewBox);
     if (!previewUrl) {
@@ -695,6 +695,13 @@ export function createGenerationRuntimeHelpers({
       emitFrontendDebugWarning("shell.preview_transfer", `${label} applyPayload is unavailable; falling back to tab switch.`);
       if (statusNode) {
         statusNode.textContent = `${label} form is unavailable.`;
+      }
+      return;
+    }
+    if (requireOriginalImageData && !imageDataUrl) {
+      // IMPORTANT: RGBA edit handoff must fail visibly when the original PNG cannot be read; a view filename is not an internal asset handle.
+      if (statusNode) {
+        statusNode.textContent = "Original PNG is unavailable; alpha-safe edit transfer was not performed.";
       }
       return;
     }
