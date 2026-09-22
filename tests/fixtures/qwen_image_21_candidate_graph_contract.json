@@ -1,5 +1,5 @@
 {
-  "profile_count": 1,
+  "profile_count": 2,
   "profiles": [
     {
       "class_types": [
@@ -17,6 +17,24 @@
       "id": "qwen_image_21",
       "node_count": 8,
       "topology_sha256": "e6f49e3e852caf8a3286ab7fc54539540e86a97f565d68b82d2ceed5eeeca183"
+    },
+    {
+      "class_types": [
+        "CLIPLoader",
+        "KSampler",
+        "QwenImage21Cache",
+        "RookieUILoadAssetImage",
+        "RookieUISaveImageWithMetadata",
+        "TextEncodeQwenImage21",
+        "UNETLoader",
+        "VAEDecode",
+        "VAELoader"
+      ],
+      "edge_count": 11,
+      "flow_kind": "edit",
+      "id": "qwen_image_21_edit",
+      "node_count": 9,
+      "topology_sha256": "706a1cde04244f8ee836d4fec36ca0b3395fd3e83b1ebe6b9b85e043c2ee92f3"
     }
   ],
   "schema_version": "current-host-profile-graph-contract-v1",

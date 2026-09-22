@@ -103,8 +103,12 @@ def build_a1111_parameters(normalized_request: Mapping[str, Any]) -> str:
             fields.append(("Schedule type", scheduler_name))
     _append_field(fields, "CFG scale", normalized_request.get("cfg_scale"))
     _append_field(fields, "Seed", normalized_request.get("execution_seed", normalized_request.get("seed")))
-    width = _clean_text(normalized_request.get("width"))
-    height = _clean_text(normalized_request.get("height"))
+    reference_sized_qwen_edit = (
+        normalized_request.get("profile") == "qwen_image_21_edit"
+        and normalized_request.get("output_size_mode") == "reference"
+    )
+    width = "" if reference_sized_qwen_edit else _clean_text(normalized_request.get("width"))
+    height = "" if reference_sized_qwen_edit else _clean_text(normalized_request.get("height"))
     if width and height:
         fields.append(("Size", f"{width}x{height}"))
     _append_selector_field(fields, "Model", normalized_request.get("checkpoint_name"))
@@ -114,7 +118,8 @@ def build_a1111_parameters(normalized_request: Mapping[str, Any]) -> str:
     surface = _infer_surface(normalized_request)
     if surface == "img2img":
         _append_field(fields, "Denoising strength", normalized_request.get("denoise_strength"))
-        _append_field(fields, "Resize mode", normalized_request.get("resize_mode"))
+        if normalized_request.get("profile") != "qwen_image_21_edit":
+            _append_field(fields, "Resize mode", normalized_request.get("resize_mode"))
         mode = _clean_text(normalized_request.get("execution_mode") or normalized_request.get("mode")).lower()
         if mode == "inpaint":
             _append_field(fields, "Mask blur", normalized_request.get("mask_blur"))
@@ -182,14 +187,16 @@ def build_rookieui_extra_pnginfo(
     scheduler_name = _clean_text(normalized_request.get("scheduler_name"))
     if scheduler_control_mode != "generic":
         scheduler_name = scheduler_control_mode
-    return {
+    qwen21_edit = profile == "qwen_image_21_edit"
+    reference_sized = qwen21_edit and normalized_request.get("output_size_mode") == "reference"
+    metadata = {
         "rookieui": {
             "schema": "rookieui.generation_metadata.v1",
             "surface": surface,
             "workflow_kind": _clean_text(workflow_kind),
             "profile": _clean_text(profile),
-            "width": normalized_request.get("width"),
-            "height": normalized_request.get("height"),
+            "width": None if reference_sized else normalized_request.get("width"),
+            "height": None if reference_sized else normalized_request.get("height"),
             "steps": normalized_request.get("steps"),
             "sampler_name": _clean_text(normalized_request.get("sampler_name")),
             "scheduler_name": scheduler_name,
@@ -202,6 +209,14 @@ def build_rookieui_extra_pnginfo(
             "seed": normalized_request.get("execution_seed", normalized_request.get("seed")),
         }
     }
+    if qwen21_edit:
+        metadata["rookieui"].update({
+            "reference_resolution": normalized_request.get("reference_resolution"),
+            "output_size_mode": normalized_request.get("output_size_mode"),
+            "edit_task": normalized_request.get("edit_task"),
+            "reference_count": len(normalized_request.get("reference_image_assets") or []),
+        })
+    return metadata
 
 
 def build_generation_metadata_payload(

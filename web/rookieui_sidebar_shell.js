@@ -51,6 +51,7 @@ import {
   createPreviewFullscreenViewer,
 } from "./rookieui_sidebar_shell_deps.js";
 import { buildShellFooter, captureContainerMarkers, createShellDisposer, destroyTabLifecycles } from "./rookieui_sidebar_lifecycle.js";
+import { applyQwen21EditSubmitControls, parseImg2ImgBatchImages } from "./sidebar_tabs/img2img/rookieui_qwen21_edit_payload.js";
 
 const ROOKIEUI_GITHUB_URL = "https://github.com/rookiestar28/ComfyUI-RookieUI";
 
@@ -651,11 +652,11 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
   statusNode.textContent = `Preview ready: ${result.data.workflow_kind}${warningSuffix ? ` | ${warningSuffix}` : ""}`;
 }
 
-function readImg2ImgPayload(elements) {
+function readImg2ImgPayload(elements, referencePayload = null) {
   const { imageEditProfile, referenceImages, mainReferenceIndex, selectedMainSlot } =
     readImg2ImgReferencePayload(elements);
-  const batchImages = parseJsonArrayField(elements.batchImagesData?.value ?? "[]");
-  return {
+  const batchImages = parseImg2ImgBatchImages(elements.batchImagesData?.value ?? "[]", emitFrontendDebugWarning);
+  const payload = {
     prompt: elements.prompt.value,
     negative_prompt: elements.negativePrompt.value,
     profile: elements.profileState.value,
@@ -668,8 +669,8 @@ function readImg2ImgPayload(elements) {
     image_data: elements.imageData.value,
     mask_asset: elements.maskAsset.value,
     mask_data: elements.maskData.value,
-    reference_images: referenceImages,
-    main_reference_index: mainReferenceIndex,
+    reference_images: referencePayload?.referenceImages ?? referenceImages,
+    main_reference_index: referencePayload?.mainReferenceIndex ?? mainReferenceIndex,
     mode: elements.mode.value,
     batch_images: batchImages,
     width: Number(elements.width.value),
@@ -713,6 +714,7 @@ function readImg2ImgPayload(elements) {
     _ui_image_edit_profile: imageEditProfile,
     _ui_selected_main_reference_slot: selectedMainSlot,
   };
+  return applyQwen21EditSubmitControls(payload, elements);
 }
 
 // IMPORTANT: keep A1111-facing mode labels separate from execution mode; sketch/inpaint-upload/batch still route through normalized backend graph lanes.
@@ -725,19 +727,6 @@ const IMG2IMG_EXECUTION_MODE_MAP = Object.freeze({
   inpaint_upload: "inpaint",
   batch: "img2img",
 });
-
-function parseJsonArrayField(rawValue) {
-  if (typeof rawValue !== "string" || !rawValue.trim()) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(rawValue);
-    return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry === "string" && entry.trim()) : [];
-  } catch (_error) {
-    emitFrontendDebugWarning("shell.img2img_batch_parse", "Failed to parse batch image JSON field; returning empty list.", _error);
-    return [];
-  }
-}
 
 function resolveImg2ImgExecutionMode(modeValue) {
   const normalized = String(modeValue ?? "").trim().toLowerCase();
@@ -804,10 +793,10 @@ function syncMaskField(modeInput, maskField, inpaintControls = [], options = {})
   }
 }
 
-async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState, previewBox, maskCanvasContract, live) {
+async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState, previewBox, maskCanvasContract, live, referencePayload = null) {
   statusNode.textContent = "Submitting img2img request...";
 
-  const payload = readImg2ImgPayload(elements);
+  const payload = readImg2ImgPayload(elements, referencePayload);
   const imageEditProfile = Boolean(payload._ui_image_edit_profile);
   delete payload._ui_image_edit_profile;
   delete payload._ui_selected_main_reference_slot;
@@ -926,8 +915,7 @@ function applyCrossPanePayload(formRegistry, targetKey, payload, options = {}) {
   if (options.activate !== false) {
     formRegistry.__shellTabs?.activateTabById?.(normalizedTarget);
   }
-  targetForm.applyPayload(payload);
-  return true;
+  return targetForm.applyPayload(payload) !== false;
 }
 
 function buildQuicksettingCard(parent, labelText, controls, id = "") {
@@ -1205,7 +1193,7 @@ function buildPaneModuleContext() {
     syncMaskField,
     resolveImg2ImgExecutionMode,
     isImg2ImgBatchMode,
-    parseJsonArrayField,
+    parseJsonArrayField: (raw) => parseImg2ImgBatchImages(raw, emitFrontendDebugWarning),
     createImg2ImgMaskCanvasContract,
     createImg2ImgMaskEditor: createImg2ImgMaskCanvasEditor,
     createImg2ImgModeRouter,
@@ -1328,7 +1316,7 @@ function applyPngInfoResult(formRegistry, targetKey, state, statusNode) {
 
   const applied = applyCrossPanePayload(formRegistry, targetKey, inspectionResult.payload ?? {});
   if (!applied) {
-    statusNode.textContent = `Target form unavailable: ${targetKey}`;
+    statusNode.textContent = `Target form rejected or unavailable: ${targetKey}`;
     return;
   }
   statusNode.textContent = `Applied ${targetKey} fields`;

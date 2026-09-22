@@ -70,6 +70,9 @@ class Img2ImgRequest:
     image_data: str = ""
     reference_images: list[dict[str, Any]] = field(default_factory=list)
     main_reference_index: int = 0
+    reference_resolution: int = 0
+    output_size_mode: str = "reference"
+    edit_task: str = "edit"
     mask_asset: str = ""
     mask_data: str = ""
     mode: str = "img2img"
@@ -198,6 +201,9 @@ class NormalizedImg2ImgRequest:
     image_asset: str
     reference_image_assets: list[str]
     main_reference_index: int
+    reference_resolution: int
+    output_size_mode: str
+    edit_task: str
     mask_asset: str
     mode: str
     execution_mode: str

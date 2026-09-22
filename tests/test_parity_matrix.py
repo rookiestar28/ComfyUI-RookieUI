@@ -40,6 +40,7 @@ class ParityMatrixTests(unittest.TestCase):
                 "longcat_image",
                 "qwen_image_21",
                 "qwen_image",
+                "qwen_image_21_edit",
                 "qwen_image_edit",
                 "qwen_image_edit_2511",
                 "firered_image_edit",

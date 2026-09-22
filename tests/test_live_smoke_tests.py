@@ -137,7 +137,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
         self.assertEqual(
             live_smoke._default_profiles_for_mode("image-edit"),
             (
-                "qwen_image_edit,qwen_image_edit_2511,"
+                "qwen_image_21_edit,qwen_image_edit,qwen_image_edit_2511,"
                 "firered_image_edit,firered_image_edit_lightning,flux_kontext_dev_edit,flux2_image_edit,"
                 "klein_9b_kv_image_edit,longcat_image_edit"
             ),
@@ -165,7 +165,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,flux_krea_dev,flux2_dev,"
                 "ideogram4,krea2_turbo,klein_4b,klein_9b,"
                 "hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
-                "longcat_image,qwen_image_21,qwen_image,z_image,z_image_turbo,qwen_image_edit,"
+                "longcat_image,qwen_image_21,qwen_image,z_image,z_image_turbo,qwen_image_21_edit,qwen_image_edit,"
                 "qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"
                 "flux_kontext_dev_edit,flux2_image_edit,klein_9b_kv_image_edit,longcat_image_edit"
             ),
@@ -511,6 +511,29 @@ class LiveSmokeCatalogTests(unittest.TestCase):
         self.assertEqual(len(payload["reference_images"]), 1)
         self.assertTrue(str(payload["reference_images"][0]["image_data"]).startswith("data:image/png;base64,"))
         self.assertNotIn("image_data", payload)
+
+    def test_qwen_image_21_edit_live_payload_uses_first_rgba_reference_and_exact_roles(self) -> None:
+        payload = live_smoke._build_edit_payload(
+            "qwen_image_21_edit",
+            {
+                "checkpoint_name": "qwen_image_2.1_int8_convrot.safetensors",
+                "vae_name": "qwen_image_2.1_vae_bf16.safetensors",
+                "text_encoder_name": "qwen3vl_8b_int8_convrot.safetensors",
+                "steps": 25, "cfg_scale": 1, "sampler_name": "euler", "scheduler_name": "simple",
+            },
+            "client-qwen21-edit",
+        )
+        self.assertEqual((payload["main_reference_index"], len(payload["reference_images"])), (0, 1))
+        self.assertEqual(payload["profile"], "qwen_image_21_edit")
+        self.assertIsNone(payload["shift"])
+        self.assertIsNone(payload["edit_megapixels"])
+        self.assertEqual(payload["template_lora_name"], "")
+        import base64
+        import io
+        from PIL import Image
+        encoded = payload["reference_images"][0]["image_data"].split(",", maxsplit=1)[1]
+        with Image.open(io.BytesIO(base64.b64decode(encoded))) as image:
+            self.assertEqual((image.mode, image.size), ("RGBA", (512, 512)))
 
     def test_build_edit_payload_uses_ordered_multi_reference_contract_for_flux_kontext(self) -> None:
         payload = live_smoke._build_edit_payload(

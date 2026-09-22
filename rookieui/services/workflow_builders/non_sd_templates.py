@@ -2126,6 +2126,65 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
 }
 
 
+def _build_qwen_image_21_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
+    # CRITICAL: the V3 encoder and cache are both required; older hosts must refuse the
+    # request rather than enqueue a graph that loses the reference or cache semantics.
+    host_nodes = sys.modules.get("nodes")
+    mappings = getattr(host_nodes, "NODE_CLASS_MAPPINGS", None)
+    required = {"TextEncodeQwenImage21", "QwenImage21Cache"}
+    if isinstance(mappings, Mapping) and not required.issubset(mappings):
+        raise ValueError("Qwen Image 2.1 edit requires host nodes TextEncodeQwenImage21 and QwenImage21Cache.")
+    if not 1 <= len(request.reference_image_assets) <= 10 or request.main_reference_index != 0:
+        raise ValueError("Qwen Image 2.1 edit requires one to ten ordered references with image 1 primary.")
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    cache_id = allocator.next()
+    workflow[cache_id] = {
+        "class_type": "QwenImage21Cache",
+        "inputs": {"model": [unet_id, 0], "device": "auto", "dtype": "default"},
+    }
+    clip_source = _build_single_clip_source(
+        workflow, allocator=allocator, clip_name=request.text_encoder_name, clip_type="qwen_image"
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    encode_inputs: dict[str, object] = {
+        "clip": clip_source,
+        "vae": [vae_id, 0],
+        "prompt": request.prompt,
+        "negative_prompt": request.negative_prompt,
+        "resolution": request.reference_resolution,
+    }
+    for index, asset in enumerate(request.reference_image_assets, start=1):
+        load_id = allocator.next()
+        workflow[load_id] = {
+            "class_type": "RookieUILoadAssetImage",
+            "inputs": {"asset_handle": asset, "preserve_alpha": True, "first_frame_only": True},
+        }
+        encode_inputs[f"images.image_{index}"] = [load_id, 0]
+    encode_id = allocator.next()
+    workflow[encode_id] = {"class_type": "TextEncodeQwenImage21", "inputs": encode_inputs}
+    latent_source = [encode_id, 2]
+    if request.output_size_mode == "custom":
+        latent_id = _append_empty_latent_node(
+            workflow, allocator=allocator, class_type="EmptyLatentImage",
+            width=request.width, height=request.height, batch_size=1,
+        )
+        latent_source = [latent_id, 0]
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow, node_id=sampler_id, positive_id=[encode_id, 0], negative_id=[encode_id, 1],
+        latent_id=latent_source, request=request, denoise=1.0, model_source=[cache_id, 0],
+    )
+    _build_decode_and_save(
+        workflow, sampler_id=sampler_id, decode_id=allocator.next(), save_id=allocator.next(),
+        vae_source=[vae_id, 0], request=request,
+    )
+    return workflow
+
+
 def _build_qwen_family_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dict[str, object]:
     profile_entry = get_model_family_registry_entry(request.profile)
     encoder_family = str(profile_entry.encoder_family or "").strip().lower()
@@ -2572,6 +2631,7 @@ def _build_longcat_image_edit_workflow(request: NormalizedImg2ImgRequest) -> dic
 
 
 _NON_SD_EDIT_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedImg2ImgRequest], dict[str, object]]] = {
+    "qwen_image_21_edit": _build_qwen_image_21_edit_workflow,
     "qwen_image_edit": _build_qwen_family_image_edit_workflow,
     "flux_kontext_dev_edit": _build_flux_kontext_dev_image_edit_workflow,
     "flux2_image_edit": _build_flux2_image_edit_workflow,

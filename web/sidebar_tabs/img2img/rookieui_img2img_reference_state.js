@@ -3,7 +3,7 @@ export function resolveActiveImg2ImgProfile(profileLookup, profileId) {
   return profileLookup.get(normalizedProfileId) ?? profileLookup.get(profileId) ?? null;
 }
 
-export function buildImageEditReferencePayloadFromElements(elements, referenceLimit = null) {
+export function buildImageEditReferencePayloadFromElements(elements, referenceLimit = null, additionalControls = null) {
   const resolvedLimit = Math.max(0, Number(referenceLimit ?? elements.maxDirectReferences?.value ?? 0) || 0);
   if (resolvedLimit <= 0) {
     return {
@@ -14,19 +14,19 @@ export function buildImageEditReferencePayloadFromElements(elements, referenceLi
   }
 
   const normalizedLimit = Math.max(1, resolvedLimit);
+  const legacyAdditionalControls = [
+    { assetInput: elements.referenceAsset2, dataInput: elements.referenceData2 },
+    { assetInput: elements.referenceAsset3, dataInput: elements.referenceData3 },
+  ];
   const orderedSlots = [
     {
       image_asset: String(elements.imageAsset?.value ?? "").trim(),
       image_data: String(elements.imageData?.value ?? "").trim(),
     },
-    {
-      image_asset: String(elements.referenceAsset2?.value ?? "").trim(),
-      image_data: String(elements.referenceData2?.value ?? "").trim(),
-    },
-    {
-      image_asset: String(elements.referenceAsset3?.value ?? "").trim(),
-      image_data: String(elements.referenceData3?.value ?? "").trim(),
-    },
+    ...(additionalControls ?? legacyAdditionalControls).map((slot) => ({
+      image_asset: String(slot.assetInput?.value ?? "").trim(),
+      image_data: String(slot.dataInput?.value ?? "").trim(),
+    })),
   ].slice(0, normalizedLimit);
 
   const selectedMainSlot = Math.min(

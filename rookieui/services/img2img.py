@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
+from rookieui.contracts.prompt_dsl import PromptPreprocessResult, PromptSemanticPlan
+from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, require_qwen_image_21_asset_role
 from rookieui.contracts.family_template_manifest import list_non_sd_edit_manifest_entries
 from rookieui.contracts.model_family_registry import (
     get_model_family_registry_entry,
@@ -250,14 +252,24 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     lora_strength_model = _coerce_lora_strength(request.lora_strength_model, "lora_strength_model")
     lora_strength_clip = _coerce_lora_strength(request.lora_strength_clip, "lora_strength_clip")
     steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
-    prompt_preprocess = preprocess_prompt_bundle(
-        prompt,
-        negative_prompt,
-        step_count=steps,
-        inventory_loras=inventory.loras,
-        inventory_embeddings=inventory.embeddings,
-        strict_match=inventory_is_host,
-    )
+    if profile.id == "qwen_image_21_edit":
+        # CRITICAL: the 2.1 encoder must receive authored image references and text unchanged;
+        # A1111 prompt parsing can silently rewrite numbered image instructions.
+        prompt_preprocess = PromptPreprocessResult(
+            cleaned_prompt=prompt,
+            cleaned_negative_prompt=negative_prompt,
+            prompt_semantics=PromptSemanticPlan.empty(prompt),
+            negative_prompt_semantics=PromptSemanticPlan.empty(negative_prompt),
+        )
+    else:
+        prompt_preprocess = preprocess_prompt_bundle(
+            prompt,
+            negative_prompt,
+            step_count=steps,
+            inventory_loras=inventory.loras,
+            inventory_embeddings=inventory.embeddings,
+            strict_match=inventory_is_host,
+        )
     prompt = prompt_preprocess.cleaned_prompt
     negative_prompt = prompt_preprocess.cleaned_negative_prompt
     lora_activations = merge_lora_activations(
@@ -292,6 +304,11 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         raise ValueError(f"profile '{profile.id}' is not currently exposed on the {requested_surface_flow} surface.")
     batch_images = _coerce_batch_images(request.batch_images)
     batch_image_seed = batch_images[0] if mode == "batch" and batch_images else ""
+    if profile.id == "qwen_image_21_edit":
+        if isinstance(request.reference_images, list) and len(request.reference_images) > 10:
+            raise ValueError("Qwen Image 2.1 supports at most 10 ordered references.")
+        if request.mask_asset or request.mask_data or batch_images:
+            raise ValueError("Qwen Image 2.1 edit does not use masks or batch uploads.")
 
     reference_image_assets = _coerce_reference_image_assets(
         reference_images=request.reference_images,
@@ -304,6 +321,24 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     main_reference_index = _coerce_int(request.main_reference_index, "main_reference_index")
     if main_reference_index < 0 or main_reference_index >= len(reference_image_assets):
         raise ValueError("main_reference_index is out of range for reference_images.")
+    if profile.id == "qwen_image_21_edit" and main_reference_index != 0:
+        # CRITICAL: the host uses image_1 to size the latent; a later primary index
+        # makes the visible target disagree with the executed edit target.
+        raise ValueError("Qwen Image 2.1 requires the primary reference first (main_reference_index=0).")
+    reference_resolution = _coerce_int(request.reference_resolution, "reference_resolution")
+    output_size_mode = normalize_option_label(request.output_size_mode, "output_size_mode", max_length=16).lower()
+    edit_task = normalize_option_label(request.edit_task, "edit_task", max_length=24).lower()
+    if profile.id == "qwen_image_21_edit":
+        if len(reference_image_assets) > 10:
+            raise ValueError("Qwen Image 2.1 supports at most 10 ordered references.")
+        if reference_resolution < 0 or reference_resolution > 4096 or reference_resolution % 32:
+            raise ValueError("reference_resolution must be 0 or a multiple of 32 through 4096.")
+        if output_size_mode not in {"reference", "custom"}:
+            raise ValueError("output_size_mode must be reference or custom.")
+        if edit_task not in {"edit", "background_removal"}:
+            raise ValueError("edit_task must be edit or background_removal.")
+    elif (reference_resolution, output_size_mode, edit_task) != (0, "reference", "edit"):
+        raise ValueError("Qwen Image 2.1 edit controls require profile 'qwen_image_21_edit'.")
     image_asset = reference_image_assets[main_reference_index]
     mask_asset = _resolve_input_asset(
         asset_value=request.mask_asset,
@@ -343,6 +378,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         field_name="height",
         applied_defaults=applied_defaults,
     )
+    if profile.id == "qwen_image_21_edit" and output_size_mode == "custom" and (width % 32 or height % 32):
+        raise ValueError("Qwen Image 2.1 custom width and height must be multiples of 32.")
     resize_mode = _normalize_choice(
         request.resize_mode,
         "resize_mode",
@@ -352,6 +389,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
     )
 
     cfg_scale = _coerce_cfg_scale(request.cfg_scale, profile.default_cfg_scale, applied_defaults)
+    if profile.id == "qwen_image_21_edit" and negative_prompt and cfg_scale <= 1.0:
+        parameter_warnings.append("Qwen Image 2.1 encodes the negative prompt, but CFG 1 does not apply it during sampling.")
+        parameter_warning_codes.append("QWEN21_NEGATIVE_CFG_ONE")
     shift = _coerce_optional_profile_float(
         request.shift,
         profile_entry.default_shift,
@@ -575,6 +615,18 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
             raise ValueError(
                 f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
+        if profile.id == "qwen_image_21_edit":
+            require_qwen_image_21_asset_role(checkpoint_name, "diffusion_models")
+            require_qwen_image_21_asset_role(text_encoder_name, "text_encoders")
+            require_qwen_image_21_asset_role(vae_name, "vae")
+            if inventory_is_host and (
+                checkpoint_name not in inventory.diffusion_models
+                or text_encoder_name not in inventory.text_encoders
+                or vae_name not in inventory.vae
+            ):
+                raise ValueError("Qwen Image 2.1 requires all three exact selectors in the host model inventory.")
+        elif any(qwen_image_21_asset_role(value) for value in (checkpoint_name, text_encoder_name, vae_name)):
+            raise ValueError(f"Qwen Image 2.1 assets require the 2.1 edit profile, not '{profile.id}'.")
     missing_template_lora_warning = ""
     if (
         primary_model_category == "diffusion_models"
@@ -609,6 +661,19 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         prompt_warnings.extend(model_only_warnings)
         prompt_warning_codes.extend(model_only_warning_codes)
 
+    if profile.id == "qwen_image_21_edit":
+        if lora_name or lora_activations or template_lora_name or "<lora:" in prompt.lower():
+            raise ValueError("Qwen Image 2.1 edit does not support RookieUI LoRA controls.")
+        if shift is not None or flux_guidance is not None or edit_megapixels is not None:
+            raise ValueError("Qwen Image 2.1 edit does not use legacy shift, guidance or edit-megapixels controls.")
+        if mask_asset or batch_images or any(unit.enabled for unit in controlnet_units) or adetailer.enabled or hires_enabled:
+            raise ValueError("Qwen Image 2.1 edit does not support mask, batch, ControlNet, ADetailer or Hires controls.")
+        if prompt_enhancement_enabled or dtype_profile != "automatic" or batch_size != 1:
+            raise ValueError("Qwen Image 2.1 edit requires raw prompts, automatic dtype and batch size 1.")
+        if "denoise_strength" in payload and denoise_strength != 1.0:
+            raise ValueError("Qwen Image 2.1 edit requires denoise_strength=1.")
+        denoise_strength = 1.0
+
     return NormalizedImg2ImgRequest(
         prompt=prompt,
         negative_prompt=negative_prompt,
@@ -628,6 +693,9 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
         image_asset=image_asset,
         reference_image_assets=reference_image_assets,
         main_reference_index=main_reference_index,
+        reference_resolution=reference_resolution,
+        output_size_mode=output_size_mode,
+        edit_task=edit_task,
         mask_asset=mask_asset,
         mode=mode,
         execution_mode=execution_mode,

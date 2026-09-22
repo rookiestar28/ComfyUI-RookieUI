@@ -537,7 +537,10 @@ def _request_prompt_workbench_json_with_status(
     )
 
 
-def _build_png_data_url(*, color: str = "white", metadata: dict[str, str] | None = None) -> str:
+def _build_png_data_url(
+    *, color: str = "white", metadata: dict[str, str] | None = None,
+    size: tuple[int, int] = (32, 32), mode: str = "RGB",
+) -> str:
     try:
         # CRITICAL: keep the Pillow import lazy; catalog-only smoke and prompt-parity dry-run checks must remain import-safe even if a shell env is missing optional image helpers.
         from PIL import Image
@@ -545,7 +548,7 @@ def _build_png_data_url(*, color: str = "white", metadata: dict[str, str] | None
     except ImportError as exc:  # pragma: no cover - depends on local runtime packaging.
         raise RuntimeError("Pillow is required for auxiliary live-smoke PNG payload generation.") from exc
 
-    image = Image.new("RGB", (32, 32), color=color)
+    image = Image.new(mode, size, color=color)
     pnginfo = None
     if metadata:
         pnginfo = PngInfo()
@@ -3354,13 +3357,20 @@ def _build_edit_payload(
 def _build_image_edit_reference_payload(profile_id: str) -> tuple[list[dict[str, str]], int]:
     manifest_entry = get_family_template_manifest_entry(profile_id)
     max_direct_references = int(getattr(manifest_entry, "max_direct_references", 0) or 0)
-    reference_count = 1 if max_direct_references <= 1 else min(max_direct_references, 3)
+    # CRITICAL: Qwen 2.1 sizes its latent from image_1 and rejects a later main index;
+    # the shared three-reference probe would misrepresent both the UI target and host graph.
+    qwen21_edit = profile_id == "qwen_image_21_edit"
+    reference_count = 1 if qwen21_edit or max_direct_references <= 1 else min(max_direct_references, 3)
     colors = ("midnightblue", "seagreen", "goldenrod")
     reference_images = [
-        {"image_data": _build_png_data_url(color=colors[index])}
+        {"image_data": _build_png_data_url(
+            color=colors[index],
+            size=(512, 512) if qwen21_edit else (32, 32),
+            mode="RGBA" if qwen21_edit else "RGB",
+        )}
         for index in range(reference_count)
     ]
-    main_reference_index = 0 if reference_count == 1 else min(reference_count - 1, 2)
+    main_reference_index = 0 if qwen21_edit or reference_count == 1 else min(reference_count - 1, 2)
     return reference_images, main_reference_index
 
 
@@ -3456,6 +3466,15 @@ def _validate_image_edit_dry_run_response(
             f"{case.case_id}: expected {case.expected_template_lora_nodes} template-owned LoraLoaderModelOnly node(s) "
             f"but got {class_types.count('LoraLoaderModelOnly')}."
         )
+    if case.profile_id == "qwen_image_21_edit":
+        if class_types.count("QwenImage21Cache") != 1 or class_types.count("TextEncodeQwenImage21") != 1:
+            errors.append(f"{case.case_id}: Qwen 2.1 cache and encoder must each appear exactly once.")
+        encoders = [node["inputs"] for node in workflow.values()
+                    if isinstance(node, dict) and node.get("class_type") == "TextEncodeQwenImage21"]
+        if encoders and [key for key in encoders[0] if key.startswith("images.image_")] != [
+            f"images.image_{index}" for index in range(1, case.expected_reference_count + 1)
+        ]:
+            errors.append(f"{case.case_id}: Qwen 2.1 references are not bound in numeric order.")
     return errors
 
 

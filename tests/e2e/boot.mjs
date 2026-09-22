@@ -15,6 +15,7 @@ const rejectRookieModels = params.get("rejectRookieModels") === "1";
 const runtimeEventScenario = params.get("runtimeEventScenario") === "1";
 const txt2imgLostResponse = params.get("txt2imgLostResponse") === "1";
 const qwen21MissingNode = params.get("qwen21MissingNode") === "1";
+const qwen21EditImport = params.get("qwen21EditImport") || "";
 const earlyTerminalScenario = params.get("earlyTerminalScenario") === "1";
 const requestedImg2ImgDelayMs = Number(params.get("img2imgDelayMs") ?? 0);
 const img2imgDelayMs = Number.isFinite(requestedImg2ImgDelayMs)
@@ -49,6 +50,11 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     text_encoder_name: "Automatic",
   },
   qwen_image_21: {
+    checkpoint_name: "qwen_image_2.1_int8_convrot.safetensors",
+    vae_name: "qwen_image_2.1_vae_bf16.safetensors",
+    text_encoder_name: "qwen3vl_8b_int8_convrot.safetensors",
+  },
+  qwen_image_21_edit: {
     checkpoint_name: "qwen_image_2.1_int8_convrot.safetensors",
     vae_name: "qwen_image_2.1_vae_bf16.safetensors",
     text_encoder_name: "qwen3vl_8b_int8_convrot.safetensors",
@@ -217,6 +223,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux2_image_edit",
   "qwen_image",
   "qwen_image_21",
+  "qwen_image_21_edit",
   "qwen_image_edit",
   "firered_image_edit",
   "klein_4b",
@@ -421,8 +428,22 @@ async function handleE2EFetch(url, options = {}) {
         service: "rookieui",
         status: "ok",
         source_type: "a1111",
-        target_form: "txt2img",
-        payload: {
+        target_form: qwen21EditImport ? "img2img" : "txt2img",
+        payload: qwen21EditImport ? {
+          profile: "qwen_image_21_edit",
+          prompt: "synthetic restore edit",
+          image_asset: "synthetic-restore-1",
+          reference_images: [
+            { image_asset: "synthetic-restore-1" },
+            { image_asset: "synthetic-restore-2" },
+          ],
+          main_reference_index: qwen21EditImport === "nonzero" ? 1 : 0,
+          reference_resolution: 1024,
+          output_size_mode: "custom",
+          edit_task: "background_removal",
+          width: 768,
+          height: 1024,
+        } : {
           prompt: "e2e imported prompt",
           negative_prompt: "e2e imported negative",
           steps: 31,

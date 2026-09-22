@@ -28,6 +28,8 @@ import {
 } from "./img2img/rookieui_img2img_mode_surface.js";
 import { createImg2ImgController } from "./img2img/rookieui_img2img_controller.js";
 import { createImg2ImgLifecycle } from "./img2img/rookieui_img2img_lifecycle.js";
+import { appendQwen21EditControls, promoteQwen21Reference } from "./img2img/rookieui_qwen21_edit_controls.js";
+import { appendImageEditReferenceCard } from "./img2img/rookieui_image_edit_reference_card.js";
 
 export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -209,6 +211,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     referenceSection: null,
     referenceHintNode: null,
     referenceSlots: [],
+    qwen21Controls: null,
     maskDropzone: null,
     maskFileInput: null,
     batchPane: null,
@@ -305,6 +308,15 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     referenceData2: createInput("hidden", "rookieui-img2img-reference-data-2", ""),
     referenceAsset3: createInput("text", "rookieui-img2img-reference-asset-3", ""),
     referenceData3: createInput("hidden", "rookieui-img2img-reference-data-3", ""),
+    referenceResolution: createInput("number", "rookieui-img2img-reference-resolution", "0", { step: 32, min: 0, max: 4096 }),
+    outputSizeMode: createSelect("rookieui-img2img-output-size-mode", [
+      { value: "reference", label: "Follow reference 1" },
+      { value: "custom", label: "Custom size" },
+    ], "reference"),
+    editTask: createSelect("rookieui-img2img-edit-task", [
+      { value: "edit", label: "Image edit" },
+      { value: "background_removal", label: "Background removal" },
+    ], "edit"),
     batchImagesData: createInput("hidden", "rookieui-img2img-batch-images-data", "[]"),
     steps: createInput("number", "rookieui-img2img-steps", "28", { step: 1, min: 1, max: 150 }),
     stepsSlider: createRangeInput("rookieui-img2img-steps-slider", "28", { step: 1, min: 1, max: 150 }),
@@ -487,6 +499,17 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     adetailer: createInput("hidden", "rookieui-img2img-adetailer", "{}"),
     controlnetUnits: createInput("hidden", "rookieui-img2img-controlnet-units", "[]"),
   };
+  const additionalReferenceControls = [
+    { assetInput: elements.referenceAsset2, dataInput: elements.referenceData2 },
+    { assetInput: elements.referenceAsset3, dataInput: elements.referenceData3 },
+    ...Array.from({ length: 7 }, (_, index) => {
+      const slot = index + 4;
+      return {
+        assetInput: createInput("text", `rookieui-img2img-reference-asset-${slot}`, ""),
+        dataInput: createInput("hidden", `rookieui-img2img-reference-data-${slot}`, ""),
+      };
+    }),
+  ];
   img2imgController.setMode(elements.mode.value);
   img2imgController.setProfileState({ profileId: elements.profileState.value });
   form.appendChild(elements.adetailer);
@@ -533,12 +556,21 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const modeAwareFieldControls = {
     widthField: null,
     heightField: null,
+    outputSizeInput: elements.outputSizeMode,
     resizeModeField: null,
     denoiseField: null,
     growMaskField: null,
     batchSizeField: null,
     clipSkipField: null,
     hiresSection: null,
+    qwenExcludedInputs: [
+      elements.lowBits, elements.resizeMode, elements.maskAsset, elements.maskBlur, elements.inpaintMaskMode,
+      elements.inpaintMaskedContent, elements.inpaintArea, elements.inpaintPadding,
+      elements.softInpaintingEnabled, elements.softInpaintingScheduleBias,
+      elements.softInpaintingPreservationStrength, elements.softInpaintingTransitionContrastBoost,
+      elements.softInpaintingMaskInfluence, elements.softInpaintingDifferenceThreshold,
+      elements.softInpaintingDifferenceContrast,
+    ],
   };
   const templateLoraControls = {
     field: null,
@@ -558,14 +590,15 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
     }
     img2imgController.setReferenceSlots([
       { image_asset: elements.imageAsset.value, image_data: elements.imageData.value },
-      { image_asset: elements.referenceAsset2.value, image_data: elements.referenceData2.value },
-      { image_asset: elements.referenceAsset3.value, image_data: elements.referenceData3.value },
+      ...additionalReferenceControls.map((slot) => ({
+        image_asset: slot.assetInput.value, image_data: slot.dataInput.value,
+      })),
     ]);
     img2imgController.setMainReferenceSlot(elements.mainReferenceIndex.value);
     return img2imgController.getReferencePayload();
   };
   const buildImageEditReferencePayload = (referenceLimit = null) => {
-    const referencePayload = buildImageEditReferencePayloadFromElements(elements, referenceLimit);
+    const referencePayload = buildImageEditReferencePayloadFromElements(elements, referenceLimit, additionalReferenceControls);
     syncControllerReferenceState(referenceLimit);
     return referencePayload;
   };
@@ -728,7 +761,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
   const buildTxt2ImgTransferPayload = () => {
     const sourcePayload = buildImg2ImgPayloadFromElements(
       elements,
-      buildImageEditReferencePayloadFromElements(elements),
+      buildImageEditReferencePayloadFromElements(elements, null, additionalReferenceControls),
     );
     return {
       prompt: sourcePayload.prompt,
@@ -1417,6 +1450,11 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         const referenceGrid = document.createElement("div");
         referenceGrid.className = "rookieui-shell__grid rookieui-shell__grid--two-column";
         referenceSection.appendChild(referenceGrid);
+        img2imgModeUi.qwen21Controls = appendQwen21EditControls({
+          referenceSection, elements, lifecycle: img2imgLifecycle, createField,
+          createActionButton, appendTextElement, syncBoundControls, statusNode,
+          syncSizeVisibility: () => syncImg2ImgModeParameterFields(syncImageEditProfileState(), modeAwareFieldControls),
+        });
         const primaryReferenceCard = document.createElement("div");
         primaryReferenceCard.className = "rookieui-shell__section rookieui-shell__section--soft";
         primaryReferenceCard.id = "rookieui-img2img-reference-card-1";
@@ -1441,113 +1479,24 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           "Uses the source image canvas and Image Asset field above.",
           "rookieui-img2img-reference-status-1",
         );
-        const createAdditionalReferenceSlot = (slotNumber, assetInput, dataInput) => {
-          const card = document.createElement("div");
-          card.className = "rookieui-shell__section rookieui-shell__section--soft";
-          card.id = `rookieui-img2img-reference-card-${slotNumber}`;
-          referenceGrid.appendChild(card);
-          appendTextElement(card, "h5", "rookieui-shell__section-title", `Reference ${slotNumber}`);
-          const mainLabel = document.createElement("label");
-          mainLabel.className = "rookieui-shell__status";
-          mainLabel.htmlFor = `rookieui-img2img-reference-main-${slotNumber - 1}`;
-          const mainRadio = document.createElement("input");
-          mainRadio.type = "radio";
-          mainRadio.name = "rookieui-img2img-main-reference";
-          mainRadio.id = `rookieui-img2img-reference-main-${slotNumber - 1}`;
-          mainRadio.value = String(slotNumber - 1);
-          mainLabel.appendChild(mainRadio);
-          mainLabel.append(" Main reference");
-          card.appendChild(mainLabel);
-          createField(card, `Reference ${slotNumber} Asset`, assetInput);
-          const actionRow = document.createElement("div");
-          card.appendChild(actionRow);
-          const uploadButton = createActionButton(
-            `rookieui-img2img-reference-upload-${slotNumber}`,
-            `Upload Reference ${slotNumber}`,
-          );
-          actionRow.appendChild(uploadButton);
-          const clearButton = createActionButton(
-            `rookieui-img2img-reference-clear-${slotNumber}`,
-            `Clear Reference ${slotNumber}`,
-          );
-          actionRow.appendChild(clearButton);
-          const fileInput = createInput("file", `rookieui-img2img-reference-file-${slotNumber}`, "", {
-            className: "rookieui-shell__file-input",
-          });
-          fileInput.accept = "image/png,image/webp,image/jpeg";
-          fileInput.hidden = true;
-          fileInput.tabIndex = -1;
-          card.appendChild(fileInput);
-          const status = appendTextElement(
-            card,
-            "p",
-            "rookieui-shell__status",
-            "No additional reference selected.",
-            `rookieui-img2img-reference-status-${slotNumber}`,
-          );
-          const updateStatus = () => {
-            const assetValue = String(assetInput.value ?? "").trim();
-            const dataValue = String(dataInput.value ?? "").trim();
-            status.textContent = assetValue
-              ? `Asset: ${assetValue}`
-              : dataValue
-                ? "Uploaded reference image ready."
-                : "No additional reference selected.";
-          };
-          img2imgLifecycle.listen(uploadButton, "click", () => {
-            fileInput.click();
-          });
-          img2imgLifecycle.listen(clearButton, "click", () => {
-            assetInput.value = "";
-            dataInput.value = "";
-            syncBoundControls([assetInput, dataInput]);
-            updateStatus();
-            statusNode.textContent = `Cleared Reference ${slotNumber}.`;
-          });
-          img2imgLifecycle.listen(assetInput, "input", () => {
-            if (String(assetInput.value ?? "").trim()) {
-              dataInput.value = "";
-            }
-            syncBoundControls([assetInput, dataInput]);
-            updateStatus();
-          });
-          img2imgLifecycle.listen(fileInput, "change", async () => {
-            const [file] = Array.from(fileInput.files ?? []);
-            if (!file) {
+        const createAdditionalReferenceSlot = (slotNumber, assetInput, dataInput) => appendImageEditReferenceCard({
+          slotNumber, assetInput, dataInput, grid: referenceGrid, lifecycle: img2imgLifecycle,
+          createField, createInput, createActionButton, appendTextElement, syncBoundControls,
+          statusNode, readFile: readImg2ImgFile, emitDebugWarning: emitFrontendDebugWarning,
+          onMakePrimary: (index) => {
+            if (elements.profileState.value === "qwen_image_21_edit") {
+              promoteQwen21Reference({
+                selectedIndex: index, elements, additionalControls: additionalReferenceControls,
+                referenceSlots: img2imgModeUi.referenceSlots, syncBoundControls,
+                maskCanvasContract: img2imgMaskCanvasContract,
+                refreshSourceCanvasSurface, statusNode, primaryRadio: primaryReferenceMainRadio,
+              });
               return;
             }
-            try {
-              const dataUrl = await readImg2ImgFile(file);
-              if (dataUrl === null) return;
-              dataInput.value = dataUrl;
-              assetInput.value = "";
-              syncBoundControls([assetInput, dataInput]);
-              updateStatus();
-              statusNode.textContent = `Loaded Reference ${slotNumber}: ${file.name}`;
-            } catch (_error) {
-              emitFrontendDebugWarning("shell.img2img_reference_upload", "Reference image upload failed.", _error);
-              statusNode.textContent = `Failed to load Reference ${slotNumber}.`;
-            }
-          });
-          img2imgLifecycle.listen(mainRadio, "change", () => {
-            if (!mainRadio.checked) {
-              return;
-            }
-            elements.mainReferenceIndex.value = String(slotNumber - 1);
+            elements.mainReferenceIndex.value = String(index);
             syncBoundControls([elements.mainReferenceIndex]);
-          });
-          updateStatus();
-          return {
-            slotIndex: slotNumber - 1,
-            card,
-            mainRadio,
-            assetInput,
-            dataInput,
-            fileInput,
-            statusNode: status,
-            updateStatus,
-          };
-        };
+          },
+        });
         img2imgLifecycle.listen(primaryReferenceMainRadio, "change", () => {
           if (!primaryReferenceMainRadio.checked) {
             return;
@@ -1577,6 +1526,8 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           },
           referenceSlotTwo,
           referenceSlotThree,
+          ...additionalReferenceControls.slice(2).map((slot, index) =>
+            createAdditionalReferenceSlot(index + 4, slot.assetInput, slot.dataInput)),
         ];
 
         const batchPane = document.createElement("section");
@@ -2263,6 +2214,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       img2imgPreviewBox,
       img2imgMaskCanvasContract,
       () => isImg2ImgAsyncEpochLive(requestEpoch),
+      buildImageEditReferencePayload(),
     );
   });
 
@@ -2284,6 +2236,14 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
 
   formRegistry.img2img = {
     applyPayload(payload) {
+      if (payload?.profile === "qwen_image_21_edit") {
+        const index = Number(payload.main_reference_index ?? 0);
+        if (!Number.isInteger(index) || index !== 0
+            || (Array.isArray(payload.reference_images) && payload.reference_images.length > 10)) {
+          statusNode.textContent = "Cannot restore Qwen Image 2.1 Edit: reference 1 must be primary and at most 10 references are allowed.";
+          return false;
+        }
+      }
       img2imgController.applyPayload(payload);
       const generationPayloadMap = {
         prompt: "prompt",
@@ -2301,6 +2261,9 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
         shift: "shift",
         flux_guidance: "fluxGuidance",
         edit_megapixels: "editMegapixels",
+        reference_resolution: "referenceResolution",
+        output_size_mode: "outputSizeMode",
+        edit_task: "editTask",
         sampler_name: "sampler",
         scheduler_name: "scheduler",
         prompt_enhancement_enabled: "promptEnhancementEnabled",
@@ -2348,10 +2311,7 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
       const referenceImages = Array.isArray(payload.reference_images)
         ? payload.reference_images.filter((entry) => entry && typeof entry === "object")
         : [];
-      const additionalReferenceSlots = [
-        { assetInput: elements.referenceAsset2, dataInput: elements.referenceData2 },
-        { assetInput: elements.referenceAsset3, dataInput: elements.referenceData3 },
-      ];
+      const additionalReferenceSlots = additionalReferenceControls;
       if (referenceImages.length) {
         const [primaryReference, ...additionalReferences] = referenceImages;
         elements.imageAsset.value = String(primaryReference?.image_asset ?? "").trim();
@@ -2361,7 +2321,10 @@ export function buildImg2ImgPane(parent, bootstrapState, formRegistry, context) 
           slot.assetInput.value = String(entry.image_asset ?? "").trim();
           slot.dataInput.value = String(entry.image_data ?? "").trim();
         });
-        elements.mainReferenceIndex.value = String(Math.min(Math.max(0, Number(payload.main_reference_index ?? 0) || 0), 2));
+        elements.mainReferenceIndex.value = String(Math.min(
+          Math.max(0, Number(payload.main_reference_index ?? 0) || 0),
+          elements.profileState.value === "qwen_image_21_edit" ? 9 : 2,
+        ));
       } else {
         additionalReferenceSlots.forEach((slot) => {
           slot.assetInput.value = "";

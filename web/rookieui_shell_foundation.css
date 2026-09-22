@@ -133,6 +133,10 @@
   background: var(--rookieui-bg-panel);
 }
 
+.rookieui-shell__section[hidden] {
+  display: none;
+}
+
 .rookieui-shell__pane > .rookieui-shell__section + .rookieui-shell__section {
   margin-top: 14px;
 }
@@ -171,6 +175,17 @@
   gap: 6px;
   font-size: 12px;
   min-width: 0;
+}
+
+.rookieui-shell__field[hidden],
+.rookieui-shell__slider-field[hidden] {
+  display: none;
+}
+
+.rookieui-shell__dropzone[hidden],
+.rookieui-shell__subtab[hidden],
+.rookieui-shell__quicksetting[hidden] {
+  display: none;
 }
 
 .rookieui-shell__inline-checkbox-field {

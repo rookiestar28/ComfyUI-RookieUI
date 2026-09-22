@@ -170,7 +170,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         by_id = {profile.id: profile for profile in contract.profiles}
         manifest_entries = {
-            entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id != "qwen_image_21"
+            entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}
         }
         self.assertEqual(set(by_id), set(manifest_entries))
         profile_graph = core_graph_contract.load_profile_graph_contract(
@@ -198,7 +198,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         contract = supported_graph_contract.load_supported_graph_contract(
             FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
         )
-        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id != "qwen_image_21"}
+        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}}
         profile_graph = core_graph_contract.load_profile_graph_contract(
             FIXTURES / PROFILE_GRAPH_FIXTURE
         )
@@ -550,7 +550,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         self.assertEqual(fixture["workflow_templates_json_version"], "0.1.66")
         expected_profiles = fixture["profiles"]
-        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id != "qwen_image_21"}
+        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}}
         self.assertEqual(set(entries), set(expected_profiles))
         for profile_id, source in expected_profiles.items():
             with self.subTest(profile_id=profile_id):
@@ -607,7 +607,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         self.assertEqual(fixture["source_revision"], HOST_SOURCE_BASIS.core.revision)
         contracts = fixture["classes"]
         emitted, literal_nodes = _literal_emitted_classes_and_nodes()
-        self.assertEqual(set(contracts), emitted - LOCAL_NODE_CLASSES - {"TextEncodeQwenImage21"})
+        self.assertEqual(set(contracts), emitted - LOCAL_NODE_CLASSES - {"TextEncodeQwenImage21", "QwenImage21Cache"})
         self.assertIn("TextGenerate", contracts)
         self.assertEqual(contracts["ControlNetLoader"]["source_path"], "nodes.py")
         self.assertEqual(contracts["DiffControlNetLoader"]["source_path"], "nodes.py")
@@ -623,7 +623,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
                     self.assertTrue(spec["type"])
 
         for class_type, emitted_inputs in literal_nodes:
-            if class_type in LOCAL_NODE_CLASSES or class_type == "TextEncodeQwenImage21":
+            if class_type in LOCAL_NODE_CLASSES or class_type in {"TextEncodeQwenImage21", "QwenImage21Cache"}:
                 continue
             with self.subTest(class_type=class_type, emitted_inputs=sorted(emitted_inputs)):
                 source_inputs = contracts[class_type]["inputs"]

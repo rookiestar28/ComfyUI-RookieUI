@@ -68,8 +68,7 @@ export function createShellStateEventContract(formRegistry) {
     if (options.activate !== false) {
       activateTopTab(normalizedTarget);
     }
-    targetForm.applyPayload(payload);
-    return true;
+    return targetForm.applyPayload(payload) !== false;
   };
 
   return Object.freeze({

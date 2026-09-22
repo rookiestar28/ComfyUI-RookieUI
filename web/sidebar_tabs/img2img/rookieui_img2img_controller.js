@@ -7,7 +7,7 @@ export const IMG2IMG_GENERATION_MODES = Object.freeze([
   "batch",
 ]);
 
-const MAX_REFERENCE_SLOTS = 3;
+const MAX_REFERENCE_SLOTS = 10;
 
 function cloneValue(value) {
   if (Array.isArray(value)) {
@@ -203,6 +203,9 @@ export function createImg2ImgController(options = {}) {
     state.mask = normalizeMask(payload, state.mask);
     state.batchImages = normalizeBatchImages(payload.batch_images ?? payload.batchImages ?? state.batchImages);
     if (Array.isArray(payload.reference_images)) {
+      if (state.profileId === "qwen_image_21_edit" && Number(payload.main_reference_index ?? 0) !== 0) {
+        throw new Error("Qwen Image 2.1 requires the primary reference first (main_reference_index=0).");
+      }
       setReferenceSlots(payload.reference_images);
       state.selectedMainSlot = clampIndex(
         payload.main_reference_index,
