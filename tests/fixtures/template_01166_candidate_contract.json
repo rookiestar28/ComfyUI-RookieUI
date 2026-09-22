@@ -1,0 +1,785 @@
+{
+  "affected_members": [
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/3d_pixal3d_multi_views.json",
+      "reason": "three-d-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_anthropic_claude_fable5_1.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_elevenlabs_text_to_speech.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_flux2.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_flux_video_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_google_gemini.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_i2v.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_video_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_google_nano_banana_create_turnaround_sheet.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_ideogram_v4_t2i.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meshy7_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meshy7_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meshy_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meshy_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meta_muse_image_image_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_meta_muse_image_t2i.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_turbo_i2v.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_turbo_t2v.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "removed",
+      "disposition": "removed",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_dall_e_2_inpaint.json",
+      "reason": "removed-provider-example"
+    },
+    {
+      "change": "removed",
+      "disposition": "removed",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_dall_e_2_t2i.json",
+      "reason": "removed-provider-example"
+    },
+    {
+      "change": "removed",
+      "disposition": "removed",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_dall_e_3_t2i.json",
+      "reason": "removed-provider-example"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_gpt6_astra.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_25_flare_image_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_25_flare_t2i.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_25_sunburst_image_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_25_sunburst_t2i.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openrouter_mai_image_26_flash.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openrouter_mai_image_26_flash_image_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openrouter_mai_image_26_image_edit.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_openrouter_mai_image_26_t2i.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_pruna_p_video_i2v.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_pruna_p_video_t2v.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_recraft_v4_style_reference.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_seedance2_0_r2v_4k.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_seedance2_0_r2v_real_human.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_topaz_image_enhance.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo3_0_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo3_0_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo3_1_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo3_1_multiview_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo3_1_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_multiview_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p1_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p1_mv_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p1_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p2_image_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p2_multiview_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_p2_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/api_tripo_text_to_model.json",
+      "reason": "provider-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_ace_step1_5_xl_sft.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_checkpoint.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_split_llm.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_ace_step_1_m2m_editing.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_ace_step_1_t2a_song.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_stable_audio_example.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_yue2_music_cover.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/audio_yue2_text2music.json",
+      "reason": "audio-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/hidream_e1_full.json",
+      "reason": "unplanned-image-example"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/image_mage_flow_turbo_t2i_int8.json",
+      "reason": "unplanned-image-example"
+    },
+    {
+      "change": "added",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/image_marigold_v2_albedo_estimation.json",
+      "reason": "unplanned-image-example"
+    },
+    {
+      "change": "added",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/image_marigold_v2_depth_estimation.json",
+      "reason": "unplanned-image-example"
+    },
+    {
+      "change": "added",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/image_marigold_v2_surface_normal_estimation.json",
+      "reason": "unplanned-image-example"
+    },
+    {
+      "change": "added",
+      "disposition": "pending",
+      "owner": "future-edit",
+      "path": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_background_removal.json",
+      "reason": "qwen-feature-not-yet-implemented"
+    },
+    {
+      "change": "added",
+      "disposition": "pending",
+      "owner": "future-edit",
+      "path": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_image_edit.json",
+      "reason": "qwen-feature-not-yet-implemented"
+    },
+    {
+      "change": "added",
+      "disposition": "pending",
+      "owner": "future-txt2img",
+      "path": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_t2i.json",
+      "reason": "qwen-feature-not-yet-implemented"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.ar.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.es.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.fa.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.fr.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.ja.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.ko.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.mcp.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.pt-BR.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.ru.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.schema.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.tr.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.zh-TW.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index.zh.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "reference-only",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/index_logo.json",
+      "reason": "catalog-data-not-runtime"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/template_seedance2_0_viral_videos_character_swap.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/template_seedance2_storyboard_to_video.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/templates_mjm_looped_restyler.json",
+      "reason": "utility-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/utility_moge3_geometry_estimation.json",
+      "reason": "utility-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/utility_moge_depth_estimation.json",
+      "reason": "utility-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/utility_sam3d_body.json",
+      "reason": "utility-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_fastvideo_fasth3_i2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_fastvideo_fasth3_t2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_3_i2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_3_ia2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_3_ic_lora.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_3_id_lora.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_3_t2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_i2v.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_ltx2_i2v_distilled.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_minimax_h3_fun_controlnet_union.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "added",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_minimax_h3_multiframe_reference.json",
+      "reason": "video-runtime-not-shipped"
+    },
+    {
+      "change": "changed",
+      "disposition": "out-of-scope",
+      "owner": "none",
+      "path": "comfyui_workflow_templates_json/templates/video_wan_animate2.json",
+      "reason": "video-runtime-not-shipped"
+    }
+  ],
+  "artifacts": {
+    "core": {
+      "bytes": 76627,
+      "filename": "comfyui_workflow_templates_core-0.3.357-py3-none-any.whl",
+      "sha256": "fa8daef2665a1d8594bef53a58ffbc47a0788fc3bbd8b68b4a6ad6c62b1b4033"
+    },
+    "json": {
+      "bytes": 3575217,
+      "filename": "comfyui_workflow_templates_json-0.1.92-py3-none-any.whl",
+      "sha256": "680dd90525faeeb41dbcd6724c6006513d607b7c3a418ab173fa850c83dc91b1"
+    },
+    "meta": {
+      "bytes": 10878,
+      "filename": "comfyui_workflow_templates-0.11.66-py3-none-any.whl",
+      "sha256": "2af993e84bb5a89e66ba84697540cf215093023c4a0c004ff4cc2be0237a198e"
+    },
+    "old_json": {
+      "bytes": 3305529,
+      "filename": "comfyui_workflow_templates_json-0.1.66-py3-none-any.whl",
+      "sha256": "e579760ce1b71200ed5a05a52373dee88931f47d413c13f5767096f24941d40a"
+    }
+  },
+  "new_json_count": 580,
+  "old_json_count": 547,
+  "preserved_profiles": [
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_chroma_text_to_image.json",
+      "profile": "chroma"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/flux_kontext_dev_basic.json",
+      "profile": "flux_kontext_dev_edit"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_dev.json",
+      "profile": "hidream_i1_dev_fp8"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_fast.json",
+      "profile": "hidream_i1_fast"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_full.json",
+      "profile": "hidream_i1_full"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_text_to_image.json",
+      "profile": "klein_4b"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_text_to_image_9b.json",
+      "profile": "klein_9b"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_9b_kv_image_edit.json",
+      "profile": "klein_9b_kv_image_edit"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_krea2_turbo_t2i.json",
+      "profile": "krea2_turbo"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_longcat_text_to_image.json",
+      "profile": "longcat_image"
+    },
+    {
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit.json",
+      "profile": "qwen_image_edit"
+    }
+  ],
+  "qwen_members": {
+    "background-removal": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_background_removal.json",
+    "edit": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_image_edit.json",
+    "txt2img": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_t2i.json"
+  },
+  "required_components": {
+    "comfyui-workflow-templates-core": "0.3.357",
+    "comfyui-workflow-templates-json": "0.1.92",
+    "comfyui-workflow-templates-media-api": "0.3.84",
+    "comfyui-workflow-templates-media-assets-01": "0.1.47",
+    "comfyui-workflow-templates-media-assets-02": "0.1.3",
+    "comfyui-workflow-templates-media-image": "0.3.160",
+    "comfyui-workflow-templates-media-other": "0.3.229",
+    "comfyui-workflow-templates-media-video": "0.3.101"
+  },
+  "schema_version": "template-01166-candidate-v1",
+  "source_revision": "7ce126c4ec77f44cc7a60f93eec52a197efb9ce5",
+  "unchanged_count": 484
+}
