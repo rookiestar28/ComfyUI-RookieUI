@@ -21,6 +21,7 @@ const [
   img2imgModeRouterModule,
   actionButtonsModule,
   generationRuntimeModule,
+  submissionLifecycleModule,
   previewFullscreenModule,
 ] = await Promise.all([
   importRevisionedModule("./rookieui_sidebar_shell_utils.js", import.meta.url),
@@ -43,6 +44,7 @@ const [
   importRevisionedModule("./sidebar_tabs/rookieui_img2img_mode_router.js", import.meta.url),
   importRevisionedModule("./rookieui_action_buttons.js", import.meta.url),
   importRevisionedModule("./rookieui_generation_runtime.js", import.meta.url),
+  importRevisionedModule("./rookieui_submission_lifecycle.js", import.meta.url),
   importRevisionedModule("./rookieui_preview_fullscreen.js", import.meta.url),
 ]);
 
@@ -95,4 +97,5 @@ export const {
   createGenerationRuntimeHelpers,
   destroyGenerationRuntimeState,
 } = generationRuntimeModule;
+export const { formatSubmissionFailure, submitWithLifecycle } = submissionLifecycleModule;
 export const { createPreviewFullscreenViewer } = previewFullscreenModule;

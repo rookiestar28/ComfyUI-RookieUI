@@ -43,6 +43,8 @@ import {
   createMiniActionButton,
   createIconActionButton,
   resolveActiveClientId,
+  formatSubmissionFailure,
+  submitWithLifecycle,
   createGenerationRuntimeState,
   createGenerationRuntimeHelpers,
   destroyGenerationRuntimeState,
@@ -621,12 +623,12 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
   if (activeClientId) {
     payload.client_id = activeClientId;
   }
-  const result = await bootstrapState.submitTxt2ImgRequest(payload);
+  const { result, earlyStatus } = await submitWithLifecycle(
+    bootstrapState, bootstrapState.submitTxt2ImgRequest, payload, runtimeState, activeClientId,
+  );
+  if (runtimeState.disposed) return;
   if (!result.ok) {
-    const detail = String(result?.data?.detail ?? "").trim();
-    statusNode.textContent = detail
-      ? `Request failed: ${result.data.status} (${detail})`
-      : `Request failed: ${result.data.status}`;
+    statusNode.textContent = formatSubmissionFailure(result);
     return;
   }
 
@@ -641,6 +643,7 @@ async function submitTxt2Img(bootstrapState, elements, statusNode, runtimeState,
       runtimeState,
       previewBox,
       warningSuffix,
+      earlyStatus,
     );
     return;
   }
@@ -866,14 +869,13 @@ async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState,
   if (clientId) {
     payload.client_id = clientId;
   }
-  const result = await bootstrapState.submitImg2ImgRequest(payload);
+  const { result, earlyStatus } = await submitWithLifecycle(
+    bootstrapState, bootstrapState.submitImg2ImgRequest, payload, runtimeState, clientId,
+  );
   // CRITICAL: reject stale UI responses.
   if (!live()) return;
   if (!result.ok) {
-    const detail = String(result?.data?.detail ?? "").trim();
-    statusNode.textContent = detail
-      ? `Request failed: ${result.data.status} (${detail})`
-      : `Request failed: ${result.data.status}`;
+    statusNode.textContent = formatSubmissionFailure(result);
     return;
   }
 
@@ -888,6 +890,7 @@ async function submitImg2Img(bootstrapState, elements, statusNode, runtimeState,
       runtimeState,
       previewBox,
       warnings,
+      earlyStatus,
     );
     return;
   }

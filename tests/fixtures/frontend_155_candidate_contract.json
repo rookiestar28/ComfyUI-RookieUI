@@ -1,0 +1,28 @@
+{
+  "accepted_revision": "8f3b1569e4241ebbb5a9333da2bd09465947c40c",
+  "artifacts": [
+    {
+      "bytes": 11017,
+      "path": "src/components/sidebar/SideToolbar.vue",
+      "sha256": "ad3a24c3ed50b738be6318f833cf12b9d6ea42cc0203616882020e34b5b7320c"
+    },
+    {
+      "bytes": 3831,
+      "path": "src/platform/remote/comfyui/execution/types.ts",
+      "sha256": "eee0dca1b1c0d9caca6aa9a7778f5745e1f1bfe702384b7906a4133c5c0d3391"
+    },
+    {
+      "bytes": 1415,
+      "path": "src/platform/remote/comfyui/types.ts",
+      "sha256": "bdf254e2dbb725f607836718c2e671c4390c71c212e086f0e47893288c251f41"
+    },
+    {
+      "bytes": 55203,
+      "path": "src/scripts/api.ts",
+      "sha256": "a890b96cc163d7c342aa0c9cecb970b3d6fbc98fb8f8ba216fc2798b91537f3e"
+    }
+  ],
+  "candidate_revision": "07c337679d250b5a7af810adb73e26449fc6e676",
+  "candidate_version": "1.55.12",
+  "schema_version": "frontend-155-candidate-v1"
+}

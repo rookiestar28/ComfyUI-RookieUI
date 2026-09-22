@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const path = require("node:path");
 
 test("restores host layout and durable pane state across sidebar destroy/remount", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -67,4 +68,56 @@ test("keeps RookieUI recoverable while the host action toolbar is hidden and ine
     body: agentSelectionVisual,
     contentType: "image/png",
   });
+});
+
+test("keeps sidebar controls usable across focus, scroll, resize, close and remount", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("test-harness.html?lifecycleSentinel=1");
+  const mount = page.locator("#mock-sidebar-tabs");
+  const content = page.locator(".rookieui-shell__content");
+  const txtTab = page.locator("#rookieui-tab-txt2img");
+  const imgTab = page.locator("#rookieui-tab-img2img");
+  await expect(txtTab).toHaveAttribute("aria-selected", "true");
+  await page.locator("#rookieui-prompt").focus();
+  await expect(page.locator("#rookieui-prompt")).toBeFocused();
+  await page.locator("#rookieui-batch-count").fill("3");
+  await expect(page.locator("#rookieui-batch-count-slider")).toHaveValue("3");
+  const visualDir = process.env.ROOKIEUI_VISUAL_EVIDENCE_DIR;
+  const baselineVisual = await mount.screenshot(visualDir
+    ? { path: path.join(visualDir, "sidebar-control-baseline-1440x1000.png") }
+    : {});
+  await testInfo.attach("sidebar-control-baseline-1440x1000", { body: baselineVisual, contentType: "image/png" });
+
+  const scroll = await content.evaluate((node) => {
+    node.style.maxHeight = "400px";
+    node.scrollTop = node.scrollHeight;
+    return { top: node.scrollTop, max: node.scrollHeight - node.clientHeight };
+  });
+  expect(scroll.max).toBeGreaterThan(0);
+  expect(scroll.top).toBeGreaterThan(0);
+  await imgTab.click();
+  await expect(page.locator("#rookieui-pane-img2img")).toBeVisible();
+  await txtTab.click();
+  await expect(page.locator("#rookieui-pane-txt2img")).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(mount).toHaveCSS("min-width", "980px");
+  await expect(page.locator("#rookieui-txt2img-submit")).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.evaluate(() => {
+    const tab = window.__ROOKIEUI_E2E_APP__.extensionManager.activeSidebarTab;
+    tab.destroy();
+    tab.render(document.getElementById("mock-sidebar-tabs"));
+  });
+  await expect(txtTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#rookieui-pane-txt2img")).toBeVisible();
+  await page.locator("#rookieui-batch-count").fill("3");
+  await expect(page.locator("#rookieui-batch-count-slider")).toHaveValue("3");
+  await page.locator("#rookieui-prompt").focus();
+  await expect(page.locator("#rookieui-prompt")).toBeFocused();
+  const remountedVisual = await mount.screenshot(visualDir
+    ? { path: path.join(visualDir, "sidebar-control-current-1440x1000.png") }
+    : {});
+  await testInfo.attach("sidebar-control-current-1440x1000", { body: remountedVisual, contentType: "image/png" });
+  expect(await mount.boundingBox()).toMatchObject({ width: 980 });
 });

@@ -4,6 +4,13 @@ export interface RookieUIApiResult<TData> {
   ok: boolean;
   status: number;
   data: TData;
+  failure_kind?: "unavailable" | "timeout" | "cancelled" | "network-unknown" | "invalid-response" | "http";
+  request_outcome?: "not-sent" | "unknown" | "rejected";
+}
+
+export interface RookieUIPostRequestOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export interface RookieUIResourceResult<TData> {
@@ -123,21 +130,25 @@ export interface RookieUIExtrasResponse {
 export function submitRookieUITxt2Img(
   payload: RookieUITxt2ImgRequest,
   fetchImpl?: typeof globalThis.fetch,
+  requestOptions?: RookieUIPostRequestOptions,
 ): Promise<RookieUIApiResult<RookieUIGenerationResponse | RookieUINetworkUnavailable>>;
 
 export function submitRookieUIImg2Img(
   payload: RookieUIImg2ImgRequest,
   fetchImpl?: typeof globalThis.fetch,
+  requestOptions?: RookieUIPostRequestOptions,
 ): Promise<RookieUIApiResult<RookieUIGenerationResponse | RookieUINetworkUnavailable>>;
 
 export function inspectRookieUIPngInfo(
   payload: RookieUIPngInfoInspectRequest,
   fetchImpl?: typeof globalThis.fetch,
+  requestOptions?: RookieUIPostRequestOptions,
 ): Promise<RookieUIApiResult<RookieUIPngInfoInspectResponse | RookieUINetworkUnavailable>>;
 
 export function submitRookieUIExtras(
   payload: RookieUIExtrasRequest,
   fetchImpl?: typeof globalThis.fetch,
+  requestOptions?: RookieUIPostRequestOptions,
 ): Promise<RookieUIApiResult<RookieUIExtrasResponse | RookieUINetworkUnavailable>>;
 
 export function fetchRookieUIResource<TData>(
@@ -151,7 +162,7 @@ export function postRookieUIJson<TPayload, TData>(
   payload: TPayload,
   fallbackData: TData,
   fetchImpl?: typeof globalThis.fetch,
-  options?: RookieUIJsonObject,
+  options?: RookieUIPostRequestOptions & RookieUIJsonObject,
 ): Promise<RookieUIApiResult<TData>>;
 
 export const fetchRookieUICapabilities: RookieUIResourceLoader;

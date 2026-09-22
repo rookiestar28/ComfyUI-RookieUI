@@ -70,6 +70,51 @@ export function destroyGenerationRuntimeState(runtimeState) {
   runtimeState.previewUrl = "";
 }
 
+export function captureSubmissionTerminalEvents(bootstrapState, runtimeState, scopedClientId) {
+  const runtimeApi = resolveRuntimeApi(bootstrapState);
+  const events = new Map();
+  const listeners = [];
+  const startedAt = Date.now();
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const [name, handler] of listeners) runtimeApi.removeEventListener(name, handler);
+    listeners.length = 0;
+    events.clear();
+    runtimeState.activeDisposers.delete(dispose);
+  };
+  if (scopedClientId && runtimeApi?.addEventListener && runtimeApi?.removeEventListener) {
+    for (const [name, status] of [
+      ["execution_success", "completed"],
+      ["execution_error", "failed"],
+      ["execution_interrupted", "cancelled"],
+    ]) {
+      const handler = (event) => {
+        if (disposed || runtimeState.disposed || Date.now() - startedAt > 60_000) return;
+        if (resolveActiveClientId(bootstrapState) !== scopedClientId) return;
+        const promptId = extractRuntimePromptId(event?.detail ?? {});
+        if (!promptId) return;
+        // CRITICAL: terminal WS messages can precede the HTTP prompt ID; keep only bounded IDs
+        // from this client socket until the response identifies the exact accepted prompt.
+        if (!events.has(promptId) && events.size >= 16) events.delete(events.keys().next().value);
+        events.set(promptId, status);
+      };
+      runtimeApi.addEventListener(name, handler);
+      listeners.push([name, handler]);
+    }
+    runtimeState.activeDisposers.add(dispose);
+  }
+  return {
+    take(promptId, currentClientId) {
+      if (disposed || runtimeState.disposed || currentClientId !== scopedClientId ||
+        resolveActiveClientId(bootstrapState) !== scopedClientId || Date.now() - startedAt > 60_000) return "";
+      return events.get(promptId) ?? "";
+    },
+    dispose,
+  };
+}
+
 function setGenerationPreview(runtimeState, previewBox, setPreviewContent, imageUrl, fallbackText) {
   if (!runtimeState || !previewBox) {
     return;
@@ -787,7 +832,7 @@ export function createGenerationRuntimeHelpers({
     });
   };
 
-  const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "") => {
+  const trackGenerationRuntime = async (bootstrapState, promptId, statusNode, runtimeState, previewBox, statusSuffix = "", initialTerminalStatus = "") => {
     if (!runtimeState || !promptId || runtimeState.disposed) {
       return;
     }
@@ -994,6 +1039,16 @@ export function createGenerationRuntimeHelpers({
     registerTerminalListener("execution_success", "completed", "Generation finished; syncing output");
     registerTerminalListener("execution_error", "failed", "Generation failed");
     registerTerminalListener("execution_interrupted", "cancelled", "Generation cancelled");
+
+    if (["completed", "failed", "cancelled"].includes(initialTerminalStatus)) {
+      terminalEventStatus = initialTerminalStatus;
+      finalStatus = initialTerminalStatus;
+      disposeActiveRunWork();
+      const message = initialTerminalStatus === "completed"
+        ? "Generation finished; syncing output"
+        : initialTerminalStatus === "failed" ? "Generation failed" : "Generation cancelled";
+      statusNode.textContent = appendStatusSuffix(`${message}: ${promptId}`, statusSuffix);
+    }
 
     const startTime = Date.now();
     const maxDurationMs = 5 * 60 * 1000;

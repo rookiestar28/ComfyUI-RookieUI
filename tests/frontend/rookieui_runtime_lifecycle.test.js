@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
+  captureSubmissionTerminalEvents,
   createGenerationRuntimeHelpers,
   createGenerationRuntimeState,
   destroyGenerationRuntimeState,
 } from "../../web/rookieui_generation_runtime.js";
 import { createPreviewFullscreenViewer } from "../../web/rookieui_preview_fullscreen.js";
+import { submitWithLifecycle } from "../../web/rookieui_submission_lifecycle.js";
 
 function createRuntimeEventTarget() {
   const listeners = new Map();
@@ -58,6 +60,7 @@ function createTrackingSubject(
   {
     runtimeState = createGenerationRuntimeState(),
     promptId = "job-current",
+    initialTerminalStatus = "",
     fetchQueueJobRequest = vi.fn(async () => ({ ok: true, data: { job: null } })),
     fetchPromptHistoryRequest = vi.fn(async () => ({ ok: true, data: {} })),
     setPreviewContent = vi.fn(),
@@ -82,6 +85,8 @@ function createTrackingSubject(
     statusNode,
     runtimeState,
     previewBox,
+    "",
+    initialTerminalStatus,
   );
   return { runtimeState, setPreviewContent, statusNode, tracking };
 }
@@ -92,6 +97,69 @@ describe("RookieUI owned runtime lifecycle", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     document.body.replaceChildren();
+  });
+
+  test("early terminal capture is prompt/client scoped, bounded and disposed", () => {
+    const runtimeApi = createRuntimeEventTarget();
+    runtimeApi.clientId = "client-a";
+    const bootstrapState = { runtimeApi, clientId: "client-a" };
+    const state = createGenerationRuntimeState();
+    const capture = captureSubmissionTerminalEvents(bootstrapState, state, "client-a");
+    runtimeApi.dispatch("execution_error", { prompt_id: "foreign" });
+    runtimeApi.dispatch("execution_success", { prompt_id: "mine" });
+    expect(capture.take("mine", "client-a")).toBe("completed");
+    expect(capture.take("foreign", "client-a")).toBe("failed");
+    expect(capture.take("mine", "client-b")).toBe("");
+
+    for (let index = 0; index < 17; index += 1) {
+      runtimeApi.dispatch("execution_success", { prompt_id: `recent-${index}` });
+    }
+    expect(capture.take("foreign", "client-a")).toBe("");
+    expect(capture.take("recent-16", "client-a")).toBe("completed");
+
+    runtimeApi.clientId = "client-b";
+    runtimeApi.dispatch("execution_interrupted", { prompt_id: "mine" });
+    expect(capture.take("mine", "client-a")).toBe("");
+    destroyGenerationRuntimeState(state);
+    expect(capture.take("recent-16", "client-a")).toBe("");
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(3);
+  });
+
+  test("disposing a pane aborts an unanswered submit and releases early listeners", async () => {
+    const runtimeApi = createRuntimeEventTarget();
+    runtimeApi.clientId = "client-a";
+    const state = createGenerationRuntimeState();
+    let requestSignal;
+    const pending = submitWithLifecycle(
+      { runtimeApi, clientId: "client-a" },
+      (_payload, { signal }) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(new DOMException("cancelled", "AbortError")), { once: true });
+        });
+      },
+      {}, state, "client-a",
+    );
+    expect(requestSignal.aborted).toBe(false);
+    destroyGenerationRuntimeState(state);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestSignal.aborted).toBe(true);
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(3);
+    expect(state.activeDisposers.size).toBe(0);
+  });
+
+  test.each([
+    ["failed", "Generation failed: job-current"],
+    ["cancelled", "Generation cancelled: job-current"],
+  ])("applies an early %s terminal without polling another job", async (initialTerminalStatus, expected) => {
+    const runtimeApi = createRuntimeEventTarget();
+    const fetchQueueJobRequest = vi.fn();
+    const subject = createTrackingSubject(runtimeApi, { initialTerminalStatus, fetchQueueJobRequest });
+    await subject.tracking;
+    expect(subject.statusNode.textContent).toBe(expected);
+    expect(fetchQueueJobRequest).not.toHaveBeenCalled();
+    expect(runtimeApi.removeEventListener).toHaveBeenCalledTimes(7);
+    destroyGenerationRuntimeState(subject.runtimeState);
   });
 
   test("destroy cancels polling, unregisters host events, revokes blob preview, and blocks late writes", async () => {

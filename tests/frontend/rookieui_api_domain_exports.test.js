@@ -75,7 +75,13 @@ describe("rookieui API domain exports", () => {
           throw new Error("offline");
         },
       ),
-    ).resolves.toEqual({ ok: false, status: 0, data: { status: "fallback" } });
+    ).resolves.toEqual({
+      ok: false,
+      status: 0,
+      data: { status: "fallback" },
+      failure_kind: "network-unknown",
+      request_outcome: "unknown",
+    });
   });
 
   test("normalizes API transport error details", () => {

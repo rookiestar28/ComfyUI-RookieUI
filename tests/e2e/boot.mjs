@@ -13,6 +13,8 @@ const runtimeApiFetch = params.get("runtimeApiFetch") === "1";
 const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 const rejectRookieModels = params.get("rejectRookieModels") === "1";
 const runtimeEventScenario = params.get("runtimeEventScenario") === "1";
+const txt2imgLostResponse = params.get("txt2imgLostResponse") === "1";
+const earlyTerminalScenario = params.get("earlyTerminalScenario") === "1";
 const requestedImg2ImgDelayMs = Number(params.get("img2imgDelayMs") ?? 0);
 const img2imgDelayMs = Number.isFinite(requestedImg2ImgDelayMs)
   ? Math.max(0, Math.min(5000, Math.trunc(requestedImg2ImgDelayMs)))
@@ -347,6 +349,14 @@ async function handleE2EFetch(url, options = {}) {
   if (route === "/rookieui/generate/txt2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.txt2img.push(payload);
+    if (txt2imgLostResponse) {
+      throw new TypeError("synthetic response lost after acceptance");
+    }
+    if (earlyTerminalScenario) {
+      e2eRuntimeApi.dispatch("execution_error", { prompt_id: "foreign-prompt" });
+      e2eRuntimeApi.dispatch("execution_success", { prompt_id: "e2e-prompt-123" });
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
     return new Response(
       JSON.stringify({
         mode: "queued",
@@ -910,7 +920,7 @@ async function handleE2EFetch(url, options = {}) {
       JSON.stringify({
         source: "host",
         queue_remaining: 0,
-        job: {
+        job: earlyTerminalScenario ? null : {
           id: promptId,
           status: runtimeEventScenario ? "in_progress" : "completed",
           output_filenames: runtimeEventScenario ? [] : ["history-image.png"],
@@ -926,6 +936,9 @@ async function handleE2EFetch(url, options = {}) {
 
   if (route.startsWith("/history/")) {
     const promptId = route.split("/").pop();
+    if (earlyTerminalScenario) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
     return new Response(
       JSON.stringify(
         runtimeEventScenario
