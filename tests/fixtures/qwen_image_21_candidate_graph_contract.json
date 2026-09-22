@@ -1,0 +1,24 @@
+{
+  "profile_count": 1,
+  "profiles": [
+    {
+      "class_types": [
+        "CLIPLoader",
+        "EmptyLatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "TextEncodeQwenImage21",
+        "UNETLoader",
+        "VAEDecode",
+        "VAELoader"
+      ],
+      "edge_count": 8,
+      "flow_kind": "txt2img",
+      "id": "qwen_image_21",
+      "node_count": 8,
+      "topology_sha256": "e6f49e3e852caf8a3286ab7fc54539540e86a97f565d68b82d2ceed5eeeca183"
+    }
+  ],
+  "schema_version": "current-host-profile-graph-contract-v1",
+  "source_revision": "e638023d54497dbe0579565e5de4bb7076899592"
+}

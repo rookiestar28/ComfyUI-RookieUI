@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from rookieui.contracts.generation import NormalizedTxt2ImgRequest, Txt2ImgRequest
 from rookieui.contracts.model_family_registry import get_model_family_registry_entry
+from rookieui.contracts.prompt_dsl import PromptPreprocessResult, PromptSemanticPlan
+from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, require_qwen_image_21_asset_role
 from rookieui.contracts.aliases import (
     HIRES_UPSCALE_METHODS as _HIRES_UPSCALE_METHODS,
     TEXT_ENCODER_LOCKED_PROFILES as _TEXT_ENCODER_LOCKED_PROFILES,
@@ -326,14 +328,24 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
             applied_defaults.append("steps")
     else:
         steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
-    prompt_preprocess = preprocess_prompt_bundle(
-        prompt,
-        negative_prompt,
-        step_count=steps,
-        inventory_loras=inventory.loras,
-        inventory_embeddings=inventory.embeddings,
-        strict_match=inventory_is_host,
-    )
+    if profile.id == "qwen_image_21":
+        # CRITICAL: this host node consumes authored text directly; A1111 parsing would rewrite
+        # instructions and silently change the new model's positive/negative conditioning.
+        prompt_preprocess = PromptPreprocessResult(
+            cleaned_prompt=prompt,
+            cleaned_negative_prompt=negative_prompt,
+            prompt_semantics=PromptSemanticPlan.empty(prompt),
+            negative_prompt_semantics=PromptSemanticPlan.empty(negative_prompt),
+        )
+    else:
+        prompt_preprocess = preprocess_prompt_bundle(
+            prompt,
+            negative_prompt,
+            step_count=steps,
+            inventory_loras=inventory.loras,
+            inventory_embeddings=inventory.embeddings,
+            strict_match=inventory_is_host,
+        )
     prompt = prompt_preprocess.cleaned_prompt
     negative_prompt = prompt_preprocess.cleaned_negative_prompt
     lora_activations = merge_lora_activations(
@@ -360,6 +372,9 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         profile.default_cfg_scale,
         applied_defaults,
     )
+    if profile.id == "qwen_image_21" and negative_prompt and cfg_scale <= 1.0:
+        parameter_warnings.append("Qwen Image 2.1 encodes the negative prompt, but CFG 1 does not apply it during sampling.")
+        parameter_warning_codes.append("QWEN21_NEGATIVE_CFG_ONE")
     shift = _coerce_optional_profile_float(
         request.shift,
         profile_entry.default_shift,
@@ -528,6 +543,20 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
             raise ValueError(
                 f"aux_text_encoder_name requires a family-specific host selector for profile '{profile.id}'."
             )
+        if profile.id == "qwen_image_21":
+            require_qwen_image_21_asset_role(checkpoint_name, "diffusion_models")
+            require_qwen_image_21_asset_role(text_encoder_name, "text_encoders")
+            require_qwen_image_21_asset_role(vae_name, "vae")
+            if inventory_is_host and (
+                checkpoint_name not in inventory.diffusion_models
+                or text_encoder_name not in inventory.text_encoders
+                or vae_name not in inventory.vae
+            ):
+                raise ValueError("Qwen Image 2.1 requires all three exact selectors in the host model inventory.")
+        elif any(qwen_image_21_asset_role(value) for value in (checkpoint_name, text_encoder_name, vae_name)):
+            raise ValueError(f"Qwen Image 2.1 assets require profile 'qwen_image_21', not '{profile.id}'.")
+        if profile.id == "qwen_image" and _is_unresolved_inventory_selector(checkpoint_name):
+            raise ValueError("qwen_image requires a legacy 2512 diffusion model; 2.1 assets are incompatible.")
     missing_template_lora_warning = ""
     if (
         primary_model_category == "diffusion_models"
@@ -587,6 +616,16 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         model_only_warnings, model_only_warning_codes = collect_model_only_lora_drift_warnings(lora_activations)
         prompt_warnings.extend(model_only_warnings)
         prompt_warning_codes.extend(model_only_warning_codes)
+
+    if profile.id == "qwen_image_21":
+        if lora_name or lora_activations or template_lora_enabled or template_lora_name or "<lora:" in prompt.lower():
+            raise ValueError("Qwen Image 2.1 does not support RookieUI LoRA controls in this profile.")
+        if shift is not None or flux_guidance is not None or edit_megapixels is not None:
+            raise ValueError("Qwen Image 2.1 does not use legacy shift, guidance, or edit-megapixels controls.")
+        if hires_enabled or any(unit.enabled for unit in controlnet_units) or adetailer.enabled:
+            raise ValueError("Qwen Image 2.1 does not support Hires, ControlNet, or ADetailer in this profile.")
+        if prompt_enhancement_enabled or dtype_profile != "automatic":
+            raise ValueError("Qwen Image 2.1 requires raw prompts and automatic dtype selection.")
 
     return NormalizedTxt2ImgRequest(
         prompt=prompt,

@@ -14,6 +14,7 @@ const E2E_VAE_OPTIONS = [
   "flux2-vae.safetensors",
   "full_encoder_small_decoder.safetensors",
   "qwen_image_vae.safetensors",
+  "qwen_image_2.1_vae_bf16.safetensors",
 ];
 const E2E_PREVIEW_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7ZrY4AAAAASUVORK5CYII=";
@@ -285,6 +286,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     "flux1-dev-kontext_fp8_scaled.safetensors",
     "flux2_dev_fp8mixed.safetensors",
     "qwen_image_2512_fp8_e4m3fn.safetensors",
+    "qwen_image_2.1_int8_convrot.safetensors",
     "qwen_image_edit_fp8_e4m3fn.safetensors",
     "FireRed-Image-Edit-1.1-transformer.safetensors",
     "flux-2-klein-base-4b.safetensors",
@@ -306,6 +308,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
   const diffusionProfileDefaults = {
     flux: "flux1-dev.safetensors",
     qwen_image: "qwen_image_2512_fp8_e4m3fn.safetensors",
+    qwen_image_21: "qwen_image_2.1_int8_convrot.safetensors",
     klein_4b: "flux-2-klein-base-4b.safetensors",
     klein_9b: "flux-2-klein-base-9b-fp8.safetensors",
     anima: "anima-preview3-base.safetensors",
@@ -337,6 +340,7 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
     { id: "hidream_i1_full", textEncoderVisible: false, ignoredHint: true },
     { id: "longcat_image", textEncoderVisible: false, ignoredHint: true },
     { id: "qwen_image", textEncoderVisible: false, ignoredHint: true },
+    { id: "qwen_image_21", textEncoderVisible: false, ignoredHint: true },
     { id: "z_image", textEncoderVisible: false, ignoredHint: true },
     { id: "z_image_turbo", textEncoderVisible: false, ignoredHint: true },
   ];
@@ -1005,6 +1009,44 @@ test("keeps Krea prompt enhancement truthful across payload and profile transiti
   request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
   expect(request.profile).toBe("krea2_turbo");
   expect(request.prompt_enhancement_enabled).toBe(true);
+});
+
+test("submits Qwen Image 2.1 with encoded negative prompt and separate model selectors", async ({ page }) => {
+  await page.goto("test-harness.html");
+  await page.locator("#rookieui-preset").selectOption("qwen_image_21");
+  await expect(page.locator("#rookieui-checkpoint")).toHaveValue("qwen_image_2.1_int8_convrot.safetensors");
+  await expect(page.locator("#rookieui-vae")).toHaveValue("qwen_image_2.1_vae_bf16.safetensors");
+  await expect(page.locator("#rookieui-steps")).toHaveValue("25");
+  await expect(page.locator("#rookieui-cfg-scale")).toHaveValue("1");
+  await expect(page.locator("#rookieui-negative-prompt")).toBeVisible();
+  await page.locator("#rookieui-prompt").fill("synthetic 2.1 scene");
+  await page.locator("#rookieui-negative-prompt").fill("synthetic unwanted detail");
+  await page.locator("#rookieui-width").fill("1024");
+  await page.locator("#rookieui-height").fill("768");
+  await page.locator("#rookieui-seed").fill("42");
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("Completed: e2e-prompt-123");
+  const request = await page.evaluate(() => window.__ROOKIEUI_E2E_REQUESTS__.txt2img.at(-1));
+  expect(request).toMatchObject({
+    profile: "qwen_image_21",
+    prompt: "synthetic 2.1 scene",
+    negative_prompt: "synthetic unwanted detail",
+    checkpoint_name: "qwen_image_2.1_int8_convrot.safetensors",
+    vae_name: "qwen_image_2.1_vae_bf16.safetensors",
+    width: 1024,
+    height: 768,
+    seed: 42,
+  });
+  await page.locator("#rookieui-preset").selectOption("qwen_image");
+  await expect(page.locator("#rookieui-checkpoint")).toHaveValue("qwen_image_2512_fp8_e4m3fn.safetensors");
+});
+
+test("shows Qwen Image 2.1 missing-host-node feedback", async ({ page }) => {
+  await page.goto("test-harness.html?qwen21MissingNode=1");
+  await page.locator("#rookieui-preset").selectOption("qwen_image_21");
+  await page.locator("#rookieui-prompt").fill("synthetic scene");
+  await page.locator("#rookieui-txt2img-submit").click();
+  await expect(page.locator("#rookieui-txt2img-status")).toContainText("TextEncodeQwenImage21");
 });
 
 test("clears unsupported scheduler and negative prompt across specialized profile transitions", async ({ page }) => {

@@ -23,6 +23,7 @@ from rookieui.contracts.family_template_manifest import (
 )
 from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
+from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, QWEN_IMAGE_21_PROFILE_IDS
 
 _HOST_MODEL_FOLDERS = (
     "audio_encoders",
@@ -387,7 +388,7 @@ def _filter_selectors_by_deny_hints(
         for selector in selectors
         if all(deny_hint not in _normalize_selector_token(selector) for deny_hint in deny_hints)
     ]
-    return filtered or list(selectors)
+    return filtered
 
 
 def _filter_explicit_diffusion_selectors(selectors: list[str]) -> list[str]:
@@ -398,6 +399,14 @@ def _filter_explicit_diffusion_selectors(selectors: list[str]) -> list[str]:
     ]
 
 
+def _filter_qwen21_generation_selectors(profile_id: str, selectors: list[str], role: str) -> list[str]:
+    if profile_id in QWEN_IMAGE_21_PROFILE_IDS:
+        return [selector for selector in selectors if qwen_image_21_asset_role(selector) == role]
+    # CRITICAL: filename-only Qwen fallbacks may select 2.1 assets for older families;
+    # preserve legacy candidates but never infer generation compatibility from a shared parent folder.
+    return [selector for selector in selectors if not qwen_image_21_asset_role(selector)]
+
+
 def _resolve_profile_diffusion_model_default(
     profile_id: str,
     selectors: list[str],
@@ -406,10 +415,15 @@ def _resolve_profile_diffusion_model_default(
         return ""
     # CRITICAL: when standard and accelerated variants coexist, defaults must prefer non-acceleration paths;
     # auto-selecting Lightning/distilled entries can silently force mismatched step/cfg defaults and degrade output quality.
+    role_selectors = _filter_qwen21_generation_selectors(profile_id, selectors, "diffusion_models")
+    if not role_selectors:
+        return ""
     candidate_selectors = _filter_selectors_by_deny_hints(
-        selectors,
+        role_selectors,
         _PROFILE_DIFFUSION_MODEL_DENY_HINTS.get(profile_id, ()),
     )
+    if not candidate_selectors:
+        return ""
     prioritized = _find_selector_by_priority(
         candidate_selectors,
         _PROFILE_DIFFUSION_MODEL_PRIORITY_HINTS.get(profile_id, ()),
@@ -420,6 +434,9 @@ def _resolve_profile_diffusion_model_default(
     matched = _find_selector_by_hints(candidate_selectors, hints)
     if matched:
         return matched
+    if profile_id.startswith("qwen_image"):
+        # CRITICAL: a stale Qwen catalog must not silently use the first unrelated diffusion file.
+        return ""
     return candidate_selectors[0]
 
 
@@ -430,11 +447,13 @@ def _resolve_profile_text_encoder_default(
     if not selectors:
         return ""
 
-    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
+    candidate_selectors = _filter_qwen21_generation_selectors(
+        normalized_profile_id, _filter_explicit_diffusion_selectors(selectors), "text_encoders"
+    )
     if not candidate_selectors:
         return ""
 
-    normalized_profile_id = _canonicalize_profile_id(profile_id)
     matched_by_priority = _find_selector_by_priority(
         candidate_selectors,
         _PROFILE_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
@@ -492,7 +511,7 @@ def resolve_text_encoder_selector_context(
 ) -> str:
     selectors = [value for value in (inventory.text_encoders or []) if isinstance(value, str) and value.strip()]
     if not selectors:
-        return inventory.default_text_encoder
+        return "" if _canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS else inventory.default_text_encoder
 
     normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models":
@@ -520,7 +539,9 @@ def resolve_aux_text_encoder_selector_context(
     normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) != "diffusion_models":
         return ""
-    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    candidate_selectors = _filter_qwen21_generation_selectors(
+        normalized_profile_id, _filter_explicit_diffusion_selectors(selectors), "text_encoders"
+    )
     return _find_selector_by_priority(
         candidate_selectors,
         _PROFILE_AUX_TEXT_ENCODER_PRIORITY_HINTS.get(normalized_profile_id, ()),
@@ -535,7 +556,9 @@ def _resolve_profile_vae_default(
         return ""
 
     normalized_profile_id = _canonicalize_profile_id(profile_id)
-    candidate_selectors = _filter_explicit_diffusion_selectors(selectors)
+    candidate_selectors = _filter_qwen21_generation_selectors(
+        normalized_profile_id, _filter_explicit_diffusion_selectors(selectors), "vae"
+    )
     if not candidate_selectors:
         return ""
 
@@ -564,7 +587,7 @@ def resolve_vae_selector_context(
 ) -> str:
     selectors = [value for value in (inventory.vae or []) if isinstance(value, str) and value.strip()]
     if not selectors:
-        return inventory.default_vae
+        return "" if _canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS else inventory.default_vae
 
     fallback_default = inventory.default_vae if inventory.default_vae in selectors else selectors[0]
     normalized_profile_id = _canonicalize_profile_id(profile_id)
@@ -610,11 +633,11 @@ def resolve_primary_model_selector_context(
 
     # IMPORTANT: profile-driven selector category must be honored for non-SDXL presets
     # (Flux/Qwen/etc.); forcing checkpoints here breaks preset-aware model-path switching.
-    if not category_values:
+    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS:
         category_id = "checkpoints"
         category_values = list(inventory.checkpoints or [])
 
-    if not category_values:
+    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS:
         category_values = [inventory.default_checkpoint]
 
     default_value = (

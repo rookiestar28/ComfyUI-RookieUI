@@ -1699,6 +1699,48 @@ def _build_krea2_turbo_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, 
     return workflow
 
 
+def _build_qwen_image_21_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
+    # CRITICAL: Core 0.34 lacks this V3 node; never queue a 2.1 graph onto a loaded
+    # older host or quietly route it through the SDXL fallback builder.
+    host_nodes = sys.modules.get("nodes")
+    mappings = getattr(host_nodes, "NODE_CLASS_MAPPINGS", None)
+    if isinstance(mappings, Mapping) and "TextEncodeQwenImage21" not in mappings:
+        raise ValueError("Qwen Image 2.1 requires host node TextEncodeQwenImage21 (ComfyUI Core 0.37 candidate).")
+    allocator = NodeIdAllocator(start=1)
+    workflow: dict[str, object] = {}
+    unet_id = allocator.next()
+    workflow[unet_id] = _build_unet_loader_node(request.checkpoint_name)
+    clip_source = _build_single_clip_source(
+        workflow, allocator=allocator, clip_name=request.text_encoder_name, clip_type="qwen_image"
+    )
+    vae_id = allocator.next()
+    workflow[vae_id] = _build_vae_loader_node(request.vae_name)
+    encode_id = allocator.next()
+    workflow[encode_id] = {
+        "class_type": "TextEncodeQwenImage21",
+        "inputs": {
+            "clip": clip_source,
+            "prompt": request.prompt,
+            "negative_prompt": request.negative_prompt,
+            "resolution": 1024,
+        },
+    }
+    latent_id = _append_empty_latent_node(
+        workflow, allocator=allocator, class_type="EmptyLatentImage",
+        width=request.width, height=request.height, batch_size=request.batch_size,
+    )
+    sampler_id = allocator.next()
+    _build_sampler_node(
+        workflow, node_id=sampler_id, positive_id=[encode_id, 0], negative_id=[encode_id, 1],
+        latent_id=latent_id, request=request, denoise=1.0, model_source=[unet_id, 0],
+    )
+    _build_decode_and_save(
+        workflow, sampler_id=sampler_id, decode_id=allocator.next(), save_id=allocator.next(),
+        vae_source=[vae_id, 0], request=request,
+    )
+    return workflow
+
+
 def _build_qwen_image_workflow(request: NormalizedTxt2ImgRequest) -> dict[str, object]:
     allocator = NodeIdAllocator(start=1)
     workflow: dict[str, object] = {}
@@ -2077,6 +2119,7 @@ _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[st
     "krea2_turbo": _build_krea2_turbo_workflow,
     "klein": lambda request: _build_klein_workflow(request, distilled=False),
     "qwen_image": _build_qwen_image_workflow,
+    "qwen_image_21": _build_qwen_image_21_workflow,
     "longcat": _build_longcat_workflow,
     "z_image": _build_z_image_workflow_for_profile,
     "ernie": _build_ernie_workflow_for_profile,

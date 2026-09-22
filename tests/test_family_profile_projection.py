@@ -51,6 +51,7 @@ EXPECTED_SHIPPED_PROFILE_IDS = (
     "hidream_i1_fast",
     "hidream_i1_full",
     "longcat_image",
+    "qwen_image_21",
     "qwen_image",
     "qwen_image_edit",
     "qwen_image_edit_2511",
@@ -66,13 +67,17 @@ EXPECTED_SHIPPED_PROFILE_IDS = (
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_profile_graph_contract.json"
+QWEN21_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "qwen_image_21_candidate_graph_contract.json"
 CORE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_core_graph_contract.json"
 
 
 class FamilyProfileProjectionTests(unittest.TestCase):
     def test_candidate_supported_sources_match_non_sd_profile_projection(self) -> None:
         contract = workflow_template_supported_graph_contract.load_supported_graph_contract()
-        supported_ids = {profile.id for profile in contract.profiles}
+        candidate_contract = core_graph_contract.load_profile_graph_contract(QWEN21_GRAPH_FIXTURE)
+        supported_ids = {profile.id for profile in contract.profiles} | {
+            profile.id for profile in candidate_contract.profiles
+        }
         projected_ids = {
             projection["id"]
             for projection in build_family_profile_projection_entries(
@@ -87,11 +92,13 @@ class FamilyProfileProjectionTests(unittest.TestCase):
         self.assertEqual(contract.schema_version, "current-host-profile-graph-contract-v1")
         self.assertEqual(contract.source_revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
         self.assertEqual(contract.profile_count, 31)
-        self.assertEqual(tuple(profile.id for profile in contract.profiles), EXPECTED_SHIPPED_PROFILE_IDS)
+        self.assertEqual(tuple(profile.id for profile in contract.profiles), tuple(
+            profile_id for profile_id in EXPECTED_SHIPPED_PROFILE_IDS if profile_id != "qwen_image_21"
+        ))
         entries = list_model_family_registry_entries()
         self.assertEqual(
             tuple(profile.flow_kind for profile in contract.profiles),
-            tuple(entry.flow_kind for entry in entries),
+            tuple(entry.flow_kind for entry in entries if entry.id != "qwen_image_21"),
         )
         for profile in contract.profiles:
             with self.subTest(profile=profile.id):
@@ -141,12 +148,12 @@ class FamilyProfileProjectionTests(unittest.TestCase):
                 "synthetic/ideogram4_unconditional_fp8_scaled.safetensors",
                 "synthetic/ideogram4_fp8_scaled.safetensors",
             ],
-            vae=["synthetic/qwen_image_vae.safetensors"],
+            vae=["synthetic/flux2-vae.safetensors"],
             text_encoders=[
                 "synthetic/qwen3vl_8b_fp8_scaled.safetensors",
                 "synthetic/qwen_3_4b.safetensors",
             ],
-            default_vae="synthetic/qwen_image_vae.safetensors",
+            default_vae="synthetic/flux2-vae.safetensors",
             default_text_encoder="synthetic/qwen_3_4b.safetensors",
         )
 
@@ -156,6 +163,8 @@ class FamilyProfileProjectionTests(unittest.TestCase):
         ):
             for entry in list_model_family_registry_entries():
                 with self.subTest(profile=entry.id):
+                    if entry.id == "qwen_image_21":
+                        continue  # Core 0.37 candidate has its own pinned graph contract below.
                     if entry.flow_kind == "txt2img":
                         inventory = (
                             ideogram_inventory
@@ -206,6 +215,24 @@ class FamilyProfileProjectionTests(unittest.TestCase):
                         ),
                         expected_by_id[entry.id],
                     )
+
+    def test_qwen21_candidate_graph_contract_is_separate_from_accepted_host(self) -> None:
+        candidate = core_graph_contract.load_profile_graph_contract(QWEN21_GRAPH_FIXTURE)
+        self.assertEqual(candidate.source_revision, "e638023d54497dbe0579565e5de4bb7076899592")  # pragma: allowlist secret
+        self.assertEqual(tuple(row.id for row in candidate.profiles), ("qwen_image_21",))
+        inventory = ModelInventorySnapshot(
+            source="host",
+            diffusion_models=["qwen_image_2.1_int8_convrot.safetensors"],
+            text_encoders=["qwen3vl_8b_int8_convrot.safetensors"],
+            vae=["qwen_image_2.1_vae_bf16.safetensors"],
+        )
+        with mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=inventory):
+            request = normalize_txt2img_request({"profile": "qwen_image_21", "prompt": "synthetic"})
+        workflow = translate_txt2img_request(request).workflow
+        self.assertEqual(
+            core_graph_contract.build_profile_graph_row("qwen_image_21", "txt2img", workflow),
+            candidate.profiles[0],
+        )
 
     def test_manifest_entry_is_frozen_and_projection_covers_every_declared_field(self) -> None:
         self.assertTrue(dataclasses.is_dataclass(FamilyTemplateManifestEntry))

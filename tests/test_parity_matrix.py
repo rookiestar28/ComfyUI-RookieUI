@@ -38,6 +38,7 @@ class ParityMatrixTests(unittest.TestCase):
                 "hidream_i1_fast",
                 "hidream_i1_full",
                 "longcat_image",
+                "qwen_image_21",
                 "qwen_image",
                 "qwen_image_edit",
                 "qwen_image_edit_2511",

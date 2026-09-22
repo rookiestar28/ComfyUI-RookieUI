@@ -165,7 +165,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,flux_krea_dev,flux2_dev,"
                 "ideogram4,krea2_turbo,klein_4b,klein_9b,"
                 "hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
-                "longcat_image,qwen_image,z_image,z_image_turbo,qwen_image_edit,"
+                "longcat_image,qwen_image_21,qwen_image,z_image,z_image_turbo,qwen_image_edit,"
                 "qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"
                 "flux_kontext_dev_edit,flux2_image_edit,klein_9b_kv_image_edit,longcat_image_edit"
             ),
@@ -753,6 +753,21 @@ class LiveSmokeCatalogTests(unittest.TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_validate_catalog_contract_accepts_qwen_image_21_exact_roles(self) -> None:
+        model = "qwen/qwen_image_2.1_int8_convrot.safetensors"
+        encoder = "qwen/qwen3vl_8b_int8_convrot.safetensors"
+        vae = "qwen/qwen_image_2.1_vae_bf16.safetensors"
+        errors, _ = live_smoke._validate_catalog_contract(
+            {
+                "diffusion_models": [model], "text_encoders": [encoder], "vae": [vae],
+                "catalog": {"primary_model_category_by_family": {"qwen_image_21": "diffusion_models"}},
+            },
+            {"presets": [{"id": "qwen_image_21", "checkpoint_name": model,
+                          "text_encoder_name": encoder, "vae_name": vae}]},
+            ["qwen_image_21"],
+        )
+        self.assertEqual(errors, [])
+
     def test_validate_catalog_contract_rejects_deferred_qwen_image_edit_multi_lora(self) -> None:
         errors, _ = live_smoke._validate_catalog_contract(
             {
@@ -763,7 +778,7 @@ class LiveSmokeCatalogTests(unittest.TestCase):
             ["qwen_image_edit_multi_lora"],
         )
 
-        self.assertEqual(errors, ["profile 'qwen_image_edit_multi_lora' missing in /rookieui/presets payload."])
+        self.assertEqual(errors, ["profile 'qwen_image_edit_multi_lora' is not a supported non-SD catalog profile."])
 
     def test_build_image_edit_dry_run_case_rejects_deferred_multi_lora_profile(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported RookieUI model family"):

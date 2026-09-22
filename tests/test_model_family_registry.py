@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
-from rookieui.contracts import workflow_template_supported_graph_contract
+from rookieui.contracts import core_graph_contract, workflow_template_supported_graph_contract
 from rookieui.contracts.family_template_manifest import (
     OFFICIAL_TEMPLATE_CORE_BLUEPRINT_DEFERRED_SURFACE_MARKERS,
     OFFICIAL_TEMPLATE_DEFERRED_SURFACE_MARKERS,
@@ -25,7 +26,12 @@ from rookieui.services.presets import build_preset_payload
 class ModelFamilyRegistryTests(unittest.TestCase):
     def test_candidate_supported_sources_cover_every_non_sd_registry_entry(self) -> None:
         contract = workflow_template_supported_graph_contract.load_supported_graph_contract()
-        supported_ids = {profile.id for profile in contract.profiles}
+        candidate = core_graph_contract.load_profile_graph_contract(
+            Path(__file__).resolve().parent / "fixtures" / "qwen_image_21_candidate_graph_contract.json"
+        )
+        supported_ids = {profile.id for profile in contract.profiles} | {
+            profile.id for profile in candidate.profiles
+        }
         registry_ids = {
             entry.id
             for entry in list_model_family_registry_entries()

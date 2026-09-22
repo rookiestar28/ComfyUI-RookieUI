@@ -14,6 +14,7 @@ const rejectRootApiFetch = params.get("rejectRootApiFetch") === "1";
 const rejectRookieModels = params.get("rejectRookieModels") === "1";
 const runtimeEventScenario = params.get("runtimeEventScenario") === "1";
 const txt2imgLostResponse = params.get("txt2imgLostResponse") === "1";
+const qwen21MissingNode = params.get("qwen21MissingNode") === "1";
 const earlyTerminalScenario = params.get("earlyTerminalScenario") === "1";
 const requestedImg2ImgDelayMs = Number(params.get("img2imgDelayMs") ?? 0);
 const img2imgDelayMs = Number.isFinite(requestedImg2ImgDelayMs)
@@ -46,6 +47,11 @@ const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
     checkpoint_name: "qwen_image_2512_fp8_e4m3fn.safetensors",
     vae_name: "qwen_image_vae.safetensors",
     text_encoder_name: "Automatic",
+  },
+  qwen_image_21: {
+    checkpoint_name: "qwen_image_2.1_int8_convrot.safetensors",
+    vae_name: "qwen_image_2.1_vae_bf16.safetensors",
+    text_encoder_name: "qwen3vl_8b_int8_convrot.safetensors",
   },
   qwen_image_edit: {
     checkpoint_name: "qwen_image_edit_fp8_e4m3fn.safetensors",
@@ -210,6 +216,7 @@ const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
   "flux2_dev",
   "flux2_image_edit",
   "qwen_image",
+  "qwen_image_21",
   "qwen_image_edit",
   "firered_image_edit",
   "klein_4b",
@@ -243,6 +250,7 @@ const E2E_VAE_OPTIONS = [
   "flux2-vae.safetensors",
   "full_encoder_small_decoder.safetensors",
   "qwen_image_vae.safetensors",
+  "qwen_image_2.1_vae_bf16.safetensors",
 ];
 
 const E2E_TEXT_ENCODER_OPTIONS = [
@@ -258,6 +266,7 @@ const E2E_TEXT_ENCODER_OPTIONS = [
   "qwen_3_06b_base.safetensors",
   "qwen_3_4b.safetensors",
   "qwen_3_8b_fp8mixed.safetensors",
+  "qwen3vl_8b_int8_convrot.safetensors",
   "t5xxl_fp16.safetensors",
   "t5xxl_fp8_e4m3fn_scaled.safetensors",
 ];
@@ -353,6 +362,13 @@ async function handleE2EFetch(url, options = {}) {
   if (route === "/rookieui/generate/txt2img") {
     const payload = JSON.parse(options.body ?? "{}");
     window.__ROOKIEUI_E2E_REQUESTS__.txt2img.push(payload);
+    if (qwen21MissingNode && payload.profile === "qwen_image_21") {
+      return new Response(JSON.stringify({
+        service: "rookieui",
+        status: "invalid-request",
+        detail: "Qwen Image 2.1 requires host node TextEncodeQwenImage21.",
+      }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
     if (txt2imgLostResponse) {
       throw new TypeError("synthetic response lost after acceptance");
     }

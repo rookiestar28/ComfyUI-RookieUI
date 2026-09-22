@@ -3042,6 +3042,9 @@ def _validate_catalog_contract(
     inventory_snapshot = _build_inventory_snapshot_from_models_payload(models_payload)
 
     for profile_id in target_profiles:
+        if profile_id not in _NON_SD_CATALOG_PROFILES:
+            errors.append(f"profile '{profile_id}' is not a supported non-SD catalog profile.")
+            continue
         preset = presets_by_id.get(profile_id)
         if preset is None:
             errors.append(f"profile '{profile_id}' missing in /rookieui/presets payload.")
