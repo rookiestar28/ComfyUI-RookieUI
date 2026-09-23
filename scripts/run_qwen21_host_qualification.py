@@ -466,6 +466,16 @@ def _client_id() -> str:
     return CLIENT_PREFIX + uuid.uuid4().hex
 
 
+def _control_submission_identity_valid(control: Mapping[str, Any]) -> bool:
+    prompt_id = control.get("prompt_id")
+    client_id = control.get("client_id")
+    return (
+        isinstance(prompt_id, str) and re.fullmatch(r"[0-9a-fA-F-]{20,80}", prompt_id) is not None
+        and isinstance(client_id, str)
+        and re.fullmatch(re.escape(CLIENT_PREFIX) + r"[0-9a-f]{32}", client_id) is not None
+    )
+
+
 def _queue_job(config: Config, prompt_id: str, client_id: str) -> dict[str, Any] | None:
     query = urllib.parse.urlencode({"client_id": client_id})
     route = "/rookieui/queue/" + urllib.parse.quote(prompt_id, safe="") + "?" + query
@@ -1018,34 +1028,48 @@ def _run_legacy_case(config: Config, private_images: Path, row: dict[str, Any], 
             )
             controls.append(previous)
             continue
-        control_row: dict[str, Any] = {"id": control.control_id, "profile": control.profile, "status": "FAIL"}
-        controls.append(control_row)
-        client_id = _client_id()
-        payload: dict[str, object] = {
-            **control.request, "prompt": PROMPTS["legacy"], "negative_prompt": "", "profile": control.profile,
-            "seed": SEED, "client_id": client_id,
-            **{field: asset.selector for field, asset in control.assets.items()},
+        # CRITICAL: explicit pre-submit false distinguishes a safe capacity stop from an accepted child job.
+        control_row: dict[str, Any] = {
+            "id": control.control_id, "profile": control.profile, "status": "FAIL", "executed": False,
         }
-        if control.route == "img2img":
-            payload["reference_images"] = [{"image_data": _fixture_data_url(config, item)} for item in control.reference_fixtures]
-            payload.setdefault("main_reference_index", 0)
-        route = "/rookieui/generate/" + control.route
-        dry_status, dry = _post_json(config, route, {**payload, "dry_run": True})
-        if dry_status != 200 or not isinstance(dry.get("workflow"), dict):
-            raise QualificationError("legacy_dry_run_rejected")
-        selectors = {json.dumps(value) for node in dry["workflow"].values() if isinstance(node, dict)
-                     for value in (node.get("inputs") or {}).values() if isinstance(value, str)}
-        if not all(json.dumps(asset.selector) in selectors for asset in control.assets.values()):
-            raise QualificationError("legacy_model_binding")
-        if any(node.get("class_type") in ("TextEncodeQwenImage21", "QwenImage21Cache")
-               for node in dry["workflow"].values() if isinstance(node, dict)):
-            raise QualificationError("legacy_graph_uses_qwen21_nodes")
-        control_row["dry_run_pass"] = True
-        _submit_and_collect(
-            config, route, payload, client_id, (control.expected_width, control.expected_height),
-            private_images / f"{row['case_id']}-{control.control_id}.png", control_row,
-        )
-        control_row["status"] = "PASS"
+        controls.append(control_row)
+        try:
+            client_id = _client_id()
+            payload: dict[str, object] = {
+                **control.request, "prompt": PROMPTS["legacy"], "negative_prompt": "", "profile": control.profile,
+                "seed": SEED, "client_id": client_id,
+                **{field: asset.selector for field, asset in control.assets.items()},
+            }
+            if control.route == "img2img":
+                payload["reference_images"] = [{"image_data": _fixture_data_url(config, item)} for item in control.reference_fixtures]
+                payload.setdefault("main_reference_index", 0)
+            route = "/rookieui/generate/" + control.route
+            dry_status, dry = _post_json(config, route, {**payload, "dry_run": True})
+            if dry_status != 200 or not isinstance(dry.get("workflow"), dict):
+                raise QualificationError("legacy_dry_run_rejected")
+            selectors = {json.dumps(value) for node in dry["workflow"].values() if isinstance(node, dict)
+                         for value in (node.get("inputs") or {}).values() if isinstance(value, str)}
+            if not all(json.dumps(asset.selector) in selectors for asset in control.assets.values()):
+                raise QualificationError("legacy_model_binding")
+            if any(node.get("class_type") in ("TextEncodeQwenImage21", "QwenImage21Cache")
+                   for node in dry["workflow"].values() if isinstance(node, dict)):
+                raise QualificationError("legacy_graph_uses_qwen21_nodes")
+            control_row["dry_run_pass"] = True
+            _submit_and_collect(
+                config, route, payload, client_id, (control.expected_width, control.expected_height),
+                private_images / f"{row['case_id']}-{control.control_id}.png", control_row,
+            )
+        except QualificationError as exc:
+            control_row.update({"status": "FAIL", "child_exit": 1, "error_code": exc.code})
+            raise
+        except Exception as exc:  # noqa: BLE001 - keep nested diagnostics content-free.
+            control_row.update({
+                "status": "FAIL", "child_exit": 1,
+                "error_code": "unexpected_" + type(exc).__name__.lower(),
+            })
+            raise
+        else:
+            control_row.update({"status": "PASS", "child_exit": 0})
     row.update({"dry_run_pass": True, "executed": True, "status": "PASS", "child_exit": 0})
 
 
@@ -1290,6 +1314,7 @@ def _validate_resume(config: Config, source_config: Config, source_path: Path,
                 or control_row.get("dry_run_pass") is not True or control_row.get("executed") is not True
                 or control_row.get("history_matched") is not True or control_row.get("terminal_status") != "completed"
                 or control_row.get("host_identity_digest") != old_identity
+                or not _control_submission_identity_valid(control_row) or control_row.get("error_code") is not None
             ):
                 raise QualificationError("resume_source_not_resumable")
             _validate_resume_artifact(
@@ -1299,7 +1324,12 @@ def _validate_resume(config: Config, source_config: Config, source_path: Path,
             completed.append(control_row)
         elif (
             control_row.get("status") != "FAIL" or control_row.get("dry_run_pass") is not True
-            or control_row.get("executed") is True or control_row.get("prompt_id") is not None
+            or control_row.get("executed") is not False or control_row.get("child_exit") != 1
+            or control_row.get("error_code") != "host_vram_low"
+            or control_row.get("host_identity_digest") != old_identity
+            or control_row.get("prompt_id") is not None or control_row.get("history_matched") is True
+            or control_row.get("output_handle") is not None or control_row.get("terminal_status") is not None
+            or legacy.get("executed") is not False or legacy.get("prompt_id") is not None
         ):
             raise QualificationError("resume_source_not_resumable")
     if not completed:
@@ -1516,6 +1546,7 @@ def _validate_execute_lineage(execute: Mapping[str, Any], rows: list[Mapping[str
                 or control.get("status") != "PASS" or control.get("child_exit") != 0
                 or control.get("dry_run_pass") is not True or control.get("executed") is not True
                 or control.get("history_matched") is not True or control.get("terminal_status") != "completed"
+                or not _control_submission_identity_valid(control) or control.get("error_code") is not None
                 or not isinstance(control.get("original_sha256"), str)
                 or not SHA256_HEX.fullmatch(control["original_sha256"])
                 or not isinstance(control.get("output_handle"), str)

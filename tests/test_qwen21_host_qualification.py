@@ -376,6 +376,59 @@ class HostQualificationCaseTests(unittest.TestCase):
                     for patch in reversed(patches):
                         patch.stop()
 
+    def test_legacy_control_records_zero_exit_and_submission_identity_on_success(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = load(root)
+            row = qualification._new_row("Q21-LEGACY")
+            workflow = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {
+                "ckpt_name": config.legacy_controls[0].assets["checkpoint_name"].selector,
+            }}}
+
+            def complete(_config: Any, _route: str, _payload: dict[str, Any], client_id: str,
+                         _expected: tuple[int | None, int | None], _image_path: Path,
+                         control_row: dict[str, Any], _validate: Any = None) -> tuple[dict[str, Any], Image.Image, bytes]:
+                control_row.update({
+                    "executed": True, "prompt_id": "00000000-0000-0000-0000-000000000001",
+                    "client_id": client_id, "history_matched": True, "terminal_status": "completed",
+                    "original_sha256": "b" * 64, "output_handle": "RookieUI_00001_.png",
+                })
+                return {}, Image.new("RGBA", (64, 64)), b"png"
+
+            with mock.patch.object(qualification, "_post_json", return_value=(200, {"workflow": workflow})), \
+                    mock.patch.object(qualification, "_submit_and_collect", side_effect=complete):
+                qualification._run_legacy_case(config, root / "images", row)
+
+            control = row["controls"][0]
+            self.assertEqual(control["status"], "PASS")
+            self.assertIs(control["executed"], True)
+            self.assertEqual(control["child_exit"], 0)
+            self.assertNotIn("error_code", control)
+            self.assertEqual(control["prompt_id"], "00000000-0000-0000-0000-000000000001")
+            self.assertRegex(control["client_id"], r"^rookieui-q21-[0-9a-f]{32}$")
+
+    def test_legacy_control_records_unsubmitted_child_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = load(root)
+            row = qualification._new_row("Q21-LEGACY")
+            workflow = {"1": {"class_type": "CheckpointLoaderSimple", "inputs": {
+                "ckpt_name": config.legacy_controls[0].assets["checkpoint_name"].selector,
+            }}}
+            with mock.patch.object(qualification, "_post_json", return_value=(200, {"workflow": workflow})), \
+                    mock.patch.object(qualification, "_submit_and_collect",
+                                      side_effect=qualification.QualificationError("host_vram_low")), \
+                    self.assertRaisesRegex(qualification.QualificationError, "host_vram_low"):
+                qualification._run_legacy_case(config, root / "images", row)
+
+            control = row["controls"][0]
+            self.assertEqual(control["status"], "FAIL")
+            self.assertIs(control.get("executed"), False)
+            self.assertEqual(control.get("child_exit"), 1)
+            self.assertEqual(control.get("error_code"), "host_vram_low")
+            self.assertIsNone(control.get("prompt_id"))
+            self.assertIsNone(control.get("output_handle"))
+
     def test_generation_uses_exact_client_job_when_snapshot_history_is_capped(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -645,6 +698,8 @@ class HostQualificationFinalizeTests(unittest.TestCase):
                         "id": control.control_id, "profile": control.profile,
                         "status": "PASS", "child_exit": 0, "dry_run_pass": True, "executed": True,
                         "history_matched": True, "terminal_status": "completed", "host_identity_digest": identity,
+                        "prompt_id": f"00000000-0000-0000-0000-{output_number:012d}",
+                        "client_id": f"rookieui-q21-{output_number:032x}",
                         "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": handle,
                     })
                 row.update(controls=controls, unavailable_controls=[dict(item) for item in config.legacy_unavailable],
@@ -724,6 +779,24 @@ class HostQualificationFinalizeTests(unittest.TestCase):
                 path.write_text(json.dumps(execute), encoding="utf-8")
                 review = self._review(path, execute)
                 with self.assertRaisesRegex(qualification.QualificationError, "execute_identity_mismatch"):
+                    self._finalize(root, config, path, review)
+
+    def test_finalize_rejects_legacy_control_without_valid_prompt_client_binding(self) -> None:
+        legacy_index = qualification.CASE_IDS.index("Q21-LEGACY")
+        for field, value in (("prompt_id", None), ("client_id", "wrong-client"),
+                             ("error_code", "host_vram_low")):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                config, path, execute = self._execute(root)
+                control = execute["cases"][legacy_index]["controls"][0]
+                if value is None:
+                    control.pop(field)
+                else:
+                    control[field] = value
+                path.write_text(json.dumps(execute), encoding="utf-8")
+                review = self._review(path, execute)
+                with self.assertRaisesRegex(qualification.QualificationError,
+                                            "execute_control_identity_lineage_invalid"):
                     self._finalize(root, config, path, review)
 
 
@@ -820,10 +893,13 @@ class HostQualificationResumeTests(unittest.TestCase):
                                 "child_exit": 0, "dry_run_pass": True, "executed": True,
                                 "history_matched": True, "terminal_status": "completed",
                                 "host_identity_digest": self.OLD_ID,
+                                "prompt_id": "00000000-0000-0000-0000-000000000001",
+                                "client_id": "rookieui-q21-" + "1" * 32,
                                 "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename}
                 failed_control = {"id": config.legacy_controls[-1].control_id,
                                   "profile": config.legacy_controls[-1].profile, "status": "FAIL",
-                                  "dry_run_pass": True}
+                                  "dry_run_pass": True, "executed": False, "child_exit": 1,
+                                  "error_code": "host_vram_low", "host_identity_digest": self.OLD_ID}
                 row.update({"status": "FAIL", "semantic_review": "NOT_APPLICABLE", "child_exit": 1,
                             "error_code": "host_vram_low", "controls": [good_control, failed_control],
                             "unavailable_controls": [dict(item) for item in config.legacy_unavailable]})
@@ -874,6 +950,8 @@ class HostQualificationResumeTests(unittest.TestCase):
                      "host_identity_digest": self.OLD_ID if index < len(controls) - 1 else current_identity,
                      "status": "PASS", "child_exit": 0, "dry_run_pass": True, "executed": True,
                      "history_matched": True, "terminal_status": "completed",
+                     "prompt_id": f"00000000-0000-0000-0000-{index + 1:012d}",
+                     "client_id": f"rookieui-q21-{index + 1:032x}",
                      "original_sha256": "b" * 64, "output_handle": f"RookieUI_{index:05d}_.png"}
                     for index, control_id in enumerate(controls)
                 ]
@@ -937,6 +1015,34 @@ class HostQualificationResumeTests(unittest.TestCase):
             self.assertEqual(resume.source_result_sha256, hashlib.sha256(path.read_bytes()).hexdigest())
             self.assertEqual(resume.source_host_identity_digest, self.OLD_ID)
             self.assertEqual(resume.completed_legacy_controls[0]["id"], "sdxl-txt2img")
+
+    def test_resume_rejects_incomplete_final_nested_control_outcome(self) -> None:
+        for field, value in (("child_exit", None), ("error_code", "job_not_completed"),
+                             ("executed", True), ("host_identity_digest", self.CURRENT_ID)):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                old_config, config, path, execute, _ = self._bundle(root)
+                execute["cases"][-1]["controls"][-1][field] = value
+                path.write_text(json.dumps(execute), encoding="utf-8")
+                with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                        self.assertRaisesRegex(qualification.QualificationError, "resume_source_not_resumable"):
+                    qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+    def test_resume_rejects_completed_control_without_prompt_client_binding(self) -> None:
+        for field, value in (("prompt_id", None), ("client_id", "wrong-client"),
+                             ("error_code", "unexpected_error")):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                old_config, config, path, execute, _ = self._bundle(root)
+                control = execute["cases"][-1]["controls"][0]
+                if value is None:
+                    control.pop(field)
+                else:
+                    control[field] = value
+                path.write_text(json.dumps(execute), encoding="utf-8")
+                with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                        self.assertRaisesRegex(qualification.QualificationError, "resume_source_not_resumable"):
+                    qualification._validate_resume(config, old_config, path, self._current_preflight(config))
 
     def test_resume_rejects_different_candidate_and_nonfinal_failure(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
