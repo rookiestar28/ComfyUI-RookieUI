@@ -25,6 +25,18 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>Qwen Image 2.1 workflows and scoped host alignment (new functionality/compatibility)</strong></summary>
+
+- Added official-template-backed `Qwen-Image 2.1` txt2img and `Qwen-Image 2.1 Edit` profiles with a dedicated Qwen Image 2.1 encoder and host-inventory matching for the diffusion model, text encoder, and VAE.
+- The edit profile accepts one to ten ordered references. Reference 1 is the edit target; users can promote another reference into that slot and choose source-based or custom output sizing.
+- Added an editable background-removal instruction preset to the same edit flow. RGBA PNG data is preserved through the image-load/save and result-handoff paths when present.
+- Added scoped source-contract coverage for the Core 0.37 Qwen node contract, bundled frontend 1.53.6, standalone frontend 1.55.12, and workflow templates 0.11.66; this does not replace the separately documented general compatibility baseline.
+- The Qwen Image 2.1 profiles require the matching diffusion model, Qwen3-VL 8B encoder, and 2.1 VAE. Review the [Qwen Research License](https://github.com/QwenLM/Qwen-Image-2.1/blob/fb7ae1d1f9611cd91524d03c53c5246b36ac8577/LICENSE) before using the model.
+
+</details>
+
+<details>
+
 <summary><strong>Frontend test files no longer shipped to browsers (stability/performance)</strong></summary>
 
 - The frontend test suite no longer lives inside the directory this pack registers with ComfyUI. ComfyUI publishes every JavaScript file beneath a registered web directory and its frontend imports all of them, so those files were previously fetched and executed by every browser on every page load, where they failed to resolve their test-runner imports.
@@ -614,7 +626,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Hires second-pass controls for generation flows (`txt2img` and `img2img`)
 - Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including parser modes, `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, old-emphasis compatibility, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
-- Official txt2img profiles include newer lanes such as `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
+- Official txt2img profiles include `Qwen-Image 2.1` and newer lanes such as `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
 - Krea-2 Turbo prompt enhancement is enabled by default on its local txt2img profile; turning it off preserves and encodes the original prompt without adding the host text-generation stage
 - Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
 - ComfyUI-native prompt submission with host API-node usage-source attribution, embedded A1111-style `parameters` metadata, and separate RookieUI origin metadata
@@ -628,8 +640,9 @@ If your host or Manager install path does not automatically install custom-node 
 <br>
 
 - official image-edit workflows live on the `img2img` surface as dedicated image-edit profiles instead of a separate visible `Edit` mode
-- visible image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
+- visible image-edit profiles: `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `Qwen-Image 2.1 Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`
 - image-edit request normalization preserves ordered `reference_images` and `main_reference_index` so official single-reference and bounded multi-reference workflows can share one truthful payload surface
+- `Qwen-Image 2.1 Edit` supports up to ten ordered references, primary-reference selection, reference-resolution control, and source-based or custom output sizing; background removal is an editable instruction preset in this same workflow
 - image-edit flows do not require user masks; mask-oriented SD inpaint controls stay on the normal `img2img` inpaint paths instead of leaking into official edit workflows
 - family-specific edit builders now cover template-owned LoRA chaining, Qwen/Qwen+ edit encoders, Flux/Klein multi-reference latent setup, and Longcat edit guidance on dedicated non-SD runtime paths
 
@@ -690,21 +703,21 @@ If your host or Manager install path does not automatically install custom-node 
 
 ### Official Non-SD Template Presets
 
-- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
-- Current official-template alignment uses `comfyui-workflow-templates` 0.11.54 as the source basis for refreshed host blueprints and packaged gallery JSON assets, but workflow families outside the shipped profile list are not implied support.
+- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2.1`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- Existing shipped profiles remain aligned to `comfyui-workflow-templates` 0.11.54; the Qwen Image 2.1 profiles use the 0.11.66 template source contract. Workflow families outside the shipped profile list are not implied support.
 - These presets follow official template defaults or source-backed mode values for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
   - `Flux Guidance`: `Flux.2 Dev`, `Longcat BF16`
   - `Prompt Enhancement`: `ERNIE-Image`, `ERNIE-Image Turbo`, `Krea-2 Turbo`
 - Official image-edit workflows ship as `img2img` image-edit profiles on the shared `Img2Img` preset surface rather than a separate visible `Edit` UI.
-- API-provider Ideogram/Krea workflows, Krea style-reference workflow, SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces.
+- API-provider Ideogram/Krea workflows, Krea style-reference workflow, SCAIL-2 character replacement, Depth Anything 3 image/video depth, Bernini-R image/video edit, TripoSplat, Anima Base 1.0, Qwen inpainting/outpainting/layered, Z-Image upscale, BiRefNet background-removal, SAM3 segmentation, MoGe/Lotus depth or geometry, Mediapipe detection, video/audio, 3D, and Gemini captioning blueprints are treated as deferred or follow-up product-surface candidates, not current RookieUI runtime surfaces. Qwen Image 2.1's editable background-removal instruction is part of its shipped image-edit profile, not the deferred BiRefNet workflow.
 
 ### Current Official Image-Edit Coverage and Template-Owned LoRAs
 
-- RookieUI's visible official ComfyUI `imageEdit` coverage includes `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
+- RookieUI's visible official ComfyUI `imageEdit` coverage includes `Qwen-Image Edit`, `Qwen-Image Edit 2511`, `Qwen-Image 2.1 Edit`, `FireRed Image Edit`, `FireRed Image Edit Lightning`, `Flux.1 Kontext Dev Edit`, `Flux.2 Image Edit`, `Flux.2 Klein 9B KV Image Edit`, and `Longcat Image Edit`.
 - Official edit workflows are treated as image-edit flows, not as mask-first inpaint surfaces. The shipped image-edit path does not require mask input.
-- Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `Qwen-Image Edit 2511`, `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
+- Multi-reference image-edit families use canonical ordered `reference_images` plus `main_reference_index` payloads on the shared `img2img` request surface, with bounded support for official multi-reference templates such as `Qwen-Image Edit 2511`, `Qwen-Image 2.1 Edit` (up to ten references), `FireRed Image Edit`, `Flux.1 Kontext Dev Edit`, and `Flux.2 Klein 9B KV Image Edit`.
 - Generic `img2img` hides official non-SD presets that are not aligned to an official image-input runtime, so users cannot accidentally route them into the legacy SD-style i2i graph and assume template parity that does not exist.
 - Official templates that expose or preload a template-owned LoRA treat it as an explicit dependency rather than a silent hidden asset:
   - RookieUI shows the official name and source-backed default configuration
@@ -919,7 +932,8 @@ Behavior and compatibility:
 ### ComfyUI Host Compatibility
 
 - Compatibility is validated against separate tested ComfyUI Core, frontend, Desktop, and workflow-template source snapshots rather than inferred from one mutable "latest ComfyUI" version.
-- The current tested source envelope covers ComfyUI Core 0.34, its bundled frontend 1.51.9, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54; this is a pinned compatibility basis rather than a blanket claim for every future host build.
+- The general tested source envelope covers ComfyUI Core 0.34, its bundled frontend 1.51.9, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54; this is a pinned compatibility basis rather than a blanket claim for every future host build.
+- Qwen Image 2.1 has a separate scoped source contract for Core 0.37 (bundled frontend 1.53.6), standalone frontend 1.55.12, and workflow templates 0.11.66. That contract covers the Qwen node, template graph, and affected frontend API surfaces; it does not imply that unrelated newer template workflows are supported.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
