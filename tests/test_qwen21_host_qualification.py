@@ -32,7 +32,9 @@ qualification = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = qualification
 SPEC.loader.exec_module(qualification)
 
-DIFFUSION = "Qwen_Image\\qwen_image_2.1_bf16.safetensors"
+DIFFUSION = "Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors"
+DIFFUSION_SHA256 = "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"  # pragma: allowlist secret - public artifact digest
+DIFFUSION_SIZE = 7256783064
 ENCODER = "qwen3vl_8b_int8_convrot.safetensors"
 VAE = "qwen_image_2.1_vae_bf16.safetensors"
 TREE = "e7b429d7f2e73bb5b97a0aa70336960489bbe6b9"  # pragma: allowlist secret - public Git tree id
@@ -57,7 +59,7 @@ def valid_config(root: Path) -> dict[str, Any]:
         (fixtures / f"{name}.png").write_bytes(data)
         entries.append({"id": name, "filename": f"{name}.png", "sha256": hashlib.sha256(data).hexdigest()})
     (fixtures / "manifest.json").write_text(json.dumps(entries), encoding="utf-8")
-    selectors = {"diffusion_bf16": DIFFUSION, "encoder_int8": ENCODER, "vae_bf16": VAE}
+    selectors = {"diffusion_primary": DIFFUSION, "encoder_int8": ENCODER, "vae_bf16": VAE}
     return {
         "schema": "Qwen21HostConfigV1",
         "host": "H1",
@@ -75,8 +77,12 @@ def valid_config(root: Path) -> dict[str, Any]:
         "process_command_sha256": digest,
         "budgets": {"request_timeout_seconds": 30, "poll_timeout_seconds": 300},
         "models": {
-            role: {"selector": selectors[role], "path": str(root / role), "sha256": digest, "size": 1}
-            for role in qualification.MODEL_ROLES
+            role: {
+                "selector": selectors[role], "path": str(root / role),
+                "sha256": DIFFUSION_SHA256 if role == "diffusion_primary" else digest,
+                "size": DIFFUSION_SIZE if role == "diffusion_primary" else 1,
+            }
+            for role in ("diffusion_primary", "encoder_int8", "vae_bf16")
         },
         "legacy_controls": [{
             "id": "sdxl-txt2img", "profile": "sdxl", "route": "txt2img",
@@ -177,6 +183,23 @@ class FakeHost:
 
 
 class HostQualificationConfigTests(unittest.TestCase):
+    def test_config_uses_exact_convrot_primary_and_rejects_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = load(root)
+            self.assertEqual(config.models["diffusion_primary"].selector, DIFFUSION)
+            self.assertEqual(config.models["diffusion_primary"].sha256, DIFFUSION_SHA256)
+            self.assertEqual(config.models["diffusion_primary"].size, DIFFUSION_SIZE)
+            for field, value in (("selector", "Qwen_Image\\qwen_image_2.1_bf16.safetensors"),
+                                 ("sha256", "b" * 64), ("size", DIFFUSION_SIZE + 1)):
+                payload = valid_config(root)
+                payload["models"]["diffusion_primary"][field] = value
+                with self.subTest(field=field), self.assertRaisesRegex(qualification.QualificationError,
+                                                                       "config_primary_diffusion_identity"):
+                    path = root / f"wrong-{field}.json"
+                    path.write_text(json.dumps(payload), encoding="utf-8")
+                    qualification.load_config(path)
+
     def test_config_accepts_real_sha1_git_object_ids(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             config = load(Path(folder))
@@ -211,14 +234,15 @@ class HostQualificationConfigTests(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaisesRegex(qualification.QualificationError, "config_legacy_request"):
                     load(Path(folder), legacy_controls=[control])
 
-    def test_variant_cases_exist_only_when_variant_is_configured(self) -> None:
+    def test_standard_int8_variant_is_not_part_of_the_required_case_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             self.assertEqual(qualification.expected_case_ids(load(root)), qualification.CASE_IDS)
-            variant = {"diffusion_int8": {"selector": "Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors",
+            self.assertFalse(any("INT8" in case_id for case_id in qualification.expected_case_ids(load(root))))
+            variant = {"diffusion_int8": {"selector": "Qwen_Image\\qwen_image_2.1_int8.safetensors",
                                           "path": str(root / "int8"), "sha256": "b" * 64, "size": 1}}
-            self.assertEqual(qualification.expected_case_ids(load(root, variants=variant))[-2:],
-                             ("Q21-INT8-T2I", "Q21-INT8-EDIT"))
+            with self.assertRaisesRegex(qualification.QualificationError, "config_variants"):
+                load(root, variants=variant)
 
     def test_script_path_invocation_can_import_repository_package(self) -> None:
         probe = (
@@ -373,11 +397,14 @@ class HostQualificationCaseTests(unittest.TestCase):
                          [f"ref_{index:02d}" for index in range(1, 11)])
 
     def test_real_builder_graphs_satisfy_case_contracts(self) -> None:
-        for case_id in ("Q21-T2I-SQUARE", "Q21-T2I-RECT", "Q21-EDIT-1-REF", "Q21-EDIT-10-REF", "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG"):
+        for case_id in qualification.CASE_IDS:
+            if case_id not in qualification.IMAGE_CASES:
+                continue
             with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as folder:
                 config = load(Path(folder))
                 host = FakeHost(config)
                 plan = qualification._case_plan(config, case_id, "client")
+                self.assertEqual(plan.payload["checkpoint_name"], config.models["diffusion_primary"].selector)
                 status, response = host.post(config, plan.route, {**plan.payload, "dry_run": True})
                 self.assertEqual(status, 200)
                 self.assertEqual(qualification._validate_graph(response, len(plan.fixtures), plan.width, plan.height,

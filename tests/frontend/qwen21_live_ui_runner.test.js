@@ -48,7 +48,11 @@ function config(overrides = {}) {
     fixture_manifest: "fixtures/manifest.json",
     rookieui_install_root: "host/custom_nodes/comfyui-rookieui",
     models: {
-      diffusion_bf16: { selector: "Qwen_Image\\qwen_image_2.1_bf16.safetensors" },
+      diffusion_primary: {
+        selector: "Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors",
+        sha256: "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d", // pragma: allowlist secret - public artifact digest
+        size: 7256783064,
+      },
       encoder_int8: { selector: "qwen3vl_8b_int8_convrot.safetensors" },
       vae_bf16: { selector: "qwen_image_2.1_vae_bf16.safetensors" },
     },
@@ -85,6 +89,18 @@ function report(rowOverrides = {}, reportOverrides = {}) {
 }
 
 describe("Qwen 2.1 live UI qualification runner", () => {
+  it("pins both UI flows to the exact convrot primary model role", () => {
+    const valid = validateConfig(config());
+    expect(valid.selectors.diffusion_primary).toBe("Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors");
+    for (const field of ["selector", "sha256", "size"]) {
+      const wrong = config();
+      wrong.models.diffusion_primary[field] = field === "selector"
+        ? "Qwen_Image\\qwen_image_2.1_bf16.safetensors"
+        : field === "sha256" ? "b".repeat(64) : 1;
+      expect(() => validateConfig(wrong)).toThrow("config_primary_diffusion_identity");
+    }
+  });
+
   it("accepts the repository's real SHA-1 git tree identity", () => {
     expect(validateConfig(config()).candidate_tree).toBe(TREE);
   });

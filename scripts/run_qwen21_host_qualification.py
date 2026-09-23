@@ -50,8 +50,8 @@ SAFE_ID = re.compile(r"^[a-z0-9][a-z0-9_.-]{1,47}$")
 CLIENT_PREFIX = "rookieui-q21-"
 REQUIRED_NODES = ("TextEncodeQwenImage21", "QwenImage21Cache", "UNETLoader", "CLIPLoader", "VAELoader")
 REQUIRED_PROFILES = ("qwen_image_21", "qwen_image_21_edit")
-MODEL_ROLES = ("diffusion_bf16", "encoder_int8", "vae_bf16")
-VARIANT_ROLES = ("diffusion_int8",)
+MODEL_ROLES = ("diffusion_primary", "encoder_int8", "vae_bf16")
+VARIANT_ROLES: tuple[str, ...] = ()
 EXPECTED_FRONTEND_INDEX_SHA256 = {
     "H1": "38f822ff4d165ccc57e39587761928f95ab63e96c9cbff53041e91bf68f395cc",  # pragma: allowlist secret - public artifact digest
     "H2": "646c7d93ee00987398471b5abd58a17a238017a5385917a2394a2d05635b8302",  # pragma: allowlist secret - public artifact digest
@@ -60,11 +60,13 @@ EXPECTED_CORE_VERSION = "0.37.0"
 EXPECTED_BUNDLED_FRONTEND_VERSION = "1.53.6"
 MINIMUM_FREE_VRAM_BYTES = 48 * 1024**3
 MODEL_CATALOGS = {
-    "diffusion_bf16": ("diffusion_models",),
-    "diffusion_int8": ("diffusion_models",),
+    "diffusion_primary": ("diffusion_models",),
     "encoder_int8": ("clip", "text_encoders"),
     "vae_bf16": ("vae",),
 }
+PRIMARY_DIFFUSION_SELECTOR = r"Qwen_Image\qwen_image_2.1_int8_convrot.safetensors"
+PRIMARY_DIFFUSION_SHA256 = "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"  # pragma: allowlist secret - public artifact digest
+PRIMARY_DIFFUSION_SIZE = 7_256_783_064
 LEGACY_ASSET_FIELDS = ("checkpoint_name", "text_encoder_name", "vae_name")
 LEGACY_CATALOGS = frozenset({"checkpoints", "diffusion_models", "clip", "text_encoders", "vae"})
 # An official 2.1 encoder basename that the owner-supplied host does not provide. Preflight
@@ -77,10 +79,9 @@ CASE_IDS = (
     "Q21-EDIT-10-REF", "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG", "Q21-TRANSFER",
     "Q21-NEGATIVE", "Q21-LEGACY",
 )
-VARIANT_CASE_IDS = {"diffusion_int8": ("Q21-INT8-T2I", "Q21-INT8-EDIT")}
 IMAGE_CASES = frozenset({
     "Q21-T2I-SQUARE", "Q21-T2I-RECT", "Q21-EDIT-1-REF", "Q21-EDIT-2-REF", "Q21-EDIT-10-REF",
-    "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG", "Q21-INT8-T2I", "Q21-INT8-EDIT",
+    "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG",
 })
 T2I_CHECKLIST = ("single_red_round_subject_visible", "plain_light_background", "no_severe_artifacts")
 EDIT_1_REF_CHECKLIST = ("circle_shape_and_position_retained", "subject_recolored_blue", "no_severe_artifacts")
@@ -99,8 +100,6 @@ SEMANTIC_CHECKLISTS: dict[str, tuple[str, ...]] = {
     "Q21-REMOVE-BG": (
         "red_round_subject_recognizable", "blue_background_removed_to_transparency", "no_severe_artifacts",
     ),
-    "Q21-INT8-T2I": T2I_CHECKLIST,
-    "Q21-INT8-EDIT": EDIT_1_REF_CHECKLIST,
 }
 PROMPTS = {
     "t2i": "A single flat red circle centered on a plain white background, simple vector illustration, no text.",
@@ -265,6 +264,11 @@ def load_config(path: Path) -> Config:
     if not isinstance(raw_models, dict) or set(raw_models) != set(MODEL_ROLES):
         raise QualificationError("config_models")
     models = {role: _model_role(raw_models[role], MODEL_CATALOGS[role], "config_model_role") for role in MODEL_ROLES}
+    primary = models["diffusion_primary"]
+    if (primary.selector, primary.sha256, primary.size) != (
+        PRIMARY_DIFFUSION_SELECTOR, PRIMARY_DIFFUSION_SHA256, PRIMARY_DIFFUSION_SIZE,
+    ):
+        raise QualificationError("config_primary_diffusion_identity")
     raw_variants = raw.get("variants", {})
     if not isinstance(raw_variants, dict) or not set(raw_variants) <= set(VARIANT_ROLES):
         raise QualificationError("config_variants")
@@ -326,8 +330,7 @@ def load_config(path: Path) -> Config:
 
 
 def expected_case_ids(config: Config) -> tuple[str, ...]:
-    variant_cases = tuple(case for role in VARIANT_ROLES if role in config.variants for case in VARIANT_CASE_IDS[role])
-    return CASE_IDS + variant_cases
+    return CASE_IDS
 
 
 def _git(path: Path, *args: str) -> str:
@@ -488,9 +491,9 @@ class CasePlan:
 
 
 def _case_plan(config: Config, case_id: str, client_id: str) -> CasePlan:
-    diffusion = config.variants["diffusion_int8"] if case_id.startswith("Q21-INT8") else config.models["diffusion_bf16"]
+    diffusion = config.models["diffusion_primary"]
     common = _common_payload(config, client_id, diffusion)
-    if case_id in ("Q21-T2I-SQUARE", "Q21-T2I-RECT", "Q21-INT8-T2I"):
+    if case_id in ("Q21-T2I-SQUARE", "Q21-T2I-RECT"):
         width, height = (768, 1024) if case_id == "Q21-T2I-RECT" else (1024, 1024)
         payload = {**common, "prompt": PROMPTS["t2i"], "profile": "qwen_image_21", "width": width, "height": height, "batch_size": 1}
         return CasePlan("/rookieui/generate/txt2img", payload, width, height, ())
@@ -498,7 +501,7 @@ def _case_plan(config: Config, case_id: str, client_id: str) -> CasePlan:
     prompt = PROMPTS["edit_1"]
     edit_task = "edit"
     promoted_order = None
-    if case_id in ("Q21-EDIT-1-REF", "Q21-INT8-EDIT"):
+    if case_id == "Q21-EDIT-1-REF":
         fixtures = ("ref_01",)
     elif case_id == "Q21-EDIT-2-REF":
         # Uploaded as Reference 1 = ref_01 and Reference 2 = ref_02, then Reference 2 is promoted.
@@ -563,7 +566,7 @@ def _validate_graph(
         return ["workflow_canvas_mismatch"]
     if config is None:
         return []
-    diffusion = config.variants["diffusion_int8"] if case_id.startswith("Q21-INT8") else config.models["diffusion_bf16"]
+    diffusion = config.models["diffusion_primary"]
     expected_loaders = {
         "UNETLoader": ("unet_name", diffusion.selector),
         "CLIPLoader": ("clip_name", config.models["encoder_int8"].selector),

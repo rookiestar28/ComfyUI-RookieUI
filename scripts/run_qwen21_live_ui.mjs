@@ -23,6 +23,9 @@ const EXECUTE_SCHEMA = "Qwen21HostQualificationV1";
 const CASE_ID = "Q21-REMOVE-BG";
 const EXPECTED_CORE_VERSION = "0.37.0";
 const EXPECTED_BUNDLED_FRONTEND_VERSION = "1.53.6";
+const PRIMARY_DIFFUSION_SELECTOR = "Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors";
+const PRIMARY_DIFFUSION_SHA256 = "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"; // pragma: allowlist secret - public artifact digest
+const PRIMARY_DIFFUSION_SIZE = 7256783064;
 // Git object IDs are SHA-1 here (40 hex); file digests are SHA-256 (64 hex).
 const GIT_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -89,9 +92,14 @@ export function validateConfig(raw) {
     if (typeof raw[key] !== "string" || !raw[key]) throw safeError("config_paths");
   }
   const selectors = {};
-  for (const role of ["diffusion_bf16", "encoder_int8", "vae_bf16"]) {
-    const selector = raw.models?.[role]?.selector;
+  for (const role of ["diffusion_primary", "encoder_int8", "vae_bf16"]) {
+    const model = raw.models?.[role];
+    const selector = model?.selector;
     if (typeof selector !== "string" || !selector) throw safeError("config_models");
+    if (role === "diffusion_primary" && (selector !== PRIMARY_DIFFUSION_SELECTOR
+        || model.sha256 !== PRIMARY_DIFFUSION_SHA256 || model.size !== PRIMARY_DIFFUSION_SIZE)) {
+      throw safeError("config_primary_diffusion_identity");
+    }
     selectors[role] = selector;
   }
   return {
@@ -348,7 +356,7 @@ async function runUiGeneration(page, config, checks, evidence) {
   await page.locator("#rookieui-tab-txt2img").click();
   await page.locator("#rookieui-preset").selectOption("qwen_image_21");
   if (await page.locator("#rookieui-preset").inputValue() !== "qwen_image_21") throw safeError("txt2img_profile_drift");
-  await selectIfPresent(page, "#rookieui-checkpoint", config.selectors.diffusion_bf16);
+  await selectIfPresent(page, "#rookieui-checkpoint", config.selectors.diffusion_primary);
   await selectIfPresent(page, "#rookieui-text-encoder", config.selectors.encoder_int8);
   await selectIfPresent(page, "#rookieui-vae", config.selectors.vae_bf16);
   await page.locator("#rookieui-prompt").fill(UI_PROMPT);
@@ -398,7 +406,7 @@ async function runEditPane(page, config, checks, state) {
   for (let slot = 1; slot <= 10; slot += 1) {
     await page.locator(`#rookieui-img2img-reference-card-${slot}`).waitFor({ state: "visible" });
   }
-  await selectIfPresent(page, "#rookieui-img2img-checkpoint", config.selectors.diffusion_bf16);
+  await selectIfPresent(page, "#rookieui-img2img-checkpoint", config.selectors.diffusion_primary);
   await selectIfPresent(page, "#rookieui-img2img-text-encoder", config.selectors.encoder_int8);
   await selectIfPresent(page, "#rookieui-img2img-vae", config.selectors.vae_bf16);
   const ref1 = fixtureBytes(config, "ref_01");
