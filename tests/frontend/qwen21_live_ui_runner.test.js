@@ -9,6 +9,7 @@ import {
   parseOptions,
   pinBrowserClientIdentity,
   selectedJob,
+  toggleSidebar,
   validateConfig,
   validateCandidateIdentity,
   validateFreeVram,
@@ -90,6 +91,31 @@ function report(rowOverrides = {}, reportOverrides = {}) {
 }
 
 describe("Qwen 2.1 live UI qualification runner", () => {
+  it("opens the current registered sidebar tab and rejects ambiguous controls", async () => {
+    const makePage = (matchCount) => {
+      const state = { selector: "", clicks: 0 };
+      const page = {
+        locator(selector) {
+          state.selector = selector;
+          return {
+            count: async () => matchCount,
+            click: async () => { state.clicks += 1; },
+          };
+        },
+      };
+      return { page, state };
+    };
+
+    const single = makePage(1);
+    await toggleSidebar(single.page);
+    expect(single.state.selector).toContain('[data-testid="comfyui-rookieui-tab-button"]');
+    expect(single.state.clicks).toBe(1);
+
+    const ambiguous = makePage(2);
+    await expect(toggleSidebar(ambiguous.page)).rejects.toThrow("sidebar_launcher_ambiguous");
+    expect(ambiguous.state.clicks).toBe(0);
+  });
+
   it("pins both UI flows to the exact convrot primary model role", () => {
     const valid = validateConfig(config());
     expect(valid.selectors.diffusion_primary).toBe("Qwen_Image\\qwen_image_2.1_int8_convrot.safetensors");

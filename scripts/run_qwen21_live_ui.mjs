@@ -36,6 +36,8 @@ const CONFIRM_MESSAGE = "Replace the current edit instruction?";
 const UI_PROMPT = "A single flat red circle centered on a plain white background, simple vector illustration, no text.";
 const EDIT_PROMPT = "Place a small copy of the red circle from <image2> at the center of the triangle in <image1>.";
 const GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
+// IMPORTANT: ComfyUI derives custom sidebar test IDs from the registered tab ID; the bare RookieUI prefix misses that button.
+export const SIDEBAR_LAUNCHER_SELECTOR = '[data-testid="comfyui-rookieui-tab-button"], [data-testid="rookieui-tab-button"], .rookieui-tab-button, #rookieui-legacy-launcher';
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -332,8 +334,8 @@ async function openSidebar(page) {
   await shell.first().waitFor({ state: "visible", timeout: 30000 });
 }
 
-async function toggleSidebar(page) {
-  const button = page.locator('[data-testid="rookieui-tab-button"], .rookieui-tab-button, #rookieui-legacy-launcher');
+export async function toggleSidebar(page) {
+  const button = page.locator(SIDEBAR_LAUNCHER_SELECTOR);
   if (await button.count() !== 1) throw safeError("sidebar_launcher_ambiguous");
   await button.click();
 }
