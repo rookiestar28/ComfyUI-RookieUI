@@ -199,6 +199,15 @@ describe("Qwen 2.1 live UI qualification runner", () => {
       .toThrow("execute_identity_mismatch");
   });
 
+  it("rejects a reused background-removal row from the source process after resume", () => {
+    const valid = validateConfig(config());
+    const staleSourceRow = report(
+      { host_identity_digest: HOST_IDENTITY },
+      { host_identity_digest: "f".repeat(64) },
+    );
+    expect(() => selectedJob(valid, staleSourceRow)).toThrow("execute_identity_mismatch");
+  });
+
   it("requires exactly one config and one output argument", () => {
     expect(parseOptions(["--config", "c.json", "--output", "o.json"])).toEqual({ config: "c.json", output: "o.json" });
     expect(() => parseOptions(["--config", "c.json"])).toThrow("arguments_invalid");

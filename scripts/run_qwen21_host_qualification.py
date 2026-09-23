@@ -80,6 +80,7 @@ CASE_IDS = (
     "Q21-EDIT-10-REF", "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG", "Q21-TRANSFER",
     "Q21-NEGATIVE", "Q21-LEGACY",
 )
+RESUME_RERUN_CASE_IDS = ("Q21-REMOVE-BG", "Q21-TRANSFER")
 IMAGE_CASES = frozenset({
     "Q21-T2I-SQUARE", "Q21-T2I-RECT", "Q21-EDIT-1-REF", "Q21-EDIT-2-REF", "Q21-EDIT-10-REF",
     "Q21-EDIT-CUSTOM", "Q21-REMOVE-BG",
@@ -985,7 +986,8 @@ def _run_transfer_case(config: Config, source_row: Mapping[str, Any], image_path
                 "alpha_summary": {"mode": summary["mode"], "min": summary["alpha_min"], "max": summary["alpha_max"]},
                 "transfer_equivalence": "download_pnginfo_and_send_to_edit_exact_bytes",
                 "input_handles": [handle, transfer_handle], "source_case_id": "Q21-REMOVE-BG",
-                "original_sha256": original_sha, "status": "PASS", "child_exit": 0})
+                "source_original_sha256": original_sha, "original_sha256": original_sha,
+                "status": "PASS", "child_exit": 0})
 
 
 def _copy_resume_artifact(config: Config, source_images: Path, target_images: Path,
@@ -1087,7 +1089,7 @@ def execute_cases(config: Config, private_images: Path, *, resume: ResumeContext
         raise QualificationError("result_images_exist")
     if resume is None and rerun_case_ids:
         raise QualificationError("resume_arguments_invalid")
-    if resume is not None and rerun_case_ids != ("Q21-EDIT-2-REF",):
+    if resume is not None and rerun_case_ids != RESUME_RERUN_CASE_IDS:
         raise QualificationError("resume_rerun_case_invalid")
     cases: list[dict[str, Any]] = []
     ordered = expected_case_ids(config)
@@ -1296,6 +1298,15 @@ def _validate_resume(config: Config, source_config: Config, source_path: Path,
         row = rows_by_case.get(case_id)
         if not isinstance(row, dict) or row.get("status") != "PASS" or row.get("child_exit") != 0:
             raise QualificationError("resume_source_not_resumable")
+    removal_row = rows_by_case.get("Q21-REMOVE-BG")
+    transfer_row = rows_by_case.get("Q21-TRANSFER")
+    if (
+        not isinstance(removal_row, dict) or not isinstance(transfer_row, dict)
+        or transfer_row.get("source_case_id") != "Q21-REMOVE-BG"
+        or transfer_row.get("source_original_sha256") != removal_row.get("original_sha256")
+        or transfer_row.get("original_sha256") != removal_row.get("original_sha256")
+    ):
+        raise QualificationError("resume_transfer_source_mismatch")
     legacy = rows_by_case.get("Q21-LEGACY")
     controls = legacy.get("controls") if isinstance(legacy, dict) else None
     if (
@@ -1480,7 +1491,7 @@ def _validate_execute_lineage(execute: Mapping[str, Any], rows: list[Mapping[str
     current_identity = execute.get("host_identity_digest")
     expected_cases = expected_case_ids(config)
     expected_reused_cases = [case_id for case_id in expected_cases
-                             if case_id not in ("Q21-EDIT-2-REF", "Q21-LEGACY")]
+                             if case_id not in (*RESUME_RERUN_CASE_IDS, "Q21-LEGACY")]
     legacy_ids = [control.control_id for control in config.legacy_controls]
     source_identity: str | None = None
     reused_legacy_ids: list[str] = []
@@ -1502,7 +1513,7 @@ def _validate_execute_lineage(execute: Mapping[str, Any], rows: list[Mapping[str
             or not isinstance(resume.get("source_execute_result_sha256"), str)
             or not SHA256_HEX.fullmatch(resume["source_execute_result_sha256"])
             or resume.get("reused_case_ids") != expected_reused_cases
-            or resume.get("rerun_case_ids") != ["Q21-EDIT-2-REF"]
+            or resume.get("rerun_case_ids") != list(RESUME_RERUN_CASE_IDS)
             or len(legacy_ids) < 2
             or resume.get("reused_legacy_control_ids") != legacy_ids[:-1]
             or resume.get("continued_legacy_control_ids") != legacy_ids[-1:]
@@ -1553,6 +1564,16 @@ def _validate_execute_lineage(execute: Mapping[str, Any], rows: list[Mapping[str
             ):
                 raise QualificationError("execute_control_identity_lineage_invalid")
 
+    removal_row = rows[expected_cases.index("Q21-REMOVE-BG")]
+    transfer_row = rows[expected_cases.index("Q21-TRANSFER")]
+    if (
+        transfer_row.get("status") != "PASS" or transfer_row.get("child_exit") != 0
+        or transfer_row.get("source_case_id") != "Q21-REMOVE-BG"
+        or transfer_row.get("source_original_sha256") != removal_row.get("original_sha256")
+        or transfer_row.get("original_sha256") != removal_row.get("original_sha256")
+    ):
+        raise QualificationError("execute_transfer_source_lineage_invalid")
+
 
 def _write_new_json(path: Path, payload: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1587,7 +1608,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--resume-result", type=Path, help="execute: exact-candidate failed result to continue")
     parser.add_argument("--resume-config", type=Path, help="execute: config bound to the prior host process")
     parser.add_argument("--rerun-case", action="append", choices=CASE_IDS,
-                        help="execute: explicitly rerun the UI-bound case during strict continuation")
+                        help="execute: strict continuation accepts the ordered UI case and dependent transfer pair")
     args = parser.parse_args(argv)
     result: dict[str, Any] = {
         "schema": RESULT_SCHEMA, "phase": args.phase, "status": "FAIL",
@@ -1607,7 +1628,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise QualificationError("arguments_invalid")
             if args.resume_result is None and args.rerun_case:
                 raise QualificationError("arguments_invalid")
-            if args.resume_result is not None and args.rerun_case != ["Q21-EDIT-2-REF"]:
+            if args.resume_result is not None and tuple(args.rerun_case or ()) != RESUME_RERUN_CASE_IDS:
                 raise QualificationError("resume_rerun_case_invalid")
         config = load_config(args.config)
         result["host"] = config.host

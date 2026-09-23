@@ -643,6 +643,7 @@ class HostQualificationCaseTests(unittest.TestCase):
             with mock.patch.object(qualification, "_post_json", side_effect=post):
                 qualification._run_transfer_case(config, source, image_path, row)
             self.assertEqual(row["status"], "PASS")
+            self.assertEqual(row["source_original_sha256"], source["original_sha256"])
             self.assertEqual(row["alpha_summary"]["min"], 90)
             self.assertEqual(len(edit_requests), 1)
             self.assertEqual(edit_requests[0]["image_asset"], "")
@@ -686,6 +687,11 @@ class HostQualificationFinalizeTests(unittest.TestCase):
                 row.update(status="PENDING_REVIEW", semantic_review="PENDING", original_sha256=hashlib.sha256(data).hexdigest(),
                            output_handle=handle, executed=True, dry_run_pass=True, history_matched=True,
                            terminal_status="completed", original_decoded=True)
+            elif case_id == "Q21-TRANSFER":
+                source_row = next(item for item in rows if item["case_id"] == "Q21-REMOVE-BG")
+                row.update(source_case_id="Q21-REMOVE-BG",
+                           source_original_sha256=source_row["original_sha256"],
+                           original_sha256=source_row["original_sha256"])
             elif case_id == "Q21-LEGACY":
                 controls = []
                 for control in config.legacy_controls:
@@ -807,6 +813,12 @@ class HostQualificationResumeCliTests(unittest.TestCase):
             (["--resume-config", "missing-config.json"], "arguments_invalid"),
             (["--resume-result", "missing.json", "--resume-config", "missing-config.json"],
              "resume_rerun_case_invalid"),
+            (["--resume-result", "missing.json", "--resume-config", "missing-config.json",
+              "--rerun-case", "Q21-TRANSFER", "--rerun-case", "Q21-REMOVE-BG"],
+             "resume_rerun_case_invalid"),
+            (["--resume-result", "missing.json", "--resume-config", "missing-config.json",
+              "--rerun-case", "Q21-REMOVE-BG", "--rerun-case", "Q21-REMOVE-BG"],
+             "resume_rerun_case_invalid"),
             (["--rerun-case", "Q21-T2I-SQUARE"], "arguments_invalid"),
         )
         with tempfile.TemporaryDirectory() as folder:
@@ -824,6 +836,53 @@ class HostQualificationResumeCliTests(unittest.TestCase):
                     preflight.assert_not_called()
                     payload = json.loads(output.read_text(encoding="utf-8"))
                     self.assertEqual(payload.get("error_code"), expected_error)
+
+    def test_ordered_ui_and_transfer_pair_reaches_resume_and_is_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps(valid_config(root)), encoding="utf-8")
+            config = qualification.load_config(config_path)
+            source_path = root / "source.json"
+            output_path = root / "resumed.json"
+            source_identity = "c" * 64
+            current_identity = "d" * 64
+            resume = qualification.ResumeContext(
+                source_result_path=source_path,
+                source_result_sha256="a" * 64,
+                source_host_identity_digest=source_identity,
+                source_images=root,
+                case_rows={},
+                completed_legacy_controls=tuple({"id": item.control_id} for item in config.legacy_controls[:-1]),
+            )
+            preflight = {
+                "candidate_tree": config.candidate_tree,
+                "host_identity_digest": current_identity,
+                "served_frontend_digest": config.frontend_index_sha256,
+                "model_role_digests": qualification._model_role_digests(config),
+                "fixture_digest": config.fixture_manifest_sha256,
+                "variants": qualification._variant_statuses(config),
+            }
+            rows = [dict(qualification._new_row(case_id), status="PENDING_REVIEW", child_exit=0)
+                    for case_id in qualification.expected_case_ids(config)]
+            with mock.patch.object(qualification, "preflight", return_value=preflight) as preflight_mock, \
+                    mock.patch.object(qualification, "_validate_resume", return_value=resume) as resume_mock, \
+                    mock.patch.object(qualification, "execute_cases", return_value=rows) as execute_mock:
+                result = qualification.main([
+                    "--config", str(config_path), "--phase", "execute", "--output", str(output_path),
+                    "--resume-result", str(source_path), "--resume-config", str(config_path),
+                    "--rerun-case", "Q21-REMOVE-BG", "--rerun-case", "Q21-TRANSFER",
+                ])
+
+            self.assertEqual(result, 2)
+            preflight_mock.assert_called_once()
+            resume_mock.assert_called_once()
+            self.assertEqual(execute_mock.call_args.kwargs["rerun_case_ids"],
+                             ("Q21-REMOVE-BG", "Q21-TRANSFER"))
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["resume"]["rerun_case_ids"], ["Q21-REMOVE-BG", "Q21-TRANSFER"])
+            self.assertNotIn("Q21-REMOVE-BG", payload["resume"]["reused_case_ids"])
+            self.assertNotIn("Q21-TRANSFER", payload["resume"]["reused_case_ids"])
 
 
 class HostQualificationResumeTests(unittest.TestCase):
@@ -880,7 +939,13 @@ class HostQualificationResumeTests(unittest.TestCase):
                             "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename,
                             "width": 512, "height": 512,
                             "semantic_checklist": list(qualification.SEMANTIC_CHECKLISTS[case_id])})
-            elif case_id in ("Q21-TRANSFER", "Q21-NEGATIVE"):
+            elif case_id == "Q21-TRANSFER":
+                source_row = next(item for item in rows if item["case_id"] == "Q21-REMOVE-BG")
+                row.update({"status": "PASS", "semantic_review": "NOT_APPLICABLE", "child_exit": 0,
+                            "source_case_id": "Q21-REMOVE-BG",
+                            "source_original_sha256": source_row["original_sha256"],
+                            "original_sha256": source_row["original_sha256"]})
+            elif case_id == "Q21-NEGATIVE":
                 row.update({"status": "PASS", "semantic_review": "NOT_APPLICABLE", "child_exit": 0})
             else:
                 passed = config.legacy_controls[0]
@@ -930,8 +995,9 @@ class HostQualificationResumeTests(unittest.TestCase):
 
     def _resumed_lineage(self, config: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         current_identity = qualification._host_identity_digest(config)
+        rerun_cases = ("Q21-REMOVE-BG", "Q21-TRANSFER")
         reused_cases = [case_id for case_id in qualification.expected_case_ids(config)
-                        if case_id not in ("Q21-EDIT-2-REF", "Q21-LEGACY")]
+                        if case_id not in (*rerun_cases, "Q21-LEGACY")]
         controls = [control.control_id for control in config.legacy_controls]
         rows: list[dict[str, Any]] = []
         for case_id in qualification.expected_case_ids(config):
@@ -957,6 +1023,11 @@ class HostQualificationResumeTests(unittest.TestCase):
                 ]
                 row.update(status="PASS", child_exit=0, executed=True, dry_run_pass=True,
                            unavailable_controls=[dict(item) for item in config.legacy_unavailable])
+            elif case_id == "Q21-TRANSFER":
+                source_row = next(item for item in rows if item["case_id"] == "Q21-REMOVE-BG")
+                row.update(status="PASS", child_exit=0, source_case_id="Q21-REMOVE-BG",
+                           source_original_sha256=source_row.get("original_sha256"),
+                           original_sha256=source_row.get("original_sha256"))
             rows.append(row)
         return ({
             "candidate_tree": config.candidate_tree,
@@ -971,7 +1042,7 @@ class HostQualificationResumeTests(unittest.TestCase):
                 "source_host_identity_digest": self.OLD_ID,
                 "current_host_identity_digest": current_identity,
                 "reused_case_ids": reused_cases,
-                "rerun_case_ids": ["Q21-EDIT-2-REF"],
+                "rerun_case_ids": list(rerun_cases),
                 "reused_legacy_control_ids": controls[:-1],
                 "continued_legacy_control_ids": controls[-1:],
             },
@@ -1005,6 +1076,12 @@ class HostQualificationResumeTests(unittest.TestCase):
             bad_control_identity[legacy_index]["controls"][0]["host_identity_digest"] = self.CURRENT_ID
             with self.assertRaisesRegex(qualification.QualificationError, "execute_control_identity_lineage_invalid"):
                 qualification._validate_execute_lineage(execute, bad_control_identity, config)
+
+            bad_transfer_source = [dict(row) for row in rows]
+            bad_transfer_source[7] = dict(bad_transfer_source[7], source_original_sha256="e" * 64)
+            with self.assertRaisesRegex(qualification.QualificationError,
+                                       "execute_transfer_source_lineage_invalid"):
+                qualification._validate_execute_lineage(execute, bad_transfer_source, config)
 
     def test_resume_accepts_exact_final_legacy_vram_stop_and_binds_both_processes(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
@@ -1104,6 +1181,17 @@ class HostQualificationResumeTests(unittest.TestCase):
                     self.assertRaisesRegex(qualification.QualificationError, "resume_source_not_resumable"):
                 qualification._validate_resume(config, old_config, path, self._current_preflight(config))
 
+    def test_resume_rejects_transfer_row_not_bound_to_source_image(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, execute, _ = self._bundle(root)
+            transfer = execute["cases"][qualification.CASE_IDS.index("Q21-TRANSFER")]
+            transfer["source_original_sha256"] = "e" * 64
+            path.write_text(json.dumps(execute), encoding="utf-8")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_transfer_source_mismatch"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
     def test_execute_resume_reuses_rows_and_only_runs_explicit_case_and_failed_control(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -1112,6 +1200,7 @@ class HostQualificationResumeTests(unittest.TestCase):
                 resume = qualification._validate_resume(config, old_config, path, self._current_preflight(config))
             rerun_images = root / "resumed-images"
             rerun_image_calls: list[str] = []
+            transfer_calls: list[tuple[str, str, str]] = []
             legacy_submissions: list[str] = []
 
             def rerun_image(config_arg: Any, case_id: str, private_images: Path, row: dict[str, Any]) -> None:
@@ -1126,6 +1215,17 @@ class HostQualificationResumeTests(unittest.TestCase):
                             "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename,
                             "width": 512, "height": 512,
                             "semantic_checklist": list(qualification.SEMANTIC_CHECKLISTS[case_id])})
+
+            def rerun_transfer(config_arg: Any, source_row: dict[str, Any], image_path: Path,
+                               row: dict[str, Any]) -> None:
+                data = image_path.read_bytes()
+                digest = hashlib.sha256(data).hexdigest()
+                self.assertEqual(source_row["case_id"], "Q21-REMOVE-BG")
+                self.assertEqual(source_row["original_sha256"], digest)
+                self.assertEqual(qualification._sha256_file(config_arg.host_output_root / source_row["output_handle"]), digest)
+                transfer_calls.append((source_row["case_id"], digest, source_row["original_sha256"]))
+                row.update({"status": "PASS", "child_exit": 0, "source_case_id": source_row["case_id"],
+                            "source_original_sha256": digest, "original_sha256": digest})
 
             def submit(config_arg: Any, route: str, payload: dict[str, Any], client_id: str,
                        dimensions: tuple[int | None, int | None], image_path: Path, row: dict[str, Any],
@@ -1152,17 +1252,21 @@ class HostQualificationResumeTests(unittest.TestCase):
                 return 200, {"workflow": workflow}
 
             with mock.patch.object(qualification, "_run_image_case", side_effect=rerun_image), \
+                    mock.patch.object(qualification, "_run_transfer_case", side_effect=rerun_transfer), \
                     mock.patch.object(qualification, "_post_json", side_effect=post), \
                     mock.patch.object(qualification, "_submit_and_collect", side_effect=submit):
                 rows = qualification.execute_cases(
-                    config, rerun_images, resume=resume, rerun_case_ids=("Q21-EDIT-2-REF",),
+                    config, rerun_images, resume=resume, rerun_case_ids=("Q21-REMOVE-BG", "Q21-TRANSFER"),
                 )
-            self.assertEqual(rerun_image_calls, ["Q21-EDIT-2-REF"])
+            self.assertEqual(rerun_image_calls, ["Q21-REMOVE-BG"])
+            self.assertEqual(len(transfer_calls), 1)
+            self.assertEqual(transfer_calls[0][0], "Q21-REMOVE-BG")
+            self.assertEqual(transfer_calls[0][1], transfer_calls[0][2])
             self.assertEqual(legacy_submissions, ["/rookieui/generate/img2img"])
             self.assertEqual([row["case_id"] for row in rows], list(qualification.CASE_IDS))
             self.assertTrue(all(row["status"] in ("PASS", "PENDING_REVIEW") and row["child_exit"] == 0 for row in rows))
             self.assertEqual(rows[0]["host_identity_digest"], self.OLD_ID)
-            self.assertEqual(rows[3]["semantic_review"], "PENDING")
+            self.assertEqual(rows[6]["semantic_review"], "PENDING")
             controls = rows[-1]["controls"]
             self.assertEqual([control["id"] for control in controls], ["sdxl-txt2img", "qwen2511-edit"])
             self.assertEqual([control["status"] for control in controls], ["PASS", "PASS"])
