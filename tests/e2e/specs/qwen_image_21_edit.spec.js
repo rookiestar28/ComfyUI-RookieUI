@@ -6,6 +6,59 @@ const TINY_PNG = Buffer.from(
   "base64",
 );
 
+test("source-canvas fit keeps the Qwen 2.1 edit form natively valid", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("test-harness.html");
+  await expect(page.locator("#rookieui-root")).toContainText('"hostSurface":"standalone-web"');
+  await page.locator("#rookieui-tab-img2img").click();
+  await page.locator("#rookieui-img2img-preset").selectOption("qwen_image_21_edit");
+  await page.locator("#rookieui-img2img-mask-editor .rookieui-shell__mask-editor-viewport").evaluate((viewport) => {
+    viewport.style.width = "400px";
+    viewport.style.height = "320px";
+    viewport.style.minHeight = "320px";
+  });
+  const sourceDataUrl = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 512;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#456789";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  });
+  const syntheticPng = Buffer.from(sourceDataUrl.slice(sourceDataUrl.indexOf(",") + 1), "base64");
+  await page.locator("#rookieui-img2img-image-file").setInputFiles({
+    name: "synthetic-fit-source.png",
+    mimeType: "image/png",
+    buffer: syntheticPng,
+  });
+  await page.locator("#rookieui-img2img-reference-file-2").setInputFiles({
+    name: "synthetic-fit-reference.png",
+    mimeType: "image/png",
+    buffer: syntheticPng,
+  });
+  await expect(page.locator("#rookieui-img2img-reference-status-2")).toContainText("Uploaded reference image ready");
+  await page.locator("#rookieui-img2img-reference-main-1").click();
+  await expect(page.locator("#rookieui-img2img-reference-main-0")).toBeChecked();
+  await page.waitForFunction(() => {
+    const preview = document.querySelector("#rookieui-img2img-mask-editor .rookieui-shell__mask-editor-source");
+    return preview instanceof HTMLImageElement && preview.complete && preview.naturalWidth === 512;
+  });
+  const zoomRow = page.locator("#rookieui-img2img-mask-editor .rookieui-shell__mask-editor-control").nth(2);
+  const zoomNumber = zoomRow.locator('input[type="number"]');
+  const zoomSlider = zoomRow.locator('input[type="range"]');
+  const zoom = await zoomNumber.evaluate((input) => ({
+    value: input.value,
+    stepMismatch: input.validity.stepMismatch,
+    valid: input.checkValidity(),
+  }));
+  expect(zoom.value).toBe("0.63");
+  expect(zoom.stepMismatch).toBe(false);
+  expect(zoom.valid).toBe(true);
+  await expect(zoomSlider).toHaveValue(zoom.value);
+  await expect.poll(() => page.locator("#rookieui-img2img-form").evaluate((form) => form.checkValidity())).toBe(true);
+});
+
 test("Qwen Image 2.1 edit keeps ten ordered references and scoped controls", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("test-harness.html");

@@ -383,6 +383,8 @@ export async function selectIfPresent(page, selector, value) {
 }
 
 async function dryRunEditRequest(page, state) {
+  const form = page.locator("#rookieui-img2img-form");
+  if (!(await form.evaluate((element) => element.checkValidity()))) throw safeError("edit_form_invalid");
   const responsePromise = page.waitForResponse(
     (response) => /\/rookieui\/generate\/img2img$/.test(new URL(response.url()).pathname) && response.request().method() === "POST",
     { timeout: 60000 },
@@ -473,7 +475,7 @@ async function runEditPane(page, config, checks, state) {
   await page.waitForFunction(() => /uploaded reference image ready/i.test(
     document.querySelector("#rookieui-img2img-reference-status-2")?.textContent ?? "",
   ), null, { timeout: 15000 });
-  await page.locator("#rookieui-img2img-reference-main-1").check();
+  await page.locator("#rookieui-img2img-reference-main-1").click();
   if (!(await page.locator("#rookieui-img2img-reference-main-0").isChecked())
       || sha256(await previewImageBytes(page, sourcePreviewSelector)) !== sha256(ref2)) {
     throw safeError("primary_promotion_not_visible");

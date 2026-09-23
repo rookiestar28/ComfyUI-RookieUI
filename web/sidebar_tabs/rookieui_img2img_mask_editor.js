@@ -145,7 +145,8 @@ export function createImg2ImgMaskCanvasEditor({
 
   const brushSizeControl = createSliderControl("Size", 36, 1, 256, 1);
   const brushOpacityControl = createSliderControl("Opacity", 1, 0.05, 1, 0.01);
-  const zoomControl = createSliderControl("Zoom", 1, 0.25, 4, 0.05);
+  // IMPORTANT: fitToViewport and wheel zoom retain hundredths; a 0.05 step can make the form invalid and block Img2Img submit.
+  const zoomControl = createSliderControl("Zoom", 1, 0.25, 4, 0.01);
 
   const actionRow = document.createElement("div");
   actionRow.className = "rookieui-shell__mask-editor-actions";
