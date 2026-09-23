@@ -7,6 +7,7 @@ import {
   FRONTEND_INDEX_SHA256_BY_HOST,
   MINIMUM_FREE_VRAM_BYTES,
   parseOptions,
+  pinBrowserClientIdentity,
   selectedJob,
   validateConfig,
   validateCandidateIdentity,
@@ -206,6 +207,32 @@ describe("Qwen 2.1 live UI qualification runner", () => {
       { host_identity_digest: "f".repeat(64) },
     );
     expect(() => selectedJob(valid, staleSourceRow)).toThrow("execute_identity_mismatch");
+  });
+
+  it("pins the validated case client id to Core's pre-navigation WebSocket identity", () => {
+    const values = new Map();
+    const windowRef = {
+      name: "",
+      sessionStorage: {
+        setItem: (key, value) => values.set(key, value),
+        getItem: (key) => values.get(key) ?? null,
+      },
+    };
+    const clientId = `rookieui-q21-${"a".repeat(32)}`;
+
+    expect(pinBrowserClientIdentity(clientId, windowRef)).toBe(true);
+    expect(windowRef.name).toBe(clientId);
+    expect(windowRef.sessionStorage.getItem("clientId")).toBe(clientId);
+  });
+
+  it("fails closed for invalid client ids and unavailable browser storage", () => {
+    const windowRef = { name: "untouched", sessionStorage: { setItem() {}, getItem: () => null } };
+    expect(() => pinBrowserClientIdentity("shared-client", windowRef)).toThrow("browser_client_invalid");
+    expect(windowRef.name).toBe("untouched");
+
+    const unavailable = { name: "", sessionStorage: { setItem() { throw new Error("private-detail"); } } };
+    expect(() => pinBrowserClientIdentity(`rookieui-q21-${"a".repeat(32)}`, unavailable))
+      .toThrow("browser_client_binding_failed");
   });
 
   it("requires exactly one config and one output argument", () => {

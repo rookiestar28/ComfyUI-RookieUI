@@ -29,6 +29,7 @@ const PRIMARY_DIFFUSION_SIZE = 7256783064;
 // Git object IDs are SHA-1 here (40 hex); file digests are SHA-256 (64 hex).
 const GIT_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
+const CLIENT_ID = /^rookieui-q21-[0-9a-f]{32}$/;
 const HANDLE = /^[A-Za-z0-9_-]{1,64}\.(?:png|jpg|webp)$/;
 const BACKGROUND_INSTRUCTION = "Remove the background from <image1> and keep the subject with transparent alpha.";
 const CONFIRM_MESSAGE = "Replace the current edit instruction?";
@@ -43,6 +44,30 @@ export function safeError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
+}
+
+export function pinBrowserClientIdentity(clientId, windowRef = globalThis.window) {
+  const codedError = (code) => {
+    const error = new Error(code);
+    error.code = code;
+    return error;
+  };
+  if (!/^rookieui-q21-[0-9a-f]{32}$/.test(clientId ?? "")) {
+    throw codedError("browser_client_invalid");
+  }
+  try {
+    if (!windowRef?.sessionStorage?.setItem || !windowRef.sessionStorage.getItem) {
+      throw codedError("browser_client_binding_failed");
+    }
+    windowRef.sessionStorage.setItem("clientId", clientId);
+    windowRef.name = clientId;
+    if (windowRef.name !== clientId || windowRef.sessionStorage.getItem("clientId") !== clientId) {
+      throw codedError("browser_client_binding_failed");
+    }
+  } catch {
+    throw codedError("browser_client_binding_failed");
+  }
+  return true;
 }
 
 function readJson(path, code = "json_unreadable") {
@@ -121,7 +146,7 @@ export function selectedJob(config, report) {
   if (row && row.host_identity_digest !== report.host_identity_digest) throw safeError("execute_identity_mismatch");
   if (!row || row.selected !== true || row.child_exit !== 0 || row.status !== "PENDING_REVIEW" || row.original_decoded !== true
       || row.history_matched !== true || row.terminal_status !== "completed" || !SHA256.test(row.original_sha256 ?? "")
-      || !/^[0-9a-fA-F-]{20,80}$/.test(row.prompt_id ?? "") || !/^rookieui-q21-[0-9a-f]{32}$/.test(row.client_id ?? "")
+      || !/^[0-9a-fA-F-]{20,80}$/.test(row.prompt_id ?? "") || !CLIENT_ID.test(row.client_id ?? "")
       || !HANDLE.test(row.output_handle ?? "")) {
     throw safeError("selected_job_unqualified");
   }
@@ -559,7 +584,9 @@ export async function run(config, output, row) {
       state.lastEditRequest = body;
       await route.continue({ postData: JSON.stringify({ ...body, dry_run: true }) });
     });
-    await page.addInitScript((clientId) => sessionStorage.setItem("clientId", clientId), row.client_id);
+    // CRITICAL: Core 0.37 reads window.name for its WebSocket clientId.
+    // Session storage alone is overwritten by Core's returned sid.
+    await page.addInitScript(pinBrowserClientIdentity, row.client_id);
     await page.goto(`${config.base_url}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForFunction(() => window.__ROOKIEUI_BOOTSTRAP__?.clientId, null, { timeout: 60000 });
     if (await page.evaluate(() => window.__ROOKIEUI_BOOTSTRAP__?.clientId) !== row.client_id) throw safeError("browser_client_mismatch");
