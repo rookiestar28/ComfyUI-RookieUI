@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { chromium } from "@playwright/test";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import * as liveUiRunner from "../../scripts/run_qwen21_live_ui.mjs";
 import {
   dataUrlBytes,
   FRONTEND_INDEX_SHA256_BY_HOST,
@@ -20,7 +21,7 @@ import {
   validateLiveProcessIdentity,
 } from "../../scripts/run_qwen21_live_ui.mjs";
 
-describe("profile-owned model selector interaction", () => {
+describe("live Qwen 2.1 UI runner browser contracts", () => {
   let browser;
   let page;
 
@@ -51,6 +52,30 @@ describe("profile-owned model selector interaction", () => {
     await expect(selectIfPresent(page, "#rookieui-text-encoder", "qwen3vl-int8"))
       .rejects.toThrow("model_selector_unavailable_rookieui_text_encoder");
     expect(await page.locator("#rookieui-text-encoder").inputValue()).toBe("other");
+  });
+
+  it("reads exact bytes from one visible image preview", async () => {
+    const previewImageBytes = liveUiRunner.previewImageBytes;
+    expect(typeof previewImageBytes).toBe("function");
+    await page.setContent('<img class="preview" width="1" height="1" src="data:image/png;base64,AQID">');
+    await expect(previewImageBytes(page, ".preview")).resolves.toEqual(Buffer.from([1, 2, 3]));
+  });
+
+  it("rejects missing, duplicate, non-image, and hidden preview targets", async () => {
+    const previewImageBytes = liveUiRunner.previewImageBytes;
+    expect(typeof previewImageBytes).toBe("function");
+    await page.setContent('<img class="preview" width="1" height="1" src="data:image/png;base64,AQID"><img class="preview" width="1" height="1" src="data:image/png;base64,AQID">');
+    await expect(previewImageBytes(page, "#missing")).rejects.toThrow("preview_image_count");
+    await expect(previewImageBytes(page, ".preview")).rejects.toThrow("preview_image_count");
+
+    await page.setContent('<div id="preview"></div>');
+    await expect(previewImageBytes(page, "#preview")).rejects.toThrow("preview_image_not_img");
+
+    await page.setContent('<img id="preview" hidden width="1" height="1" src="data:image/png;base64,AQID">');
+    await expect(previewImageBytes(page, "#preview")).rejects.toThrow("preview_image_hidden");
+
+    await page.setContent('<img id="preview" width="1" height="1" src="data:text/plain;base64,AQID">');
+    await expect(previewImageBytes(page, "#preview")).rejects.toThrow("data_url_invalid");
   });
 });
 

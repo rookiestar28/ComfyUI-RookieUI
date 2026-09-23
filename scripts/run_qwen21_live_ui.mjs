@@ -161,6 +161,16 @@ export function dataUrlBytes(value) {
   return Buffer.from(match[1], "base64");
 }
 
+export async function previewImageBytes(page, selector) {
+  const preview = page.locator(selector);
+  if (await preview.count() !== 1) throw safeError("preview_image_count");
+  if (!(await preview.evaluate((element) => element instanceof HTMLImageElement))) {
+    throw safeError("preview_image_not_img");
+  }
+  if (!(await preview.isVisible())) throw safeError("preview_image_hidden");
+  return dataUrlBytes(await preview.getAttribute("src"));
+}
+
 export function validateGenerationCapacity(queue, stats) {
   if (!Array.isArray(queue?.queue_running) || !Array.isArray(queue?.queue_pending)) {
     throw safeError("host_queue_shape");
@@ -344,7 +354,21 @@ async function capture(page, dir, name, selector) {
   const target = page.locator(selector).first();
   await target.waitFor({ state: "visible", timeout: 15000 });
   const path = join(dir, `${name}.png`);
-  await target.screenshot({ path, animations: "disabled" });
+  const mask = await page.addStyleTag({ content: `
+    input, select, textarea, [contenteditable], [contenteditable] * {
+      color: transparent !important;
+      -webkit-text-fill-color: transparent !important;
+      text-shadow: 0 0 8px rgba(0, 0, 0, 1) !important;
+      caret-color: transparent !important;
+    }
+    input::placeholder, textarea::placeholder { color: transparent !important; text-shadow: none !important; }
+    #rookieui-pnginfo-metadata, #rookieui-pnginfo-metadata * { visibility: hidden !important; }
+  ` });
+  try {
+    await target.screenshot({ path, animations: "disabled" });
+  } finally {
+    await mask.evaluate((style) => style.remove());
+  }
   return sha256(readFileSync(path));
 }
 
@@ -356,10 +380,6 @@ export async function selectIfPresent(page, selector, value) {
   }
   // CRITICAL: template-owned selectors can be hidden/disabled; only accept their exact preset value, never force a hidden interaction.
   if (await select.inputValue() !== value) throw safeError(`model_selector_unavailable_${selector.slice(1).replaceAll("-", "_")}`);
-}
-
-async function inputBytes(page, selector) {
-  return dataUrlBytes(await page.locator(selector).inputValue());
 }
 
 async function dryRunEditRequest(page, state) {
@@ -440,19 +460,22 @@ async function runEditPane(page, config, checks, state) {
   await selectIfPresent(page, "#rookieui-img2img-vae", config.selectors.vae_bf16);
   const ref1 = fixtureBytes(config, "ref_01");
   const ref2 = fixtureBytes(config, "ref_02");
+  const sourcePreviewSelector = "#rookieui-img2img-source-canvas-preview";
   await page.locator("#rookieui-img2img-image-file").setInputFiles({ name: "reference-1.png", mimeType: "image/png", buffer: ref1 });
-  await page.locator("#rookieui-img2img-reference-file-2").setInputFiles({ name: "reference-2.png", mimeType: "image/png", buffer: ref2 });
-  await page.waitForFunction(() => document.querySelector("#rookieui-image-data")?.value
-    && document.querySelector("#rookieui-img2img-reference-data-2")?.value, null, { timeout: 15000 });
-  if (sha256(await inputBytes(page, "#rookieui-image-data")) !== sha256(ref1)
-      || sha256(await inputBytes(page, "#rookieui-img2img-reference-data-2")) !== sha256(ref2)) {
-    throw safeError("reference_upload_bytes_changed");
+  await page.waitForFunction(() => {
+    const preview = document.querySelector("#rookieui-img2img-source-canvas-preview");
+    return preview instanceof HTMLImageElement && !preview.hidden && preview.getAttribute("src")?.startsWith("data:image/");
+  }, null, { timeout: 15000 });
+  if (sha256(await previewImageBytes(page, sourcePreviewSelector)) !== sha256(ref1)) {
+    throw safeError("reference_one_preview_mismatch");
   }
+  await page.locator("#rookieui-img2img-reference-file-2").setInputFiles({ name: "reference-2.png", mimeType: "image/png", buffer: ref2 });
+  await page.waitForFunction(() => /uploaded reference image ready/i.test(
+    document.querySelector("#rookieui-img2img-reference-status-2")?.textContent ?? "",
+  ), null, { timeout: 15000 });
   await page.locator("#rookieui-img2img-reference-main-1").check();
-  if (sha256(await inputBytes(page, "#rookieui-image-data")) !== sha256(ref2)
-      || sha256(await inputBytes(page, "#rookieui-img2img-reference-data-2")) !== sha256(ref1)
-      || !(await page.locator("#rookieui-img2img-reference-main-0").isChecked())
-      || await page.locator("#rookieui-img2img-main-reference-index").inputValue() !== "0") {
+  if (!(await page.locator("#rookieui-img2img-reference-main-0").isChecked())
+      || sha256(await previewImageBytes(page, sourcePreviewSelector)) !== sha256(ref2)) {
     throw safeError("primary_promotion_not_visible");
   }
   await page.locator("#rookieui-img2img-prompt").fill(EDIT_PROMPT);
