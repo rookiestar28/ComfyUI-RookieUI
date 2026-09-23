@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { chromium } from "@playwright/test";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   dataUrlBytes,
@@ -9,6 +10,7 @@ import {
   parseOptions,
   pinBrowserClientIdentity,
   selectedJob,
+  selectIfPresent,
   toggleSidebar,
   validateConfig,
   validateCandidateIdentity,
@@ -17,6 +19,40 @@ import {
   validateHostRuntimeIdentity,
   validateLiveProcessIdentity,
 } from "../../scripts/run_qwen21_live_ui.mjs";
+
+describe("profile-owned model selector interaction", () => {
+  let browser;
+  let page;
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: true });
+    page = await browser.newPage();
+    page.setDefaultTimeout(1200);
+  });
+
+  afterAll(async () => {
+    await browser?.close();
+  });
+
+  it("sets a visible enabled selector to the requested model", async () => {
+    await page.setContent('<select id="rookieui-text-encoder"><option value="other">Other</option><option value="qwen3vl-int8">Qwen 3 VL</option></select>');
+    await selectIfPresent(page, "#rookieui-text-encoder", "qwen3vl-int8");
+    expect(await page.locator("#rookieui-text-encoder").inputValue()).toBe("qwen3vl-int8");
+  });
+
+  it("accepts a hidden disabled profile-owned selector only when its selected value already matches", async () => {
+    await page.setContent('<select id="rookieui-text-encoder" hidden disabled><option value="qwen3vl-int8" selected>Qwen 3 VL</option></select>');
+    await expect(selectIfPresent(page, "#rookieui-text-encoder", "qwen3vl-int8")).resolves.toBeUndefined();
+    expect(await page.locator("#rookieui-text-encoder").inputValue()).toBe("qwen3vl-int8");
+  });
+
+  it("fails closed when a hidden disabled selector does not hold the requested model", async () => {
+    await page.setContent('<select id="rookieui-text-encoder" hidden disabled><option value="other" selected>Other</option><option value="qwen3vl-int8">Qwen 3 VL</option></select>');
+    await expect(selectIfPresent(page, "#rookieui-text-encoder", "qwen3vl-int8"))
+      .rejects.toThrow("model_selector_unavailable_rookieui_text_encoder");
+    expect(await page.locator("#rookieui-text-encoder").inputValue()).toBe("other");
+  });
+});
 
 const TREE = "e7b429d7f2e73bb5b97a0aa70336960489bbe6b9"; // pragma: allowlist secret - public Git tree id
 const CORE = "e638023d54497dbe0579565e5de4bb7076899592"; // pragma: allowlist secret - public Git commit id

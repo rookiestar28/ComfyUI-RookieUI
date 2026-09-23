@@ -348,11 +348,13 @@ async function capture(page, dir, name, selector) {
   return sha256(readFileSync(path));
 }
 
-async function selectIfPresent(page, selector, value) {
+export async function selectIfPresent(page, selector, value) {
   const select = page.locator(selector);
-  if (await select.locator(`option[value="${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`).count()) {
+  const optionCount = await select.locator(`option[value="${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"]`).count();
+  if (optionCount > 0 && await select.isVisible() && await select.isEnabled()) {
     await select.selectOption(value);
   }
+  // CRITICAL: template-owned selectors can be hidden/disabled; only accept their exact preset value, never force a hidden interaction.
   if (await select.inputValue() !== value) throw safeError(`model_selector_unavailable_${selector.slice(1).replaceAll("-", "_")}`);
 }
 
