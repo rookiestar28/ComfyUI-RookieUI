@@ -52,6 +52,13 @@ REQUIRED_NODES = ("TextEncodeQwenImage21", "QwenImage21Cache", "UNETLoader", "CL
 REQUIRED_PROFILES = ("qwen_image_21", "qwen_image_21_edit")
 MODEL_ROLES = ("diffusion_bf16", "encoder_int8", "vae_bf16")
 VARIANT_ROLES = ("diffusion_int8",)
+EXPECTED_FRONTEND_INDEX_SHA256 = {
+    "H1": "38f822ff4d165ccc57e39587761928f95ab63e96c9cbff53041e91bf68f395cc",  # pragma: allowlist secret - public artifact digest
+    "H2": "646c7d93ee00987398471b5abd58a17a238017a5385917a2394a2d05635b8302",  # pragma: allowlist secret - public artifact digest
+}
+EXPECTED_CORE_VERSION = "0.37.0"
+EXPECTED_BUNDLED_FRONTEND_VERSION = "1.53.6"
+MINIMUM_FREE_VRAM_BYTES = 48 * 1024**3
 MODEL_CATALOGS = {
     "diffusion_bf16": ("diffusion_models",),
     "diffusion_int8": ("diffusion_models",),
@@ -242,6 +249,9 @@ def load_config(path: Path) -> Config:
     host = raw.get("host")
     if host not in ("H1", "H2"):
         raise QualificationError("config_host")
+    frontend_digest = _require_pattern(raw.get("frontend_index_sha256"), SHA256_HEX, "config_frontend")
+    if frontend_digest != EXPECTED_FRONTEND_INDEX_SHA256[host]:
+        raise QualificationError("config_frontend_identity")
     base_url = raw.get("base_url")
     if not isinstance(base_url, str):
         raise QualificationError("config_url")
@@ -300,7 +310,7 @@ def load_config(path: Path) -> Config:
         rookieui_install_root=Path(raw["rookieui_install_root"]),
         host_output_root=Path(raw["host_output_root"]),
         core_head=_require_pattern(raw.get("core_head"), GIT_OBJECT_ID, "config_core"),
-        frontend_index_sha256=_require_pattern(raw.get("frontend_index_sha256"), SHA256_HEX, "config_frontend"),
+        frontend_index_sha256=frontend_digest,
         fixture_manifest=Path(raw["fixture_manifest"]),
         fixture_manifest_sha256=_require_pattern(raw.get("fixture_manifest_sha256"), SHA256_HEX, "config_fixture"),
         process_pid=pid,
@@ -407,8 +417,25 @@ def _vram_free(config: Config) -> int | None:
     devices = _get_json(config, "/system_stats").get("devices")
     if isinstance(devices, list) and devices and isinstance(devices[0], dict):
         value = devices[0].get("vram_free")
-        return value if isinstance(value, int) else None
+        return value if isinstance(value, int) and not isinstance(value, bool) else None
     return None
+
+
+def _assert_generation_capacity(config: Config) -> int:
+    """Refuse new model work unless the host and GPU meet the frozen capacity floor."""
+    queue = _get_json(config, "/queue")
+    running = queue.get("queue_running")
+    pending = queue.get("queue_pending")
+    if not isinstance(running, list) or not isinstance(pending, list):
+        raise QualificationError("host_queue_shape")
+    if running or pending:
+        raise QualificationError("host_queue_busy")
+    free = _vram_free(config)
+    if free is None or isinstance(free, bool):
+        raise QualificationError("host_vram_unavailable")
+    if free < MINIMUM_FREE_VRAM_BYTES:
+        raise QualificationError("host_vram_low")
+    return free
 
 
 def _fixture_entries(config: Config) -> list[dict[str, Any]]:
@@ -655,7 +682,7 @@ def _submit_and_collect(
     if before != 0:
         raise QualificationError("client_id_not_fresh")
     started = time.monotonic()
-    row["vram_free_before"] = _vram_free(config)
+    row["vram_free_before"] = _assert_generation_capacity(config)
     submit_status, submitted = _post_json(config, route, payload)
     submission = submitted.get("submission")
     prompt_id = submission.get("prompt_id") if isinstance(submission, dict) else None
@@ -679,7 +706,10 @@ def _submit_and_collect(
         raise QualificationError("job_terminal_timeout")
     row["terminal_status"] = str(job["status"])
     row["history_matched"] = True
-    row["vram_free_after"] = _vram_free(config)
+    vram_free_after = _vram_free(config)
+    if not isinstance(vram_free_after, int) or isinstance(vram_free_after, bool):
+        raise QualificationError("host_vram_unavailable")
+    row["vram_free_after"] = vram_free_after
     if job["status"] != "completed":
         raise QualificationError("job_not_completed")
     if _client_job_count(config, client_id) != 1:
@@ -1010,8 +1040,18 @@ def preflight(config: Config) -> dict[str, object]:
     required = set(REQUIRED_PROFILES) | {control.profile for control in config.legacy_controls}
     if not required <= profiles:
         raise QualificationError("rookieui_profile_missing")
+    runtime_stats = _get_json(config, "/system_stats").get("system")
+    if not isinstance(runtime_stats, dict) or runtime_stats.get("comfyui_version") != EXPECTED_CORE_VERSION:
+        raise QualificationError("host_core_runtime_mismatch")
+    packages = runtime_stats.get("comfy_package_versions")
+    bundled_frontend = next((item for item in packages if isinstance(item, dict)
+                             and item.get("name") == "comfyui-frontend-package"), None) if isinstance(packages, list) else None
+    if not isinstance(bundled_frontend, dict) or bundled_frontend.get("installed") != EXPECTED_BUNDLED_FRONTEND_VERSION:
+        raise QualificationError("host_bundled_frontend_mismatch")
     queue = _get_json(config, "/queue")
-    if any(queue.get(key) for key in ("queue_running", "queue_pending")):
+    if not isinstance(queue.get("queue_running"), list) or not isinstance(queue.get("queue_pending"), list):
+        raise QualificationError("host_queue_shape")
+    if queue["queue_running"] or queue["queue_pending"]:
         raise QualificationError("host_queue_busy")
     identity = {"pid": config.process_pid, "created": config.process_created_utc,
                 "command_sha256": config.process_command_sha256, "core": config.core_head,

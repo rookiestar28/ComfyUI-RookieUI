@@ -37,6 +37,8 @@ ENCODER = "qwen3vl_8b_int8_convrot.safetensors"
 VAE = "qwen_image_2.1_vae_bf16.safetensors"
 TREE = "e7b429d7f2e73bb5b97a0aa70336960489bbe6b9"  # pragma: allowlist secret - public Git tree id
 CORE = "e638023d54497dbe0579565e5de4bb7076899592"  # pragma: allowlist secret - public Git commit id
+FRONTEND_H1 = "38f822ff4d165ccc57e39587761928f95ab63e96c9cbff53041e91bf68f395cc"  # pragma: allowlist secret - public artifact digest
+FRONTEND_H2 = "646c7d93ee00987398471b5abd58a17a238017a5385917a2394a2d05635b8302"  # pragma: allowlist secret - public artifact digest
 
 
 def _png(size: tuple[int, int], color: tuple[int, int, int, int], info: PngInfo | None = None) -> bytes:
@@ -65,7 +67,7 @@ def valid_config(root: Path) -> dict[str, Any]:
         "rookieui_install_root": str(root / "core" / "custom_nodes" / "comfyui-rookieui"),
         "host_output_root": str(root / "host-output"),
         "core_head": CORE,
-        "frontend_index_sha256": digest,
+        "frontend_index_sha256": FRONTEND_H1,
         "fixture_manifest": str(fixtures / "manifest.json"),
         "fixture_manifest_sha256": digest,
         "process_pid": 123,
@@ -165,10 +167,11 @@ class FakeHost:
     def patches(self) -> list[Any]:
         return [
             mock.patch.object(qualification, "_post_json", side_effect=self.post),
+            mock.patch.object(qualification, "_get_json", return_value={"queue_running": [], "queue_pending": []}),
             mock.patch.object(qualification, "_queue_job", side_effect=self.queue_job),
             mock.patch.object(qualification, "_client_job_count", side_effect=self.job_count),
             mock.patch.object(qualification, "_get_bytes", side_effect=self.get_bytes),
-            mock.patch.object(qualification, "_vram_free", return_value=None),
+            mock.patch.object(qualification, "_vram_free", return_value=qualification.MINIMUM_FREE_VRAM_BYTES),
             mock.patch.object(qualification.time, "sleep"),
         ]
 
@@ -184,6 +187,15 @@ class HostQualificationConfigTests(unittest.TestCase):
             with self.subTest(value=value), tempfile.TemporaryDirectory() as folder:
                 with self.assertRaisesRegex(qualification.QualificationError, "config_candidate"):
                     load(Path(folder), candidate_tree=value)
+
+    def test_config_pins_frontend_digest_to_host_identity(self) -> None:
+        for host, digest in (("H1", FRONTEND_H2), ("H2", FRONTEND_H1)):
+            with self.subTest(host=host), tempfile.TemporaryDirectory() as folder:
+                with self.assertRaisesRegex(qualification.QualificationError, "config_frontend_identity"):
+                    load(Path(folder), host=host, frontend_index_sha256=digest)
+        for host, digest in (("H1", FRONTEND_H1), ("H2", FRONTEND_H2)):
+            with self.subTest(host=host), tempfile.TemporaryDirectory() as folder:
+                self.assertEqual(load(Path(folder), host=host, frontend_index_sha256=digest).host, host)
 
     def test_config_rejects_remote_or_credentialed_host(self) -> None:
         for url in ("https://example.com:8188", "http://user:pass@127.0.0.1:8188", "http://127.0.0.1:8189"):  # pragma: allowlist secret
@@ -275,6 +287,70 @@ class HostQualificationResultTests(unittest.TestCase):
 
 
 class HostQualificationCaseTests(unittest.TestCase):
+    def test_generation_capacity_requires_idle_queue_and_minimum_vram(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            config = load(Path(folder))
+            minimum = qualification.MINIMUM_FREE_VRAM_BYTES
+            with mock.patch.object(qualification, "_get_json", return_value={"queue_running": [], "queue_pending": []}), \
+                    mock.patch.object(qualification, "_vram_free", return_value=minimum):
+                self.assertEqual(qualification._assert_generation_capacity(config), minimum)
+            with mock.patch.object(qualification, "_get_json", return_value={"queue_running": [{}], "queue_pending": []}), \
+                    mock.patch.object(qualification, "_vram_free") as vram:
+                with self.assertRaisesRegex(qualification.QualificationError, "host_queue_busy"):
+                    qualification._assert_generation_capacity(config)
+                vram.assert_not_called()
+            with mock.patch.object(qualification, "_get_json", return_value={"queue_running": [], "queue_pending": []}), \
+                    mock.patch.object(qualification, "_vram_free", return_value=minimum - 1):
+                with self.assertRaisesRegex(qualification.QualificationError, "host_vram_low"):
+                    qualification._assert_generation_capacity(config)
+            with mock.patch.object(qualification, "_get_json", return_value={"queue_running": [], "queue_pending": []}), \
+                    mock.patch.object(qualification, "_vram_free", return_value=None):
+                with self.assertRaisesRegex(qualification.QualificationError, "host_vram_unavailable"):
+                    qualification._assert_generation_capacity(config)
+            with mock.patch.object(qualification, "_get_json", return_value={"queue_running": [], "queue_pending": []}), \
+                    mock.patch.object(qualification, "_vram_free", return_value=True):
+                with self.assertRaisesRegex(qualification.QualificationError, "host_vram_unavailable"):
+                    qualification._assert_generation_capacity(config)
+
+    def test_completed_generation_requires_post_run_vram_observation(self) -> None:
+        for after in (None, True):
+            with self.subTest(after=after), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                config = load(root)
+                host = FakeHost(config)
+                plan = qualification._case_plan(config, "Q21-T2I-SQUARE", "fresh-client")
+                host.output_size = (plan.width, plan.height)
+                row = qualification._new_row("Q21-T2I-SQUARE")
+                patches = host.patches() + [mock.patch.object(qualification, "_vram_free",
+                                                               side_effect=[qualification.MINIMUM_FREE_VRAM_BYTES, after])]
+                for patch in patches:
+                    patch.start()
+                try:
+                    with self.assertRaisesRegex(qualification.QualificationError, "host_vram_unavailable"):
+                        qualification._submit_and_collect(
+                            config, plan.route, plan.payload, "fresh-client", (plan.width, plan.height),
+                            root / "images" / "Q21-T2I-SQUARE.png", row,
+                        )
+                finally:
+                    for patch in reversed(patches):
+                        patch.stop()
+
+    def test_submission_runs_capacity_guard_before_posting(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            config = load(Path(folder))
+            row = qualification._new_row("Q21-T2I-SQUARE")
+            with mock.patch.object(qualification, "_client_job_count", return_value=0), \
+                    mock.patch.object(qualification, "_assert_generation_capacity", create=True,
+                                      side_effect=qualification.QualificationError("host_queue_busy")) as guard, \
+                    mock.patch.object(qualification, "_post_json") as post:
+                with self.assertRaisesRegex(qualification.QualificationError, "host_queue_busy"):
+                    qualification._submit_and_collect(
+                        config, "/rookieui/generate/txt2img", {}, "fresh-client", (512, 512),
+                        Path(folder) / "image.png", row,
+                    )
+                guard.assert_called_once_with(config)
+                post.assert_not_called()
+
     def test_graph_rejects_lexical_reference_reordering(self) -> None:
         required = ("UNETLoader", "CLIPLoader", "VAELoader", "KSampler", "VAEDecode", "EmptyLatentImage")
         graph = {str(index): {"class_type": name, "inputs": {"width": 512, "height": 512} if name == "EmptyLatentImage" else {}}
@@ -428,7 +504,7 @@ class HostQualificationFinalizeTests(unittest.TestCase):
                 row.update(status="PENDING_REVIEW", original_sha256=hashlib.sha256(data).hexdigest())
             rows.append(row)
         execute = {"schema": "Qwen21HostQualificationV1", "phase": "execute", "host": "H1", "status": "PENDING_REVIEW",
-                   "candidate_tree": TREE, "served_frontend_digest": "a" * 64, "host_identity_digest": "c" * 64,
+                   "candidate_tree": TREE, "served_frontend_digest": config.frontend_index_sha256, "host_identity_digest": "c" * 64,
                    "model_role_digests": {}, "fixture_digest": "a" * 64, "variants": {}, "cases": rows}
         path = root / "H1-execute.json"
         path.write_text(json.dumps(execute), encoding="utf-8")

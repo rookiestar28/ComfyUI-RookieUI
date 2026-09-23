@@ -12,6 +12,11 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const RESULT_SCHEMA = "Qwen21LiveUIV1";
+export const FRONTEND_INDEX_SHA256_BY_HOST = Object.freeze({
+  H1: "38f822ff4d165ccc57e39587761928f95ab63e96c9cbff53041e91bf68f395cc", // pragma: allowlist secret - public artifact digest
+  H2: "646c7d93ee00987398471b5abd58a17a238017a5385917a2394a2d05635b8302", // pragma: allowlist secret - public artifact digest
+});
+export const MINIMUM_FREE_VRAM_BYTES = 48 * 1024 ** 3;
 const CONFIG_SCHEMA = "Qwen21HostConfigV1";
 const EXECUTE_SCHEMA = "Qwen21HostQualificationV1";
 const CASE_ID = "Q21-REMOVE-BG";
@@ -67,6 +72,9 @@ export function validateConfig(raw) {
   }
   if (!GIT_OBJECT_ID.test(raw.candidate_tree ?? "")) throw safeError("config_candidate");
   if (!SHA256.test(raw.frontend_index_sha256 ?? "")) throw safeError("config_frontend");
+  if (raw.frontend_index_sha256 !== FRONTEND_INDEX_SHA256_BY_HOST[raw.host]) {
+    throw safeError("config_frontend_identity");
+  }
   for (const key of ["fixture_manifest", "rookieui_install_root"]) {
     if (typeof raw[key] !== "string" || !raw[key]) throw safeError("config_paths");
   }
@@ -105,6 +113,24 @@ export function dataUrlBytes(value) {
   return Buffer.from(match[1], "base64");
 }
 
+export function validateGenerationCapacity(queue, stats) {
+  if (!Array.isArray(queue?.queue_running) || !Array.isArray(queue?.queue_pending)) {
+    throw safeError("host_queue_shape");
+  }
+  if (queue.queue_running.length || queue.queue_pending.length) throw safeError("host_queue_busy");
+  const free = validateFreeVram(stats);
+  if (free < MINIMUM_FREE_VRAM_BYTES) throw safeError("host_vram_low");
+  return free;
+}
+
+export function validateFreeVram(stats) {
+  const free = stats?.devices?.[0]?.vram_free;
+  if (!Number.isSafeInteger(free) || free < 0) {
+    throw safeError("host_vram_unavailable");
+  }
+  return free;
+}
+
 function fixtureBytes(config, fixtureId) {
   const entries = readJson(config.fixture_manifest, "fixture_manifest_invalid");
   const entry = Array.isArray(entries) ? entries.find((item) => item?.id === fixtureId) : null;
@@ -122,9 +148,21 @@ function hostInputSha(config, handle) {
 }
 
 async function hostJson(config, path) {
-  const response = await fetch(new URL(path, config.base_url));
+  const response = await fetch(new URL(path, config.base_url), { signal: AbortSignal.timeout(10000) });
   if (response.status !== 200) throw safeError("host_http_status");
   return response.json();
+}
+
+async function assertGenerationCapacity(config) {
+  const [queue, stats] = await Promise.all([
+    hostJson(config, "/queue"),
+    hostJson(config, "/system_stats"),
+  ]);
+  return validateGenerationCapacity(queue, stats);
+}
+
+async function readFreeVram(config) {
+  return validateFreeVram(await hostJson(config, "/system_stats"));
 }
 
 async function jobFor(config, promptId, clientId) {
@@ -195,6 +233,7 @@ async function runUiGeneration(page, config, checks, evidence) {
   await page.locator("#rookieui-prompt").fill(UI_PROMPT);
   await page.locator("#rookieui-width").fill("1024");
   await page.locator("#rookieui-height").fill("1024");
+  const vramFreeBefore = await assertGenerationCapacity(config);
   const submitted = page.waitForResponse(
     (response) => /\/rookieui\/generate\/txt2img$/.test(new URL(response.url()).pathname) && response.request().method() === "POST",
     { timeout: 60000 },
@@ -223,10 +262,12 @@ async function runUiGeneration(page, config, checks, evidence) {
   const job = await jobFor(config, promptId, evidence.clientId);
   const output = job?.reusable_outputs?.[0];
   if (job?.status !== "completed" || !HANDLE.test(output ?? "")) throw safeError("ui_generation_job_unbound");
+  const vramFreeAfter = await readFreeVram(config);
   const src = await page.locator("#rookieui-txt2img-preview img").first().getAttribute("src");
   if (!src || new URL(src, config.base_url).searchParams.get("filename") !== output) throw safeError("ui_preview_not_job_output");
   if (!progressObserved) throw safeError("ui_progress_event_not_observed");
-  checks.ui_generation = { prompt_id: promptId, progress_observed: true, preview_bound_to_output: true };
+  checks.ui_generation = { prompt_id: promptId, progress_observed: true, preview_bound_to_output: true,
+    vram_free_before: vramFreeBefore, vram_free_after: vramFreeAfter };
 }
 
 async function runEditPane(page, config, checks, state) {
