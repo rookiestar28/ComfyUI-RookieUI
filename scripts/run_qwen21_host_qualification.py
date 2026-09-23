@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import hashlib
 import io
 import json
@@ -169,6 +170,16 @@ class Config:
     variants: Mapping[str, ModelRole]
     legacy_controls: tuple[LegacyControl, ...]
     legacy_unavailable: tuple[Mapping[str, str], ...]
+
+
+@dataclass(frozen=True)
+class ResumeContext:
+    source_result_path: Path
+    source_result_sha256: str
+    source_host_identity_digest: str
+    source_images: Path
+    case_rows: Mapping[str, Mapping[str, Any]]
+    completed_legacy_controls: tuple[Mapping[str, Any], ...]
 
 
 def _sha256_file(path: Path) -> str:
@@ -331,6 +342,61 @@ def load_config(path: Path) -> Config:
 
 def expected_case_ids(config: Config) -> tuple[str, ...]:
     return CASE_IDS
+
+
+def _model_role_digests(config: Config) -> dict[str, str]:
+    return {role: asset.sha256 for role, asset in _all_models(config).items()}
+
+
+def _variant_statuses(config: Config) -> dict[str, str]:
+    return {role: ("CONFIGURED" if role in config.variants else "UNAVAILABLE_NOT_CONFIGURED")
+            for role in VARIANT_ROLES}
+
+
+def _host_identity_digest(config: Config) -> str:
+    # CRITICAL: keep deferred so importing this runner does not load optional host adapters.
+    from rookieui.services.version import resolve_runtime_build_fingerprint
+
+    identity = {"pid": config.process_pid, "created": config.process_created_utc,
+                "command_sha256": config.process_command_sha256, "core": config.core_head,
+                "frontend": config.frontend_index_sha256,
+                "rookieui": resolve_runtime_build_fingerprint()}
+    return _digest(identity)
+
+
+def _resolved_path_identity(path: Path) -> str:
+    return os.path.normcase(str(path.resolve()))
+
+
+def _static_config_identity(config: Config) -> dict[str, object]:
+    def asset_identity(asset: ModelRole) -> dict[str, object]:
+        return {"selector": asset.selector, "path": _resolved_path_identity(asset.path),
+                "sha256": asset.sha256, "size": asset.size, "catalogs": list(asset.catalogs)}
+
+    controls = []
+    for control in config.legacy_controls:
+        controls.append({
+            "id": control.control_id, "profile": control.profile, "route": control.route,
+            "request": dict(control.request),
+            "assets": {field: asset_identity(asset) for field, asset in sorted(control.assets.items())},
+            "reference_fixtures": list(control.reference_fixtures),
+            "expected_width": control.expected_width, "expected_height": control.expected_height,
+        })
+    return {
+        "host": config.host, "base_url": config.base_url, "candidate_tree": config.candidate_tree,
+        "core_root": _resolved_path_identity(config.core_root),
+        "rookieui_install_root": _resolved_path_identity(config.rookieui_install_root),
+        "host_output_root": _resolved_path_identity(config.host_output_root), "core_head": config.core_head,
+        "frontend_index_sha256": config.frontend_index_sha256,
+        "fixture_manifest": _resolved_path_identity(config.fixture_manifest),
+        "fixture_manifest_sha256": config.fixture_manifest_sha256,
+        "request_timeout_seconds": config.request_timeout_seconds,
+        "poll_timeout_seconds": config.poll_timeout_seconds,
+        "models": {role: asset_identity(asset) for role, asset in sorted(config.models.items())},
+        "variants": {role: asset_identity(asset) for role, asset in sorted(config.variants.items())},
+        "legacy_controls": controls,
+        "legacy_unavailable": [dict(item) for item in config.legacy_unavailable],
+    }
 
 
 def _git(path: Path, *args: str) -> str:
@@ -912,11 +978,46 @@ def _run_transfer_case(config: Config, source_row: Mapping[str, Any], image_path
                 "original_sha256": original_sha, "status": "PASS", "child_exit": 0})
 
 
-def _run_legacy_case(config: Config, private_images: Path, row: dict[str, Any]) -> None:
+def _copy_resume_artifact(config: Config, source_images: Path, target_images: Path,
+                          evidence_name: str, row: Mapping[str, Any]) -> None:
+    source = _validate_resume_artifact(config, source_images, evidence_name, row)
+    digest = row.get("original_sha256")
+    data = source.read_bytes()
+    if not isinstance(digest, str) or hashlib.sha256(data).hexdigest() != digest:
+        raise QualificationError("resume_image_digest_mismatch")
+    target = target_images / evidence_name
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("xb") as output:
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+    except FileExistsError as exc:
+        raise QualificationError("resume_destination_exists") from exc
+    if _sha256_file(target) != digest:
+        raise QualificationError("resume_image_copy_mismatch")
+
+
+def _run_legacy_case(config: Config, private_images: Path, row: dict[str, Any], *,
+                     completed_controls: tuple[Mapping[str, Any], ...] = (),
+                     source_images: Path | None = None) -> None:
     controls: list[dict[str, Any]] = []
     row["controls"] = controls
     row["unavailable_controls"] = [dict(item) for item in config.legacy_unavailable]
-    for control in config.legacy_controls:
+    if completed_controls and source_images is None:
+        raise QualificationError("resume_source_not_resumable")
+    if len(completed_controls) >= len(config.legacy_controls):
+        raise QualificationError("resume_source_not_resumable")
+    for index, control in enumerate(config.legacy_controls):
+        if index < len(completed_controls):
+            previous = copy.deepcopy(dict(completed_controls[index]))
+            if previous.get("id") != control.control_id or previous.get("profile") != control.profile:
+                raise QualificationError("resume_source_not_resumable")
+            _copy_resume_artifact(
+                config, source_images, private_images, f"Q21-LEGACY-{control.control_id}.png", previous,  # type: ignore[arg-type]
+            )
+            controls.append(previous)
+            continue
         control_row: dict[str, Any] = {"id": control.control_id, "profile": control.profile, "status": "FAIL"}
         controls.append(control_row)
         client_id = _client_id()
@@ -948,10 +1049,39 @@ def _run_legacy_case(config: Config, private_images: Path, row: dict[str, Any]) 
     row.update({"dry_run_pass": True, "executed": True, "status": "PASS", "child_exit": 0})
 
 
-def execute_cases(config: Config, private_images: Path) -> list[dict[str, Any]]:
+def _reuse_case_row(config: Config, resume: ResumeContext, private_images: Path, case_id: str) -> dict[str, Any]:
+    source = resume.case_rows[case_id]
+    row = copy.deepcopy(dict(source))
+    if case_id in IMAGE_CASES:
+        _copy_resume_artifact(config, resume.source_images, private_images, f"{case_id}.png", source)
+    return row
+
+
+def execute_cases(config: Config, private_images: Path, *, resume: ResumeContext | None = None,
+                  rerun_case_ids: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+    if private_images.exists():
+        raise QualificationError("result_images_exist")
+    if resume is None and rerun_case_ids:
+        raise QualificationError("resume_arguments_invalid")
+    if resume is not None and rerun_case_ids != ("Q21-EDIT-2-REF",):
+        raise QualificationError("resume_rerun_case_invalid")
     cases: list[dict[str, Any]] = []
     ordered = expected_case_ids(config)
+    private_images.mkdir(parents=True, exist_ok=False)
     for case_id in ordered:
+        if resume is not None and case_id not in rerun_case_ids and case_id != "Q21-LEGACY":
+            try:
+                cases.append(_reuse_case_row(config, resume, private_images, case_id))
+            except QualificationError as exc:
+                row = _new_row(case_id)
+                row["error_code"] = exc.code
+                cases.append(row)
+                for remaining in ordered[len(cases):]:
+                    pending = _new_row(remaining)
+                    pending.update({"status": "NOT_RUN", "error_code": "prior_case_failed"})
+                    cases.append(pending)
+                break
+            continue
         row = _new_row(case_id)
         try:
             if case_id in IMAGE_CASES:
@@ -962,7 +1092,11 @@ def execute_cases(config: Config, private_images: Path) -> list[dict[str, Any]]:
             elif case_id == "Q21-NEGATIVE":
                 _run_negative_case(config, row)
             elif case_id == "Q21-LEGACY":
-                _run_legacy_case(config, private_images, row)
+                _run_legacy_case(
+                    config, private_images, row,
+                    completed_controls=resume.completed_legacy_controls if resume else (),
+                    source_images=resume.source_images if resume else None,
+                )
             else:
                 raise QualificationError("case_unregistered")
         except QualificationError as exc:
@@ -1011,6 +1145,171 @@ def _process_identity(pid: int) -> tuple[str, str]:
     if not isinstance(payload, dict) or not isinstance(payload.get("created"), str) or not isinstance(payload.get("command"), str):
         raise QualificationError("host_process_identity_invalid")
     return payload["created"], hashlib.sha256(payload["command"].encode("utf-8")).hexdigest()
+
+
+def _process_identity_if_alive(pid: int) -> tuple[str, str] | None:
+    """Return a safe identity tuple for a prior host PID, or None when it has exited."""
+    command = (
+        f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={pid}'; "
+        "if ($null -eq $p) { Write-Output 'ABSENT' } else { "
+        "[pscustomobject]@{created=$p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ'); "
+        "command=$p.CommandLine} | ConvertTo-Json -Compress }"
+    )
+    try:
+        result = subprocess.run(["powershell", "-NoProfile", "-Command", command], capture_output=True, text=True,
+                                check=True, timeout=25)
+        if result.stdout.strip() == "ABSENT":
+            return None
+        payload = json.loads(result.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
+        raise QualificationError("resume_process_probe_failed") from exc
+    if not isinstance(payload, dict) or not isinstance(payload.get("created"), str) or not isinstance(payload.get("command"), str):
+        raise QualificationError("resume_process_probe_failed")
+    return payload["created"], hashlib.sha256(payload["command"].encode("utf-8")).hexdigest()
+
+
+def _resume_host_output_path(config: Config, output_handle: object) -> Path:
+    if not isinstance(output_handle, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}\.png", output_handle):
+        raise QualificationError("resume_host_output_handle_invalid")
+    root = config.host_output_root.resolve()
+    path = root / output_handle
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise QualificationError("resume_host_output_unavailable") from exc
+    if path.is_symlink() or not resolved.is_relative_to(root) or not resolved.is_file():
+        raise QualificationError("resume_host_output_unavailable")
+    return resolved
+
+
+def _validate_resume_artifact(config: Config, source_images: Path, evidence_name: str,
+                              row: Mapping[str, Any]) -> Path:
+    digest = row.get("original_sha256")
+    if not isinstance(digest, str) or not SHA256_HEX.fullmatch(digest):
+        raise QualificationError("resume_source_not_resumable")
+    output_path = _resume_host_output_path(config, row.get("output_handle"))
+    if _sha256_file(output_path) != digest:
+        raise QualificationError("resume_host_output_digest_mismatch")
+    evidence = source_images / evidence_name
+    try:
+        resolved = evidence.resolve(strict=True)
+    except OSError as exc:
+        raise QualificationError("resume_image_unavailable") from exc
+    if evidence.is_symlink() or not resolved.is_relative_to(source_images.resolve()) or not resolved.is_file():
+        raise QualificationError("resume_image_unavailable")
+    if _sha256_file(resolved) != digest:
+        raise QualificationError("resume_image_digest_mismatch")
+    return resolved
+
+
+def _validate_resume(config: Config, source_config: Config, source_path: Path,
+                     current_preflight: Mapping[str, Any]) -> ResumeContext:
+    if _static_config_identity(config) != _static_config_identity(source_config):
+        raise QualificationError("resume_config_mismatch")
+    old_process = (source_config.process_pid, source_config.process_created_utc, source_config.process_command_sha256)
+    new_process = (config.process_pid, config.process_created_utc, config.process_command_sha256)
+    if old_process == new_process:
+        raise QualificationError("resume_process_identity_mismatch")
+    if _process_identity_if_alive(source_config.process_pid) == (
+        source_config.process_created_utc, source_config.process_command_sha256,
+    ):
+        raise QualificationError("resume_old_process_active")
+    _, execute = _load_json_bytes(source_path, "resume_result_unreadable")
+    source_sha256 = _sha256_file(source_path)
+    if execute.get("candidate_tree") != config.candidate_tree:
+        raise QualificationError("resume_candidate_mismatch")
+    old_identity = execute.get("host_identity_digest")
+    current_identity = current_preflight.get("host_identity_digest")
+    if (
+        isinstance(old_identity, str) and SHA256_HEX.fullmatch(old_identity)
+        and isinstance(current_identity, str) and SHA256_HEX.fullmatch(current_identity)
+        and old_identity == current_identity
+    ):
+        raise QualificationError("resume_process_identity_mismatch")
+    if (
+        execute.get("schema") != RESULT_SCHEMA or execute.get("phase") != "execute" or execute.get("host") != config.host
+        or execute.get("status") != "FAIL" or execute.get("error_code") != "case_matrix_not_accepted"
+        or not isinstance(old_identity, str) or not SHA256_HEX.fullmatch(old_identity)
+        or not isinstance(current_identity, str) or not SHA256_HEX.fullmatch(current_identity)
+        or execute.get("served_frontend_digest") != current_preflight.get("served_frontend_digest")
+        or execute.get("model_role_digests") != current_preflight.get("model_role_digests")
+        or execute.get("fixture_digest") != current_preflight.get("fixture_digest")
+        or execute.get("variants") != current_preflight.get("variants")
+        or execute.get("execution_identity_segments") != [old_identity]
+        or execute.get("served_frontend_digest") != config.frontend_index_sha256
+        or execute.get("model_role_digests") != _model_role_digests(config)
+        or execute.get("fixture_digest") != config.fixture_manifest_sha256
+        or execute.get("variants") != _variant_statuses(config)
+    ):
+        raise QualificationError("resume_result_identity_mismatch")
+    rows = execute.get("cases")
+    expected = expected_case_ids(config)
+    if not isinstance(rows, list) or [row.get("case_id") for row in rows if isinstance(row, dict)] != list(expected):
+        raise QualificationError("resume_case_matrix_mismatch")
+    rows_by_case: dict[str, Mapping[str, Any]] = {}
+    for index, row in enumerate(rows):
+        if (
+            not isinstance(row, dict) or row.get("candidate_tree") != config.candidate_tree
+            or row.get("host_identity_digest") != old_identity
+            or row.get("served_frontend_digest") != config.frontend_index_sha256
+            or row.get("model_role_digests") != _model_role_digests(config)
+            or row.get("fixture_digest") != config.fixture_manifest_sha256
+        ):
+            raise QualificationError("resume_row_identity_mismatch")
+        rows_by_case[expected[index]] = row
+    for case_id in IMAGE_CASES:
+        row = rows_by_case.get(case_id)
+        if (
+            not isinstance(row, dict) or row.get("status") != "PENDING_REVIEW" or row.get("child_exit") != 0
+            or row.get("semantic_review") != "PENDING" or row.get("executed") is not True
+            or row.get("history_matched") is not True or row.get("terminal_status") != "completed"
+            or row.get("original_decoded") is not True
+        ):
+            raise QualificationError("resume_source_not_resumable")
+        _validate_resume_artifact(config, source_path.parent / (source_path.stem + "-images"),
+                                  f"{case_id}.png", row)
+    for case_id in ("Q21-TRANSFER", "Q21-NEGATIVE"):
+        row = rows_by_case.get(case_id)
+        if not isinstance(row, dict) or row.get("status") != "PASS" or row.get("child_exit") != 0:
+            raise QualificationError("resume_source_not_resumable")
+    legacy = rows_by_case.get("Q21-LEGACY")
+    controls = legacy.get("controls") if isinstance(legacy, dict) else None
+    if (
+        not isinstance(legacy, dict) or legacy.get("status") != "FAIL" or legacy.get("child_exit") != 1
+        or legacy.get("error_code") != "host_vram_low" or legacy.get("unavailable_controls") != [dict(x) for x in config.legacy_unavailable]
+        or not isinstance(controls, list) or len(controls) != len(config.legacy_controls)
+    ):
+        raise QualificationError("resume_source_not_resumable")
+    completed: list[Mapping[str, Any]] = []
+    for index, (control, control_row) in enumerate(zip(config.legacy_controls, controls, strict=True)):
+        if not isinstance(control_row, dict) or control_row.get("id") != control.control_id or control_row.get("profile") != control.profile:
+            raise QualificationError("resume_source_not_resumable")
+        if index < len(controls) - 1:
+            if (
+                control_row.get("status") != "PASS" or control_row.get("child_exit") != 0
+                or control_row.get("dry_run_pass") is not True or control_row.get("executed") is not True
+                or control_row.get("history_matched") is not True or control_row.get("terminal_status") != "completed"
+                or control_row.get("host_identity_digest") != old_identity
+            ):
+                raise QualificationError("resume_source_not_resumable")
+            _validate_resume_artifact(
+                config, source_path.parent / (source_path.stem + "-images"),
+                f"Q21-LEGACY-{control.control_id}.png", control_row,
+            )
+            completed.append(control_row)
+        elif (
+            control_row.get("status") != "FAIL" or control_row.get("dry_run_pass") is not True
+            or control_row.get("executed") is True or control_row.get("prompt_id") is not None
+        ):
+            raise QualificationError("resume_source_not_resumable")
+    if not completed:
+        raise QualificationError("resume_source_not_resumable")
+    return ResumeContext(
+        source_result_path=source_path, source_result_sha256=source_sha256,
+        source_host_identity_digest=old_identity,
+        source_images=source_path.parent / (source_path.stem + "-images"),
+        case_rows=rows_by_case, completed_legacy_controls=tuple(completed),
+    )
 
 
 def _all_models(config: Config) -> dict[str, ModelRole]:
@@ -1069,12 +1368,9 @@ def preflight(config: Config) -> dict[str, object]:
         raise QualificationError("host_queue_shape")
     if queue["queue_running"] or queue["queue_pending"]:
         raise QualificationError("host_queue_busy")
-    identity = {"pid": config.process_pid, "created": config.process_created_utc,
-                "command_sha256": config.process_command_sha256, "core": config.core_head,
-                "frontend": config.frontend_index_sha256, "rookieui": runtime["build_fingerprint"]}
     return {
         "candidate_tree": config.candidate_tree,
-        "host_identity_digest": _digest(identity),
+        "host_identity_digest": _host_identity_digest(config),
         "served_frontend_digest": config.frontend_index_sha256,
         "model_role_digests": {role: model.sha256 for role, model in _all_models(config).items()},
         "fixture_digest": config.fixture_manifest_sha256,
@@ -1102,11 +1398,15 @@ def finalize(config: Config, execute_path: Path, review_path: Path) -> dict[str,
         execute.get("schema") != RESULT_SCHEMA or execute.get("phase") != "execute" or execute.get("host") != config.host
         or execute.get("candidate_tree") != config.candidate_tree or execute.get("status") != "PENDING_REVIEW"
         or execute.get("served_frontend_digest") != config.frontend_index_sha256
+        or execute.get("model_role_digests") != _model_role_digests(config)
+        or execute.get("fixture_digest") != config.fixture_manifest_sha256
+        or execute.get("variants") != _variant_statuses(config)
     ):
         raise QualificationError("execute_identity_mismatch")
     rows = execute.get("cases")
     if not isinstance(rows, list) or [row.get("case_id") for row in rows if isinstance(row, dict)] != list(expected_case_ids(config)):
         raise QualificationError("execute_case_matrix_mismatch")
+    _validate_execute_lineage(execute, rows, config)
     _, review = _load_json_bytes(review_path, "review_unreadable")
     if (
         review.get("schema") != REVIEW_SCHEMA or review.get("host") != config.host
@@ -1141,7 +1441,86 @@ def finalize(config: Config, execute_path: Path, review_path: Path) -> dict[str,
         final_rows.append(final)
     return {**{key: execute[key] for key in (
         "candidate_tree", "host_identity_digest", "served_frontend_digest", "model_role_digests", "fixture_digest", "variants",
-    )}, "execute_result_sha256": hashlib.sha256(execute_bytes).hexdigest(), "cases": final_rows}
+    )}, "execution_identity_segments": execute["execution_identity_segments"],
+            "execute_result_sha256": hashlib.sha256(execute_bytes).hexdigest(), "cases": final_rows}
+
+
+def _validate_execute_lineage(execute: Mapping[str, Any], rows: list[Mapping[str, Any]], config: Config) -> None:
+    segments = execute.get("execution_identity_segments")
+    current_identity = execute.get("host_identity_digest")
+    expected_cases = expected_case_ids(config)
+    expected_reused_cases = [case_id for case_id in expected_cases
+                             if case_id not in ("Q21-EDIT-2-REF", "Q21-LEGACY")]
+    legacy_ids = [control.control_id for control in config.legacy_controls]
+    source_identity: str | None = None
+    reused_legacy_ids: list[str] = []
+    if (
+        not isinstance(segments, list) or not 1 <= len(segments) <= 2
+        or not all(isinstance(item, str) and SHA256_HEX.fullmatch(item) for item in segments)
+        or len(set(segments)) != len(segments) or current_identity not in segments
+        or current_identity != _host_identity_digest(config)
+    ):
+        raise QualificationError("execute_identity_lineage_invalid")
+    resume = execute.get("resume")
+    if len(segments) == 1:
+        if resume is not None:
+            raise QualificationError("execute_identity_lineage_invalid")
+    else:
+        if (
+            not isinstance(resume, dict) or resume.get("source_host_identity_digest") != segments[0]
+            or resume.get("current_host_identity_digest") != current_identity
+            or not isinstance(resume.get("source_execute_result_sha256"), str)
+            or not SHA256_HEX.fullmatch(resume["source_execute_result_sha256"])
+            or resume.get("reused_case_ids") != expected_reused_cases
+            or resume.get("rerun_case_ids") != ["Q21-EDIT-2-REF"]
+            or len(legacy_ids) < 2
+            or resume.get("reused_legacy_control_ids") != legacy_ids[:-1]
+            or resume.get("continued_legacy_control_ids") != legacy_ids[-1:]
+        ):
+            raise QualificationError("execute_identity_lineage_invalid")
+        source_identity = segments[0]
+        reused_legacy_ids = legacy_ids[:-1]
+    for case_id, row in zip(expected_cases, rows, strict=True):
+        expected_identity = (
+            source_identity if source_identity is not None and case_id in expected_reused_cases else current_identity
+        )
+        if (
+            not isinstance(row, dict) or row.get("host_identity_digest") not in segments
+            or row.get("host_identity_digest") != expected_identity
+            or row.get("candidate_tree") != execute.get("candidate_tree")
+            or row.get("served_frontend_digest") != execute.get("served_frontend_digest")
+            or row.get("model_role_digests") != execute.get("model_role_digests")
+            or row.get("fixture_digest") != execute.get("fixture_digest")
+        ):
+            raise QualificationError("execute_row_identity_lineage_invalid")
+        controls = row.get("controls", [])
+        if not isinstance(controls, list):
+            raise QualificationError("execute_control_identity_lineage_invalid")
+        if case_id != "Q21-LEGACY":
+            if controls:
+                raise QualificationError("execute_control_identity_lineage_invalid")
+            continue
+        if (
+            [control.get("id") for control in controls if isinstance(control, dict)] != legacy_ids
+            or len(controls) != len(legacy_ids)
+            or row.get("status") != "PASS" or row.get("child_exit") != 0
+            or row.get("executed") is not True or row.get("dry_run_pass") is not True
+            or row.get("unavailable_controls") != [dict(item) for item in config.legacy_unavailable]
+        ):
+            raise QualificationError("execute_control_identity_lineage_invalid")
+        for index, control in enumerate(controls):
+            expected_control_identity = source_identity if legacy_ids[index] in reused_legacy_ids else current_identity
+            if (
+                not isinstance(control, dict) or control.get("host_identity_digest") != expected_control_identity
+                or control.get("profile") != config.legacy_controls[index].profile
+                or control.get("status") != "PASS" or control.get("child_exit") != 0
+                or control.get("dry_run_pass") is not True or control.get("executed") is not True
+                or control.get("history_matched") is not True or control.get("terminal_status") != "completed"
+                or not isinstance(control.get("original_sha256"), str)
+                or not SHA256_HEX.fullmatch(control["original_sha256"])
+                or not isinstance(control.get("output_handle"), str)
+            ):
+                raise QualificationError("execute_control_identity_lineage_invalid")
 
 
 def _write_new_json(path: Path, payload: Mapping[str, object]) -> None:
@@ -1174,6 +1553,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--execute-result", type=Path, help="finalize: the execute-phase result to bind")
     parser.add_argument("--review", type=Path, help="finalize: the recorded semantic review")
+    parser.add_argument("--resume-result", type=Path, help="execute: exact-candidate failed result to continue")
+    parser.add_argument("--resume-config", type=Path, help="execute: config bound to the prior host process")
+    parser.add_argument("--rerun-case", action="append", choices=CASE_IDS,
+                        help="execute: explicitly rerun the UI-bound case during strict continuation")
     args = parser.parse_args(argv)
     result: dict[str, Any] = {
         "schema": RESULT_SCHEMA, "phase": args.phase, "status": "FAIL",
@@ -1185,6 +1568,16 @@ def main(argv: list[str] | None = None) -> int:
             raise QualificationError("result_exists")
         if (args.phase == "finalize") != bool(args.execute_result and args.review):
             raise QualificationError("arguments_invalid")
+        has_resume = args.resume_result is not None or args.resume_config is not None
+        if args.phase != "execute" and (has_resume or args.rerun_case):
+            raise QualificationError("arguments_invalid")
+        if args.phase == "execute":
+            if (args.resume_result is None) != (args.resume_config is None):
+                raise QualificationError("arguments_invalid")
+            if args.resume_result is None and args.rerun_case:
+                raise QualificationError("arguments_invalid")
+            if args.resume_result is not None and args.rerun_case != ["Q21-EDIT-2-REF"]:
+                raise QualificationError("resume_rerun_case_invalid")
         config = load_config(args.config)
         result["host"] = config.host
         if args.phase == "finalize":
@@ -1195,12 +1588,38 @@ def main(argv: list[str] | None = None) -> int:
         else:
             result.update(preflight(config))
             if args.phase == "execute":
-                result["cases"] = execute_cases(config, args.output.parent / (args.output.stem + "-images"))
+                resume = None
+                if args.resume_result is not None and args.resume_config is not None:
+                    source_config = load_config(args.resume_config)
+                    resume = _validate_resume(config, source_config, args.resume_result, result)
+                    current_identity = result["host_identity_digest"]
+                    result["execution_identity_segments"] = [resume.source_host_identity_digest, current_identity]
+                    result["resume"] = {
+                        "source_execute_result_sha256": resume.source_result_sha256,
+                        "source_host_identity_digest": resume.source_host_identity_digest,
+                        "current_host_identity_digest": current_identity,
+                        "reused_case_ids": [case_id for case_id in expected_case_ids(config)
+                                             if case_id not in args.rerun_case and case_id != "Q21-LEGACY"],
+                        "rerun_case_ids": list(args.rerun_case or []),
+                        "reused_legacy_control_ids": [control["id"] for control in resume.completed_legacy_controls],
+                        "continued_legacy_control_ids": [config.legacy_controls[len(resume.completed_legacy_controls)].control_id],
+                    }
+                else:
+                    result["execution_identity_segments"] = [result["host_identity_digest"]]
+                result["cases"] = execute_cases(
+                    config, args.output.parent / (args.output.stem + "-images"),
+                    resume=resume, rerun_case_ids=tuple(args.rerun_case or ()),
+                )
                 for row in result["cases"]:
+                    row_identity = row.get("host_identity_digest", result["host_identity_digest"])
+                    row["host_identity_digest"] = row_identity
                     row.update({key: result[key] for key in (
-                        "candidate_tree", "host_identity_digest", "served_frontend_digest", "model_role_digests",
+                        "candidate_tree", "served_frontend_digest", "model_role_digests",
                         "fixture_digest",
                     )})
+                    for control in row.get("controls", []):
+                        if isinstance(control, dict):
+                            control.setdefault("host_identity_digest", result["host_identity_digest"])
                 result["status"] = _aggregate(result["cases"], expected_case_ids(config))
                 if result["status"] == "FAIL":
                     raise QualificationError("case_matrix_not_accepted")

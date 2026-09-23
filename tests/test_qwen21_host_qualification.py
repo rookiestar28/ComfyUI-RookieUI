@@ -295,9 +295,16 @@ class HostQualificationResultTests(unittest.TestCase):
     def test_execute_cannot_report_pass_without_complete_cases(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            load(root)
+            config = load(root)
             output = root / "result.json"
-            with mock.patch.object(qualification, "preflight", return_value={}), \
+            preflight = {
+                "candidate_tree": config.candidate_tree, "host_identity_digest": "c" * 64,
+                "served_frontend_digest": config.frontend_index_sha256,
+                "model_role_digests": qualification._model_role_digests(config),
+                "fixture_digest": config.fixture_manifest_sha256,
+                "variants": qualification._variant_statuses(config),
+            }
+            with mock.patch.object(qualification, "preflight", return_value=preflight), \
                     mock.patch.object(qualification, "execute_cases", return_value=[]):
                 code = qualification.main(["--config", str(root / "config.json"), "--phase", "execute", "--output", str(output)])
             self.assertEqual(code, 1)
@@ -606,17 +613,47 @@ class HostQualificationFinalizeTests(unittest.TestCase):
         config = load(root)
         images = root / "H1-execute-images"
         images.mkdir()
+        config.host_output_root.mkdir(parents=True)
         rows = []
+        identity = qualification._host_identity_digest(config)
+        model_digests = qualification._model_role_digests(config)
+        variants = qualification._variant_statuses(config)
+        output_number = 0
         for case_id in qualification.CASE_IDS:
-            row = dict(qualification._new_row(case_id), child_exit=0, status="PASS")
+            row = dict(qualification._new_row(case_id), child_exit=0, status="PASS",
+                       candidate_tree=config.candidate_tree, host_identity_digest=identity,
+                       served_frontend_digest=config.frontend_index_sha256,
+                       model_role_digests=model_digests, fixture_digest=config.fixture_manifest_sha256)
             if case_id in qualification.SEMANTIC_CHECKLISTS:
+                output_number += 1
                 data = _png((64, 64), (len(case_id), 1, 2, 255))
                 (images / f"{case_id}.png").write_bytes(data)
-                row.update(status="PENDING_REVIEW", original_sha256=hashlib.sha256(data).hexdigest())
+                handle = f"RookieUI_{output_number:05d}_.png"
+                (config.host_output_root / handle).write_bytes(data)
+                row.update(status="PENDING_REVIEW", semantic_review="PENDING", original_sha256=hashlib.sha256(data).hexdigest(),
+                           output_handle=handle, executed=True, dry_run_pass=True, history_matched=True,
+                           terminal_status="completed", original_decoded=True)
+            elif case_id == "Q21-LEGACY":
+                controls = []
+                for control in config.legacy_controls:
+                    output_number += 1
+                    data = _png((64, 64), (output_number, 2, 3, 255))
+                    (images / f"Q21-LEGACY-{control.control_id}.png").write_bytes(data)
+                    handle = f"RookieUI_{output_number:05d}_.png"
+                    (config.host_output_root / handle).write_bytes(data)
+                    controls.append({
+                        "id": control.control_id, "profile": control.profile,
+                        "status": "PASS", "child_exit": 0, "dry_run_pass": True, "executed": True,
+                        "history_matched": True, "terminal_status": "completed", "host_identity_digest": identity,
+                        "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": handle,
+                    })
+                row.update(controls=controls, unavailable_controls=[dict(item) for item in config.legacy_unavailable],
+                           executed=True, dry_run_pass=True)
             rows.append(row)
         execute = {"schema": "Qwen21HostQualificationV1", "phase": "execute", "host": "H1", "status": "PENDING_REVIEW",
-                   "candidate_tree": TREE, "served_frontend_digest": config.frontend_index_sha256, "host_identity_digest": "c" * 64,
-                   "model_role_digests": {}, "fixture_digest": "a" * 64, "variants": {}, "cases": rows}
+                   "candidate_tree": TREE, "served_frontend_digest": config.frontend_index_sha256, "host_identity_digest": identity,
+                   "execution_identity_segments": [identity], "model_role_digests": model_digests,
+                   "fixture_digest": config.fixture_manifest_sha256, "variants": variants, "cases": rows}
         path = root / "H1-execute.json"
         path.write_text(json.dumps(execute), encoding="utf-8")
         return config, path, execute
@@ -673,6 +710,367 @@ class HostQualificationFinalizeTests(unittest.TestCase):
             review["cases"]["Q21-T2I-SQUARE"]["checklist"] = {"looks_fine": True}
             with self.assertRaisesRegex(qualification.QualificationError, "review_entry_invalid"):
                 self._finalize(root, config, path, review)
+
+    def test_finalize_rejects_model_fixture_or_variant_identity_drift(self) -> None:
+        for field, mutate in (
+            ("model_role_digests", lambda value: value["model_role_digests"].update(diffusion_primary="e" * 64)),
+            ("fixture_digest", lambda value: value.update(fixture_digest="f" * 64)),
+            ("variants", lambda value: value["variants"].update(qwen21_diffusion="CONFIGURED")),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                config, path, execute = self._execute(root)
+                mutate(execute)
+                path.write_text(json.dumps(execute), encoding="utf-8")
+                review = self._review(path, execute)
+                with self.assertRaisesRegex(qualification.QualificationError, "execute_identity_mismatch"):
+                    self._finalize(root, config, path, review)
+
+
+class HostQualificationResumeCliTests(unittest.TestCase):
+    def test_resume_arguments_fail_closed_before_host_contact(self) -> None:
+        cases = (
+            (["--resume-result", "missing.json"], "arguments_invalid"),
+            (["--resume-config", "missing-config.json"], "arguments_invalid"),
+            (["--resume-result", "missing.json", "--resume-config", "missing-config.json"],
+             "resume_rerun_case_invalid"),
+            (["--rerun-case", "Q21-T2I-SQUARE"], "arguments_invalid"),
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config_path = root / "config.json"
+            config_path.write_text(json.dumps(valid_config(root)), encoding="utf-8")
+            for index, (extra_args, expected_error) in enumerate(cases):
+                with self.subTest(extra_args=extra_args):
+                    output = root / f"invalid-{index}.json"
+                    with mock.patch.object(qualification, "preflight") as preflight:
+                        result = qualification.main([
+                            "--config", str(config_path), "--phase", "execute", "--output", str(output), *extra_args,
+                        ])
+                    self.assertEqual(result, 1)
+                    preflight.assert_not_called()
+                    payload = json.loads(output.read_text(encoding="utf-8"))
+                    self.assertEqual(payload.get("error_code"), expected_error)
+
+
+class HostQualificationResumeTests(unittest.TestCase):
+    OLD_ID = "c" * 64
+    CURRENT_ID = "d" * 64
+
+    def _bundle(self, root: Path) -> tuple[Any, Any, Path, dict[str, Any], Path]:
+        old_raw = valid_config(root)
+        edit_control = {
+            "id": "qwen2511-edit", "profile": "qwen_image_edit_2511", "route": "img2img",
+            "request": {"width": 512, "height": 512, "steps": 4}, "reference_fixtures": ["ref_01"],
+            "assets": {"checkpoint_name": {
+                "selector": "Qwen_Image\\qwen_image_edit_2511.safetensors", "path": str(root / "legacy-qwen2511"),
+                "sha256": "b" * 64, "size": 1, "catalogs": ["checkpoints"],
+            }},
+            "expected_width": 512, "expected_height": 512,
+        }
+        old_raw["legacy_controls"].append(edit_control)
+        old_raw.update({"process_pid": 123, "process_created_utc": "2026-09-23T08:00:00.0000000Z"})
+        old_path = root / "old-config.json"
+        old_path.write_text(json.dumps(old_raw), encoding="utf-8")
+        old_config = qualification.load_config(old_path)
+        current_raw = dict(old_raw, process_pid=124, process_created_utc="2026-09-23T09:00:00.0000000Z")
+        current_path = root / "current-config.json"
+        current_path.write_text(json.dumps(current_raw), encoding="utf-8")
+        config = qualification.load_config(current_path)
+
+        role_assets = {**config.models, **config.variants}
+        for control in config.legacy_controls:
+            for field, asset in control.assets.items():
+                role_assets[f"legacy.{control.control_id}.{field}"] = asset
+        model_digests = {name: model.sha256 for name, model in role_assets.items()}
+        variants = {name: "UNAVAILABLE_NOT_CONFIGURED" for name in qualification.VARIANT_ROLES}
+        source_path = root / "H1-execute.json"
+        images = root / "H1-execute-images"
+        images.mkdir()
+        config.host_output_root.mkdir(parents=True)
+        rows: list[dict[str, Any]] = []
+        output_number = 0
+        for case_id in qualification.CASE_IDS:
+            row = dict(qualification._new_row(case_id))
+            row.update({"candidate_tree": TREE, "host_identity_digest": self.OLD_ID,
+                        "served_frontend_digest": config.frontend_index_sha256,
+                        "model_role_digests": model_digests, "fixture_digest": config.fixture_manifest_sha256})
+            if case_id in qualification.SEMANTIC_CHECKLISTS:
+                output_number += 1
+                data = _png((512, 512), (220, 20, 20, 255))
+                filename = f"RookieUI_{output_number:05d}_.png"
+                (images / f"{case_id}.png").write_bytes(data)
+                (config.host_output_root / filename).write_bytes(data)
+                row.update({"status": "PENDING_REVIEW", "semantic_review": "PENDING", "child_exit": 0,
+                            "dry_run_pass": True, "executed": True, "history_matched": True,
+                            "terminal_status": "completed", "original_decoded": True,
+                            "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename,
+                            "width": 512, "height": 512,
+                            "semantic_checklist": list(qualification.SEMANTIC_CHECKLISTS[case_id])})
+            elif case_id in ("Q21-TRANSFER", "Q21-NEGATIVE"):
+                row.update({"status": "PASS", "semantic_review": "NOT_APPLICABLE", "child_exit": 0})
+            else:
+                passed = config.legacy_controls[0]
+                output_number += 1
+                data = _png((64, 64), (220, 20, 20, 255))
+                filename = f"RookieUI_{output_number:05d}_.png"
+                (images / f"{case_id}-{passed.control_id}.png").write_bytes(data)
+                (config.host_output_root / filename).write_bytes(data)
+                good_control = {"id": passed.control_id, "profile": passed.profile, "status": "PASS",
+                                "child_exit": 0, "dry_run_pass": True, "executed": True,
+                                "history_matched": True, "terminal_status": "completed",
+                                "host_identity_digest": self.OLD_ID,
+                                "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename}
+                failed_control = {"id": config.legacy_controls[-1].control_id,
+                                  "profile": config.legacy_controls[-1].profile, "status": "FAIL",
+                                  "dry_run_pass": True}
+                row.update({"status": "FAIL", "semantic_review": "NOT_APPLICABLE", "child_exit": 1,
+                            "error_code": "host_vram_low", "controls": [good_control, failed_control],
+                            "unavailable_controls": [dict(item) for item in config.legacy_unavailable]})
+            rows.append(row)
+        execute = {
+            "schema": qualification.RESULT_SCHEMA, "phase": "execute", "host": config.host,
+            "status": "FAIL", "error_code": "case_matrix_not_accepted", "candidate_tree": config.candidate_tree,
+            "host_identity_digest": self.OLD_ID,
+            "execution_identity_segments": [self.OLD_ID],
+            "served_frontend_digest": config.frontend_index_sha256, "model_role_digests": model_digests,
+            "fixture_digest": config.fixture_manifest_sha256, "variants": variants, "cases": rows,
+        }
+        source_path.write_text(json.dumps(execute), encoding="utf-8")
+        return old_config, config, source_path, execute, images
+
+    def _current_preflight(self, config: Any) -> dict[str, Any]:
+        role_assets = {**config.models, **config.variants}
+        for control in config.legacy_controls:
+            for field, asset in control.assets.items():
+                role_assets[f"legacy.{control.control_id}.{field}"] = asset
+        return {
+            "candidate_tree": config.candidate_tree, "host_identity_digest": self.CURRENT_ID,
+            "served_frontend_digest": config.frontend_index_sha256,
+            "model_role_digests": {name: model.sha256 for name, model in role_assets.items()},
+            "fixture_digest": config.fixture_manifest_sha256,
+            "variants": {name: "UNAVAILABLE_NOT_CONFIGURED" for name in qualification.VARIANT_ROLES},
+        }
+
+    def _resumed_lineage(self, config: Any) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        current_identity = qualification._host_identity_digest(config)
+        reused_cases = [case_id for case_id in qualification.expected_case_ids(config)
+                        if case_id not in ("Q21-EDIT-2-REF", "Q21-LEGACY")]
+        controls = [control.control_id for control in config.legacy_controls]
+        rows: list[dict[str, Any]] = []
+        for case_id in qualification.expected_case_ids(config):
+            identity = self.OLD_ID if case_id in reused_cases else current_identity
+            row = {
+                "case_id": case_id, "candidate_tree": config.candidate_tree,
+                "host_identity_digest": identity,
+                "served_frontend_digest": config.frontend_index_sha256,
+                "model_role_digests": qualification._model_role_digests(config),
+                "fixture_digest": config.fixture_manifest_sha256,
+                "controls": [],
+            }
+            if case_id == "Q21-LEGACY":
+                row["controls"] = [
+                    {"id": control_id, "profile": config.legacy_controls[index].profile,
+                     "host_identity_digest": self.OLD_ID if index < len(controls) - 1 else current_identity,
+                     "status": "PASS", "child_exit": 0, "dry_run_pass": True, "executed": True,
+                     "history_matched": True, "terminal_status": "completed",
+                     "original_sha256": "b" * 64, "output_handle": f"RookieUI_{index:05d}_.png"}
+                    for index, control_id in enumerate(controls)
+                ]
+                row.update(status="PASS", child_exit=0, executed=True, dry_run_pass=True,
+                           unavailable_controls=[dict(item) for item in config.legacy_unavailable])
+            rows.append(row)
+        return ({
+            "candidate_tree": config.candidate_tree,
+            "host_identity_digest": current_identity,
+            "execution_identity_segments": [self.OLD_ID, current_identity],
+            "served_frontend_digest": config.frontend_index_sha256,
+            "model_role_digests": qualification._model_role_digests(config),
+            "fixture_digest": config.fixture_manifest_sha256,
+            "variants": qualification._variant_statuses(config),
+            "resume": {
+                "source_execute_result_sha256": "a" * 64,
+                "source_host_identity_digest": self.OLD_ID,
+                "current_host_identity_digest": current_identity,
+                "reused_case_ids": reused_cases,
+                "rerun_case_ids": ["Q21-EDIT-2-REF"],
+                "reused_legacy_control_ids": controls[:-1],
+                "continued_legacy_control_ids": controls[-1:],
+            },
+        }, rows)
+
+    def test_execute_lineage_accepts_only_declared_resume_rows_and_control_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            _, config, _, _, _ = self._bundle(Path(folder))
+            execute, rows = self._resumed_lineage(config)
+            self.assertIsNone(qualification._validate_execute_lineage(execute, rows, config))
+
+            bad_case_list = dict(execute, resume=dict(execute["resume"]))
+            bad_case_list["resume"]["reused_case_ids"] = [*execute["resume"]["reused_case_ids"], "Q21-LEGACY"]
+            with self.assertRaisesRegex(qualification.QualificationError, "execute_identity_lineage_invalid"):
+                qualification._validate_execute_lineage(bad_case_list, rows, config)
+
+            bad_control_prefix = dict(execute, resume=dict(execute["resume"]))
+            bad_control_prefix["resume"]["reused_legacy_control_ids"] = []
+            with self.assertRaisesRegex(qualification.QualificationError, "execute_identity_lineage_invalid"):
+                qualification._validate_execute_lineage(bad_control_prefix, rows, config)
+
+            bad_row_identity = [dict(row) for row in rows]
+            bad_row_identity[0] = dict(bad_row_identity[0], host_identity_digest=self.CURRENT_ID)
+            with self.assertRaisesRegex(qualification.QualificationError, "execute_row_identity_lineage_invalid"):
+                qualification._validate_execute_lineage(execute, bad_row_identity, config)
+
+            bad_control_identity = [dict(row) for row in rows]
+            legacy_index = qualification.expected_case_ids(config).index("Q21-LEGACY")
+            bad_control_identity[legacy_index] = dict(bad_control_identity[legacy_index])
+            bad_control_identity[legacy_index]["controls"] = [dict(item) for item in rows[legacy_index]["controls"]]
+            bad_control_identity[legacy_index]["controls"][0]["host_identity_digest"] = self.CURRENT_ID
+            with self.assertRaisesRegex(qualification.QualificationError, "execute_control_identity_lineage_invalid"):
+                qualification._validate_execute_lineage(execute, bad_control_identity, config)
+
+    def test_resume_accepts_exact_final_legacy_vram_stop_and_binds_both_processes(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, _, _ = self._bundle(root)
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None):
+                resume = qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+            self.assertEqual(resume.source_result_sha256, hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertEqual(resume.source_host_identity_digest, self.OLD_ID)
+            self.assertEqual(resume.completed_legacy_controls[0]["id"], "sdxl-txt2img")
+
+    def test_resume_rejects_different_candidate_and_nonfinal_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, execute, _ = self._bundle(root)
+            execute["candidate_tree"] = "f" * 40
+            path.write_text(json.dumps(execute), encoding="utf-8")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_candidate_mismatch"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, execute, _ = self._bundle(root)
+            execute["cases"][2]["status"] = "FAIL"
+            path.write_text(json.dumps(execute), encoding="utf-8")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_source_not_resumable"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+    def test_resume_rejects_modified_image_or_host_output_before_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, _, images = self._bundle(root)
+            (images / "Q21-T2I-SQUARE.png").write_bytes(b"tampered")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_image_digest_mismatch"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, execute, _ = self._bundle(root)
+            handle = execute["cases"][0]["output_handle"]
+            (config.host_output_root / handle).write_bytes(b"tampered")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_host_output_digest_mismatch"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+    def test_resume_rejects_same_or_still_running_old_process(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, _, _ = self._bundle(root)
+            same_identity = dict(self._current_preflight(config), host_identity_digest=self.OLD_ID)
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_process_identity_mismatch"):
+                qualification._validate_resume(config, old_config, path, same_identity)
+            with mock.patch.object(qualification, "_process_identity_if_alive",
+                                   return_value=(old_config.process_created_utc, old_config.process_command_sha256)), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_old_process_active"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+    def test_resume_rejects_modified_completed_legacy_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, execute, _ = self._bundle(root)
+            execute["cases"][-1]["controls"][0]["status"] = "FAIL"
+            path.write_text(json.dumps(execute), encoding="utf-8")
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None), \
+                    self.assertRaisesRegex(qualification.QualificationError, "resume_source_not_resumable"):
+                qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+
+    def test_execute_resume_reuses_rows_and_only_runs_explicit_case_and_failed_control(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old_config, config, path, _, _ = self._bundle(root)
+            with mock.patch.object(qualification, "_process_identity_if_alive", return_value=None):
+                resume = qualification._validate_resume(config, old_config, path, self._current_preflight(config))
+            rerun_images = root / "resumed-images"
+            rerun_image_calls: list[str] = []
+            legacy_submissions: list[str] = []
+
+            def rerun_image(config_arg: Any, case_id: str, private_images: Path, row: dict[str, Any]) -> None:
+                rerun_image_calls.append(case_id)
+                data = _png((512, 512), (20, 200, 30, 255))
+                (private_images / f"{case_id}.png").write_bytes(data)
+                filename = "RookieUI_00050_.png"
+                (config_arg.host_output_root / filename).write_bytes(data)
+                row.update({"status": "PENDING_REVIEW", "semantic_review": "PENDING", "child_exit": 0,
+                            "dry_run_pass": True, "executed": True, "history_matched": True,
+                            "terminal_status": "completed", "original_decoded": True,
+                            "original_sha256": hashlib.sha256(data).hexdigest(), "output_handle": filename,
+                            "width": 512, "height": 512,
+                            "semantic_checklist": list(qualification.SEMANTIC_CHECKLISTS[case_id])})
+
+            def submit(config_arg: Any, route: str, payload: dict[str, Any], client_id: str,
+                       dimensions: tuple[int | None, int | None], image_path: Path, row: dict[str, Any],
+                       validate_submitted: Any = None) -> tuple[dict[str, Any], Image.Image, bytes]:
+                legacy_submissions.append(route)
+                width, height = dimensions
+                self.assertIsNotNone(width)
+                self.assertIsNotNone(height)
+                data = _png((width or 64, height or 64), (200, 20, 20, 255))
+                image_path.write_bytes(data)
+                filename = "RookieUI_00051_.png"
+                (config_arg.host_output_root / filename).write_bytes(data)
+                row.update({"executed": True, "dry_run_pass": True, "history_matched": True,
+                            "terminal_status": "completed", "child_exit": 0,
+                            "original_decoded": True, "original_sha256": hashlib.sha256(data).hexdigest(),
+                            "output_handle": filename, "width": width, "height": height,
+                            "alpha_summary": {"mode": "RGB", "min": 255, "max": 255}})
+                return {}, Image.new("RGBA", (width or 64, height or 64)), data
+
+            def post(_config: Any, _route: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+                workflow = {"1": {"class_type": "LegacyLoader", "inputs": {
+                    field: asset.selector for field, asset in config.legacy_controls[-1].assets.items()
+                }}}
+                return 200, {"workflow": workflow}
+
+            with mock.patch.object(qualification, "_run_image_case", side_effect=rerun_image), \
+                    mock.patch.object(qualification, "_post_json", side_effect=post), \
+                    mock.patch.object(qualification, "_submit_and_collect", side_effect=submit):
+                rows = qualification.execute_cases(
+                    config, rerun_images, resume=resume, rerun_case_ids=("Q21-EDIT-2-REF",),
+                )
+            self.assertEqual(rerun_image_calls, ["Q21-EDIT-2-REF"])
+            self.assertEqual(legacy_submissions, ["/rookieui/generate/img2img"])
+            self.assertEqual([row["case_id"] for row in rows], list(qualification.CASE_IDS))
+            self.assertTrue(all(row["status"] in ("PASS", "PENDING_REVIEW") and row["child_exit"] == 0 for row in rows))
+            self.assertEqual(rows[0]["host_identity_digest"], self.OLD_ID)
+            self.assertEqual(rows[3]["semantic_review"], "PENDING")
+            controls = rows[-1]["controls"]
+            self.assertEqual([control["id"] for control in controls], ["sdxl-txt2img", "qwen2511-edit"])
+            self.assertEqual([control["status"] for control in controls], ["PASS", "PASS"])
+            self.assertEqual(controls[0]["host_identity_digest"], self.OLD_ID)
+
+    def test_resumed_result_finalizer_rejects_unlisted_row_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config, path, execute = HostQualificationFinalizeTests()._execute(root)
+            execute["cases"][0]["host_identity_digest"] = "e" * 64
+            path.write_text(json.dumps(execute), encoding="utf-8")
+            review = HostQualificationFinalizeTests()._review(path, execute)
+            with self.assertRaisesRegex(qualification.QualificationError, "execute_row_identity_lineage_invalid"):
+                HostQualificationFinalizeTests()._finalize(root, config, path, review)
 
 
 if __name__ == "__main__":
