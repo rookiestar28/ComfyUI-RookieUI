@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,12 +9,29 @@ import {
   parseOptions,
   selectedJob,
   validateConfig,
+  validateCandidateIdentity,
   validateFreeVram,
   validateGenerationCapacity,
+  validateHostRuntimeIdentity,
+  validateLiveProcessIdentity,
 } from "../../scripts/run_qwen21_live_ui.mjs";
 
 const TREE = "e7b429d7f2e73bb5b97a0aa70336960489bbe6b9"; // pragma: allowlist secret - public Git tree id
+const CORE = "e638023d54497dbe0579565e5de4bb7076899592"; // pragma: allowlist secret - public Git commit id
 const DIGEST = FRONTEND_INDEX_SHA256_BY_HOST.H1;
+const HOST_IDENTITY = "d".repeat(64);
+
+function expectedHostIdentity(configured, fingerprint) {
+  const identity = {
+    command_sha256: configured.process_command_sha256,
+    core: configured.core_head,
+    created: configured.process_created_utc,
+    frontend: configured.frontend_index_sha256,
+    pid: configured.process_pid,
+    rookieui: fingerprint,
+  };
+  return createHash("sha256").update(JSON.stringify(identity)).digest("hex");
+}
 
 function config(overrides = {}) {
   return {
@@ -21,6 +39,11 @@ function config(overrides = {}) {
     host: "H1",
     base_url: "http://127.0.0.1:8188/",
     candidate_tree: TREE,
+    core_root: "C:\\host\\ComfyUI",
+    core_head: CORE,
+    process_pid: 12345,
+    process_created_utc: "2026-09-22T11:00:00.0000000Z",
+    process_command_sha256: "e".repeat(64),
     frontend_index_sha256: DIGEST,
     fixture_manifest: "fixtures/manifest.json",
     rookieui_install_root: "host/custom_nodes/comfyui-rookieui",
@@ -40,6 +63,7 @@ function report(rowOverrides = {}, reportOverrides = {}) {
     host: "H1",
     status: "PENDING_REVIEW",
     candidate_tree: TREE,
+    host_identity_digest: HOST_IDENTITY,
     served_frontend_digest: DIGEST,
     cases: [{
       case_id: "Q21-REMOVE-BG",
@@ -53,6 +77,7 @@ function report(rowOverrides = {}, reportOverrides = {}) {
       prompt_id: "0f7c0c9e-6f71-4c5a-9d1e-2b0f3c8a9e11",
       client_id: `rookieui-q21-${"c".repeat(32)}`,
       output_handle: "RookieUI_00007_.png",
+      host_identity_digest: HOST_IDENTITY,
       ...rowOverrides,
     }],
     ...reportOverrides,
@@ -82,6 +107,55 @@ describe("Qwen 2.1 live UI qualification runner", () => {
       .toThrow("config_frontend_identity");
   });
 
+  it("requires the frozen local Core process identity", () => {
+    expect(() => validateConfig(config({ process_pid: 0 }))).toThrow("config_process");
+    expect(() => validateConfig(config({ process_command_sha256: "invalid" }))).toThrow("config_process");
+    expect(() => validateConfig(config({ core_head: "bad" }))).toThrow("config_process");
+  });
+
+  it("requires the UI runner's clean local candidate tree to remain frozen", () => {
+    const valid = validateConfig(config());
+    expect(validateCandidateIdentity(valid, { tree: TREE, dirty: false })).toBe(true);
+    expect(() => validateCandidateIdentity(valid, { tree: "f".repeat(40), dirty: false }))
+      .toThrow("candidate_tree_mismatch");
+    expect(() => validateCandidateIdentity(valid, { tree: TREE, dirty: true }))
+      .toThrow("candidate_worktree_dirty");
+  });
+
+  it("binds current Core, bundled frontend and runtime fingerprint to the execute identity", () => {
+    const valid = validateConfig(config());
+    const fingerprint = `sha256:${"a".repeat(64)}`;
+    const stats = { system: { comfyui_version: "0.37.0", comfy_package_versions: [
+      { name: "comfyui-frontend-package", installed: "1.53.6" },
+    ] } };
+    const bootstrap = { runtime: { build_fingerprint: fingerprint } };
+    const digest = expectedHostIdentity(valid, fingerprint);
+    expect(validateHostRuntimeIdentity(stats, bootstrap, valid, digest)).toBe(fingerprint);
+    expect(() => validateHostRuntimeIdentity({ system: { ...stats.system, comfyui_version: "0.38.0" } }, bootstrap, valid, digest))
+      .toThrow("host_core_runtime_mismatch");
+    expect(() => validateHostRuntimeIdentity({ system: { ...stats.system, comfy_package_versions: [] } }, bootstrap, valid, digest))
+      .toThrow("host_bundled_frontend_mismatch");
+    expect(() => validateHostRuntimeIdentity(stats, { runtime: { build_fingerprint: "stale" } }, valid, digest))
+      .toThrow("host_rookieui_fingerprint_mismatch");
+    expect(() => validateHostRuntimeIdentity(stats, bootstrap, valid, "f".repeat(64)))
+      .toThrow("host_identity_digest_mismatch");
+  });
+
+  it("requires the running listener PID, creation time and command digest to match", () => {
+    const valid = validateConfig(config());
+    const identity = {
+      listener_pid: valid.process_pid,
+      pid: valid.process_pid,
+      created_utc: valid.process_created_utc,
+      command_sha256: valid.process_command_sha256,
+    };
+    expect(validateLiveProcessIdentity(valid, identity)).toBe(true);
+    expect(() => validateLiveProcessIdentity(valid, { ...identity, listener_pid: valid.process_pid + 1 }))
+      .toThrow("host_process_identity_mismatch");
+    expect(() => validateLiveProcessIdentity(valid, { ...identity, command_sha256: "f".repeat(64) }))
+      .toThrow("host_process_identity_mismatch");
+  });
+
   it("requires an idle global queue and at least 48 GiB free before generation", () => {
     const enough = { devices: [{ vram_free: MINIMUM_FREE_VRAM_BYTES }] };
     expect(validateGenerationCapacity({ queue_running: [], queue_pending: [] }, enough)).toBe(MINIMUM_FREE_VRAM_BYTES);
@@ -103,6 +177,10 @@ describe("Qwen 2.1 live UI qualification runner", () => {
     expect(() => selectedJob(valid, report({ terminal_status: "failed" }))).toThrow("selected_job_unqualified");
     expect(() => selectedJob(valid, report({ client_id: "shared-client" }))).toThrow("selected_job_unqualified");
     expect(() => selectedJob(valid, report({ output_handle: "../escape.png" }))).toThrow("selected_job_unqualified");
+    expect(() => selectedJob(valid, report({ host_identity_digest: "f".repeat(64) })))
+      .toThrow("execute_identity_mismatch");
+    expect(() => selectedJob(valid, report({}, { host_identity_digest: "f".repeat(64) })))
+      .toThrow("execute_identity_mismatch");
   });
 
   it("requires exactly one config and one output argument", () => {

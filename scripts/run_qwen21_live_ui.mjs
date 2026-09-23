@@ -7,9 +7,10 @@
  */
 
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const RESULT_SCHEMA = "Qwen21LiveUIV1";
 export const FRONTEND_INDEX_SHA256_BY_HOST = Object.freeze({
@@ -20,6 +21,8 @@ export const MINIMUM_FREE_VRAM_BYTES = 48 * 1024 ** 3;
 const CONFIG_SCHEMA = "Qwen21HostConfigV1";
 const EXECUTE_SCHEMA = "Qwen21HostQualificationV1";
 const CASE_ID = "Q21-REMOVE-BG";
+const EXPECTED_CORE_VERSION = "0.37.0";
+const EXPECTED_BUNDLED_FRONTEND_VERSION = "1.53.6";
 // Git object IDs are SHA-1 here (40 hex); file digests are SHA-256 (64 hex).
 const GIT_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -31,6 +34,7 @@ const EDIT_PROMPT = "Place a small copy of the red circle from <image2> at the c
 const GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export function safeError(code) {
   const error = new Error(code);
@@ -71,6 +75,12 @@ export function validateConfig(raw) {
     throw safeError("config_url");
   }
   if (!GIT_OBJECT_ID.test(raw.candidate_tree ?? "")) throw safeError("config_candidate");
+  if (!GIT_OBJECT_ID.test(raw.core_head ?? "") || typeof raw.core_root !== "string" || !raw.core_root
+      || !Number.isSafeInteger(raw.process_pid) || raw.process_pid <= 0
+      || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(raw.process_created_utc ?? "")
+      || !SHA256.test(raw.process_command_sha256 ?? "")) {
+    throw safeError("config_process");
+  }
   if (!SHA256.test(raw.frontend_index_sha256 ?? "")) throw safeError("config_frontend");
   if (raw.frontend_index_sha256 !== FRONTEND_INDEX_SHA256_BY_HOST[raw.host]) {
     throw safeError("config_frontend_identity");
@@ -86,6 +96,8 @@ export function validateConfig(raw) {
   }
   return {
     host: raw.host, base_url: url.origin, candidate_tree: raw.candidate_tree,
+    core_root: raw.core_root, core_head: raw.core_head, process_pid: raw.process_pid,
+    process_created_utc: raw.process_created_utc, process_command_sha256: raw.process_command_sha256,
     frontend_index_sha256: raw.frontend_index_sha256, fixture_manifest: raw.fixture_manifest,
     rookieui_install_root: raw.rookieui_install_root, selectors,
   };
@@ -94,10 +106,11 @@ export function validateConfig(raw) {
 export function selectedJob(config, report) {
   if (report?.schema !== EXECUTE_SCHEMA || report.host !== config.host || report.phase !== "execute"
       || report.candidate_tree !== config.candidate_tree || report.served_frontend_digest !== config.frontend_index_sha256
-      || report.status !== "PENDING_REVIEW") {
+      || !SHA256.test(report.host_identity_digest ?? "") || report.status !== "PENDING_REVIEW") {
     throw safeError("execute_identity_mismatch");
   }
   const row = report.cases?.find((item) => item.case_id === CASE_ID);
+  if (row && row.host_identity_digest !== report.host_identity_digest) throw safeError("execute_identity_mismatch");
   if (!row || row.selected !== true || row.child_exit !== 0 || row.status !== "PENDING_REVIEW" || row.original_decoded !== true
       || row.history_matched !== true || row.terminal_status !== "completed" || !SHA256.test(row.original_sha256 ?? "")
       || !/^[0-9a-fA-F-]{20,80}$/.test(row.prompt_id ?? "") || !/^rookieui-q21-[0-9a-f]{32}$/.test(row.client_id ?? "")
@@ -129,6 +142,114 @@ export function validateFreeVram(stats) {
     throw safeError("host_vram_unavailable");
   }
   return free;
+}
+
+export function validateLiveProcessIdentity(config, identity) {
+  if (identity?.listener_pid !== config.process_pid || identity?.pid !== config.process_pid
+      || identity?.created_utc !== config.process_created_utc
+      || identity?.command_sha256 !== config.process_command_sha256) {
+    throw safeError("host_process_identity_mismatch");
+  }
+  return true;
+}
+
+export function validateCandidateIdentity(config, observation) {
+  if (observation?.tree !== config.candidate_tree) throw safeError("candidate_tree_mismatch");
+  if (observation?.dirty !== false) throw safeError("candidate_worktree_dirty");
+  return true;
+}
+
+export function validateHostRuntimeIdentity(stats, bootstrap, config, expectedDigest) {
+  const system = stats?.system;
+  if (system?.comfyui_version !== EXPECTED_CORE_VERSION) throw safeError("host_core_runtime_mismatch");
+  const packages = system?.comfy_package_versions;
+  const frontend = Array.isArray(packages)
+    ? packages.find((item) => item?.name === "comfyui-frontend-package")
+    : undefined;
+  if (frontend?.installed !== EXPECTED_BUNDLED_FRONTEND_VERSION) throw safeError("host_bundled_frontend_mismatch");
+  const fingerprint = bootstrap?.runtime?.build_fingerprint;
+  if (typeof fingerprint !== "string" || !/^sha256:[0-9a-f]{64}$/.test(fingerprint)) {
+    throw safeError("host_rookieui_fingerprint_mismatch");
+  }
+  const identity = {
+    command_sha256: config.process_command_sha256,
+    core: config.core_head,
+    created: config.process_created_utc,
+    frontend: config.frontend_index_sha256,
+    pid: config.process_pid,
+    rookieui: fingerprint,
+  };
+  if (!SHA256.test(expectedDigest ?? "") || sha256(Buffer.from(JSON.stringify(identity))) !== expectedDigest) {
+    throw safeError("host_identity_digest_mismatch");
+  }
+  return fingerprint;
+}
+
+function verifyLocalProcess(config) {
+  if (process.platform !== "win32") throw safeError("host_process_identity_unavailable");
+  const command = `$listener = Get-NetTCPConnection -LocalPort 8188 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; `
+    + `$proc = Get-CimInstance Win32_Process -Filter 'ProcessId=${config.process_pid}'; `
+    + "if ($null -eq $listener -or $null -eq $proc) { exit 2 }; "
+    + "$bytes=[System.Text.Encoding]::UTF8.GetBytes([string]$proc.CommandLine); "
+    + "$sha=[System.Security.Cryptography.SHA256]::Create(); "
+    + "$commandHash=[BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant(); "
+    + "[pscustomobject]@{listener_pid=[int]$listener.OwningProcess; pid=[int]$proc.ProcessId; "
+    + "created_utc=$proc.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ'); "
+    + "command_sha256=$commandHash} | ConvertTo-Json -Compress";
+  let observation;
+  try {
+    observation = JSON.parse(execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", command], {
+      encoding: "utf8", timeout: 25000, windowsHide: true,
+    }));
+  } catch {
+    throw safeError("host_process_identity_unavailable");
+  }
+  const identity = {
+    listener_pid: observation.listener_pid,
+    pid: observation.pid,
+    created_utc: observation.created_utc,
+    command_sha256: observation.command_sha256,
+  };
+  validateLiveProcessIdentity(config, identity);
+}
+
+function verifyLocalCandidate(config) {
+  let tree;
+  let dirty;
+  try {
+    tree = execFileSync("git", ["-C", PROJECT_ROOT, "rev-parse", "HEAD^{tree}"], {
+      encoding: "utf8", timeout: 30000, windowsHide: true,
+    }).trim();
+    dirty = execFileSync("git", ["-C", PROJECT_ROOT, "status", "--porcelain", "--untracked-files=no"], {
+      encoding: "utf8", timeout: 30000, windowsHide: true,
+    }).trim().length > 0;
+  } catch {
+    throw safeError("candidate_identity_unavailable");
+  }
+  validateCandidateIdentity(config, { tree, dirty });
+}
+
+function verifyLocalCore(config) {
+  let head;
+  try {
+    head = execFileSync("git", ["-C", config.core_root, "rev-parse", "HEAD"], {
+      encoding: "utf8", timeout: 30000, windowsHide: true,
+    }).trim();
+  } catch {
+    throw safeError("core_head_unavailable");
+  }
+  if (head !== config.core_head) throw safeError("core_head_mismatch");
+}
+
+async function verifyCurrentHost(config, row) {
+  verifyLocalCandidate(config);
+  verifyLocalProcess(config);
+  verifyLocalCore(config);
+  const [stats, bootstrap] = await Promise.all([
+    hostJson(config, "/system_stats"),
+    hostJson(config, "/rookieui/bootstrap"),
+  ]);
+  validateHostRuntimeIdentity(stats, bootstrap, config, row.host_identity_digest);
 }
 
 function fixtureBytes(config, fixtureId) {
@@ -393,6 +514,7 @@ async function runTransfer(page, config, row, output, checks) {
 }
 
 export async function run(config, output, row) {
+  await verifyCurrentHost(config, row);
   const index = await fetch(`${config.base_url}/`);
   if (index.status !== 200 || sha256(Buffer.from(await index.arrayBuffer())) !== config.frontend_index_sha256) {
     throw safeError("frontend_digest_mismatch");
@@ -471,7 +593,8 @@ export async function main(argv = process.argv.slice(2)) {
     const execute = readJson(resolve(dirname(args.output), `${config.host}-execute.json`), "execute_result_unreadable");
     const row = selectedJob(config, execute);
     Object.assign(result, { host: config.host, candidate_tree: config.candidate_tree,
-      served_frontend_digest: config.frontend_index_sha256, selected_case_id: CASE_ID, selected_prompt_id: row.prompt_id });
+      served_frontend_digest: config.frontend_index_sha256, host_identity_digest: row.host_identity_digest,
+      selected_case_id: CASE_ID, selected_prompt_id: row.prompt_id });
     Object.assign(result, await run(config, args.output, row));
     result.status = "PASS";
     exitCode = 0;
