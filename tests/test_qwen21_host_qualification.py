@@ -115,6 +115,7 @@ class FakeHost:
         config.host_output_root.mkdir(parents=True, exist_ok=True)
         self.posts: list[tuple[str, dict[str, Any]]] = []
         self.jobs: dict[str, dict[str, Any]] = {}
+        self.queue_queries: list[tuple[str, str]] = []
         self.output_size = (512, 512)
         self.output_color = (220, 30, 30, 255)
 
@@ -160,6 +161,7 @@ class FakeHost:
         return 200, response
 
     def queue_job(self, config: Any, prompt_id: str, client_id: str) -> dict[str, Any] | None:
+        self.queue_queries.append((prompt_id, client_id))
         job = self.jobs.get(prompt_id)
         return job if job and job["client_id"] == client_id else None
 
@@ -358,6 +360,66 @@ class HostQualificationCaseTests(unittest.TestCase):
                 finally:
                     for patch in reversed(patches):
                         patch.stop()
+
+    def test_generation_uses_exact_client_job_when_snapshot_history_is_capped(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = load(root)
+            host = FakeHost(config)
+            plan = qualification._case_plan(config, "Q21-T2I-SQUARE", "fresh-client")
+            host.output_size = (plan.width, plan.height)
+            row = qualification._new_row("Q21-T2I-SQUARE")
+            host_patches = host.patches()
+            for patch in host_patches:
+                patch.start()
+            # Model the aggregate page omitting this completed job while exact prompt lookup works.
+            count_patch = mock.patch.object(qualification, "_client_job_count", return_value=0)
+            count_mock = count_patch.start()
+            try:
+                job, _image, original = qualification._submit_and_collect(
+                    config,
+                    plan.route,
+                    plan.payload,
+                    "fresh-client",
+                    (plan.width, plan.height),
+                    root / "images" / "Q21-T2I-SQUARE.png",
+                    row,
+                )
+            finally:
+                count_patch.stop()
+                for patch in reversed(host_patches):
+                    patch.stop()
+
+            self.assertEqual(job["id"], row["prompt_id"])
+            self.assertEqual(row["terminal_status"], "completed")
+            self.assertTrue(row["history_matched"])
+            self.assertTrue(row["original_decoded"])
+            self.assertEqual(hashlib.sha256(original).hexdigest(), row["original_sha256"])
+            self.assertEqual(row["vram_free_after"], qualification.MINIMUM_FREE_VRAM_BYTES)
+            self.assertEqual(host.queue_queries[0], (job["id"], "fresh-client"))
+            self.assertEqual(host.queue_queries[-1][0], job["id"])
+            self.assertNotEqual(host.queue_queries[-1][1], "fresh-client")
+            self.assertEqual(count_mock.call_count, 1)
+
+    def test_submission_rejects_a_nonfresh_client_before_enqueue(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            config = load(Path(folder))
+            row = qualification._new_row("Q21-T2I-SQUARE")
+            with mock.patch.object(qualification, "_client_job_count", return_value=1), \
+                    mock.patch.object(qualification, "_assert_generation_capacity", create=True) as guard, \
+                    mock.patch.object(qualification, "_post_json") as post:
+                with self.assertRaisesRegex(qualification.QualificationError, "client_id_not_fresh"):
+                    qualification._submit_and_collect(
+                        config,
+                        "/rookieui/generate/txt2img",
+                        {},
+                        "reused-client",
+                        (512, 512),
+                        Path(folder) / "image.png",
+                        row,
+                    )
+            guard.assert_not_called()
+            post.assert_not_called()
 
     def test_submission_runs_capacity_guard_before_posting(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

@@ -715,8 +715,8 @@ def _submit_and_collect(
     row["vram_free_after"] = vram_free_after
     if job["status"] != "completed":
         raise QualificationError("job_not_completed")
-    if _client_job_count(config, client_id) != 1:
-        raise QualificationError("client_job_count_mismatch")
+    # CRITICAL: aggregate history limits oldest global rows before client filtering; the exact
+    # prompt-and-client lookup above remains authoritative after later jobs exceed that window.
     # A filtered queue is a visibility aid, not authentication. A different client ID
     # must not see this job before the selected output is accepted as job-bound.
     if _queue_job(config, prompt_id, _client_id()) is not None:
