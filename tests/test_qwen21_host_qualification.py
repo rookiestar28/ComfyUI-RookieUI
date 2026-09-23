@@ -128,6 +128,12 @@ class FakeHost:
         (self.input_root / handle).write_bytes(data)
         return handle
 
+    def _resolve_asset(self, handle: str) -> Path:
+        path = self.input_root / handle
+        if not path.is_file():
+            raise ValueError("synthetic asset is not a runtime input handle")
+        return path
+
     def post(self, config: Any, route: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         self.posts.append((route, json.loads(json.dumps(payload))))
         body = dict(payload)
@@ -138,10 +144,12 @@ class FakeHost:
                 {"image_asset": ref["image_asset"]} if "image_asset" in ref else {"image_asset": self._store(ref["image_data"])}
                 for ref in body["reference_images"]
             ]
+        if isinstance(body.get("image_data"), str) and body["image_data"]:
+            body["image_asset"] = self._store(body.pop("image_data"))
         try:
             with mock.patch("rookieui.services.img2img.discover_model_inventory", return_value=self._inventory()), \
                     mock.patch("rookieui.services.txt2img.discover_model_inventory", return_value=self._inventory()), \
-                    mock.patch("rookieui.services.img2img.resolve_asset_path", return_value=Path("synthetic.png")):
+                    mock.patch("rookieui.services.img2img.resolve_asset_path", side_effect=self._resolve_asset):
                 if route.endswith("txt2img"):
                     translation = translate_txt2img_request(normalize_txt2img_request(body))
                 else:
@@ -550,6 +558,7 @@ class HostQualificationCaseTests(unittest.TestCase):
             for key, value in metadata["extra_pnginfo"].items():
                 info.add_text(key, json.dumps(value))
             original = _png((512, 512), (200, 20, 20, 90), info)
+            data_url = "data:image/png;base64," + base64.b64encode(original).decode()
             config.host_output_root.mkdir(parents=True, exist_ok=True)
             (config.host_output_root / "RookieUI_00001_.png").write_bytes(original)
             image_path = root / "Q21-REMOVE-BG.png"
@@ -562,17 +571,30 @@ class HostQualificationCaseTests(unittest.TestCase):
                         mock.patch("rookieui.services.asset_store._ensure_runtime_dirs"):
                     return 200, {"status": "ok", **pnginfo.parse_pnginfo_payload(payload).to_payload()}
 
+            edit_requests: list[dict[str, Any]] = []
+
             def post(config_arg: Any, route: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-                return inspect(route, payload) if route.endswith("pnginfo/inspect") else host.post(config_arg, route, payload)
+                if route.endswith("pnginfo/inspect"):
+                    return inspect(route, payload)
+                edit_requests.append(dict(payload))
+                return host.post(config_arg, route, payload)
 
             row = qualification._new_row("Q21-TRANSFER")
             with mock.patch.object(qualification, "_post_json", side_effect=post):
                 qualification._run_transfer_case(config, source, image_path, row)
             self.assertEqual(row["status"], "PASS")
             self.assertEqual(row["alpha_summary"]["min"], 90)
-            self.assertEqual(row["input_handles"][1], "RookieUI_00001_.png")
+            self.assertEqual(len(edit_requests), 1)
+            self.assertEqual(edit_requests[0]["image_asset"], "")
+            self.assertEqual(edit_requests[0]["image_data"], data_url)
+            self.assertNotIn("reference_images", edit_requests[0])
+            self.assertTrue(edit_requests[0]["dry_run"])
+            self.assertNotEqual(row["input_handles"][1], "RookieUI_00001_.png")
+            for handle in row["input_handles"]:
+                transferred = (host.input_root / handle).read_bytes()
+                self.assertEqual(hashlib.sha256(transferred).hexdigest(), hashlib.sha256(original).hexdigest())
 
-            comfy_only = dict(inspect("", {"image_data": "data:image/png;base64," + base64.b64encode(original).decode()})[1],
+            comfy_only = dict(inspect("", {"image_data": data_url})[1],
                               source_type="comfyui")
             with mock.patch.object(qualification, "_post_json", return_value=(200, comfy_only)), \
                     self.assertRaisesRegex(qualification.QualificationError, "pnginfo_interpretation_mismatch"):

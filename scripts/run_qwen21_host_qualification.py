@@ -882,20 +882,33 @@ def _run_transfer_case(config: Config, source_row: Mapping[str, Any], image_path
     stored_summary, _ = _decode_png(original, summary["width"], summary["height"])
     if (stored_summary["alpha_min"], stored_summary["alpha_max"]) != (summary["alpha_min"], summary["alpha_max"]):
         raise QualificationError("pnginfo_alpha_mismatch")
-    for transfer_handle in (handle, output_handle):
-        client_id = _client_id()
-        plan = _case_plan(config, "Q21-EDIT-1-REF", client_id)
-        plan.payload["reference_images"] = [{"image_asset": transfer_handle}]
-        dry_status, dry = _post_json(config, plan.route, {**plan.payload, "dry_run": True})
-        if dry_status != 200 or _validate_graph(
-            dry, 1, summary["width"], summary["height"], config=config, case_id="Q21-EDIT-1-REF",
-            expected_handles=[transfer_handle],
-        ):
-            raise QualificationError("transfer_graph_failed")
+    client_id = _client_id()
+    plan = _case_plan(config, "Q21-EDIT-1-REF", client_id)
+    plan.payload.pop("reference_images", None)
+    # CRITICAL: preview handoff sends original /view bytes as image_data; an output filename is
+    # not a RookieUI runtime input handle and must not bypass the upload/normalization boundary.
+    plan.payload["image_asset"] = ""
+    plan.payload["image_data"] = data_url
+    dry_status, dry = _post_json(config, plan.route, {**plan.payload, "dry_run": True})
+    normalized = dry.get("normalized_request")
+    transfer_handles = normalized.get("reference_image_assets") if isinstance(normalized, dict) else None
+    if (
+        dry_status != 200 or not isinstance(transfer_handles, list) or len(transfer_handles) != 1
+        or not isinstance(transfer_handles[0], str)
+    ):
+        raise QualificationError("transfer_input_normalization_failed")
+    transfer_handle = transfer_handles[0]
+    if _host_input_sha256(config, transfer_handle) != original_sha:
+        raise QualificationError("transfer_bytes_mismatch")
+    if _validate_graph(
+        dry, 1, summary["width"], summary["height"], config=config, case_id="Q21-EDIT-1-REF",
+        expected_handles=transfer_handles,
+    ):
+        raise QualificationError("transfer_graph_failed")
     row.update({"dry_run_pass": True, "original_decoded": True, "width": summary["width"], "height": summary["height"],
                 "alpha_summary": {"mode": summary["mode"], "min": summary["alpha_min"], "max": summary["alpha_max"]},
                 "transfer_equivalence": "download_pnginfo_and_send_to_edit_exact_bytes",
-                "input_handles": [handle, output_handle], "source_case_id": "Q21-REMOVE-BG",
+                "input_handles": [handle, transfer_handle], "source_case_id": "Q21-REMOVE-BG",
                 "original_sha256": original_sha, "status": "PASS", "child_exit": 0})
 
 
