@@ -157,6 +157,27 @@ describe("registerRookieUIBootstrapExtension", () => {
     expect(declarationText).toContain("fetchApi?: (route: string, options?: RequestInit) => Promise<Response>;");
   });
 
+  test("lets the host own auth and route resolution while forwarding request options", async () => {
+    const controller = new AbortController();
+    const options = { method: "POST", headers: { Accept: "application/json" }, signal: controller.signal, timeoutMs: 60_000 };
+    const response = { ok: true, status: 202 };
+    const runtimeApi = {
+      fetchApi: vi.fn(function (route, forwarded) {
+        expect(this).toBe(runtimeApi);
+        expect(route).toBe("/rookieui/generate/txt2img");
+        expect(forwarded).toBe(options);
+        return Promise.resolve(response);
+      }),
+    };
+    const fallback = vi.fn();
+    const hostFetch = createRookieUIHostFetch(fallback, runtimeApi);
+    expect(await hostFetch("/rookieui/generate/txt2img", options)).toBe(response);
+    expect(runtimeApi.fetchApi).toHaveBeenCalledTimes(1);
+    expect(fallback).not.toHaveBeenCalled();
+    controller.abort();
+    expect(options.signal.aborted).toBe(true);
+  });
+
   test("runtime preview helper imports current image data into PNG Info inspection", async () => {
     const applyCrossPanePayload = vi.fn(() => true);
     const helpers = createGenerationRuntimeHelpers({

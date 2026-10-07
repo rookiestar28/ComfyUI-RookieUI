@@ -15,6 +15,10 @@ _ROLE_BASENAMES = {
         "qwen3vl_8b_w4a8.safetensors",
     }),
     "vae": frozenset({"qwen_image_2.1_vae_bf16.safetensors"}),
+    "prompt_enhancers": frozenset({
+        "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors",
+        "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors",
+    }),
 }
 
 

@@ -505,13 +505,24 @@ def _find_text_encoder_sequence(
     return []
 
 
+def _generation_text_encoder_selectors(inventory: ModelInventorySnapshot) -> list[str]:
+    # CRITICAL: dedicated prompt enhancers are not generation CLIPs. Shared
+    # Qwen filename hints otherwise pair Qwen/Z-Image with an incompatible encoder.
+    return [value for value in (inventory.text_encoders or [])
+            if isinstance(value, str) and value.strip()
+            and qwen_image_21_asset_role(value) != "prompt_enhancers"]
+
+
 def resolve_text_encoder_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
 ) -> str:
-    selectors = [value for value in (inventory.text_encoders or []) if isinstance(value, str) and value.strip()]
+    selectors = _generation_text_encoder_selectors(inventory)
     if not selectors:
-        return "" if _canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS else inventory.default_text_encoder
+        if (_canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS
+                or qwen_image_21_asset_role(inventory.default_text_encoder) == "prompt_enhancers"):
+            return ""
+        return inventory.default_text_encoder
 
     normalized_profile_id = _canonicalize_profile_id(profile_id)
     if PRIMARY_MODEL_CATEGORY_BY_FAMILY.get(normalized_profile_id) == "diffusion_models":
@@ -533,7 +544,7 @@ def resolve_aux_text_encoder_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
 ) -> str:
-    selectors = [value for value in (inventory.text_encoders or []) if isinstance(value, str) and value.strip()]
+    selectors = _generation_text_encoder_selectors(inventory)
     if not selectors:
         return ""
     normalized_profile_id = _canonicalize_profile_id(profile_id)

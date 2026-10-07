@@ -1,0 +1,445 @@
+{
+  "core_components": {
+    "comfyui-embedded-docs": "0.5.13",
+    "comfyui-frontend-package": "1.53.10",
+    "comfyui-workflow-templates": "0.11.76"
+  },
+  "distributions": [
+    {
+      "bytes": 10877,
+      "filename": "comfyui_workflow_templates-0.11.76-py3-none-any.whl",
+      "name": "comfyui-workflow-templates",
+      "sha256": "fcb40359461d290f400dd882fa6d43d725f56907d8289777f10a664f37f4ac05",
+      "version": "0.11.76"
+    },
+    {
+      "bytes": 79878,
+      "filename": "comfyui_workflow_templates_core-0.3.367-py3-none-any.whl",
+      "name": "comfyui-workflow-templates-core",
+      "sha256": "6ba7c25b8da5dcee2491d3f156edf24e59d3dd68edfb649032f689f03fdc5101",
+      "version": "0.3.367"
+    },
+    {
+      "bytes": 3806387,
+      "filename": "comfyui_workflow_templates_json-0.1.102-py3-none-any.whl",
+      "name": "comfyui-workflow-templates-json",
+      "sha256": "7c1361d148be87d74e51cb51e7f43fdedc3adff0a853f46221781433514034be",
+      "version": "0.1.102"
+    }
+  ],
+  "legacy_templates": [
+    {
+      "bytes": 21806,
+      "executable_sha256": "db971961e3ec58f371bc75dd6a468bd1d7e9779d2704bb47056b4c1b6943f4de",
+      "member": "comfyui_workflow_templates_json/templates/image_chroma_text_to_image.json",
+      "profile": "chroma",
+      "sha256": "fd89c0b70424d2b3273259244736554fe47f85de11c013e48bbef887798dc807"
+    },
+    {
+      "bytes": 38019,
+      "executable_sha256": "b5f3d11b056fbd4dde4eac520d08d01c6e94f88945aa6aaa632a285ccf6baf6d",
+      "member": "comfyui_workflow_templates_json/templates/flux_kontext_dev_basic.json",
+      "profile": "flux_kontext_dev_edit",
+      "sha256": "28d57d262f04c7a1de809aa593428df519afe120337017b0645e75e4cfd41011"
+    },
+    {
+      "bytes": 16325,
+      "executable_sha256": "6e43869284078df7bfaf9566144a0cd518883825654b3be5f4e04ec0932748fa",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_dev.json",
+      "profile": "hidream_i1_dev_fp8",
+      "sha256": "39f47cb27b7baacccbfdb061c08df6d8eddede17282a635f0f27a3dfcf2a8bc4"
+    },
+    {
+      "bytes": 16282,
+      "executable_sha256": "c2307c21b54ec6127c2ecf4057d12f0650c5d828f5c8060b35b13bb3b282683d",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_fast.json",
+      "profile": "hidream_i1_fast",
+      "sha256": "c2a6a09ef218fa2c560c93b795506c7e8c7c0af53934341a590e5edba8a6b7ca"
+    },
+    {
+      "bytes": 16288,
+      "executable_sha256": "7b50be46d141250f4e228f268c0eb0432b252f55f03521774f96aae196d77be1",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_full.json",
+      "profile": "hidream_i1_full",
+      "sha256": "0992df685679cf0afdcf2d55eed7b3d4ad46f263f3e593b119c40583de639fc8"
+    },
+    {
+      "bytes": 69872,
+      "executable_sha256": "8adb5d28551b929136aee90d9aea38e46a10362a3596aeb6bd7f8d5369c35e16",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_text_to_image.json",
+      "profile": "klein_4b",
+      "sha256": "8bb879856e54765b6c3ed219181e855981d8d10cfd19acff836603d9b56e838f"
+    },
+    {
+      "bytes": 39584,
+      "executable_sha256": "f78d83e71628a519082a364a512f7bdfdc3312521361459969e97184f4c2e63c",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_text_to_image_9b.json",
+      "profile": "klein_9b",
+      "sha256": "3f7a00594fb22cbee9f33e6c9e3fbc3aabdb3c318869206b4d3d0a5860f9cddd"
+    },
+    {
+      "bytes": 46553,
+      "executable_sha256": "794bf06ff7713478363b851a4bf367df1a21a6685f9a8a2675595c1cf32b0a87",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_9b_kv_image_edit.json",
+      "profile": "klein_9b_kv_image_edit",
+      "sha256": "23cb1b1d9a0f7851d99b122cb89a99c77b185af1e4d28a6fdfa47629db200f16"
+    },
+    {
+      "bytes": 59070,
+      "executable_sha256": "22332a4685421185c2a01215f00425ad7a5a73c780510ebc3722a3d192be403f",
+      "member": "comfyui_workflow_templates_json/templates/image_krea2_turbo_t2i.json",
+      "profile": "krea2_turbo",
+      "sha256": "8688a4fe39292924761b184d9bc1ad6a62817c55fb0de704becca041150fac69"
+    },
+    {
+      "bytes": 33378,
+      "executable_sha256": "9701aad5b805edd0ba3f5a2471a0f38fd50235cd2deb550f0068f88856bbe5f9",
+      "member": "comfyui_workflow_templates_json/templates/image_longcat_text_to_image.json",
+      "profile": "longcat_image",
+      "sha256": "0df9cfdf378e68b3776879f548bfa8653ead129ad1e70f689bbd03a7f17d55bf"
+    },
+    {
+      "bytes": 51694,
+      "executable_sha256": "9e94729d7d082244bfc009f89b433deab0c284bd2338035090008b2f3e6a7443",
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit.json",
+      "profile": "qwen_image_edit",
+      "sha256": "177d260f8fdd686a5884a3a48658360910b6e60cdc4a469214966c3effbe5c03"
+    }
+  ],
+  "qwen_templates": {
+    "edit": {
+      "bytes": 96740,
+      "graph_contract": {
+        "cache": [
+          "QwenImage21Cache",
+          "auto",
+          "default"
+        ],
+        "clip_slot": 0,
+        "direct_prompt": [
+          "GraphInput",
+          "prompt"
+        ],
+        "encoder": "TextEncodeQwenImage21",
+        "encoder_loader": [
+          "qwen3vl_8b_int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "enhanced_prompt": [
+          "TextGenerate",
+          0
+        ],
+        "enhancer_loader": [
+          "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "model": "qwen_image_2.1_int8_convrot.safetensors",
+        "negative": [
+          "TextEncodeQwenImage21",
+          1
+        ],
+        "positive": [
+          "TextEncodeQwenImage21",
+          0
+        ],
+        "prompt_switch": [
+          "ComfySwitchNode",
+          false,
+          false
+        ],
+        "resolution": 0,
+        "sampler_defaults": [
+          25,
+          1,
+          "euler",
+          "simple",
+          1
+        ],
+        "vae": "qwen_image_2.1_vae_bf16.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_image_edit.json",
+      "sha256": "c1e6551759de131f083a040da072ac6f032c3c8401ceca202412cd912897d0fc"
+    },
+    "txt2img": {
+      "bytes": 78494,
+      "graph_contract": {
+        "cache": [
+          "QwenImage21Cache",
+          "auto",
+          "default"
+        ],
+        "clip_slot": 0,
+        "direct_prompt": [
+          "GraphInput",
+          "prompt"
+        ],
+        "encoder": "TextEncodeQwenImage21",
+        "encoder_loader": [
+          "qwen3vl_8b_int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "enhanced_prompt": [
+          "TextGenerate",
+          0
+        ],
+        "enhancer_loader": [
+          "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors",
+          "stable_diffusion"
+        ],
+        "model": "qwen_image_2.1_int8_convrot.safetensors",
+        "negative": [
+          "TextEncodeQwenImage21",
+          1
+        ],
+        "positive": [
+          "TextEncodeQwenImage21",
+          0
+        ],
+        "prompt_switch": [
+          "ComfySwitchNode",
+          false,
+          false
+        ],
+        "resolution": 1024,
+        "sampler_defaults": [
+          25,
+          1,
+          "euler",
+          "simple",
+          1
+        ],
+        "vae": "qwen_image_2.1_vae_bf16.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_t2i.json",
+      "sha256": "5f2b50eeaf27e56a45456681ad5319df1ae51243d9653ac3f92c7dc05d1e1503"
+    }
+  },
+  "schema_version": "host-reference-alignment-v1",
+  "scope": "source-contract-only",
+  "source_artifacts": [
+    {
+      "bytes": 128,
+      "path": "comfyui_version.py",
+      "sha256": "090b43edd2cc18025c42831cbfea57729b09b613fc15289d4dc59b5d9cd40e33",
+      "source": "core"
+    },
+    {
+      "bytes": 521,
+      "path": "requirements.txt",
+      "sha256": "bc8968fdb1ff5ca7b895387749b3d3357378b4618c962bc065b6e44a2d08f2df",
+      "source": "core"
+    },
+    {
+      "bytes": 67823,
+      "path": "server.py",
+      "sha256": "d663cf43ee1999886b1523da72942b96fd032a2dc2fcfa6572c621577d98b945",
+      "source": "core"
+    },
+    {
+      "bytes": 64577,
+      "path": "execution.py",
+      "sha256": "a628d8c81b8381147a8dafa5133340ab02e54a05694db4013833138297e7b9dc",
+      "source": "core"
+    },
+    {
+      "bytes": 4199,
+      "path": "comfy_execution/media_enrichment.py",
+      "sha256": "3e89b14b9bed357c0a3fede8864bef20b096fc517e2e5097b54fd8a8331e0348",
+      "source": "core"
+    },
+    {
+      "bytes": 4708,
+      "path": "comfy_extras/nodes_upscale_model.py",
+      "sha256": "fafaf6351a15f981d40157c087490da702e096cad9fbaa85859e501fe7180564",
+      "source": "core"
+    },
+    {
+      "bytes": 11872,
+      "path": "comfy_extras/nodes_qwen.py",
+      "sha256": "54ce02aa9e167c0b497ce026ac6b558f539427d2d1ed4fc1fcc2ec8e6bc529da",
+      "source": "core"
+    },
+    {
+      "bytes": 24508,
+      "path": "comfy_extras/nodes_textgen.py",
+      "sha256": "ce41b40babe829cf8773aee3c3e43079f91205db921f6d964685e5fb0e5d7f54",
+      "source": "core"
+    },
+    {
+      "bytes": 106208,
+      "path": "comfy_api/latest/_io.py",
+      "sha256": "c2a5aded4895a1adf1acb2df6c011fdfb74e15b0d4fd331ec00ea7562d91d91d",
+      "source": "core"
+    },
+    {
+      "bytes": 109190,
+      "path": "nodes.py",
+      "sha256": "aefb6652fb568036e90bb2c1632c096528e813be5a53c8ee6f22866dc573e35b",
+      "source": "core"
+    },
+    {
+      "bytes": 27713,
+      "path": "blueprints/Text to Image (Anima).json",
+      "sha256": "ec4dde0805dbbd7a442c9e5434aa92c0dfc0a7d8818570b46f59c391f260ee51",
+      "source": "core"
+    },
+    {
+      "bytes": 57598,
+      "path": "blueprints/Text to Image (Ernie Image).json",
+      "sha256": "e39bde265f479dba2999d1722217d63158e0da037eea7ae308788f07747d2e7a",
+      "source": "core"
+    },
+    {
+      "bytes": 55927,
+      "path": "blueprints/Text to Image (Ernie Image Turbo).json",
+      "sha256": "7c9fdfe1ee760dacc49194d295b7b9d951949d804c7d3b3ba3c29d64fe7cf045",
+      "source": "core"
+    },
+    {
+      "bytes": 56268,
+      "path": "blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "sha256": "a528983426e61156d558da6c746ba6e401340dbcbcff4a2e9a530fc661972d38",
+      "source": "core"
+    },
+    {
+      "bytes": 25891,
+      "path": "blueprints/Text to Image (Flux.1 Dev).json",
+      "sha256": "d77c8ff4a8d2af64f085319ba2c8bc18bf119e8731eea75ea32656b706c9e169",
+      "source": "core"
+    },
+    {
+      "bytes": 48801,
+      "path": "blueprints/Text to Image (Flux.2 Dev).json",
+      "sha256": "a8738e78ea9000621d1a77beba05e20cd779559751bf77674913f09dbd183206",
+      "source": "core"
+    },
+    {
+      "bytes": 53697,
+      "path": "blueprints/Image Edit (Flux.2 Dev).json",
+      "sha256": "69f4d7e8c88e4d17797ca8cd3476a25d4a19051403a1b4536e99517f3c29dffb",
+      "source": "core"
+    },
+    {
+      "bytes": 25906,
+      "path": "blueprints/Text to Image (Flux.1 Krea Dev).json",
+      "sha256": "4e0bf19e4978b698c8e79695528f5780fc49b4279c26ca99232093fa0948be8f",
+      "source": "core"
+    },
+    {
+      "bytes": 64873,
+      "path": "blueprints/Text to Image (Ideogram v4).json",
+      "sha256": "3bf04919d5a87a9872363a80fe9638d5d41001980b94e4058f10208602689210",
+      "source": "core"
+    },
+    {
+      "bytes": 36260,
+      "path": "blueprints/Image Edit (LongCat Image Edit).json",
+      "sha256": "820104ccdc0804e68a34444564dd4da7a8c6ce2bd1b2d0be37122b43b6ef73cd",
+      "source": "core"
+    },
+    {
+      "bytes": 51536,
+      "path": "blueprints/Text to Image (Qwen-Image 2512).json",
+      "sha256": "60900b3da6d7cedabfecc6984a0c0b641d4d7170a1ff076b858e8c6fa3ee1c92",
+      "source": "core"
+    },
+    {
+      "bytes": 39745,
+      "path": "blueprints/Image Edit (Qwen 2511).json",
+      "sha256": "f5339d66f11772e28b2c16c47f1ab3d638c88fc0b8d5379ce9f285ad43f6ede9",
+      "source": "core"
+    },
+    {
+      "bytes": 29488,
+      "path": "blueprints/Text to Image (Z-Image-Base).json",
+      "sha256": "f2ab24adb9e35186797f06f282691baeb36cd58c0244f4986cc8e0879612b334",
+      "source": "core"
+    },
+    {
+      "bytes": 27701,
+      "path": "blueprints/Text to Image (Z-Image-Turbo).json",
+      "sha256": "b3029adb874cfc80b33fa974698f331054cf17ddc2bfbadf90b031abae84d30c",
+      "source": "core"
+    },
+    {
+      "bytes": 13286,
+      "path": "package.json",
+      "sha256": "46c13b80a2e4b70e70ec7e759d3af3d5a3971887e007592966054252b4d300ce",
+      "source": "frontend"
+    },
+    {
+      "bytes": 63070,
+      "path": "src/scripts/api.ts",
+      "sha256": "203a9bcb5e2f5f3d5ed00975ad2cba6bacfef2519de35c1c2d442b9daf047807",
+      "source": "frontend"
+    },
+    {
+      "bytes": 3964,
+      "path": "src/types/extensionTypes.ts",
+      "sha256": "4ccadca0c73c5f3d7cf3c7a05a3ce29d619cd0816ad7119a4d3e8dae33f96dd7",
+      "source": "frontend"
+    },
+    {
+      "bytes": 5820,
+      "path": "src/stores/workspace/sidebarTabStore.ts",
+      "sha256": "cc5110834805f535d520a770c4df1eff096e759471edee268449b6523e8bb129",
+      "source": "frontend"
+    },
+    {
+      "bytes": 10547,
+      "path": "src/services/extensionService.ts",
+      "sha256": "1672974c7baeecc346d5e44407947f9efcc6aafdb0259ef1eea6c05ddf043f56",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1755,
+      "path": "src/components/sidebar/tabs/SidebarTabTemplate.vue",
+      "sha256": "29ebcdf2dda6759fb01cd2258c664c4c2430ba0106c4441f23d914af79864784",
+      "source": "frontend"
+    },
+    {
+      "bytes": 23004,
+      "path": "src/components/graph/GraphCanvas.vue",
+      "sha256": "3b19cd1841099ccd270a45280440ba46761ea1de6e91efe5072648795924a49a",
+      "source": "frontend"
+    },
+    {
+      "bytes": 17757,
+      "path": "src/components/LiteGraphCanvasSplitterOverlay.vue",
+      "sha256": "fc25fbdafb8fa883f1fe60d18384768e6dbe950a48f5e8e67da0917f6aa3a144",
+      "source": "frontend"
+    },
+    {
+      "bytes": 10971,
+      "path": "src/components/sidebar/SideToolbar.vue",
+      "sha256": "47e69f4fe44af3e6b89d3501b06735f6c662723f796a82e4ec49c8b4817a08d5",
+      "source": "frontend"
+    },
+    {
+      "bytes": 3872,
+      "path": "src/platform/remote/comfyui/execution/types.ts",
+      "sha256": "499f08b6034aa2dd8a5f6110498d300d1c8026a32ddc0fa3d5a9354956d46952",
+      "source": "frontend"
+    }
+  ],
+  "sources": {
+    "core": {
+      "revision": "7a5dad695fe1cae25efcb2550530fb20ef68da3d",
+      "version": "0.39.0"
+    },
+    "frontend": {
+      "revision": "c5309a53cbaa7a352cd7c94c7f855767726d05b7",
+      "version": "1.57.0"
+    }
+  },
+  "template_components": {
+    "comfyui-workflow-templates-core": "0.3.367",
+    "comfyui-workflow-templates-json": "0.1.102",
+    "comfyui-workflow-templates-media-api": "0.3.84",
+    "comfyui-workflow-templates-media-assets-01": "0.1.48",
+    "comfyui-workflow-templates-media-assets-02": "0.1.9",
+    "comfyui-workflow-templates-media-image": "0.3.160",
+    "comfyui-workflow-templates-media-other": "0.3.229",
+    "comfyui-workflow-templates-media-video": "0.3.101"
+  }
+}

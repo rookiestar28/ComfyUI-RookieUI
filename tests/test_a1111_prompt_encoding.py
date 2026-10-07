@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 import unittest
+from copy import deepcopy
 
 from rookieui import nodes
 from rookieui.services.a1111_prompt_encoding import (
     A1111PromptEncodingOptions,
+    _merge_encode_metadata,
     build_a1111_prompt_encoding_plan,
+    encode_a1111_sdxl_prompt_conditioning,
+    encode_a1111_sdxl_prompt_text_conditioning,
 )
+
+
+_OMITTED_METADATA = object()
+
+
+def _scheduled_metadata(pooled_output, add_dict):
+    metadata = {"pooled_output": pooled_output}
+    # Match host dict.update: omission is valid, but explicit None must fail.
+    metadata.update({} if add_dict is _OMITTED_METADATA else add_dict)
+    return metadata
 
 
 class _FakeClip:
@@ -20,10 +34,10 @@ class _FakeClip:
             return {"l": [[("BOS", 1.0, 0), (text, 1.0, 1), ("EOS", 1.0, 0)]]}
         return {"l": [[("BOS", 1.0), (text, 1.0), ("EOS", 1.0)]]}
 
-    def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+    def encode_from_tokens_scheduled(self, tokens, add_dict=_OMITTED_METADATA):
         self.encoded.append(tokens)
         text = tokens["l"][0][1][0]
-        return [[f"cond::{text}", {"pooled_output": f"pooled::{text}", **(add_dict or {})}]]
+        return [[f"cond::{text}", _scheduled_metadata(f"pooled::{text}", add_dict)]]
 
 
 class _FakeSDXLClip(_FakeClip):
@@ -44,14 +58,79 @@ class _FakeSDXLClip(_FakeClip):
             "l": [[("BOS", 1.0), (f"l::{text}", 1.0), ("EOS", 1.0)]],
         }
 
-    def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+    def encode_from_tokens_scheduled(self, tokens, add_dict=_OMITTED_METADATA):
         self.encoded.append(tokens)
         g_text = tokens["g"][0][1][0]
         l_text = tokens["l"][0][1][0]
-        return [[f"cond::{g_text}|{l_text}", {"pooled_output": f"pooled::{g_text}", **(add_dict or {})}]]
+        return [[f"cond::{g_text}|{l_text}", _scheduled_metadata(f"pooled::{g_text}", add_dict)]]
 
 
 class A1111PromptEncodingTests(unittest.TestCase):
+    def test_scheduled_clip_fakes_reject_explicit_none_but_allow_omission(self) -> None:
+        for clip in (_FakeClip(), _FakeSDXLClip()):
+            with self.subTest(clip=type(clip).__name__):
+                tokens = clip.tokenize("portrait")
+                self.assertTrue(clip.encode_from_tokens_scheduled(tokens))
+                self.assertTrue(clip.encode_from_tokens_scheduled(tokens, add_dict={}))
+                with self.assertRaises(TypeError):
+                    clip.encode_from_tokens_scheduled(tokens, add_dict=None)
+
+    def test_merge_encode_metadata_always_returns_a_fresh_mapping(self) -> None:
+        for base in (None, {}, {"width": 1024, "tags": ["base"]}):
+            for extra in (None, {}, {"height": 768, "tags": ["extra"]}):
+                with self.subTest(base=base, extra=extra):
+                    original_base, original_extra = deepcopy(base), deepcopy(extra)
+                    merged = _merge_encode_metadata(base, extra)
+                    self.assertIsInstance(merged, dict)
+                    self.assertIsNot(merged, base)
+                    self.assertIsNot(merged, extra)
+                    expected = {**(base or {}), **(extra or {})}
+                    if base and extra and "tags" in base and "tags" in extra:
+                        expected["tags"] = [*base["tags"], *extra["tags"]]
+                    self.assertEqual(merged, expected)
+                    merged["new_key"] = True
+                    self.assertEqual(base, original_base)
+                    self.assertEqual(extra, original_extra)
+
+    def test_merge_encode_metadata_preserves_list_order_and_replacement_without_mutation(self) -> None:
+        base = {"tags": ["base"], "width": 1024, "replace": ["old"]}
+        extra = {"tags": ["first", "second"], "height": 768, "replace": "new"}
+        original_base, original_extra = deepcopy(base), deepcopy(extra)
+        merged = _merge_encode_metadata(base, extra)
+        self.assertEqual(list(merged), ["tags", "width", "replace", "height"])
+        self.assertEqual(merged, {"tags": ["base", "first", "second"], "width": 1024, "height": 768, "replace": "new"})
+        merged["tags"].append("later")
+        self.assertEqual(base, original_base)
+        self.assertEqual(extra, original_extra)
+
+    def test_sd15_empty_and_negative_text_use_the_host_mapping_contract_in_all_engines(self) -> None:
+        node = nodes.RookieUIA1111CLIPTextEncode()
+        for engine in ("parity", "text_only", "legacy"):
+            for text in ("", "low quality, blurry"):
+                with self.subTest(engine=engine, text=text):
+                    conditioning, = node.encode(_FakeClip(), text, a1111_engine=engine)
+                    self.assertEqual(conditioning, [[f"cond::{text}", {"pooled_output": f"pooled::{text}"}]])
+
+    def test_sdxl_services_without_dimension_metadata_use_the_host_mapping_contract(self) -> None:
+        for encoder in (encode_a1111_sdxl_prompt_conditioning, encode_a1111_sdxl_prompt_text_conditioning):
+            for text_g, text_l in (("portrait", "low quality"), ("", "")):
+                with self.subTest(encoder=encoder.__name__, text_g=text_g, text_l=text_l):
+                    conditioning = encoder(
+                        _FakeSDXLClip(), text_g=text_g, text_l=text_l,
+                        tokenizer=nodes.RookieUIA1111CLIPTextEncodeSDXL._tokenize_sdxl_pair,
+                    )
+                    self.assertEqual(len(conditioning), 1)
+                    self.assertEqual(set(conditioning[0][1]), {"pooled_output"})
+
+    def test_sdxl_dimension_metadata_is_preserved_in_all_engines(self) -> None:
+        dimensions = {"width": 1024, "height": 768, "crop_w": 16, "crop_h": 32, "target_width": 1280, "target_height": 960}
+        for engine in ("parity", "text_only", "legacy"):
+            with self.subTest(engine=engine):
+                conditioning, = nodes.RookieUIA1111CLIPTextEncodeSDXL().encode(
+                    _FakeSDXLClip(), **dimensions, text_g="portrait", text_l="low quality", a1111_engine=engine,
+                )
+                self.assertEqual({key: conditioning[0][1][key] for key in dimensions}, dimensions)
+
     def test_nodes_expose_parser_mode_matrix(self) -> None:
         expected_modes = ["A1111", "full", "comfy++", "fixed attention"]
 
@@ -263,11 +342,11 @@ class A1111PromptEncodingTests(unittest.TestCase):
             def tokenize(self, text, return_word_ids=False):
                 return {"l": [[("BOS", 1.0), (text, 1.0), ("EOS", 1.0)]]}
 
-            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+            def encode_from_tokens_scheduled(self, tokens, add_dict=_OMITTED_METADATA):
                 text = tokens["l"][0][1][0]
                 self.encoded_texts.append(text)
                 value = 20.0 if text == "hero (eyes:1.3)" else 5.0
-                return [[value, {"pooled_output": f"pooled::{text}", **(add_dict or {})}]]
+                return [[value, _scheduled_metadata(f"pooled::{text}", add_dict)]]
 
         clip = _FakeClip()
         node = nodes.RookieUIA1111CLIPTextEncode()
@@ -285,11 +364,11 @@ class A1111PromptEncodingTests(unittest.TestCase):
             def tokenize(self, text, return_word_ids=False):
                 return {"l": [[("BOS", 1.0), (text, 1.0), ("EOS", 1.0)]]}
 
-            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+            def encode_from_tokens_scheduled(self, tokens, add_dict=_OMITTED_METADATA):
                 text = tokens["l"][0][1][0]
                 self.encoded_texts.append(text)
                 value = 20.0 if text == "hero (eyes:1.3)" else 5.0
-                return [[value, {"pooled_output": f"pooled::{text}", **(add_dict or {})}]]
+                return [[value, _scheduled_metadata(f"pooled::{text}", add_dict)]]
 
         clip = _FakeClip()
         node = nodes.RookieUIA1111CLIPTextEncode()
@@ -313,9 +392,9 @@ class A1111PromptEncodingTests(unittest.TestCase):
                     }
                 return {"l": [[("BOS", 1.0), ("hero", 1.0), ("eyes", 1.3), ("EOS", 1.0)]]}
 
-            def encode_from_tokens_scheduled(self, tokens, add_dict=None):
+            def encode_from_tokens_scheduled(self, tokens, add_dict=_OMITTED_METADATA):
                 self.encoded_token_weights.append([float(entry[1]) for entry in tokens["l"][0]])
-                return [[10.0, {"pooled_output": "pooled::old", **(add_dict or {})}]]
+                return [[10.0, _scheduled_metadata("pooled::old", add_dict)]]
 
         clip = _WeightedClip()
         node = nodes.RookieUIA1111CLIPTextEncode()

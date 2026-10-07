@@ -76,10 +76,11 @@ def _options_or_default(options: A1111PromptEncodingOptions | None) -> A1111Prom
 def _merge_encode_metadata(
     base: dict[str, Any] | None,
     extra: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    if not extra:
-        return base
+) -> dict[str, Any]:
+    # CRITICAL: scheduled CLIP calls dict.update; even empty metadata must be a fresh dict, never None.
     merged = _clone_metadata(base)
+    if not extra:
+        return merged
     for key, value in extra.items():
         if isinstance(value, list) and isinstance(merged.get(key), list):
             merged[key] = [*merged[key], *value]

@@ -217,6 +217,10 @@ def _resolve_diffusion_text_encoder_selector(
         )
         for selector in selectors
     ]
+    # CRITICAL: check each resolved bundle component, not the pipe-delimited
+    # string; otherwise a prompt enhancer can bypass generation-role admission.
+    if any(qwen_image_21_asset_role(selector) == "prompt_enhancers" for selector in resolved):
+        raise ValueError("Qwen Image 2.1 prompt enhancers cannot be used as generation text encoders.")
     # CRITICAL: preserve ordered composite encoder bundles for official template-backed non-SD profiles;
     # collapsing them back to one selector breaks Flux dual-encoder and HiDream quadruple-encoder loader topology.
     return "|".join(resolved)

@@ -80,9 +80,21 @@ class _ComfyUpscalerBackend:
         tensor = torch.from_numpy(array)[None,]
         output = ImageUpscaleWithModel().upscale(model, tensor)
         output_tensor = _extract_node_output_value(output)
-        output_array = output_tensor.detach().cpu().numpy()[0]
+        # IMPORTANT: host intermediates can be BF16, which NumPy cannot read;
+        # normalize to float before validating the batch and channel boundary.
+        output_array = output_tensor.detach().float().cpu().numpy()
+        if (
+            output_array.ndim != 4
+            or output_array.shape[0] != 1
+            or output_array.shape[1] == 0
+            or output_array.shape[2] == 0
+            or output_array.shape[3] not in {3, 4}
+            or not np.isfinite(output_array).all()
+        ):
+            raise ValueError("Invalid ComfyUI upscaler output: expected one finite RGB or RGBA image.")
+        output_array = output_array[0]
         output_array = np.clip(output_array * 255.0, 0, 255).astype(np.uint8)
-        upscaled = Image.fromarray(output_array, mode="RGB")
+        upscaled = Image.fromarray(output_array)
         if upscaled.size != target_size:
             upscaled = _resize_with_pil(upscaled, target_size)
         return upscaled
@@ -320,16 +332,21 @@ def execute_extras_request(
 
     for asset_handle in request.source_assets:
         source_path = resolve_asset_path(asset_handle)
-        image = Image.open(source_path)
-        image = ImageOps.exif_transpose(image)
-        metadata = {
-            key: value
-            for key, value in getattr(image, "info", {}).items()
-            if isinstance(key, str) and isinstance(value, str)
-        }
-
-        processed = image.convert("RGB")
-        processed = _resize_image(processed, request, warnings=warnings, upscaler_backend=upscaler_backend)
+        with Image.open(source_path) as source, ImageOps.exif_transpose(source) as image:
+            metadata = {
+                key: value
+                for key, value in image.info.items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
+            # CRITICAL: own alpha across the RGB-only model/blend/restoration
+            # pipeline; converting before detaching it silently makes PNGs opaque.
+            alpha = (
+                image.convert("RGBA").getchannel("A")
+                if "A" in image.getbands() or "transparency" in image.info
+                else None
+            )
+            processed = image.convert("RGB")
+        processed = _resize_image(processed, request, warnings=warnings, upscaler_backend=upscaler_backend).convert("RGB")
         processed, diagnostic = _apply_face_restoration(
             processed,
             request,
@@ -339,6 +356,10 @@ def execute_extras_request(
         diagnostics.append(diagnostic)
         if request.color_correction:
             processed = ImageOps.autocontrast(processed)
+        if alpha is not None:
+            if alpha.size != processed.size:
+                alpha = alpha.resize(processed.size, Image.Resampling.BILINEAR)
+            processed.putalpha(alpha)
 
         saved = save_output_image(
             processed,
