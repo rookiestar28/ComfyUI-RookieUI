@@ -25,6 +25,19 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.1.2: Prompt encoding, transparent Extras, and compatibility checks (bugfix/stability/security)</strong></summary>
+
+- Fixed default Stable Diffusion prompt encoding failures on newer ComfyUI hosts.
+- Extras now preserves source transparency through resizing, upscaling, blending, face restoration, and color correction.
+- Dedicated Qwen Image 2.1 prompt enhancement models are excluded from generation encoder selection, preventing incompatible automatic or manual pairings.
+- Expanded source compatibility checks for newer ComfyUI, frontend, and workflow-template versions while keeping the documented host compatibility scopes separate.
+- Updated frontend dependencies to address known security advisories.
+- Verified saved SD1.5 PNG prompt metadata with ordinary, weighted, multiline, Unicode, and long prompts.
+
+</details>
+
+<details>
+
 <summary><strong>Qwen Image 2.1 workflows and scoped host alignment (new functionality/compatibility)</strong></summary>
 
 - Added official-template-backed `Qwen-Image 2.1` txt2img and `Qwen-Image 2.1 Edit` profiles with a dedicated Qwen Image 2.1 encoder and host-inventory matching for the diffusion model, text encoder, and VAE.
@@ -589,6 +602,8 @@ python -m pip install -r requirements.txt
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
 
+For a manual installation, update from the `ComfyUI-RookieUI` directory with `git pull --ff-only`, then rerun `python -m pip install -r requirements.txt` in the ComfyUI Python environment. After updating, restart ComfyUI and reload the browser to load the current backend and sidebar assets.
+
 RookieUI requires Python 3.10 or newer and must be installed into the same Python environment used by ComfyUI.
 
 `ControlNet` and `ADetailer` support are built into RookieUI itself. You do not need to install separate external custom-node packs just to use RookieUI's integrated ControlNet or ADetailer surfaces.
@@ -668,7 +683,9 @@ If your host or Manager install path does not automatically install custom-node 
 ### PNG Info
 
 - image-first metadata ingest from file upload, drag/drop, and preview quick actions
-- generated RookieUI PNG outputs embed A1111-style `parameters` metadata for later inspection and reuse
+- generated RookieUI PNG outputs embed A1111-style `parameters`, the ComfyUI `prompt` graph, and RookieUI metadata when host metadata saving is enabled
+- use the original saved output PNG for metadata inspection and reuse; screenshots and live preview frames may not contain generation metadata
+- ComfyUI's `--disable-metadata` option intentionally omits prompt metadata from saved files
 - A1111 metadata parsing path, including RookieUI-generated infotext
 - automatic positive/negative prompt extraction
 - apply parsed parameters into `txt2img` or `img2img`
@@ -679,6 +696,7 @@ If your host or Manager install path does not automatically install custom-node 
 - single-image/batch postprocessing surface with RookieUI-managed output assets and preview payloads
 - preview quick action handoff from completed generation outputs
 - scale-by and scale-to resizing through a dedicated extras contract and execution path
+- source transparency is preserved in output PNGs, with alpha resized to the final output dimensions; opaque RGB inputs keep RGB output
 - selected ComfyUI upscaler model execution when available, plus PIL Lanczos fallback with explicit warnings when the host runtime or model is unavailable
 - optional second-upscaler blending through `upscaler_2_visibility`
 - optional color-correction postprocessing through autocontrast
@@ -698,6 +716,7 @@ If your host or Manager install path does not automatically install custom-node 
 - SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics, single-node conditioning composition, parser-mode selection, old-emphasis compatibility, and inventory-aware embeddings / textual inversion handling
 - Official non-SD template presets now surface family-specific controls only when the upstream workflow exposes them, including `Shift`, `Flux Guidance`, and `Prompt Enhancement`
 - Fixed template-owned encoder bundles keep `Text Encoder` controls hidden on the shipped official non-SD preset matrix instead of implying a user-selectable pairing that the official template does not expose
+- Qwen Image 2.1 profiles use the authored prompt directly; dedicated prompt enhancement models cannot be selected as generation text encoders
 - Model inventory includes current ComfyUI postprocessing-related catalog categories such as upscale models, latent upscalers, and background-removal models; some categories are diagnostic-only until a shipped RookieUI surface uses them directly
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
@@ -934,6 +953,8 @@ Behavior and compatibility:
 - Compatibility is validated against separate tested ComfyUI Core, frontend, Desktop, and workflow-template source snapshots rather than inferred from one mutable "latest ComfyUI" version.
 - The general tested source envelope covers ComfyUI Core 0.34, its bundled frontend 1.51.9, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54; this is a pinned compatibility basis rather than a blanket claim for every future host build.
 - Qwen Image 2.1 has a separate scoped source contract for Core 0.37 (bundled frontend 1.53.6), standalone frontend 1.55.12, and workflow templates 0.11.66. That contract covers the Qwen node, template graph, and affected frontend API surfaces; it does not imply that unrelated newer template workflows are supported.
+- Additional source-contract checks cover Core 0.39.0, standalone frontend 1.57.0, and workflow templates 0.11.76; live compatibility remains scoped to the tested environments described here.
+- SD1.5 default generation and saved PNG prompt readback have also been checked on Core 0.38.0 with CyberRealistic V9 FP16.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
 - Frontend API calls prefer the host-provided `fetchApi` resolver when available, so RookieUI requests can follow the active ComfyUI frontend routing context while preserving canonical RookieUI routes.
