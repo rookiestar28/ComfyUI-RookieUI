@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from rookieui.services.state_persistence import atomic_write_json, quarantine_corrupt_json
+from rookieui.services.prompt_workbench_openai import validate_prompt_workbench_provider_config
 from rookieui.contracts.prompt_workbench import (
     PROMPT_WORKBENCH_NAMESPACES,
     PROMPT_WORKBENCH_PANELS,
@@ -479,6 +480,8 @@ def import_prompt_workbench_store(payload: object) -> dict[str, Any]:
     with _STATE_LOCK:
         existing = load_prompt_workbench_store()
         cleaned = _replace_masked_secret_placeholders(raw_store, existing)
+        # SECURITY: validate after secret restoration but before any write; imports cannot redirect stored keys.
+        validate_prompt_workbench_provider_config(_coerce_store_shape(cleaned)["config"])
         imported = save_prompt_workbench_store(cleaned)
     return {
         "schema_version": imported["schema_version"],
@@ -493,6 +496,7 @@ def update_prompt_workbench_config(payload: object) -> dict[str, Any]:
     with _STATE_LOCK:
         store = load_prompt_workbench_store()
         store["config"] = _normalize_config_payload(store["config"], payload)
+        validate_prompt_workbench_provider_config(store["config"])
         for namespace in PROMPT_WORKBENCH_NAMESPACES:
             store["surfaces"][namespace]["history"] = store["surfaces"][namespace]["history"][: store["config"]["history_limit"]]
             store["surfaces"][namespace]["favorites"] = store["surfaces"][namespace]["favorites"][

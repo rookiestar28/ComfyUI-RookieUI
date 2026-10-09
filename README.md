@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.1.3: Prompt Workbench provider request protection (bugfix/security)</strong></summary>
+
+- Translation and AI assist now accept only the official OpenAI and MyMemory HTTPS endpoints.
+- Custom endpoint settings and imports are rejected; provider requests block redirects and unsafe network destinations.
+- Provider connections retain TLS certificate verification and bypass environment proxy routing to keep API credentials bound to the approved service.
+- Existing custom endpoint settings require an explicit switch to the official endpoint before execution. API keys remain masked in exports and browser responses.
+
+</details>
+
+<details>
+
 <summary><strong>1.1.2: Prompt encoding, transparent Extras, and compatibility checks (bugfix/stability/security)</strong></summary>
 
 - Fixed default Stable Diffusion prompt encoding failures on newer ComfyUI hosts.
@@ -126,7 +137,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 - Refreshed the current ComfyUI host source basis and revalidated shipped workflow graphs, node signatures, prompt submission behavior, and compatibility boundaries against it.
 - Direct prompt submission now follows current host hook, validation, metadata, queue, and sensitive-data handling semantics more closely, including third-party prompt-hook compatibility coverage.
 - Route registration is now retry-safe and tolerant of optional compatibility-route collisions; stateful or sensitive RookieUI routes fail closed when ComfyUI multi-user mode is enabled.
-- Prompt Workbench provider secrets remain write-only, while custom provider endpoints require explicit opt-in and use bounded schemes, credentials, timeouts, payload sizes, and concurrency.
+- Prompt Workbench provider secrets remain write-only. Translation and AI assist use only the official OpenAI (`https://api.openai.com/v1`) and MyMemory (`https://api.mymemory.translated.net/get`) HTTPS endpoints, with bounded timeouts, payload sizes, and concurrency. Custom endpoints, redirects, unsafe DNS destinations, and environment proxy routing are blocked. Existing custom endpoint configurations stop executing until the official URL is restored explicitly; their API keys are not automatically moved to another service. OpenAI-compatible third-party or local servers are currently unsupported, and provider access requires direct connectivity.
 - Provider, Extras, and ControlNet work is moved off the main event loop where needed, and sidebar teardown now releases listeners, observers, timers, object URLs, and shared layout changes across repeated remounts.
 - CI now gates registry publication on the complete test job, verifies installed dependencies against the lockfile, blocks high-severity dependency advisories, runs a required current-host contract lane, and rejects internal-only paths or symlinks from public release artifacts.
 
@@ -602,6 +613,8 @@ python -m pip install -r requirements.txt
 
 Then restart ComfyUI. The `RookieUI` sidebar tab will be available in the frontend host.
 
+Comfy Registry submissions may remain under review before Manager can offer them. If Manager offers an older release, use the manual installation or update steps to get the current GitHub version.
+
 For a manual installation, update from the `ComfyUI-RookieUI` directory with `git pull --ff-only`, then rerun `python -m pip install -r requirements.txt` in the ComfyUI Python environment. After updating, restart ComfyUI and reload the browser to load the current backend and sidebar assets.
 
 RookieUI requires Python 3.10 or newer and must be installed into the same Python environment used by ComfyUI.
@@ -825,7 +838,9 @@ Behavior and compatibility:
 - Catalog surfaces expose group tags, prompt-library entries, embeddings, and LoRA quick-insert helpers on the same workbench seam.
 - Group Tags can be shown or hidden inline and support group/subgroup browsing plus add/remove behavior against the active prompt text.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, reference-only, or otherwise unavailable on the current host/setup.
-- Shipped translation execution paths are OpenAI-compatible chat translation and MyMemory public translation; AI assist uses the OpenAI-compatible provider contract.
+- Shipped translation execution paths use the official OpenAI chat API or MyMemory public translation; AI assist uses the official OpenAI chat API.
+- Provider URLs are restricted to `https://api.openai.com/v1` and `https://api.mymemory.translated.net/get`. Third-party or local OpenAI-compatible servers are unsupported; redirects, unsafe network destinations, and environment proxy routing are blocked, so these providers require direct connectivity.
+- When upgrading from a custom endpoint configuration, explicitly restore the official URL and check its provider credentials before running translation or AI assist. Old custom settings remain visible but cannot execute; unsafe configuration changes and imports are rejected before saving.
 
 #### Prompt Workbench Danbooru Upsampler Action
 

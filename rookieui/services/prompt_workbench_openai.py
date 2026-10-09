@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from dataclasses import dataclass
+import http.client
+import ipaddress
 import json
+import socket
+from collections.abc import Iterator
 from typing import Any
 from urllib import parse
 from urllib import request
 
 
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_MYMEMORY_BASE_URL = "https://api.mymemory.translated.net/get"
+_PROVIDER_BASE_URLS = frozenset({DEFAULT_OPENAI_BASE_URL, DEFAULT_MYMEMORY_BASE_URL})
 MAX_PROVIDER_REQUEST_BYTES = 256 * 1024
 MAX_PROVIDER_RESPONSE_BYTES = 1024 * 1024
 MIN_PROVIDER_TIMEOUT_SECONDS = 5
@@ -51,12 +59,144 @@ def validate_provider_endpoint(
 ) -> str:
     canonical_default = _validate_http_url_structure(default_url).rstrip("/")
     candidate = _validate_http_url_structure(str(raw_url or "").strip() or canonical_default).rstrip("/")
-    if candidate != canonical_default and allow_custom_endpoint is not True:
+    # SECURITY: API/import payloads control both URL and opt-in; the flag cannot authorize egress.
+    if canonical_default not in _PROVIDER_BASE_URLS or candidate != canonical_default:
         raise PromptWorkbenchOpenAIProviderError(
-            "Custom provider endpoints require allow_custom_endpoint=true."
+            "Custom provider endpoints are not supported. Restore the official provider HTTPS endpoint."
         )
-    # This proportional local-product check does not provide DNS-rebinding or enterprise egress isolation.
     return candidate
+
+
+def validate_prompt_workbench_provider_config(config: dict[str, Any]) -> None:
+    for surface in ("translation", "ai_assist"):
+        settings = config.get(surface, {})
+        providers = settings.get("providers", {}) if isinstance(settings, dict) else {}
+        if not isinstance(providers, dict):
+            continue
+        for provider_id, default_url in (
+            ("openai", DEFAULT_OPENAI_BASE_URL),
+            ("mymemory_free", DEFAULT_MYMEMORY_BASE_URL),
+        ):
+            provider_config = providers.get(provider_id)
+            if not isinstance(provider_config, dict):
+                continue
+            try:
+                validate_provider_endpoint(
+                    provider_config.get("base_url"),
+                    default_url=default_url,
+                    allow_custom_endpoint=False,
+                )
+            except PromptWorkbenchOpenAIProviderError as exc:
+                raise ValueError(str(exc)) from exc
+
+
+def _validate_provider_request(req: request.Request) -> tuple[str, str]:
+    url = _validate_http_url_structure(req.full_url)
+    parsed = parse.urlsplit(url)
+    hostname = parsed.hostname or ""
+    method = req.get_method()
+    is_openai = (
+        parsed.netloc == "api.openai.com"
+        and parsed.path == "/v1/chat/completions"
+        and method == "POST"
+        and not parsed.query
+    )
+    is_mymemory = (
+        parsed.netloc == "api.mymemory.translated.net"
+        and parsed.path == "/get"
+        and method == "GET"
+    )
+    if parsed.scheme != "https" or not (is_openai or is_mymemory):
+        raise PromptWorkbenchOpenAIProviderError("Provider request destination is not approved.")
+    if len(url.encode("utf-8")) > MAX_PROVIDER_REQUEST_BYTES:
+        raise PromptWorkbenchOpenAIProviderError("Provider request URL exceeds the size limit.")
+    if is_mymemory:
+        query = parse.parse_qsl(parsed.query, keep_blank_values=True)
+        keys = [key for key, _ in query]
+        if set(keys) - {"q", "langpair", "de"} or len(keys) != len(set(keys)) or not {"q", "langpair"} <= set(keys):
+            raise PromptWorkbenchOpenAIProviderError("MyMemory request query is not approved.")
+    for name, _ in req.header_items():
+        if name.lower() not in {"content-type", "authorization"} or (
+            is_mymemory and name.lower() == "authorization"
+        ):
+            raise PromptWorkbenchOpenAIProviderError("Provider request headers are not approved.")
+    path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+    return hostname, path
+
+
+@dataclass(frozen=True, slots=True)
+class _ProviderAddress:
+    family: socket.AddressFamily
+    address: str
+
+
+def _resolve_public_provider_address(hostname: str) -> _ProviderAddress:
+    addresses = socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
+    if not addresses:
+        raise PromptWorkbenchOpenAIProviderError("Provider DNS returned no usable address.")
+    validated: list[_ProviderAddress] = []
+    for family, _, _, _, sockaddr in addresses:
+        address = str(sockaddr[0])
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError as exc:
+            raise PromptWorkbenchOpenAIProviderError("Provider DNS returned an unsafe address.") from exc
+        if (
+            family not in {socket.AF_INET, socket.AF_INET6}
+            or "%" in address
+            or not ip.is_global
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+            or (
+                isinstance(ip, ipaddress.IPv6Address)
+                and (ip.is_site_local or ip.ipv4_mapped is not None or ip.sixtofour is not None or ip.teredo is not None)
+            )
+            or (family == socket.AF_INET) != isinstance(ip, ipaddress.IPv4Address)
+        ):
+            raise PromptWorkbenchOpenAIProviderError("Provider DNS returned an unsafe address.")
+        validated.append(_ProviderAddress(socket.AddressFamily(family), str(ip)))
+    return validated[0]
+
+
+class _PinnedProviderHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, hostname: str, address: _ProviderAddress, *, timeout: int) -> None:
+        super().__init__(hostname, port=443, timeout=timeout)
+        self._provider_address = address
+
+    def connect(self) -> None:
+        if self._tunnel_host:
+            raise PromptWorkbenchOpenAIProviderError("Provider proxy tunnels are not supported.")
+        address = self._provider_address
+        sock = socket.socket(address.family, socket.SOCK_STREAM, socket.IPPROTO_TCP)
+        try:
+            sock.settimeout(self.timeout)
+            target = (address.address, 443) if address.family == socket.AF_INET else (address.address, 443, 0, 0)
+            # SECURITY: connect only to the validated IP; keep the approved hostname for verified TLS/SNI.
+            # Calling super().connect() would resolve again and reopen DNS-rebinding/proxy bypasses.
+            sock.connect(target)
+            self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        except BaseException:
+            sock.close()
+            raise
+
+
+@contextmanager
+def _open_provider_response(req: request.Request, *, timeout: int) -> Iterator[http.client.HTTPResponse]:
+    hostname, path = _validate_provider_request(req)
+    address = _resolve_public_provider_address(hostname)
+    connection = _PinnedProviderHTTPSConnection(hostname, address, timeout=timeout)
+    try:
+        connection.request(req.get_method(), path, body=req.data, headers=dict(req.header_items()))
+        with connection.getresponse() as response:
+            # SECURITY: never follow Location, including same-host redirects; credentials stay provider-bound.
+            if 300 <= response.status < 400:
+                raise PromptWorkbenchOpenAIProviderError("Provider redirects are not allowed.")
+            if not 200 <= response.status < 300:
+                raise PromptWorkbenchOpenAIProviderError(f"Provider returned HTTP {response.status}.")
+            yield response
+    finally:
+        connection.close()
 
 
 def openai_headers(api_key: str) -> dict[str, str]:
@@ -79,8 +219,9 @@ def urlopen_json(
             f"Provider request body must be at most {MAX_PROVIDER_REQUEST_BYTES} bytes."
         )
     req = request.Request(url, data=data, headers=headers or {}, method="POST" if data is not None else "GET")
+    _validate_provider_request(req)
     try:
-        with request.urlopen(req, timeout=bounded_provider_timeout(timeout)) as response:
+        with _open_provider_response(req, timeout=bounded_provider_timeout(timeout)) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             response_bytes = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
     except PromptWorkbenchOpenAIProviderError:
@@ -112,7 +253,7 @@ def openai_chat_completion(
     base_url = validate_provider_endpoint(
         provider_config.get("base_url"),
         default_url=DEFAULT_OPENAI_BASE_URL,
-        allow_custom_endpoint=provider_config.get("allow_custom_endpoint") is True,
+        allow_custom_endpoint=False,
     )
     model = str(provider_config.get("model", "")).strip()
     timeout_seconds = bounded_provider_timeout(provider_config.get("timeout_seconds", 20))

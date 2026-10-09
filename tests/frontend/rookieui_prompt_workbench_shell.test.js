@@ -108,7 +108,7 @@ function createBootstrapState(overrides = {}) {
                 config_fields: [
                   { key: "api_key", title: "API Key", secret: true, placeholder: "sk-..." },
                   { key: "model", title: "Model", placeholder: "gpt-4.1-mini" },
-                  { key: "allow_custom_endpoint", title: "Allow Custom Endpoint", value_type: "boolean", default: false },
+                  { key: "base_url", title: "API URL (Official Endpoint Only)", default: "https://api.openai.com/v1" },
                 ],
               },
             ],
@@ -2117,14 +2117,13 @@ describe("prompt workbench shell", () => {
     document.getElementById("assist-workbench-panel-assist").click();
     await flushPromises();
 
-    const customEndpointOptIn = document.getElementById("assist-workbench-assist-config-allow_custom_endpoint");
-    expect(customEndpointOptIn.type).toBe("checkbox");
-    expect(customEndpointOptIn.checked).toBe(false);
-    customEndpointOptIn.checked = true;
-    customEndpointOptIn.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(document.getElementById("assist-workbench-assist-config-allow_custom_endpoint")).toBeNull();
+    const providerUrl = document.getElementById("assist-workbench-assist-config-base_url");
+    expect(providerUrl.value).toBe("https://api.openai.com/v1");
+    providerUrl.dispatchEvent(new Event("change", { bubbles: true }));
     await flushPromises();
     expect(bootstrapState.updatePromptWorkbenchConfigRequest.mock.calls.some(
-      ([config]) => config?.ai_assist?.providers?.openai?.allow_custom_endpoint === true,
+      ([config]) => config?.ai_assist?.providers?.openai?.base_url === "https://api.openai.com/v1",
     )).toBe(true);
 
     const languageSelect = document.getElementById("assist-workbench-assist-language");

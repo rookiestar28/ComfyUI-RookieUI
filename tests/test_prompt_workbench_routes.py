@@ -52,7 +52,7 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
                                 "providers": {
                                     "openai": {
                                         "api_key": "test-openai-key",  # pragma: allowlist secret
-                                        "base_url": "https://example.test/v1",
+                                        "base_url": "https://api.openai.com/v1",
                                         "model": "gpt-4.1-mini",
                                     }
                                 },
@@ -83,7 +83,7 @@ class PromptWorkbenchRouteTests(unittest.TestCase):
                                 "providers": {
                                     "openai": {
                                         "api_key": sentinel,
-                                        "base_url": "https://example.test/v1",
+                                        "base_url": "https://api.openai.com/v1",
                                         "model": "gpt-4.1-mini",
                                     }
                                 },

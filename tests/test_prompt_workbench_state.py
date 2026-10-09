@@ -30,7 +30,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -43,7 +43,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         self.assertEqual(payload["config"]["translation"]["providers"]["openai"]["api_key"], "********")
         self.assertEqual(
             payload["config"]["translation"]["providers"]["openai"]["base_url"],
-            "https://example.test/v1",
+            "https://api.openai.com/v1",
         )
         self.assertEqual(payload["config"]["translation"]["providers"]["openai"]["model"], "gpt-4.1-mini")
 
@@ -55,7 +55,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                             "rogue_field": "drop-me",
                         },
@@ -274,7 +274,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -287,7 +287,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
         provider_config = payload["data"]["config"]["translation"]["providers"]["openai"]
         self.assertEqual(payload["secret_policy"], "masked_provider_fields")  # pragma: allowlist secret
         self.assertEqual(provider_config["api_key"], "********")
-        self.assertEqual(provider_config["base_url"], "https://example.test/v1")
+        self.assertEqual(provider_config["base_url"], "https://api.openai.com/v1")
         self.assertNotIn("test-openai-key", json.dumps(payload))  # pragma: allowlist secret
 
     def test_export_api_has_no_raw_secret_bypass_parameter(self) -> None:
@@ -303,7 +303,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -337,7 +337,7 @@ class PromptWorkbenchStateTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "existing-secret",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },

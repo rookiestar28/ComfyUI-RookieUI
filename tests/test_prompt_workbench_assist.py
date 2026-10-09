@@ -38,7 +38,7 @@ class PromptWorkbenchAssistTests(unittest.TestCase):
         self.env_patcher.start()
         self.addCleanup(self.env_patcher.stop)
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_ai_assist_generates_prompt_via_openai_provider(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
@@ -50,8 +50,8 @@ class PromptWorkbenchAssistTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
-                            "allow_custom_endpoint": True,
+                            "base_url": "https://api.openai.com/v1",
+                            "allow_custom_endpoint": False,
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -87,7 +87,7 @@ class PromptWorkbenchAssistTests(unittest.TestCase):
                     "default_provider": "openai",
                     "providers": {
                         "openai": {
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },

@@ -213,7 +213,7 @@ def _translate_via_mymemory(text: str, *, from_lang: str, to_lang: str, provider
     base_url = validate_provider_endpoint(
         provider_config.get("base_url"),
         default_url="https://api.mymemory.translated.net/get",
-        allow_custom_endpoint=provider_config.get("allow_custom_endpoint") is True,
+        allow_custom_endpoint=False,
     )
     timeout_seconds = bounded_provider_timeout(provider_config.get("timeout_seconds", 15), default=15)
     query = {

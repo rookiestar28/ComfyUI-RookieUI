@@ -168,15 +168,9 @@ def _openai_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
         ),
         PromptWorkbenchProviderField(
             key="base_url",
-            title="Base URL",
+            title="API URL (Official Endpoint Only)",
             default="https://api.openai.com/v1",
             placeholder="https://api.openai.com/v1",
-        ),
-        PromptWorkbenchProviderField(
-            key="allow_custom_endpoint",
-            title="Allow Custom Endpoint",
-            value_type="boolean",
-            default=False,
         ),
         PromptWorkbenchProviderField(
             key="model",
@@ -204,15 +198,9 @@ def _mymemory_provider_fields() -> tuple[PromptWorkbenchProviderField, ...]:
         ),
         PromptWorkbenchProviderField(
             key="base_url",
-            title="Base URL",
+            title="API URL (Official Endpoint Only)",
             default="https://api.mymemory.translated.net/get",
             placeholder="https://api.mymemory.translated.net/get",
-        ),
-        PromptWorkbenchProviderField(
-            key="allow_custom_endpoint",
-            title="Allow Custom Endpoint",
-            value_type="boolean",
-            default=False,
         ),
         PromptWorkbenchProviderField(
             key="timeout_seconds",
@@ -247,11 +235,12 @@ def _provider_catalog_entries() -> tuple[PromptWorkbenchProviderCatalogEntry, ..
             execution_state="shipped",
             supports_batch=True,
             reference_origin="sd-webui-prompt-all-in-one: openai",
-            summary="Network-backed translation path using an OpenAI-compatible chat-completions endpoint.",
+            summary="Network-backed translation using the official OpenAI chat-completions endpoint.",
             config_fields=_openai_provider_fields(),
             notes=(
                 "Translation execution is available through the shipped provider contract.",
                 "AI-assist execution uses the same OpenAI-compatible provider contract.",
+                "Only the official HTTPS endpoint is supported; custom URLs and redirects are blocked.",
             ),
         ),
         PromptWorkbenchProviderCatalogEntry(

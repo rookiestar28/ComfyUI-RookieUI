@@ -51,8 +51,8 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
-                            "allow_custom_endpoint": True,
+                            "base_url": "https://api.openai.com/v1",
+                            "allow_custom_endpoint": False,
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -130,7 +130,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["dictionary_hits"], ["masterpiece", "city skyline"])
         self.assertEqual(payload["dictionary_misses"], ["unknown tag"])
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_translate_payload_uses_openai_provider(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
@@ -139,8 +139,8 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                     "providers": {
                         "openai": {
                             "api_key": "test-openai-key",  # pragma: allowlist secret
-                            "base_url": "https://example.test/v1",
-                            "allow_custom_endpoint": True,
+                            "base_url": "https://api.openai.com/v1",
+                            "allow_custom_endpoint": False,
                             "model": "gpt-4.1-mini",
                         }
                     },
@@ -158,7 +158,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["translated_text"], "translated prompt")
         self.assertIn("/chat/completions", mocked_urlopen.call_args.args[0].full_url)
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_translate_payload_supports_mymemory_batch(self, mocked_urlopen: mock.Mock) -> None:
         prompt_workbench_state.update_prompt_workbench_config(
             {
@@ -183,7 +183,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["translated_texts"], ["uno", "dos"])
         self.assertEqual(mocked_urlopen.call_count, 2)
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_dictionary_first_manual_translation_falls_back_for_misses(self, mocked_urlopen: mock.Mock) -> None:
         catalog_root = Path(self.runtime_dir.name) / "catalogs"
         catalog_root.mkdir(parents=True)
@@ -221,7 +221,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["dictionary_misses"], ["city skyline"])
         self.assertEqual(mocked_urlopen.call_count, 1)
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_dictionary_only_auto_translation_does_not_call_network_for_misses(self, mocked_urlopen: mock.Mock) -> None:
         catalog_root = Path(self.runtime_dir.name) / "catalogs"
         catalog_root.mkdir(parents=True)
@@ -258,7 +258,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
         self.assertEqual(payload["dictionary_misses"], ["city skyline"])
         mocked_urlopen.assert_not_called()
 
-    @mock.patch("rookieui.services.prompt_workbench_openai.request.urlopen")
+    @mock.patch("rookieui.services.prompt_workbench_openai._open_provider_response")
     def test_translation_blacklist_skips_dictionary_and_provider_translation(self, mocked_urlopen: mock.Mock) -> None:
         catalog_root = Path(self.runtime_dir.name) / "catalogs"
         catalog_root.mkdir(parents=True)
@@ -309,7 +309,7 @@ class PromptWorkbenchTranslationTests(unittest.TestCase):
                     "default_provider": "openai",
                     "providers": {
                         "openai": {
-                            "base_url": "https://example.test/v1",
+                            "base_url": "https://api.openai.com/v1",
                             "model": "gpt-4.1-mini",
                         }
                     },
