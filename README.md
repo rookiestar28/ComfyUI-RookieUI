@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.1.4: Embedding folder and translation file access protection (bugfix/security)</strong></summary>
+
+- The optional `embedding_directory` input on the RookieUI A1111 CLIP Text Encode nodes now accepts only a ComfyUI-registered embeddings folder or one of its subfolders. Embedding names come from ComfyUI's own embeddings list, and other filesystem paths are rejected instead of scanned.
+- Prompt Workbench translation now accepts only language codes such as `en`, `zh-TW`, or `auto`, and reads local translation dictionaries only from its own catalog folder.
+- Translation errors no longer include file paths or file contents.
+- XYZ Plot grid assembly matches generated file names exactly and only uses files inside the ComfyUI output folder.
+
+</details>
+
+<details>
+
 <summary><strong>1.1.3: Prompt Workbench provider request protection (bugfix/security)</strong></summary>
 
 - Translation and AI assist now accept only the official OpenAI and MyMemory HTTPS endpoints.
@@ -839,6 +850,7 @@ Behavior and compatibility:
 - Group Tags can be shown or hidden inline and support group/subgroup browsing plus add/remove behavior against the active prompt text.
 - Translation and AI-assist delivery run through the built-in `/rookieui/prompt-tools/*` route family, with explicit truthfulness when a provider is shipped but unconfigured, reference-only, or otherwise unavailable on the current host/setup.
 - Shipped translation execution paths use the official OpenAI chat API or MyMemory public translation; AI assist uses the official OpenAI chat API.
+- Translation source and target languages must be language codes such as `en`, `zh-TW`, or `auto`; other values are rejected before translation runs.
 - Provider URLs are restricted to `https://api.openai.com/v1` and `https://api.mymemory.translated.net/get`. Third-party or local OpenAI-compatible servers are unsupported; redirects, unsafe network destinations, and environment proxy routing are blocked, so these providers require direct connectivity.
 - When upgrading from a custom endpoint configuration, explicitly restore the official URL and check its provider credentials before running translation or AI assist. Old custom settings remain visible but cannot execute; unsafe configuration changes and imports are rejected before saving.
 
@@ -1003,6 +1015,7 @@ Runtime notes:
 
 - `SD1.5`, `SDXL`, `Pony`, `Illustrious`, and `Noob` use the same RookieUI parity text-encode seam.
 - The RookieUI A1111 CLIP Text Encode nodes keep optional legacy fallback controls for host compatibility; existing workflows do not need new required inputs.
+- The optional `embedding_directory` node input lets prompt words resolve against installed embeddings. Leave it empty to use only the names listed in `embedding_names`, or enter a ComfyUI-registered embeddings folder (for example `<ComfyUI>/models/embeddings` or a folder added through `extra_model_paths.yaml`) or one of its subfolders. Other filesystem paths are never scanned; when embedding resolution runs, they stop the node with an error.
 - The default parser path remains A1111-style. Other parser modes are available for compatibility and diagnostic workflows without changing existing required node inputs.
 - Token chunk rebatching applies recent comma backtrack and preserves grouped textual-inversion boundaries when the active host tokenizer exposes word-id metadata; hosts without that metadata fall back safely to the baseline tokenize path.
 - The shipped parity surface is covered by parser, node-level encoder, textual inversion resolver, tensor-summary comparison helper, and translator compatibility checks.
