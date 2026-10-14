@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import io
 import logging
+import os
 import re
 import secrets
 import threading
@@ -131,6 +132,27 @@ def _load_folder_paths_module() -> Any | None:
     return folder_paths
 
 
+def _iter_exact_basename_matches(output_root: Path, basename: str) -> list[Path]:
+    # SECURITY: compare names literally; rglob(basename) treated "* ? [" in history-derived
+    # names as patterns. Each match must also realpath back inside the output root so a
+    # symlink placed there cannot redirect reads elsewhere.
+    wanted = os.path.normcase(basename)
+    matches: list[Path] = []
+    for directory, _subdirectories, filenames in os.walk(output_root):
+        for filename in filenames:
+            if os.path.normcase(filename) != wanted:
+                continue
+            candidate = Path(directory) / filename
+            try:
+                resolved = candidate.resolve()
+                resolved.relative_to(output_root)
+            except (OSError, RuntimeError, ValueError):
+                continue
+            if resolved.is_file():
+                matches.append(resolved)
+    return matches
+
+
 def _resolve_host_output_path(selector: str) -> Path:
     normalized_selector = normalize_host_selector(selector, "selector", default_value="")
     if not normalized_selector:
@@ -154,7 +176,7 @@ def _resolve_host_output_path(selector: str) -> Path:
         raise ValueError(f"Unknown RookieUI asset handle: {normalized_selector}")
 
     basename_matches = sorted(
-        (path for path in output_root.rglob(normalized_selector) if path.is_file()),
+        _iter_exact_basename_matches(output_root, normalized_selector),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )

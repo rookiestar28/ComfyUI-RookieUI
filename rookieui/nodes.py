@@ -137,6 +137,14 @@ def _require_clip_input(clip) -> None:
         )
 
 
+# IMPORTANT: keep this widget name/position for saved workflows; the value only selects a
+# ComfyUI-registered embeddings folder and is never walked as a filesystem path.
+_EMBEDDING_DIRECTORY_TOOLTIP = (
+    "Optional. Leave empty, or enter a ComfyUI-registered embeddings folder (or a subfolder of one) "
+    "to auto-resolve embedding names. Other filesystem paths are rejected."
+)
+
+
 class RookieUIA1111CLIPTextEncode:
     @classmethod
     def INPUT_TYPES(cls):
@@ -149,7 +157,7 @@ class RookieUIA1111CLIPTextEncode:
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
                 "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
-                "embedding_directory": ("STRING", {"default": ""}),
+                "embedding_directory": ("STRING", {"default": "", "tooltip": _EMBEDDING_DIRECTORY_TOOLTIP}),
                 "embedding_names": ("STRING", {"multiline": True, "default": ""}),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),
@@ -225,7 +233,7 @@ class RookieUIA1111CLIPTextEncodeSDXL:
                 "steps": ("INT", {"default": 10, "min": 1, "max": 10000}),
                 "a1111_engine": (["parity", "text_only", "legacy"],),
                 "parser": (list(PROMPT_PARSER_MODE_OPTIONS),),
-                "embedding_directory": ("STRING", {"default": ""}),
+                "embedding_directory": ("STRING", {"default": "", "tooltip": _EMBEDDING_DIRECTORY_TOOLTIP}),
                 "embedding_names": ("STRING", {"multiline": True, "default": ""}),
                 "mean_normalization": ("BOOLEAN", {"default": True}),
                 "use_old_emphasis_implementation": ("BOOLEAN", {"default": False}),

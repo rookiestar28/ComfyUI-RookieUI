@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import re
 from typing import Any
 from urllib import parse
 
@@ -25,6 +26,8 @@ from rookieui.services.prompt_workbench_tokens import parse_prompt_workbench_tok
 
 _MAX_TRANSLATE_ITEMS = 32
 _MAX_TRANSLATE_TEXT_LENGTH = 16000
+_LANGUAGE_TAG_RE = re.compile(r"[A-Za-z]{2,8}(?:[-_][A-Za-z0-9]{1,8}){0,3}")
+_TRANSLATION_FAILURE_DETAIL = "Prompt-workbench translation failed."
 
 
 class PromptWorkbenchTranslateProviderError(RuntimeError):
@@ -59,6 +62,18 @@ def _normalize_text(value: object, *, max_length: int) -> str:
     return value.strip()[:max_length]
 
 
+def _normalize_language_tag(value: object, *, field_name: str, default: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return default
+    tag = value.strip()
+    # CRITICAL: to_lang becomes part of a catalog filename; validate the full tag before any
+    # truncation or filesystem use. Accepting free text here allowed "x/../../secret" to read
+    # arbitrary CSV files (Registry arbitrary-file-read finding; Windows collapses ".." lexically).
+    if _LANGUAGE_TAG_RE.fullmatch(tag) is None:
+        raise ValueError(f"{field_name} must be a language code such as en, zh-TW or auto.")
+    return tag
+
+
 def _normalize_translate_payload(payload: object) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Prompt-workbench translate payload must be an object.")
@@ -77,8 +92,8 @@ def _normalize_translate_payload(payload: object) -> dict[str, Any]:
 
     return {
         "provider": _normalize_text(payload.get("provider"), max_length=80),
-        "from_lang": _normalize_text(payload.get("from_lang"), max_length=32) or "auto",
-        "to_lang": _normalize_text(payload.get("to_lang"), max_length=32) or "en",
+        "from_lang": _normalize_language_tag(payload.get("from_lang"), field_name="from_lang", default="auto"),
+        "to_lang": _normalize_language_tag(payload.get("to_lang"), field_name="to_lang", default="en"),
         "text": single_text,
         "texts": batch_texts,
         "dictionary_first": bool(payload.get("dictionary_first")),
@@ -238,8 +253,12 @@ def _translation_dictionary_paths(to_lang: str) -> tuple[Path, ...]:
     catalog_root = _prompt_workbench_root() / "catalogs"
     normalized_lang = str(to_lang or "").strip()
     candidates = []
-    if normalized_lang:
-        candidates.append(catalog_root / f"translation_dictionary.{normalized_lang}.csv")
+    # SECURITY: keep this sink-side recheck even though payload normalization validates the tag;
+    # only a single "translation_dictionary.<tag>.csv" name directly under catalogs/ may be built.
+    if normalized_lang and _LANGUAGE_TAG_RE.fullmatch(normalized_lang) is not None:
+        candidate = catalog_root / f"translation_dictionary.{normalized_lang}.csv"
+        if candidate.parent == catalog_root:
+            candidates.append(candidate)
     candidates.append(catalog_root / "translation_dictionary.csv")
     return tuple(candidates)
 
@@ -430,8 +449,13 @@ def translate_prompt_workbench_payload(payload: object) -> PromptWorkbenchTransl
                     )
         except PromptWorkbenchTranslateProviderError:
             raise
-        except Exception as exc:  # pragma: no cover - error normalization path
+        except PromptWorkbenchOpenAIProviderError as exc:
+            # Provider/endpoint errors carry fixed, code-owned text that users need to act on.
             raise PromptWorkbenchTranslateProviderError(str(exc)) from exc
+        except Exception as exc:
+            # SECURITY: never echo str(exc) to the client here; dictionary I/O errors contain
+            # absolute paths and decode errors quote file bytes (arbitrary-file-read disclosure).
+            raise PromptWorkbenchTranslateProviderError(_TRANSLATION_FAILURE_DETAIL) from exc
 
     if normalized["texts"]:
         return PromptWorkbenchTranslationExecutionResult(

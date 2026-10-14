@@ -1,31 +1,30 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
-import shutil
+import sys
+import types
 import unittest
+from unittest import mock
 
 from rookieui.services.textual_inversion_resolver import (
+    list_registered_embedding_inventory,
     resolve_textual_inversion_prompt,
-    scan_textual_inversion_embeddings,
 )
 
 
 class TextualInversionResolverTests(unittest.TestCase):
-    def test_scan_textual_inversion_embeddings_collects_relative_files(self) -> None:
-        root = Path(".tmp") / "test_textual_inversion_resolver"
-        if root.exists():
-            shutil.rmtree(root)
-        try:
-            (root / "style").mkdir(parents=True)
-            (root / "style" / "badhandv4.pt").write_bytes(b"not loaded by scanner")
-            (root / "ignore.txt").write_text("ignored", encoding="utf-8")
+    def test_registered_embedding_inventory_uses_host_inventory_names(self) -> None:
+        root = (Path(".tmp") / "test_textual_inversion_resolver" / "embeddings").resolve()
+        folder_paths = types.SimpleNamespace(
+            get_folder_paths=lambda folder_name: [str(root)] if folder_name == "embeddings" else [],
+            get_filename_list=lambda folder_name: [os.path.join("style", "badhandv4.pt"), "ignore.txt"],
+        )
 
-            names = scan_textual_inversion_embeddings(root)
+        with mock.patch.dict(sys.modules, {"folder_paths": folder_paths}):
+            names = list_registered_embedding_inventory(root)
 
-            self.assertEqual(names, ["style/badhandv4.pt"])
-        finally:
-            if root.exists():
-                shutil.rmtree(root)
+        self.assertEqual(names, ["style/badhandv4.pt"])
 
     def test_resolve_textual_inversion_prompt_handles_aliases_and_fix_metadata(self) -> None:
         result = resolve_textual_inversion_prompt(

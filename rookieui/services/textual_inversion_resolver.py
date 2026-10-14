@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from pathlib import Path
 import os
 import re
 from typing import Any, Iterable
 
 _EMBEDDING_EXTENSIONS = (".safetensors", ".pt", ".bin")
+_MAX_EMBEDDING_DIRECTORY_LENGTH = 4096
+_EMBEDDING_DIRECTORY_REJECTION = (
+    "embedding_directory must be empty or name a ComfyUI-registered embeddings folder "
+    "(or a subfolder of one); other filesystem paths are not scanned."
+)
 _EXPLICIT_EMBEDDING_RE = re.compile(
     r"(?<![\w./\\!$-])embedding:(?P<name>[\w.\-!$/\\]+)(?![\w./\\!$-])",
     re.IGNORECASE,
@@ -148,27 +152,105 @@ def _parse_embedding_info(entry: str) -> TextualInversionEmbeddingInfo | None:
     return TextualInversionEmbeddingInfo(name=name, vectors=vectors, channels=channels)
 
 
-def scan_textual_inversion_embeddings(embedding_directory: str | os.PathLike[str] | None) -> list[str]:
-    if not embedding_directory:
-        return []
-    root = Path(embedding_directory)
+def _load_folder_paths_module() -> Any | None:
     try:
-        root = root.expanduser().resolve()
-    except (OSError, RuntimeError):
-        return []
-    if not root.is_dir():
-        return []
+        import folder_paths
+    except Exception:
+        return None
+    return folder_paths
 
-    names: list[str] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in _EMBEDDING_EXTENSIONS:
-            continue
+
+def _lexical_absolute_path(value: str) -> str:
+    # abspath/normpath/normcase are pure string operations here; they never stat the path.
+    return os.path.normcase(os.path.normpath(os.path.abspath(value)))
+
+
+def _name_case_key(name: str) -> str:
+    # normcase folds case on Windows but also turns "/" into "\\"; keep "/" as the separator.
+    return os.path.normcase(name).replace("\\", "/")
+
+
+def _registered_embedding_roots(folder_paths_module: Any) -> tuple[str, ...]:
+    get_folder_paths = getattr(folder_paths_module, "get_folder_paths", None)
+    if not callable(get_folder_paths):
+        return ()
+    try:
+        roots = get_folder_paths("embeddings")
+    except Exception:
+        return ()
+    if not isinstance(roots, (list, tuple)):
+        return ()
+    return tuple(
+        dict.fromkeys(_lexical_absolute_path(root) for root in roots if isinstance(root, str) and root.strip())
+    )
+
+
+def _relative_to_registered_root(candidate: str, roots: tuple[str, ...]) -> str | None:
+    for root in roots:
         try:
-            relative = path.resolve().relative_to(root).as_posix()
-        except (OSError, ValueError):
+            if os.path.commonpath((root, candidate)) != root:
+                continue
+        except ValueError:
+            # Different drives or mixed absolute/relative forms are never inside the root.
             continue
-        names.append(relative)
-    return names
+        relative = os.path.relpath(candidate, root)
+        return "" if relative == os.curdir else relative.replace(os.sep, "/").strip("/")
+    return None
+
+
+def list_registered_embedding_inventory(embedding_directory: str | os.PathLike[str] | None) -> list[str]:
+    """Return root-relative embedding names for a ComfyUI-registered embeddings folder.
+
+    The value only selects a host-registered root (or a subfolder of one); the names come from
+    the host's own embeddings inventory, never from walking the client-supplied path.
+    """
+    if embedding_directory is None:
+        return []
+    if isinstance(embedding_directory, os.PathLike):
+        embedding_directory = os.fspath(embedding_directory)
+    if not isinstance(embedding_directory, str):
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION)
+    requested = embedding_directory.strip()
+    if not requested:
+        return []
+    # CRITICAL: embedding_directory is attacker-controlled through /prompt. Decide containment
+    # lexically against host-registered roots *before* any filesystem call, and never walk,
+    # resolve or stat the requested path; Path(value).resolve().rglob() here was the Registry
+    # arbitrary-file-read finding (directory listing / existence oracle via prompt metadata).
+    if len(requested) > _MAX_EMBEDDING_DIRECTORY_LENGTH or any(
+        ord(character) < 32 or ord(character) == 127 for character in requested
+    ):
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION)
+    folder_paths_module = _load_folder_paths_module()
+    if folder_paths_module is None:
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION)
+    subfolder = _relative_to_registered_root(
+        _lexical_absolute_path(requested),
+        _registered_embedding_roots(folder_paths_module),
+    )
+    if subfolder is None:
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION)
+
+    get_filename_list = getattr(folder_paths_module, "get_filename_list", None)
+    if not callable(get_filename_list):
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION)
+    try:
+        inventory = get_filename_list("embeddings")
+    except Exception as exc:
+        raise ValueError(_EMBEDDING_DIRECTORY_REJECTION) from exc
+
+    subfolder_key = _name_case_key(subfolder)
+    names: list[str] = []
+    for entry in inventory if isinstance(inventory, (list, tuple)) else ():
+        if not isinstance(entry, str):
+            continue
+        name = entry.replace("\\", "/").strip("/")
+        if not name or os.path.splitext(name)[1].lower() not in _EMBEDDING_EXTENSIONS:
+            continue
+        if subfolder_key and not _name_case_key(name).startswith(subfolder_key + "/"):
+            continue
+        names.append(name)
+    return sorted(dict.fromkeys(names))
 
 
 def _build_embedding_lookup(
@@ -180,7 +262,7 @@ def _build_embedding_lookup(
     alias_values: set[str] = set()
     inventory_entries = [
         *_iter_inventory_entries(embedding_names),
-        *scan_textual_inversion_embeddings(embedding_directory),
+        *list_registered_embedding_inventory(embedding_directory),
     ]
     for entry in inventory_entries:
         info = _parse_embedding_info(entry)
