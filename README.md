@@ -25,6 +25,19 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.2.0: MOSS-Image generation, layout guidance, and sidebar reliability (new functionality/compatibility)</strong></summary>
+
+- Added native `MOSS-Image Base` and `MOSS-Image SFT` text-to-image presets with matching model selection, host prerequisite checks, and Skip Layer Guidance (SLG) controls.
+- Added experimental Layout guidance for ordered object, character, and text boxes, with a canvas preview, input validation, and PNG Info restoration.
+- MOSS uses the official sampling defaults; prompt enhancement remains unavailable, negative prompts start empty, and automatic encoder selection prefers int8_convrot. See the preset notes below for these differences.
+- Improved sidebar startup when browser storage is blocked or unavailable, and kept MOSS parameters and layout drafts consistent across profile changes and parameter restoration.
+- Added source compatibility checks for Core 0.42, Frontend 1.59.1, and workflow templates 0.11.96. Real GPU checks covered Base/SFT generation, Layout, preview actions, and saved PNG restoration with the tested int8 model combinations.
+- Updated frontend development tooling, including Vite 8.3.5. This release also includes the provider-request and local-file access protections documented in 1.1.3 and 1.1.4 below.
+
+</details>
+
+<details>
+
 <summary><strong>1.1.4: Embedding folder and translation file access protection (bugfix/security)</strong></summary>
 
 - The optional `embedding_directory` input on the RookieUI A1111 CLIP Text Encode nodes now accepts only a ComfyUI-registered embeddings folder or one of its subfolders. Embedding names come from ComfyUI's own embeddings list, and other filesystem paths are rejected instead of scanned.
@@ -75,7 +88,7 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 <summary><strong>Frontend test files no longer shipped to browsers (stability/performance)</strong></summary>
 
 - The frontend test suite no longer lives inside the directory this pack registers with ComfyUI. ComfyUI publishes every JavaScript file beneath a registered web directory and its frontend imports all of them, so those files were previously fetched and executed by every browser on every page load, where they failed to resolve their test-runner imports.
-- Files served by this pack dropped from 114 to 73, all of them runtime modules. The wasted requests, the console errors they produced, and the exposure of the internal test layout to anyone reading the extension listing are all removed.
+- That cleanup reduced the served file set from 114 to 73 runtime modules at the time; later features add their own runtime modules. The wasted test requests and browser import errors were removed.
 - A guard now fails if any test file or test directory reappears under the served directory. It reads the registered directory name from the package rather than assuming it, so changing that declaration cannot move the served tree out from under the check.
 - The registered directory name is unchanged, so existing installations keep resolving the same extension path. The shipped module set and its cache-busting revision token are untouched.
 
@@ -666,6 +679,7 @@ If your host or Manager install path does not automatically install custom-node 
 - Stable Diffusion family prompt semantics parity through RookieUI-owned encoder nodes, including parser modes, `BREAK`, `AND`, scheduling slices, alternate scheduling, attention markers, old-emphasis compatibility, weighted conditioning, and embeddings / textual inversion tokens
 - Official non-SD template translation for shipped txt2img presets, including family-specific parameter mapping such as `shift`, `flux_guidance`, and `prompt_enhancement_enabled` where the official workflow requires them
 - Official txt2img profiles include `Qwen-Image 2.1` and newer lanes such as `Flux.1 Krea Dev`, `Flux.2 Dev`, `Ideogram v4`, and `Krea-2 Turbo`, with official encoder/model/LoRA prerequisites surfaced through the normal model selector contract
+- `MOSS-Image Base` and `MOSS-Image SFT` add native text-to-image generation, an SLG toggle, and experimental box-based Layout guidance; their supported controls and default differences are described below
 - Krea-2 Turbo prompt enhancement is enabled by default on its local txt2img profile; turning it off preserves and encodes the original prompt without adding the host text-generation stage
 - Z-Image Turbo can use official model-patch ControlNet workflows through host `model_patches` inventory when the required ComfyUI nodes and patch files are available
 - ComfyUI-native prompt submission with host API-node usage-source attribution, embedded A1111-style `parameters` metadata, and separate RookieUI origin metadata
@@ -739,15 +753,57 @@ If your host or Manager install path does not automatically install custom-node 
 
 - SD1.5, SDXL, Pony, Illustrious, and Noob use RookieUI's Stable Diffusion parity text-encode path for A1111-style prompt semantics, single-node conditioning composition, parser-mode selection, old-emphasis compatibility, and inventory-aware embeddings / textual inversion handling
 - Official non-SD template presets now surface family-specific controls only when the upstream workflow exposes them, including `Shift`, `Flux Guidance`, and `Prompt Enhancement`
-- Fixed template-owned encoder bundles keep `Text Encoder` controls hidden on the shipped official non-SD preset matrix instead of implying a user-selectable pairing that the official template does not expose
+- Profiles with fixed template-owned encoder bundles keep `Text Encoder` controls hidden; MOSS exposes a selector limited to its supported generation encoders
 - Qwen Image 2.1 profiles use the authored prompt directly; dedicated prompt enhancement models cannot be selected as generation text encoders
 - Model inventory includes current ComfyUI postprocessing-related catalog categories such as upscale models, latent upscalers, and background-removal models; some categories are diagnostic-only until a shipped RookieUI surface uses them directly
 - Clip Skip remains editable in UI; some profiles may ignore it at execution time
 
 ### Official Non-SD Template Presets
 
-- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `Qwen-Image 2.1`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
-- Existing shipped profiles remain aligned to `comfyui-workflow-templates` 0.11.54; the Qwen Image 2.1 profiles use the 0.11.66 template source contract. Workflow families outside the shipped profile list are not implied support.
+The `MOSS-Image Base` and `MOSS-Image SFT` text-to-image presets use native ComfyUI loaders and
+FLUX.2 latents. Their controls are enabled only when the running host exposes MOSS encoding,
+the required nodes and samplers, and matching installed models. The source contract targets
+ComfyUI Core 0.42; older documented host scopes remain separate.
+
+- Install the matching `moss_image_base` or `moss_image_sft` BF16/int8_convrot diffusion model in
+  `models/diffusion_models`, a generic `qwen3.5_9b` BF16/int8_convrot/w4a8_gptq encoder in
+  `models/text_encoders`, and `flux2-vae_small.safetensors` or `flux2-vae.safetensors` in `models/vae`.
+  Keep official filenames; subfolders are supported. Qwen Image 2.1 prompt-enhancer encoders cannot
+  substitute for the MOSS generation encoder.
+- Defaults are 1024×1024, 25 steps, CFG 2.5 and `er_sde` / `simple`. Dimensions must be divisible by
+  16 within RookieUI's existing limits. Base enables Skip Layer Guidance (SLG) by default; SFT
+  disables it. The checkbox overrides either default and is preserved in saved PNG metadata.
+- These sampling defaults follow the official 0.11.96 templates, with deliberate differences:
+  prompt enhancement is unavailable (the ordinary official Base/SFT templates enable it), the
+  negative prompt starts empty, and the seed starts at `-1` for random generation. Automatic
+  encoder selection prefers int8_convrot, then BF16, then w4a8_gptq; the official templates preselect
+  w4a8_gptq. VAE selection prefers `flux2-vae_small.safetensors`, then `flux2-vae.safetensors`.
+- Positive and negative prompts go directly to the native encoder. Prompt enhancement, A1111
+  prompt compilation, LoRAs, Hires, ControlNet, ADetailer and img2img are unavailable for these
+  profiles. PNG Info restores supported parameters to Txt2Img and explains unsupported transfers.
+- Model-name admission does not verify file contents or establish every quantization's runtime
+  compatibility. Review the [official MOSS-Image model and Apache 2.0 license](https://github.com/OpenMOSS/MOSS-Image/tree/52b87fca23acedc399d062d593bec388aee9926a).
+- Real GPU checks covered Base/SFT, ordinary generation and Layout, using int8_convrot diffusion
+  models, `qwen3.5_9b_int8_convrot.safetensors`, and `flux2-vae.safetensors` on Core 0.42 with
+  Frontend 1.59.1 and templates 0.11.96. BF16 and w4a8_gptq selections were not live-qualified;
+  these checks do not reproduce every official default or qualify every admitted model variant.
+
+The optional experimental **Layout guidance** control authors up to 32 ordered object, character
+or text boxes. Enter normalized `y0, x0, y1, x1` coordinates from 0 to 1000 with a positive area;
+the preview follows the selected output width and height. Text boxes preserve literal rendered
+text, and an optional palette accepts up to eight comma-separated `#RRGGBB` colors. Captions are
+limited to 2,048 Unicode characters, rendered text to 1,024, and the layout to 128 KiB of UTF-8 JSON.
+Invalid drafts show an error and prevent generation. Disabling Layout retains the editable draft;
+empty or disabled layouts use the ordinary authored positive prompt.
+
+Layout defaults SLG on for both Base and SFT. An explicit SLG choice survives Layout toggles and
+parameter restoration. Native conditioning uses centered pixel boxes derived from the same output
+dimensions, with no additional custom node or bounding-box output image. PNG Info restores the
+original layout fields to txt2img. Layout guidance is experimental and does not guarantee exact
+text rendering or spatial adherence.
+
+- RookieUI ships official ComfyUI template-backed txt2img presets for `Anima`, `Chroma`, `ERNIE-Image`, `ERNIE-Image Turbo`, `Flux.1 Dev FP8`, `Flux.1 Krea Dev`, `Flux.2 Dev`, `Flux.2 4B Klein`, `Flux.2 9B Klein`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Ideogram v4`, `Krea-2 Turbo`, `Longcat BF16`, `MOSS-Image Base`, `MOSS-Image SFT`, `Qwen-Image 2.1`, `Qwen-Image 2512`, `Z-Image`, and `Z-Image Turbo`.
+- Earlier shipped profiles remain aligned to `comfyui-workflow-templates` 0.11.54; Qwen Image 2.1 uses the 0.11.66 source contract, and MOSS uses 0.11.96. Workflow families outside the shipped profile list are not implied support.
 - These presets follow official template defaults or source-backed mode values for width, height, steps, CFG, sampler, and scheduler, and they keep template-owned encoder bundles hidden when the official workflow hard-codes those pairings.
 - Family-specific controls are preserved where the official workflows require them:
   - `Shift`: `Chroma`, `HiDream i1 Dev FP8`, `HiDream i1 fast`, `HiDream i1 full`, `Qwen-Image 2512`, `Z-Image`, `Z-Image Turbo`
@@ -786,17 +842,17 @@ If your host or Manager install path does not automatically install custom-node 
 
 <br>
 
-- Shipped official non-SD template workflows now accept prompt-inline LoRA syntax such as `<lora:model_name:1>` on their native template runtime path instead of treating inline LoRAs as Stable Diffusion-only behavior.
+- Supported official non-SD template workflows accept prompt-inline LoRA syntax such as `<lora:model_name:1>` on their native template runtime path. MOSS-Image profiles do not support LoRAs and reject inline LoRA requests.
 - RookieUI extracts inline LoRA activations from the prompt, creates model-only `Load LoRA` nodes, and chains them immediately after the official `Load Diffusion Model` path before submitting the final ComfyUI workflow JSON to the host.
 - When a preset has an enabled official template LoRA, RookieUI preserves it first and appends prompt-inline LoRAs after it. This means the effective order is:
   - `Load Diffusion Model`
   - template-owned `Load LoRA` nodes
   - prompt-inline `Load LoRA` nodes
-- This support applies to shipped official non-SD template txt2img and image-edit builders.
+- This support applies to compatible official non-SD template txt2img and image-edit builders; it excludes MOSS-Image.
 
 Simple usage:
 
-1. Select a shipped official non-SD preset.
+1. Select a shipped official non-SD preset that supports LoRAs.
 2. Type prompt-inline LoRA syntax directly in the prompt, for example `<lora:example_model:1>`.
 3. Generate normally; RookieUI will append the corresponding model-only `Load LoRA` nodes automatically before the host run.
 
@@ -809,7 +865,7 @@ Behavior and limits:
 ### Model Support
 
 - Stable Diffusion family
-- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1`, `Flux.2`, `HiDream i1`, `Ideogram`, `Krea-2`, `Longcat Image`, `Qwen-Image`, and `Z-Image`
+- Official non-SD template preset families: `Anima`, `Chroma`, `ERNIE-Image`, `Flux.1`, `Flux.2`, `HiDream i1`, `Ideogram`, `Krea-2`, `Longcat Image`, `MOSS-Image`, `Qwen-Image`, and `Z-Image`
 - `Z-Image` also covers the Lumina/Z-Image naming lineage used by the official host templates and RookieUI aliases
 
 Prompt semantics note:
@@ -981,6 +1037,8 @@ Behavior and compatibility:
 - The general tested source envelope covers ComfyUI Core 0.34, its bundled frontend 1.51.9, standalone frontend 1.54.1, and `comfyui-workflow-templates` 0.11.54; this is a pinned compatibility basis rather than a blanket claim for every future host build.
 - Qwen Image 2.1 has a separate scoped source contract for Core 0.37 (bundled frontend 1.53.6), standalone frontend 1.55.12, and workflow templates 0.11.66. That contract covers the Qwen node, template graph, and affected frontend API surfaces; it does not imply that unrelated newer template workflows are supported.
 - Additional source-contract checks cover Core 0.39.0, standalone frontend 1.57.0, and workflow templates 0.11.76; live compatibility remains scoped to the tested environments described here.
+- An additive source contract covers Core 0.42, standalone frontend 1.59.1, and workflow templates 0.11.96 without replacing the general compatibility basis. MOSS Base/SFT generation and Layout were checked on a real GPU with the int8 model combinations listed above, using an official Frontend 1.59.1 build from its source CI. This is a scoped host/model result, not qualification of every model variant or a statement that all older hosts support MOSS.
+- Existing SD generation and native Flux.2 Klein PNG workflow replay were also checked on that newer host. Legacy A1111-form restoration for Klein remains unsupported.
 - SD1.5 default generation and saved PNG prompt readback have also been checked on Core 0.38.0 with CyberRealistic V9 FP16.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
