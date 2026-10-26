@@ -8,6 +8,7 @@ from rookieui.services.adetailer import build_adetailer_capability_payload
 from rookieui.services.parity_matrix import build_parity_payload
 from rookieui.services.prompt_capability_matrix import build_prompt_capability_matrix_payload
 from rookieui.services.version import resolve_shell_version
+from rookieui.services.moss_image import build_moss_capability_payload
 from rookieui.services.z_image_controlnet import build_z_image_controlnet_capability_payload
 
 
@@ -87,6 +88,7 @@ class RookieUICapabilitiesSnapshot:
         default_factory=build_z_image_controlnet_capability_payload
     )
     routes: list[str] = field(default_factory=list)
+    moss_image: dict[str, object] = field(default_factory=build_moss_capability_payload)
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

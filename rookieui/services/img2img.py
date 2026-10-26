@@ -3,6 +3,7 @@ from __future__ import annotations
 from rookieui.contracts.generation import Img2ImgRequest, NormalizedImg2ImgRequest
 from rookieui.contracts.prompt_dsl import PromptPreprocessResult, PromptSemanticPlan
 from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, require_qwen_image_21_asset_role
+from rookieui.contracts.moss_image import is_moss_exclusive_asset
 from rookieui.contracts.family_template_manifest import list_non_sd_edit_manifest_entries
 from rookieui.contracts.model_family_registry import (
     get_model_family_registry_entry,
@@ -627,6 +628,8 @@ def normalize_img2img_request(payload: dict[str, object]) -> NormalizedImg2ImgRe
                 raise ValueError("Qwen Image 2.1 requires all three exact selectors in the host model inventory.")
         elif any(qwen_image_21_asset_role(value) for value in (checkpoint_name, text_encoder_name, vae_name)):
             raise ValueError(f"Qwen Image 2.1 assets require the 2.1 edit profile, not '{profile.id}'.")
+        if any(is_moss_exclusive_asset(value) for value in (checkpoint_name, text_encoder_name)):
+            raise ValueError('MOSS generation assets are not supported by image-edit profiles.')
     missing_template_lora_warning = ""
     if (
         primary_model_category == "diffusion_models"

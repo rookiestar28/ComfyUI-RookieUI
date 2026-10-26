@@ -119,6 +119,10 @@ def _normalize_model_family_registry_payload(payload: dict[str, object]) -> dict
                 "default_prompt_enhancement_enabled": bool(
                     entry.get("default_prompt_enhancement_enabled", False)
                 ),
+                "default_moss_slg_enabled": (
+                    entry.get("default_moss_slg_enabled")
+                    if type(entry.get("default_moss_slg_enabled")) is bool else None
+                ),
                 "edit_megapixels_visible": bool(entry.get("edit_megapixels_visible", False)),
                 "default_edit_megapixels": (
                     float(entry.get("default_edit_megapixels"))

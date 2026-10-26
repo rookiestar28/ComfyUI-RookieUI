@@ -282,6 +282,8 @@ test("loads the RookieUI bootstrap harness", async ({ page }) => {
 
   // CRITICAL: this preset matrix pins the clip-skip regression seam; profile switches must never hard-disable input/slider.
   const diffusionModelOptions = [
+    "moss_image_base_int8_convrot.safetensors",
+    "moss_image_sft_int8_convrot.safetensors",
     "flux1-dev.safetensors",
     "flux1-dev-kontext_fp8_scaled.safetensors",
     "flux2_dev_fp8mixed.safetensors",

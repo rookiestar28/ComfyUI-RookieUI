@@ -14,6 +14,7 @@ def build_pnginfo_contract_meta() -> dict[str, object]:
         "input_mode": "image_only",
         "a1111_apply_targets": ["txt2img", "img2img"],
         "comfy_metadata_behavior": "inspect_only",
+        "moss_image_apply_targets": ["txt2img"],
     }
 
 

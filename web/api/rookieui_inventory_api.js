@@ -3,6 +3,7 @@ import { fetchRookieUIResource, toErrorDetail } from "./rookieui_api_transport.j
 import { CONTROLNET_UNION_CONTRACT_FALLBACK } from "./rookieui_controlnet_resources.js";
 import { POLICY_CONTRACT_VERSION, resolveEffectiveParameterPolicy } from "../rookieui_effective_parameter_policy.js";
 import { buildModelFamilyStableProjection } from "../rookieui_family_profile_projection.js";
+import { MOSS_IMAGE_FALLBACK_ENTRIES } from "../rookieui_moss_image_profiles.js";
 import {
   FLUX_KREA_DEV_FALLBACK_ENTRY,
   QWEN_IMAGE_EDIT_2511_FALLBACK_ENTRY,
@@ -545,6 +546,12 @@ const DEFAULT_MODEL_FAMILY_ENTRY_CANDIDATES = [
       "Matches the official Longcat BF16 template defaults.",
       "Text Encoder selector stays hidden because the official template owns the fixed qwen_2.5_vl pairing.",
     ],
+  },
+  {
+    ...MOSS_IMAGE_FALLBACK_ENTRIES[0],
+  },
+  {
+    ...MOSS_IMAGE_FALLBACK_ENTRIES[1],
   },
   {
     id: "qwen_image_21",
@@ -1125,6 +1132,7 @@ export const DEFAULT_MODEL_FAMILY_REGISTRY_ENTRIES = Object.freeze(
     default_template_lora_enabled: false,
     default_template_lora_strength: 1.0,
     default_template_lora_trigger_word: "",
+    default_moss_slg_enabled: null,
     template_lora_trigger_visible: false,
     image_edit_profile: false,
     request_contract_surface: "",
@@ -1159,9 +1167,10 @@ const DEFAULT_PRESETS = Object.freeze(
     title: entry.id === "sd15" ? "SD1.5" : entry.id === "sdxl" ? "SDXL" : entry.title,
     profile: entry.id,
     base_family: entry.public_base_family,
-    checkpoint_name: "__host_default__",
-    vae_name: "Automatic",
-    text_encoder_name: "Automatic",
+    checkpoint_name: typeof entry.default_moss_slg_enabled === "boolean" ? "" : "__host_default__",
+    vae_name: typeof entry.default_moss_slg_enabled === "boolean" ? "" : "Automatic",
+    text_encoder_name: typeof entry.default_moss_slg_enabled === "boolean" ? "" : "Automatic",
+    moss_options: typeof entry.default_moss_slg_enabled === "boolean" ? { slg_enabled: entry.default_moss_slg_enabled } : null,
     template_lora_name: "",
     template_lora_enabled: Boolean(entry.default_template_lora_enabled),
     template_lora_strength: Number(entry.default_template_lora_strength ?? 1),
@@ -1201,6 +1210,16 @@ export const DEFAULT_NEWER_FAMILY_PROFILES = Object.freeze(
 );
 
 const DEFAULT_CAPABILITIES = Object.freeze({
+  moss_image: {
+    profiles: Object.fromEntries(MOSS_IMAGE_FALLBACK_ENTRIES.map(entry => [entry.id, {
+      available: false, without_slg_available: false, slg_available: false,
+      reasons: ["Connect to a compatible ComfyUI host and install matching MOSS assets."],
+      without_slg_reasons: ["MOSS host capability has not been verified."],
+      slg_reasons: ["MOSS host and SLG capability have not been verified."],
+    }])),
+    prompt_enhancement_available: false,
+    supported_flows: ["txt2img"],
+  },
   service: "rookieui",
   visibility: "internal",
   // IMPORTANT: shell version must come from backend capabilities (pyproject source of truth).

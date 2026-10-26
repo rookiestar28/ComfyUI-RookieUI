@@ -23,10 +23,12 @@ function normalizeStoredState(candidate) {
 }
 
 function readStorageState(storage, key) {
-  if (!storage?.getItem) {
-    return null;
-  }
   try {
+    // IMPORTANT: feature getters can throw too; keep every method check and
+    // operation guarded below so denied storage cannot break sidebar mounting.
+    if (!storage?.getItem) {
+      return null;
+    }
     const raw = storage.getItem(key);
     if (!raw) {
       return null;
@@ -38,10 +40,10 @@ function readStorageState(storage, key) {
 }
 
 function writeStorageState(storage, key, state) {
-  if (!storage?.setItem) {
-    return;
-  }
   try {
+    if (!storage?.setItem) {
+      return;
+    }
     storage.setItem(key, JSON.stringify(state));
   } catch (_error) {
     // Storage can be unavailable in private or embedded host contexts.
@@ -57,10 +59,10 @@ function resolveStorage(container) {
 }
 
 function canUseStorage(storage) {
-  if (!storage?.setItem || !storage?.removeItem) {
-    return false;
-  }
   try {
+    if (!storage?.setItem || !storage?.removeItem) {
+      return false;
+    }
     const probeKey = "rookieui:shell-state:probe";
     storage.setItem(probeKey, "1");
     storage.removeItem(probeKey);
@@ -128,8 +130,11 @@ export function createShellPersistenceController(container, bootstrapState) {
   const storage = resolveStorage(container);
   const storageUsable = canUseStorage(storage);
   const key = resolveStateKey(bootstrapState);
+  // IMPORTANT: write probes do not prove reads work. Keep the memory fallback
+  // on denied reads, or a remount silently discards the current tab and controls.
+  const storedState = storageUsable ? readStorageState(storage, key) : null;
   let state = normalizeStoredState(
-    storageUsable ? readStorageState(storage, key) : memoryStateByKey.get(key),
+    storedState ?? memoryStateByKey.get(key),
   );
 
   const commit = () => {

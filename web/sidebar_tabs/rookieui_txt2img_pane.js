@@ -4,9 +4,10 @@ import {
   createPromptWorkbenchShell,
   createXYZPlotShell,
 } from "./rookieui_pane_deps.js";
-import { buildTxt2ImgPayloadFromElements } from "./rookieui_generation_payload_state.js";
+import { buildTxt2ImgPayloadFromElements, TXT2IMG_PAYLOAD_FIELD_MAP } from "./rookieui_generation_payload_state.js";
 import * as ideogramControls from "./rookieui_ideogram_mode_controls.js";
 import { createTemplateLoraController } from "./rookieui_template_lora_controls.js";
+import { createMossImagePaneControls } from "./rookieui_moss_image_controls.js";
 
 export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) {
   const {
@@ -256,6 +257,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       initialScheduler,
     ),
     ideogramMode: ideogramControls.createIdeogramModeSelect(createSelect),
+    mossSlgEnabled: createCheckbox("rookieui-moss-slg-enabled", false),
     promptEnhancementEnabled: createCheckbox("rookieui-prompt-enhancement-enabled", false),
     seed: createInput("number", "rookieui-seed", "-1", { step: 1 }),
     seedExtra: createCheckbox("rookieui-seed-extra", false),
@@ -428,8 +430,9 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   submitButton.textContent = "Generate";
   actionRail.appendChild(submitButton);
   let txt2imgSubmitInFlight = false;
+  let mossController = null;
   const runTxt2ImgSubmission = async () => {
-    if (txt2imgSubmitInFlight) {
+    if (txt2imgSubmitInFlight || mossController?.canSubmit() === false) {
       return;
     }
     txt2imgSubmitInFlight = true;
@@ -439,6 +442,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     } finally {
       txt2imgSubmitInFlight = false;
       submitButton.disabled = false;
+      mossController?.sync();
     }
   };
   submitButton.addEventListener("click", (event) => {
@@ -539,6 +543,8 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   statusNode.textContent = "Idle";
   actionRail.appendChild(statusNode);
 
+  mossController = createMossImagePaneControls({ elements, form, submitButton, profileLookup,
+    bootstrapState, isBusy: () => txt2imgSubmitInFlight, createInlineCheckboxField });
   updateFormFromPreset(presetLookup, initialPreset, elements, profileLookup, bootstrapState.models);
   syncFamilyAwareModuleQuicksetting(
     profileLookup,
@@ -550,6 +556,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
   syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
   ideogramModeController.sync();
   templateLoraController.sync({ resetDefaults: true });
+  mossController.sync({ resetDefaults: true });
   elements.preset.addEventListener("change", () => {
     updateFormFromPreset(presetLookup, elements.preset.value, elements, profileLookup, bootstrapState.models);
     syncFamilyAwareModuleQuicksetting(
@@ -562,6 +569,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     ideogramModeController.sync();
     templateLoraController.sync({ resetDefaults: true });
+    mossController.sync({ resetDefaults: true });
   });
 
   const subtabHost = document.createElement("div");
@@ -593,6 +601,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
         createField(samplingGrid, "Sampling Method", elements.sampler);
         advancedParameterControls.schedulerField = createField(samplingGrid, "Schedule Type", elements.scheduler);
         ideogramModeController.attach(createField(samplingGrid, "Ideogram Mode", elements.ideogramMode));
+        samplingGrid.appendChild(mossController.field);
         createSliderField(samplingGrid, "Sampling Steps", elements.steps, elements.stepsSlider, "rookieui-steps-field");
         createSliderField(samplingGrid, "CFG Scale", elements.cfgScale, elements.cfgScaleSlider, "rookieui-cfg-scale-field");
         advancedParameterControls.shiftField = createField(samplingGrid, "Shift", elements.shift);
@@ -954,6 +963,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     await runTxt2ImgSubmission();
   });
 
+  mossController.sync();
   const txt2imgStateLock = installPaneStateLock(formRegistry, "txt2img", elements, () => {
     // IMPORTANT: tab restore must re-apply Clip Skip editability; otherwise old profile lock state can persist and look frozen.
     syncClipSkipAvailability(profileLookup, elements.profileState.value, elements.clipSkip, elements.clipSkipSlider);
@@ -967,46 +977,12 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
     syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
     ideogramModeController.sync();
     templateLoraController.sync();
+    mossController.sync();
   });
 
   formRegistry.txt2img = {
     applyPayload(payload) {
-      applyPayloadToElements(elements, payload, {
-        prompt: "prompt",
-        negative_prompt: "negativePrompt",
-        profile: "profileState",
-        checkpoint_name: "checkpoint",
-        vae_name: "vae",
-        text_encoder_name: "textEncoder",
-        dtype_profile: "lowBits",
-        width: "width",
-        height: "height",
-        steps: "steps",
-        cfg_scale: "cfgScale",
-        shift: "shift",
-        flux_guidance: "fluxGuidance",
-        sampler_name: "sampler",
-        scheduler_name: "scheduler",
-        ideogram_mode: "ideogramMode",
-        prompt_enhancement_enabled: "promptEnhancementEnabled",
-        seed: "seed",
-        seed_extra: "seedExtra",
-        batch_count: "batchCount",
-        batch_size: "batchSize",
-        clip_skip: "clipSkip",
-        hires_enabled: "hiresEnabled",
-        hires_scale: "hiresScale",
-        hires_steps: "hiresSteps",
-        hires_denoise: "hiresDenoise",
-        hires_upscale_method: "hiresUpscaleMethod",
-        template_lora_name: "templateLoraName",
-        template_lora_enabled: "templateLoraEnabled",
-        template_lora_strength: "templateLoraStrength",
-        template_lora_trigger_word: "templateLoraTriggerWord",
-        lora_name: "loraName",
-        lora_strength_model: "loraStrengthModel",
-        lora_strength_clip: "loraStrengthClip",
-      });
+      applyPayloadToElements(elements, payload, TXT2IMG_PAYLOAD_FIELD_MAP);
       if (Array.isArray(payload.controlnet_units)) {
         elements.controlnetUnits.value = JSON.stringify(payload.controlnet_units);
         txt2imgControlNetEditor?.setUnits(payload.controlnet_units);
@@ -1031,6 +1007,7 @@ export function buildTxt2ImgPane(parent, bootstrapState, formRegistry, context) 
       syncFamilyAwareAdvancedParameterFields(profileLookup, elements.profileState.value, advancedParameterControls);
       ideogramModeController.sync();
       templateLoraController.sync();
+      mossController.sync({ payload });
       syncBoundControls(Object.values(elements));
       txt2imgStateLock.capture();
     },

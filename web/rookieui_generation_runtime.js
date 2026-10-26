@@ -1,3 +1,5 @@
+import { isMossImageProfile } from "./rookieui_moss_image_profiles.js";
+
 function normalizeRuntimeClientId(rawClientId) {
   if (typeof rawClientId !== "string") {
     return "";
@@ -26,14 +28,25 @@ export function resolveActiveClientId(bootstrapState) {
     }
     return runtimeClientId;
   }
-  const sessionClientId = normalizeRuntimeClientId(globalThis?.window?.sessionStorage?.getItem?.("clientId"));
-  if (sessionClientId) {
-    if (bootstrapState) {
-      bootstrapState.clientId = sessionClientId;
-    }
-    return sessionClientId;
+  // IMPORTANT: preserve the selected bootstrap ID when storage is stale or
+  // denied; changing it here detaches submissions from the initial queue scope.
+  const selectedClientId = normalizeRuntimeClientId(bootstrapState?.clientId);
+  if (selectedClientId) {
+    return selectedClientId;
   }
-  return normalizeRuntimeClientId(bootstrapState?.clientId);
+  try {
+    // The storage property and method getters can throw before getItem runs.
+    const sessionClientId = normalizeRuntimeClientId(globalThis?.window?.sessionStorage?.getItem?.("clientId"));
+    if (sessionClientId) {
+      if (bootstrapState) {
+        bootstrapState.clientId = sessionClientId;
+      }
+      return sessionClientId;
+    }
+  } catch (_error) {
+    // No storage dependency is required for an in-memory client boundary.
+  }
+  return "";
 }
 
 export function createGenerationRuntimeState({ previewPlaceholder = "" } = {}) {
@@ -707,6 +720,10 @@ export function createGenerationRuntimeHelpers({
     }
     if (imageDataUrl) {
       const metadataResult = await inspectPreviewMetadataPayload(imageDataUrl, inspectPngInfoRequest);
+      if (isMossImageProfile(metadataResult.payload.profile)) {
+        if (statusNode) statusNode.textContent = "MOSS Image metadata supports txt2img only; img2img/inpaint transfer is unavailable.";
+        return;
+      }
       const applied = applyCrossPanePayload(
         formRegistry,
         "img2img",

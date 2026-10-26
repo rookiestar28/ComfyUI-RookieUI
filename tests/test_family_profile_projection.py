@@ -51,6 +51,8 @@ EXPECTED_SHIPPED_PROFILE_IDS = (
     "hidream_i1_fast",
     "hidream_i1_full",
     "longcat_image",
+    "moss_image_base",
+    "moss_image_sft",
     "qwen_image_21",
     "qwen_image",
     "qwen_image_21_edit",
@@ -71,6 +73,9 @@ PROFILE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_profile_grap
 QWEN21_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "qwen_image_21_candidate_graph_contract.json"
 CORE_GRAPH_FIXTURE = ROOT / "tests" / "fixtures" / "current_host_core_graph_contract.json"
 QWEN21_CANDIDATE_IDS = frozenset({"qwen_image_21", "qwen_image_21_edit"})
+MOSS_CANDIDATE_IDS = frozenset({'moss_image_base', 'moss_image_sft'})
+MOSS_GRAPH_FIXTURE = ROOT / 'tests/fixtures/moss_image_candidate_graph_contract.json'
+SCOPED_CANDIDATE_IDS = QWEN21_CANDIDATE_IDS | MOSS_CANDIDATE_IDS
 
 
 class FamilyProfileProjectionTests(unittest.TestCase):
@@ -79,7 +84,7 @@ class FamilyProfileProjectionTests(unittest.TestCase):
         candidate_contract = core_graph_contract.load_profile_graph_contract(QWEN21_GRAPH_FIXTURE)
         supported_ids = {profile.id for profile in contract.profiles} | {
             profile.id for profile in candidate_contract.profiles
-        }
+        } | {profile.id for profile in core_graph_contract.load_profile_graph_contract(MOSS_GRAPH_FIXTURE).profiles}
         projected_ids = {
             projection["id"]
             for projection in build_family_profile_projection_entries(
@@ -95,12 +100,12 @@ class FamilyProfileProjectionTests(unittest.TestCase):
         self.assertEqual(contract.source_revision, "30bdda1ef13a3a34fce2cd2fec633f15d832122a")
         self.assertEqual(contract.profile_count, 31)
         self.assertEqual(tuple(profile.id for profile in contract.profiles), tuple(
-            profile_id for profile_id in EXPECTED_SHIPPED_PROFILE_IDS if profile_id not in QWEN21_CANDIDATE_IDS
+            profile_id for profile_id in EXPECTED_SHIPPED_PROFILE_IDS if profile_id not in SCOPED_CANDIDATE_IDS
         ))
         entries = list_model_family_registry_entries()
         self.assertEqual(
             tuple(profile.flow_kind for profile in contract.profiles),
-            tuple(entry.flow_kind for entry in entries if entry.id not in QWEN21_CANDIDATE_IDS),
+            tuple(entry.flow_kind for entry in entries if entry.id not in SCOPED_CANDIDATE_IDS),
         )
         for profile in contract.profiles:
             with self.subTest(profile=profile.id):
@@ -165,8 +170,8 @@ class FamilyProfileProjectionTests(unittest.TestCase):
         ):
             for entry in list_model_family_registry_entries():
                 with self.subTest(profile=entry.id):
-                    if entry.id in QWEN21_CANDIDATE_IDS:
-                        continue  # Core 0.37 candidate has its own pinned graph contract below.
+                    if entry.id in SCOPED_CANDIDATE_IDS:
+                        continue  # Qwen 2.1 / MOSS have distinct scoped host envelopes below.
                     if entry.flow_kind == "txt2img":
                         inventory = (
                             ideogram_inventory

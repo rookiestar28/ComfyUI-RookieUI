@@ -333,6 +333,7 @@ class PresetDefinition:
     encoder_family: str = ""
     template_lora_chain_mode: str = "none"
     ideogram_mode: str = ""
+    moss_options: dict[str, bool] | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)

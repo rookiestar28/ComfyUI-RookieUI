@@ -35,6 +35,7 @@ from rookieui.contracts.family_template_manifest import (
     get_family_template_manifest_entry,
 )
 from rookieui.contracts.models import ModelInventorySnapshot
+from rookieui.contracts.moss_image import MOSS_IMAGE_PROFILE_IDS
 from rookieui.contracts.pnginfo import PNGINFO_CONTRACT_VERSION
 from rookieui.contracts.queue import QUEUE_CONTRACT_VERSION
 from rookieui.contracts.adetailer import ADETAILER_INTEGRATED_CONTRACT_VERSION
@@ -382,6 +383,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=float(os.getenv("ROOKIEUI_LIVE_POLL_INTERVAL_SECONDS", "2")),
         help="Queue polling interval in seconds when --execute is enabled (default: %(default)s).",
     )
+    parser.add_argument("--moss-layout", action="store_true", help="Use native rectangular Layout cases; catalog MOSS profiles only.")
     return parser
 
 
@@ -3274,7 +3276,10 @@ def _build_txt2img_payload(
     client_id: str,
     *,
     models_payload: dict[str, Any] | None = None,
+    moss_layout: bool = False,
 ) -> dict[str, Any]:
+    if moss_layout and profile_id not in MOSS_IMAGE_PROFILE_IDS:
+        raise ValueError("MOSS Layout requires a native MOSS profile.")
     vae_name, text_encoder_name, shift, flux_guidance = _resolve_family_selectors_for_live_payload(
         profile_id,
         preset,
@@ -3284,7 +3289,7 @@ def _build_txt2img_payload(
     template_lora_name = str(preset.get("template_lora_name", "")).strip()
     if models_payload is not None and not template_lora_name:
         template_lora_name = resolve_template_lora_selector_context(profile_id, _build_inventory_snapshot_from_models_payload(models_payload))
-    return {
+    payload = {
         "prompt": f"[rookieui live smoke] {profile_id}",
         "negative_prompt": "",
         "profile": profile_id,
@@ -3306,6 +3311,38 @@ def _build_txt2img_payload(
         "hires_enabled": False,
         "client_id": client_id,
     }
+    if profile_id in MOSS_IMAGE_PROFILE_IDS:
+        # IMPORTANT: one-step generic smoke cannot qualify native MOSS image/layout behavior.
+        payload.update(prompt="A red ceramic mug on the left of a clean studio poster, with the title MOSS on the right.",
+                       steps=25, prompt_enhancement_enabled=False,
+                       moss_options={"slg_enabled": moss_layout or profile_id == "moss_image_base"})
+        if moss_layout:
+            payload.update(width=1024, height=768)
+            payload["moss_options"]["layout"] = {
+                "enabled": True, "elements": [
+                    {"kind": "object", "caption": "a red ceramic mug", "bbox": [200, 100, 850, 450]},
+                    {"kind": "text", "caption": "large bold title", "text": "MOSS", "bbox": [250, 550, 600, 950]},
+                ],
+            }
+    return payload
+
+
+def _validate_moss_live_capabilities(
+    base_url: str, profiles: list[str], *, moss_layout: bool, timeout_seconds: float,
+) -> list[str]:
+    selected = [profile for profile in profiles if profile in MOSS_IMAGE_PROFILE_IDS]
+    if not selected:
+        return []
+    payload = _load_capabilities_payload(base_url, timeout_seconds)
+    moss = payload.get("moss_image")
+    rows = moss.get("profiles", {}) if isinstance(moss, dict) else {}
+    errors = []
+    for profile in selected:
+        row = rows.get(profile) if isinstance(rows, dict) else None
+        key = "slg_available" if moss_layout or profile == "moss_image_base" else "without_slg_available"
+        if not isinstance(row, dict) or row.get(key) is not True:
+            errors.append(f"profile '{profile}' missing native MOSS capability '{key}'.")
+    return errors
 
 
 def _build_edit_payload(
@@ -4346,6 +4383,7 @@ def _run_execute_smoke(
     request_timeout_seconds: float,
     poll_timeout_seconds: float,
     poll_interval_seconds: float,
+    moss_layout: bool = False,
 ) -> list[str]:
     errors: list[str] = []
     for profile_id in profiles:
@@ -4370,6 +4408,7 @@ def _run_execute_smoke(
                 preset,
                 client_id,
                 models_payload=models_payload,
+                moss_layout=moss_layout,
             )
         submit_result = _request_json(
             "POST",
@@ -4570,6 +4609,11 @@ def main() -> int:
     args = _build_parser().parse_args()
     base_url = _normalize_base_url(args.base_url, route_mode=args.route_mode)
     profiles = _parse_profiles(args.profiles or _default_profiles_for_mode(args.validation_mode))
+    if args.moss_layout and (args.validation_mode != "catalog" or not profiles or any(
+        profile not in MOSS_IMAGE_PROFILE_IDS for profile in profiles
+    )):
+        print("[live-smoke] ERROR: --moss-layout requires catalog mode with only native MOSS profiles.", file=sys.stderr)
+        return 1
     if args.validation_mode not in {"auxiliary-contracts", "auxiliary-pipelines", "prompt-workbench", "xyz-plot", "full-pipeline"} and not profiles:
         print("[live-smoke] ERROR: no profiles selected.", file=sys.stderr)
         return 1
@@ -5105,6 +5149,12 @@ def main() -> int:
         return 0
 
     contract_errors, presets_by_id = _validate_catalog_contract(models_payload, presets_payload, profiles)
+    try:
+        contract_errors.extend(_validate_moss_live_capabilities(
+            base_url, profiles, moss_layout=args.moss_layout, timeout_seconds=args.request_timeout_seconds,
+        ))
+    except Exception as exc:
+        contract_errors.append(f"native MOSS preflight failed: {exc}")
     if contract_errors:
         print("[live-smoke] ERROR: catalog contract validation failed:", file=sys.stderr)
         for error in contract_errors:
@@ -5122,6 +5172,7 @@ def main() -> int:
                 request_timeout_seconds=args.request_timeout_seconds,
                 poll_timeout_seconds=args.poll_timeout_seconds,
                 poll_interval_seconds=args.poll_interval_seconds,
+                moss_layout=args.moss_layout,
             )
         except Exception as exc:
             print(f"[live-smoke] ERROR: execute lane failed unexpectedly: {exc}", file=sys.stderr)

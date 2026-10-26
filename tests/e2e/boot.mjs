@@ -26,6 +26,8 @@ const apiURL = (route) => (typeof route === "string" && route.startsWith("/api")
 const normalizeE2EApiRoute = (url) => (typeof url === "string" && url.startsWith("/api/") ? url.slice(4) : url);
 
 const E2E_SELECTOR_DEFAULTS_BY_ID = Object.freeze({
+  moss_image_base: { checkpoint_name: "moss_image_base_int8_convrot.safetensors", vae_name: "flux2-vae.safetensors", text_encoder_name: "qwen3.5_9b_int8_convrot.safetensors" },
+  moss_image_sft: { checkpoint_name: "moss_image_sft_int8_convrot.safetensors", vae_name: "flux2-vae.safetensors", text_encoder_name: "qwen3.5_9b_int8_convrot.safetensors" },
   sd15: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
   sdxl: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
   pony: { checkpoint_name: "realvisxl.safetensors", vae_name: "Automatic", text_encoder_name: "Automatic" },
@@ -217,6 +219,8 @@ const E2E_PRIMARY_MODEL_CATEGORY_BY_FAMILY = { ...DEFAULT_PRIMARY_MODEL_CATEGORY
 
 // IMPORTANT: keep this fixture order stable; bootstrap.spec.js pins the diffusion-model selector contract.
 const E2E_DIFFUSION_PROFILE_ORDER = Object.freeze([
+  "moss_image_base",
+  "moss_image_sft",
   "flux",
   "flux_kontext_dev_edit",
   "flux2_dev",
@@ -261,6 +265,7 @@ const E2E_VAE_OPTIONS = [
 ];
 
 const E2E_TEXT_ENCODER_OPTIONS = [
+  "qwen3.5_9b_int8_convrot.safetensors",
   "Automatic",
   "clip_l.safetensors",
   "clip_l_hidream.safetensors",
@@ -423,6 +428,19 @@ async function handleE2EFetch(url, options = {}) {
   }
 
   if (route === "/rookieui/pnginfo/inspect") {
+    if (params.get("mossPng") === "1") {
+      return new Response(JSON.stringify({ source_type: "rookieui", target_form: "txt2img",
+        payload: { profile: "moss_image_sft", prompt: "synthetic PNG restored 中文", negative_prompt: "synthetic negative",
+          checkpoint_name: "moss_image_sft_int8_convrot.safetensors", text_encoder_name: "qwen3.5_9b_int8_convrot.safetensors",
+          vae_name: "flux2-vae.safetensors", width: 768, height: 1024, steps: 27, cfg_scale: 3,
+          sampler_name: "er_sde", scheduler_name: "simple", seed: 321, batch_size: 1, batch_count: 1,
+          moss_options: { slg_enabled: true, ...(params.get("mossLayout") === "1" ? { layout: {
+            enabled: true, elements: [{ kind: "text", caption: "synthetic PNG layout", text: "還原\ntext",
+              bbox: [100, 200, 800, 900], palette: ["#abcdef"] }],
+          } } : {}) } },
+        apply_targets: ["txt2img"], warnings: ["MOSS Image img2img transfer is unavailable."], unsupported_fields: [],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     return new Response(
       JSON.stringify({
         service: "rookieui",
@@ -928,10 +946,12 @@ async function handleE2EFetch(url, options = {}) {
       JSON.stringify({
         source: "internal",
         samplers: [
+          { id: "er_sde", title: "ER SDE", tier: "core", default: false, aliases: [] },
           { id: "euler_ancestral", title: "Euler a", tier: "core", default: true, aliases: ["euler a"] },
           { id: "dpmpp_2m", title: "DPM++ 2M", tier: "core", default: false, aliases: ["dpm++ 2m"] },
         ],
         schedulers: [
+          { id: "simple", title: "Simple", tier: "core", default: false, aliases: [] },
           { id: "normal", title: "Normal", tier: "core", default: true, aliases: ["automatic"] },
           { id: "ddim_uniform", title: "DDIM Uniform", tier: "extended", default: false, aliases: ["ddim"] },
         ],
@@ -1194,6 +1214,15 @@ async function handleE2EFetch(url, options = {}) {
       service: "rookieui",
       visibility: "internal",
       shell_version: "0.1.0",
+      moss_image: {
+        profiles: Object.fromEntries(["moss_image_base", "moss_image_sft"].map(id => [id, {
+          available: params.get("mossHost") !== "missing",
+          without_slg_available: params.get("mossHost") !== "missing",
+          slg_available: params.get("mossHost") !== "missing",
+          without_slg_reasons: params.get("mossHost") === "missing" ? ["MOSS host nodes or models are unavailable."] : [],
+          slg_reasons: params.get("mossHost") === "missing" ? ["MOSS host nodes or models are unavailable."] : [],
+        }])),
+      },
       host_surfaces: ["standalone-web", "desktop"],
       features: {
         sidebarShell: true,

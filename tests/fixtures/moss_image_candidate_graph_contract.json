@@ -1,0 +1,42 @@
+{
+  "schema_version": "current-host-profile-graph-contract-v1",
+  "source_revision": "19ae172bff6c9e4c738e7f2e00fe087f5b5b46ab",
+  "profile_count": 2,
+  "profiles": [
+    {
+      "id": "moss_image_base",
+      "flow_kind": "txt2img",
+      "node_count": 10,
+      "edge_count": 10,
+      "class_types": [
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "EmptyFlux2LatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "SkipLayerGuidanceDiTSimple",
+        "UNETLoader",
+        "VAEDecode",
+        "VAELoader"
+      ],
+      "topology_sha256": "21b42ab32809c839145ab9b7bcbe15d983038cee9456a0fa2446fedb09bd0dc0"
+    },
+    {
+      "id": "moss_image_sft",
+      "flow_kind": "txt2img",
+      "node_count": 9,
+      "edge_count": 9,
+      "class_types": [
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "EmptyFlux2LatentImage",
+        "KSampler",
+        "RookieUISaveImageWithMetadata",
+        "UNETLoader",
+        "VAEDecode",
+        "VAELoader"
+      ],
+      "topology_sha256": "c4e7754a7f701350d9947ed8f2ed63ec50f236311b33d5c99a22946793aad718"
+    }
+  ]
+}

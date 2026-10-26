@@ -43,9 +43,15 @@ function createRookieUIClientId(windowRef, runtimeApi = null) {
     return apiClientId;
   }
 
-  const sessionClientId = normalizeClientId(windowRef?.sessionStorage?.getItem?.("clientId"));
-  if (sessionClientId) {
-    return sessionClientId;
+  try {
+    // IMPORTANT: sessionStorage's getter can itself throw SecurityError; keep
+    // the entire access guarded so denied storage cannot reject host setup.
+    const sessionClientId = normalizeClientId(windowRef?.sessionStorage?.getItem?.("clientId"));
+    if (sessionClientId) {
+      return sessionClientId;
+    }
+  } catch (_error) {
+    // Session persistence is optional; reuse the generated in-memory identity.
   }
   if (typeof globalThis?.crypto?.randomUUID === "function") {
     return `rookieui-${globalThis.crypto.randomUUID()}`;
@@ -128,10 +134,11 @@ export function registerRookieUIBootstrapExtension({
       const hostSurface = detectHostSurface(windowRef);
       const clientId = createRookieUIClientId(windowRef, runtimeApi);
       const bootstrapData = await loadRookieUIBootstrapData(apiFetch, { clientId });
-      if (clientId && windowRef?.sessionStorage?.setItem) {
+      if (clientId) {
         try {
           // IMPORTANT: persist the active host client id so queue polling and runtime events stay on the same session boundary after host reconnects.
-          windowRef.sessionStorage.setItem("clientId", clientId);
+          // Keep the storage and method getters inside this guard as well.
+          windowRef?.sessionStorage?.setItem?.("clientId", clientId);
         } catch (_error) {
           // Ignore storage failures (e.g., private mode restrictions).
         }

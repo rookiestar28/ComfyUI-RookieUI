@@ -1,3 +1,5 @@
+import { isMossImageProfile } from "./rookieui_moss_image_profiles.js";
+import { buildTxt2ImgSubmissionPayloadFromElements as readTxt2ImgPayload } from "./sidebar_tabs/rookieui_generation_payload_state.js";
 import {
   appendTextElement,
   bindSliderPair,
@@ -571,44 +573,6 @@ function readOptionalNumericControl(input) {
   return rawValue ? Number(rawValue) : null;
 }
 
-function readTxt2ImgPayload(elements) {
-  return {
-    prompt: elements.prompt.value,
-    negative_prompt: elements.negativePrompt.value,
-    profile: elements.profileState.value,
-    dtype_profile: elements.lowBits.value,
-    checkpoint_name: elements.checkpoint.value,
-    vae_name: elements.vae.value,
-    text_encoder_name: elements.textEncoder.value,
-    template_lora_name: elements.templateLoraName?.value ?? "",
-    width: Number(elements.width.value),
-    height: Number(elements.height.value),
-    steps: Number(elements.steps.value),
-    cfg_scale: Number(elements.cfgScale.value),
-    shift: elements.shift ? readOptionalNumericControl(elements.shift) : null,
-    flux_guidance: elements.fluxGuidance ? readOptionalNumericControl(elements.fluxGuidance) : null,
-    edit_megapixels: elements.editMegapixels ? readOptionalNumericControl(elements.editMegapixels) : null,
-    sampler_name: elements.sampler.value,
-    scheduler_name: elements.scheduler.value,
-    prompt_enhancement_enabled: elements.promptEnhancementEnabled?.checked ?? false,
-    seed: Number(elements.seed.value),
-    seed_extra: elements.seedExtra.checked,
-    batch_size: Number(elements.batchSize.value),
-    batch_count: Number(elements.batchCount.value),
-    clip_skip: Number(elements.clipSkip.value),
-    hires_enabled: elements.hiresEnabled.checked,
-    hires_scale: Number(elements.hiresScale.value),
-    hires_steps: Number(elements.hiresSteps.value),
-    hires_denoise: Number(elements.hiresDenoise.value),
-    hires_upscale_method: elements.hiresUpscaleMethod.value,
-    template_lora_name: elements.templateLoraName?.value ?? "",
-    lora_name: elements.loraName.value,
-    lora_strength_model: Number(elements.loraStrengthModel.value),
-    lora_strength_clip: Number(elements.loraStrengthClip.value),
-    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
-    controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
-  };
-}
 
 function formatGenerationWarnings(resultData) {
   const warnings = resultData?.normalized_request?.prompt_warnings ?? resultData?.warnings ?? [];
@@ -1272,7 +1236,9 @@ function setPreviewContent(previewBox, imageDataUrl, placeholderText) {
 function updatePngInfoApplyButtons(state, buttons) {
   const applyTargets = state.inspectionResult?.apply_targets ?? [];
   const isA1111 = state.inspectionResult?.source_type === "a1111";
-  buttons.txt2img.disabled = !(isA1111 && applyTargets.includes("txt2img"));
+  const isMoss = state.inspectionResult?.source_type === "rookieui" &&
+    isMossImageProfile(state.inspectionResult?.payload?.profile);
+  buttons.txt2img.disabled = !((isA1111 || isMoss) && applyTargets.includes("txt2img"));
   buttons.img2img.disabled = !(isA1111 && applyTargets.includes("img2img"));
 }
 
@@ -1311,6 +1277,12 @@ function applyPngInfoResult(formRegistry, targetKey, state, statusNode) {
   const inspectionResult = state.inspectionResult;
   if (!inspectionResult) {
     statusNode.textContent = "Load PNG metadata first before applying it.";
+    return;
+  }
+
+  if (isMossImageProfile(inspectionResult.payload?.profile) &&
+      (targetKey !== "txt2img" || !inspectionResult.apply_targets?.includes("txt2img"))) {
+    statusNode.textContent = "MOSS Image metadata supports txt2img restoration only.";
     return;
   }
 

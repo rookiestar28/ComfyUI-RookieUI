@@ -43,6 +43,7 @@ from rookieui.services.workflow_builders.image_edit_foundation import (
 )
 from rookieui.services.workflow_builders.output import _build_decode_and_save
 from rookieui.services.workflow_builders import prompt_conditioning
+from rookieui.services.workflow_builders.moss_image import build_moss_image_workflow
 
 _ERNIE_PROMPT_ENHANCER_TEMPLATE = (
     '<s>[SYSTEM_PROMPT]你是一个专业的文生图 Prompt 增强助手。你将收到用户的简短图片描述及目标生成分辨率，'
@@ -2110,6 +2111,7 @@ def _build_ernie_workflow_for_profile(request: NormalizedTxt2ImgRequest) -> dict
 
 
 _NON_SD_RUNTIME_BUILDERS: dict[str, Callable[[NormalizedTxt2ImgRequest], dict[str, object]]] = {
+    "moss_image": build_moss_image_workflow,
     "anima": _build_anima_workflow,
     "flux": _build_flux_workflow,
     "hidream": _build_hidream_workflow,

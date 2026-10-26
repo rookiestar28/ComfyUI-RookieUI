@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from rookieui.security.request_guard import MAX_INFOTEXT_LENGTH, normalize_prompt_text
+from rookieui.contracts.moss_image import MOSS_IMAGE_PROFILE_IDS, project_moss_png_request
 
 _SAMPLER_DISPLAY_NAMES = {
     "euler_ancestral": "Euler a",
@@ -216,6 +217,8 @@ def build_rookieui_extra_pnginfo(
             "edit_task": normalized_request.get("edit_task"),
             "reference_count": len(normalized_request.get("reference_image_assets") or []),
         })
+    if profile in MOSS_IMAGE_PROFILE_IDS:
+        metadata['rookieui']['request'] = project_moss_png_request(normalized_request)
     return metadata
 
 

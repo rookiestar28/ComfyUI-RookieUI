@@ -6,6 +6,7 @@ from typing import Any
 from rookieui.contracts.adetailer import NormalizedADetailerRequest
 from rookieui.contracts.controlnet import NormalizedControlNetUnit
 from rookieui.contracts.prompt_dsl import PromptLoraActivation
+from rookieui.contracts.moss_image import MossImageOptions
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class Txt2ImgRequest:
     adetailer: dict[str, Any] = field(default_factory=dict)
     controlnet_units: list[dict[str, Any]] = field(default_factory=list)
     alwayson_scripts: dict[str, Any] = field(default_factory=dict)
+    moss_options: dict[str, Any] | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -176,9 +178,13 @@ class NormalizedTxt2ImgRequest:
     negative_prompt_mode: str = "encoded"
     parameter_warnings: list[str] = field(default_factory=list)
     parameter_warning_codes: list[str] = field(default_factory=list)
+    moss_options: MossImageOptions | None = None
 
     def to_payload(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        if self.moss_options is not None:
+            result['moss_options'] = self.moss_options.to_payload()
+        return result
 
 
 @dataclass(frozen=True)

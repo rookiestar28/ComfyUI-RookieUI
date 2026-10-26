@@ -16,6 +16,7 @@ from rookieui.contracts.aliases import (
     RESIZE_MODE_ALIASES as _RESIZE_MODE_ALIASES,
 )
 from rookieui.contracts.pnginfo import PNGInfoParseResult
+from rookieui.services.moss_pnginfo import parse_moss_pnginfo
 from rookieui.security.request_guard import (
     normalize_infotext,
     normalize_prompt_text,
@@ -303,6 +304,9 @@ def _inspect_comfy_metadata(
 
 def parse_pnginfo_payload(payload: dict[str, object]) -> PNGInfoParseResult:
     metadata_items, image_infotext, asset_handle = _extract_image_source(payload)
+    moss_result = parse_moss_pnginfo(metadata_items, asset_handle)
+    if moss_result is not None:
+        return moss_result
     if image_infotext:
         source = "image.parameters"
         infotext = normalize_infotext(image_infotext)

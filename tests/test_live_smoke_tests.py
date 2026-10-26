@@ -165,7 +165,7 @@ class LiveSmokePromptParityTests(unittest.TestCase):
                 "anima,chroma,ernie_image,ernie_image_turbo,flux,flux_krea_dev,flux2_dev,"
                 "ideogram4,krea2_turbo,klein_4b,klein_9b,"
                 "hidream_i1_dev_fp8,hidream_i1_fast,hidream_i1_full,"
-                "longcat_image,qwen_image_21,qwen_image,z_image,z_image_turbo,qwen_image_21_edit,qwen_image_edit,"
+                "longcat_image,moss_image_base,moss_image_sft,qwen_image_21,qwen_image,z_image,z_image_turbo,qwen_image_21_edit,qwen_image_edit,"
                 "qwen_image_edit_2511,firered_image_edit,firered_image_edit_lightning,"
                 "flux_kontext_dev_edit,flux2_image_edit,klein_9b_kv_image_edit,longcat_image_edit"
             ),

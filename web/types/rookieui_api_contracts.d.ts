@@ -70,7 +70,21 @@ export interface RookieUIGenerationResponse {
   detail?: string;
 }
 
+export interface RookieUIMossLayoutElement {
+  kind: "object" | "text" | "character";
+  caption: string;
+  text?: string;
+  bbox: [number, number, number, number];
+  palette?: string[];
+}
+
+export interface RookieUIMossLayout {
+  enabled: boolean;
+  elements: RookieUIMossLayoutElement[];
+}
+
 export interface RookieUITxt2ImgRequest {
+  moss_options?: { slg_enabled?: boolean; layout?: RookieUIMossLayout };
   prompt?: string;
   negative_prompt?: string;
   profile?: string;

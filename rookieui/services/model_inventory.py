@@ -24,6 +24,9 @@ from rookieui.contracts.family_template_manifest import (
 from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.models import ModelInventorySnapshot, PRIMARY_MODEL_CATEGORY_BY_FAMILY
 from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, QWEN_IMAGE_21_PROFILE_IDS
+from rookieui.contracts.moss_image import (
+    MOSS_IMAGE_PROFILE_IDS, is_moss_exclusive_asset, matches_moss_asset,
+)
 
 _HOST_MODEL_FOLDERS = (
     "audio_encoders",
@@ -400,6 +403,11 @@ def _filter_explicit_diffusion_selectors(selectors: list[str]) -> list[str]:
 
 
 def _filter_qwen21_generation_selectors(profile_id: str, selectors: list[str], role: str) -> list[str]:
+    if profile_id in MOSS_IMAGE_PROFILE_IDS:
+        return [selector for selector in selectors if matches_moss_asset(profile_id, selector, role)]
+    # CRITICAL: broad legacy Qwen hints also match MOSS Qwen3.5. Exclude those
+    # generation assets before sequence/default selection, retaining shared VAEs.
+    selectors = [selector for selector in selectors if not is_moss_exclusive_asset(selector)]
     if profile_id in QWEN_IMAGE_21_PROFILE_IDS:
         return [selector for selector in selectors if qwen_image_21_asset_role(selector) == role]
     # CRITICAL: filename-only Qwen fallbacks may select 2.1 assets for older families;
@@ -517,9 +525,17 @@ def resolve_text_encoder_selector_context(
     profile_id: str,
     inventory: ModelInventorySnapshot,
 ) -> str:
-    selectors = _generation_text_encoder_selectors(inventory)
+    normalized_profile_id = _canonicalize_profile_id(profile_id)
+    generation_selectors = _generation_text_encoder_selectors(inventory)
+    selectors = _filter_qwen21_generation_selectors(
+        normalized_profile_id, generation_selectors, "text_encoders"
+    )
     if not selectors:
-        if (_canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS
+        # IMPORTANT: a filtered-out generation inventory is not an empty offline
+        # inventory. Never reactivate its incompatible global default selector.
+        if (normalized_profile_id in QWEN_IMAGE_21_PROFILE_IDS | MOSS_IMAGE_PROFILE_IDS
+                or generation_selectors
+                or is_moss_exclusive_asset(inventory.default_text_encoder)
                 or qwen_image_21_asset_role(inventory.default_text_encoder) == "prompt_enhancers"):
             return ""
         return inventory.default_text_encoder
@@ -598,7 +614,7 @@ def resolve_vae_selector_context(
 ) -> str:
     selectors = [value for value in (inventory.vae or []) if isinstance(value, str) and value.strip()]
     if not selectors:
-        return "" if _canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS else inventory.default_vae
+        return "" if _canonicalize_profile_id(profile_id) in QWEN_IMAGE_21_PROFILE_IDS | MOSS_IMAGE_PROFILE_IDS else inventory.default_vae
 
     fallback_default = inventory.default_vae if inventory.default_vae in selectors else selectors[0]
     normalized_profile_id = _canonicalize_profile_id(profile_id)
@@ -644,11 +660,11 @@ def resolve_primary_model_selector_context(
 
     # IMPORTANT: profile-driven selector category must be honored for non-SDXL presets
     # (Flux/Qwen/etc.); forcing checkpoints here breaks preset-aware model-path switching.
-    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS:
+    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS | MOSS_IMAGE_PROFILE_IDS:
         category_id = "checkpoints"
         category_values = list(inventory.checkpoints or [])
 
-    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS:
+    if not category_values and normalized_profile_id not in QWEN_IMAGE_21_PROFILE_IDS | MOSS_IMAGE_PROFILE_IDS:
         category_values = [inventory.default_checkpoint]
 
     default_value = (

@@ -31,7 +31,9 @@ class ModelFamilyRegistryTests(unittest.TestCase):
         )
         supported_ids = {profile.id for profile in contract.profiles} | {
             profile.id for profile in candidate.profiles
-        }
+        } | {profile.id for profile in core_graph_contract.load_profile_graph_contract(
+            Path(__file__).resolve().parent / 'fixtures' / 'moss_image_candidate_graph_contract.json'
+        ).profiles}
         registry_ids = {
             entry.id
             for entry in list_model_family_registry_entries()
@@ -133,7 +135,11 @@ class ModelFamilyRegistryTests(unittest.TestCase):
             source_paths["krea2_turbo"],
             "comfyui-workflow-templates-json==0.1.66:image_krea2_turbo_t2i.json",
         )
-        packaged_paths = [path for path in source_paths.values() if path.startswith("comfyui-workflow")]
+        for variant in ('base', 'sft'):
+            self.assertEqual(source_paths[f'moss_image_{variant}'],
+                f'comfyui-workflow-templates-json==0.1.122:image_moss_image_{variant}_t2i.json')
+        packaged_paths = [path for profile, path in source_paths.items()
+                          if not profile.startswith('moss_image_') and path.startswith("comfyui-workflow")]
         self.assertTrue(packaged_paths)
         self.assertTrue(
             all(path.startswith("comfyui-workflow-templates-json==0.1.66:") for path in packaged_paths)

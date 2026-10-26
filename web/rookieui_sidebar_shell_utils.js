@@ -35,6 +35,7 @@ export function buildProfileLookup(capabilities) {
       default_flux_guidance: entry.default_flux_guidance ?? null,
       prompt_enhancement_visible: Boolean(entry.prompt_enhancement_visible),
       default_prompt_enhancement_enabled: Boolean(entry.default_prompt_enhancement_enabled),
+      default_moss_slg_enabled: typeof entry.default_moss_slg_enabled === "boolean" ? entry.default_moss_slg_enabled : null,
       edit_megapixels_visible: Boolean(entry.edit_megapixels_visible),
       default_edit_megapixels: entry.default_edit_megapixels ?? null,
       template_lora_visible: Boolean(entry.template_lora_visible),

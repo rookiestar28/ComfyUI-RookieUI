@@ -4,6 +4,9 @@ from rookieui.contracts.generation import NormalizedTxt2ImgRequest, Txt2ImgReque
 from rookieui.contracts.model_family_registry import get_model_family_registry_entry
 from rookieui.contracts.prompt_dsl import PromptPreprocessResult, PromptSemanticPlan
 from rookieui.contracts.qwen_image_21_assets import qwen_image_21_asset_role, require_qwen_image_21_asset_role
+from rookieui.contracts.moss_image import (
+    MOSS_IMAGE_PROFILE_IDS, is_moss_exclusive_asset, matches_moss_asset, normalize_moss_options,
+)
 from rookieui.contracts.aliases import (
     HIRES_UPSCALE_METHODS as _HIRES_UPSCALE_METHODS,
     TEXT_ENCODER_LOCKED_PROFILES as _TEXT_ENCODER_LOCKED_PROFILES,
@@ -279,6 +282,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
 
     profile = get_parity_profile(normalize_option_label(request.profile, "profile", max_length=32))
     profile_entry = get_model_family_registry_entry(profile.id)
+    moss_options = normalize_moss_options(request.moss_options, default_slg=profile_entry.default_moss_slg_enabled)
     negative_resolution = resolve_effective_negative_prompt(profile_entry, negative_prompt)
     negative_prompt = negative_resolution.value
     parameter_warnings = list(negative_resolution.warnings)
@@ -332,7 +336,7 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
             applied_defaults.append("steps")
     else:
         steps = _coerce_steps(request.steps, profile.default_steps, applied_defaults)
-    if profile.id == "qwen_image_21":
+    if profile.id == "qwen_image_21" or profile.id in MOSS_IMAGE_PROFILE_IDS:
         # CRITICAL: this host node consumes authored text directly; A1111 parsing would rewrite
         # instructions and silently change the new model's positive/negative conditioning.
         prompt_preprocess = PromptPreprocessResult(
@@ -371,6 +375,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         field_name="height",
         applied_defaults=applied_defaults,
     )
+    if profile.id in MOSS_IMAGE_PROFILE_IDS and (width % 16 or height % 16):
+        raise ValueError('MOSS width and height must be divisible by 16.')
     cfg_scale = _coerce_cfg_scale(
         request.cfg_scale,
         profile.default_cfg_scale,
@@ -439,6 +445,8 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
     clip_skip = _coerce_int(clip_skip, "clip_skip")
     if clip_skip < 1 or clip_skip > 12:
         raise ValueError("clip_skip must be between 1 and 12.")
+    if profile.id in MOSS_IMAGE_PROFILE_IDS and clip_skip != 1:
+        raise ValueError('MOSS uses native CLIP depth; clip_skip must be 1.')
     if not profile.supports_clip_skip:
         clip_skip = 1
 
@@ -559,6 +567,14 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
                 raise ValueError("Qwen Image 2.1 requires all three exact selectors in the host model inventory.")
         elif any(qwen_image_21_asset_role(value) for value in (checkpoint_name, text_encoder_name, vae_name)):
             raise ValueError(f"Qwen Image 2.1 assets require profile 'qwen_image_21', not '{profile.id}'.")
+        if profile.id in MOSS_IMAGE_PROFILE_IDS:
+            for role, selector in (('diffusion_models', checkpoint_name), ('text_encoders', text_encoder_name), ('vae', vae_name)):
+                if not matches_moss_asset(profile.id, selector, role):
+                    raise ValueError(f'MOSS {role} requires the matching official generation selector.')
+                if inventory_is_host and selector not in getattr(inventory, role):
+                    raise ValueError(f'MOSS {role} requires a registered host selector.')
+        elif any(is_moss_exclusive_asset(value) for value in (checkpoint_name, text_encoder_name)):
+            raise ValueError('MOSS generation assets require a matching MOSS Image profile.')
         if profile.id == "qwen_image" and _is_unresolved_inventory_selector(checkpoint_name):
             raise ValueError("qwen_image requires a legacy 2512 diffusion model; 2.1 assets are incompatible.")
     missing_template_lora_warning = ""
@@ -631,7 +647,17 @@ def normalize_txt2img_request(payload: dict[str, object]) -> NormalizedTxt2ImgRe
         if prompt_enhancement_enabled or dtype_profile != "automatic":
             raise ValueError("Qwen Image 2.1 requires raw prompts and automatic dtype selection.")
 
+    if profile.id in MOSS_IMAGE_PROFILE_IDS:
+        if (lora_name or lora_activations or template_lora_enabled or template_lora_name or hires_enabled
+                or any(unit.enabled for unit in controlnet_units) or adetailer.enabled):
+            raise ValueError('MOSS does not support LoRA, Hires, ControlNet or ADetailer controls.')
+        if shift is not None or flux_guidance is not None or edit_megapixels is not None:
+            raise ValueError('MOSS uses native sampling without shift, guidance or edit controls.')
+        if prompt_enhancement_enabled or dtype_profile != 'automatic' or clip_skip != 1:
+            raise ValueError('MOSS requires raw prompts, automatic dtype and native CLIP depth.')
+
     return NormalizedTxt2ImgRequest(
+        moss_options=moss_options,
         prompt=prompt,
         negative_prompt=negative_prompt,
         profile=profile.id,

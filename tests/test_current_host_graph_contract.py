@@ -170,7 +170,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         by_id = {profile.id: profile for profile in contract.profiles}
         manifest_entries = {
-            entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}
+            entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit", "moss_image_base", "moss_image_sft"}
         }
         self.assertEqual(set(by_id), set(manifest_entries))
         profile_graph = core_graph_contract.load_profile_graph_contract(
@@ -198,7 +198,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         contract = supported_graph_contract.load_supported_graph_contract(
             FIXTURES / WORKFLOW_TEMPLATE_SUPPORTED_GRAPH_FIXTURE
         )
-        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}}
+        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit", "moss_image_base", "moss_image_sft"}}
         profile_graph = core_graph_contract.load_profile_graph_contract(
             FIXTURES / PROFILE_GRAPH_FIXTURE
         )
@@ -550,7 +550,7 @@ class CurrentHostGraphContractTests(unittest.TestCase):
         )
         self.assertEqual(fixture["workflow_templates_json_version"], "0.1.66")
         expected_profiles = fixture["profiles"]
-        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit"}}
+        entries = {entry.id: entry for entry in list_non_sd_manifest_entries() if entry.id not in {"qwen_image_21", "qwen_image_21_edit", "moss_image_base", "moss_image_sft"}}
         self.assertEqual(set(entries), set(expected_profiles))
         for profile_id, source in expected_profiles.items():
             with self.subTest(profile_id=profile_id):

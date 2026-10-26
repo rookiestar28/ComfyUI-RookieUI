@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from rookieui.contracts.host_source_basis import (
@@ -156,6 +156,7 @@ class FamilyTemplateManifestEntry:
     default_ideogram_mode: str = ""
     scheduler_control_mode: str = "generic"
     negative_prompt_mode: str = "encoded"
+    default_moss_slg_enabled: bool | None = None
 
     def to_registry_payload(self) -> dict[str, Any]:
         return {
@@ -205,6 +206,7 @@ class FamilyTemplateManifestEntry:
             "default_ideogram_mode": self.default_ideogram_mode,
             "scheduler_control_mode": self.scheduler_control_mode,
             "negative_prompt_mode": self.negative_prompt_mode,
+            "default_moss_slg_enabled": self.default_moss_slg_enabled,
         }
 
     def to_preset_payload(
@@ -247,6 +249,10 @@ class FamilyTemplateManifestEntry:
             "ideogram_mode": self.default_ideogram_mode,
             "scheduler_control_mode": self.scheduler_control_mode,
             "negative_prompt_mode": self.negative_prompt_mode,
+            "moss_options": (
+                {"slg_enabled": self.default_moss_slg_enabled}
+                if self.default_moss_slg_enabled is not None else None
+            ),
         }
 
 
@@ -425,6 +431,31 @@ def _template_entry(
         scheduler_control_mode=scheduler_control_mode,
         negative_prompt_mode=negative_prompt_mode,
     )
+
+
+def _moss_entry(variant: str, *, slg_enabled: bool) -> FamilyTemplateManifestEntry:
+    profile = f"moss_image_{variant}"
+    return replace(_template_entry(
+        id=profile, title=f"MOSS-Image {variant.upper() if variant == 'sft' else 'Base'}",
+        public_base_family="moss_image", default_width=1024, default_height=1024,
+        default_steps=25, default_cfg_scale=2.5, default_sampler="er_sde", default_scheduler="simple",
+        compatibility_summary="Native MOSS-Image text-to-image; real inference requires host qualification.",
+        notes=(
+            "Requires matching Base/SFT diffusion, Qwen3.5 9B generation encoder and FLUX.2 VAE.",
+            "Prompt enhancement is off; authored text is sent directly to the native encoder.",
+            "Apache-2.0: https://github.com/OpenMOSS/MOSS-Image/blob/main/LICENSE",
+            "Img2Img, Hires, ControlNet, ADetailer and LoRA controls are unavailable in this profile.",
+        ),
+        runtime_adapter_id="moss_image",
+        official_template_path=f"comfyui-workflow-templates-json==0.1.122:image_{profile}_t2i.json",
+        diffusion_model_hints=(profile,),
+        diffusion_model_priority_hints=((f"{profile}_int8_convrot.safetensors",), (f"{profile}_bf16.safetensors",)),
+        text_encoder_hints=("qwen3.5_9b",),
+        text_encoder_priority_hints=(("qwen3.5_9b_int8_convrot.safetensors",), ("qwen3.5_9b_bf16.safetensors",),
+                                     ("qwen3.5_9b_w4a8_gptq.safetensors",)),
+        vae_hints=("flux2-vae",),
+        vae_priority_hints=(("flux2-vae_small.safetensors",), ("flux2-vae.safetensors",)),
+    ), text_encoder_visible=True, default_moss_slg_enabled=slg_enabled)
 
 
 _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
@@ -1030,6 +1061,8 @@ _ALL_MANIFEST_ENTRIES: tuple[FamilyTemplateManifestEntry, ...] = (
         vae_priority_hints=(("ae",), ("longcat",)),
         vae_deny_hints=("qwen",),
     ),
+    _moss_entry("base", slg_enabled=True),
+    _moss_entry("sft", slg_enabled=False),
     _template_entry(
         id="qwen_image_21",
         title="Qwen-Image 2.1",

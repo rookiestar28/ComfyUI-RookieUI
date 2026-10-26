@@ -1,3 +1,6 @@
+import { isMossImageProfile } from "../rookieui_moss_image_profiles.js";
+import { readMossLayoutState } from "./rookieui_moss_layout.js";
+
 export function parseJsonObjectField(rawValue, fallback = {}) {
   if (typeof rawValue !== "string" || !rawValue.trim()) {
     return { ...fallback };
@@ -40,7 +43,7 @@ export function readOptionalNumericValue(input) {
 }
 
 export function buildTxt2ImgPayloadFromElements(elements) {
-  return {
+  const payload = {
     prompt: elements.prompt.value,
     negative_prompt: elements.negativePrompt.disabled ? "" : elements.negativePrompt.value,
     profile: elements.profileState.value,
@@ -78,6 +81,19 @@ export function buildTxt2ImgPayloadFromElements(elements) {
     adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}", {}),
     controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
+  if (isMossImageProfile(payload.profile)) {
+    // IMPORTANT: disabled SD controls retain their drafts. Never send those stale
+    // values to the native MOSS graph after a profile switch.
+    Object.assign(payload, {
+      dtype_profile: "automatic", clip_skip: 1, shift: null, flux_guidance: null,
+      prompt_enhancement_enabled: false, hires_enabled: false, lora_name: "",
+      template_lora_name: "", template_lora_enabled: false, template_lora_trigger_word: "",
+      controlnet_units: [], adetailer: {}, moss_options: { slg_enabled: elements.mossSlgEnabled.checked },
+    });
+    const layout = readMossLayoutState(elements);
+    if (layout !== null) payload.moss_options.layout = layout;
+  }
+  return payload;
 }
 
 export function buildImg2ImgPayloadFromElements(elements, imageEditReferencePayload = {}) {
@@ -143,3 +159,81 @@ export function buildImg2ImgPayloadFromElements(elements, imageEditReferencePayl
     controlnet_units: qwen21Edit ? [] : parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
   };
 }
+
+export function buildTxt2ImgSubmissionPayloadFromElements(elements) {
+  if (isMossImageProfile(elements.profileState.value)) {
+    return buildTxt2ImgPayloadFromElements(elements);
+  }
+  return {
+    prompt: elements.prompt.value,
+    negative_prompt: elements.negativePrompt.value,
+    profile: elements.profileState.value,
+    dtype_profile: elements.lowBits.value,
+    checkpoint_name: elements.checkpoint.value,
+    vae_name: elements.vae.value,
+    text_encoder_name: elements.textEncoder.value,
+    width: Number(elements.width.value),
+    height: Number(elements.height.value),
+    steps: Number(elements.steps.value),
+    cfg_scale: Number(elements.cfgScale.value),
+    shift: elements.shift ? readOptionalNumericValue(elements.shift) : null,
+    flux_guidance: elements.fluxGuidance ? readOptionalNumericValue(elements.fluxGuidance) : null,
+    edit_megapixels: elements.editMegapixels ? readOptionalNumericValue(elements.editMegapixels) : null,
+    sampler_name: elements.sampler.value,
+    scheduler_name: elements.scheduler.value,
+    prompt_enhancement_enabled: elements.promptEnhancementEnabled?.checked ?? false,
+    seed: Number(elements.seed.value),
+    seed_extra: elements.seedExtra.checked,
+    batch_size: Number(elements.batchSize.value),
+    batch_count: Number(elements.batchCount.value),
+    clip_skip: Number(elements.clipSkip.value),
+    hires_enabled: elements.hiresEnabled.checked,
+    hires_scale: Number(elements.hiresScale.value),
+    hires_steps: Number(elements.hiresSteps.value),
+    hires_denoise: Number(elements.hiresDenoise.value),
+    hires_upscale_method: elements.hiresUpscaleMethod.value,
+    template_lora_name: elements.templateLoraName?.value ?? "",
+    lora_name: elements.loraName.value,
+    lora_strength_model: Number(elements.loraStrengthModel.value),
+    lora_strength_clip: Number(elements.loraStrengthClip.value),
+    adetailer: parseJsonObjectField(elements.adetailer?.value ?? "{}"),
+    controlnet_units: parseJsonObjectArrayField(elements.controlnetUnits?.value ?? "[]"),
+  };
+}
+
+export const TXT2IMG_PAYLOAD_FIELD_MAP = Object.freeze({
+  prompt: "prompt",
+  negative_prompt: "negativePrompt",
+  profile: "profileState",
+  checkpoint_name: "checkpoint",
+  vae_name: "vae",
+  text_encoder_name: "textEncoder",
+  dtype_profile: "lowBits",
+  width: "width",
+  height: "height",
+  steps: "steps",
+  cfg_scale: "cfgScale",
+  shift: "shift",
+  flux_guidance: "fluxGuidance",
+  sampler_name: "sampler",
+  scheduler_name: "scheduler",
+  ideogram_mode: "ideogramMode",
+  prompt_enhancement_enabled: "promptEnhancementEnabled",
+  seed: "seed",
+  seed_extra: "seedExtra",
+  batch_count: "batchCount",
+  batch_size: "batchSize",
+  clip_skip: "clipSkip",
+  hires_enabled: "hiresEnabled",
+  hires_scale: "hiresScale",
+  hires_steps: "hiresSteps",
+  hires_denoise: "hiresDenoise",
+  hires_upscale_method: "hiresUpscaleMethod",
+  template_lora_name: "templateLoraName",
+  template_lora_enabled: "templateLoraEnabled",
+  template_lora_strength: "templateLoraStrength",
+  template_lora_trigger_word: "templateLoraTriggerWord",
+  lora_name: "loraName",
+  lora_strength_model: "loraStrengthModel",
+  lora_strength_clip: "loraStrengthClip",
+});

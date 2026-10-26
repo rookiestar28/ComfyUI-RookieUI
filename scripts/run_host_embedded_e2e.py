@@ -63,6 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=_env_flag("ROOKIEUI_HOST_EMBEDDED_SKIP_EXECUTE", default=False),
         help="Run only the strict report pass and skip the execute pass.",
     )
+    parser.add_argument("--moss-layout", action="store_true", help="Qualify native MOSS Layout in catalog mode.")
     return parser
 
 
@@ -83,6 +84,8 @@ def _build_live_smoke_command(args: argparse.Namespace, *, execute: bool) -> lis
     ]
     if args.profiles:
         command.extend(["--profiles", args.profiles])
+    if args.moss_layout:
+        command.append("--moss-layout")
     if execute:
         command.append("--execute")
     return command

@@ -3,6 +3,7 @@ from __future__ import annotations
 from rookieui.contracts.models import PresetDefinition
 from rookieui.contracts.model_family_registry import list_model_family_registry_entries
 from rookieui.contracts.qwen_image_21_assets import QWEN_IMAGE_21_PROFILE_IDS
+from rookieui.contracts.moss_image import MOSS_IMAGE_PROFILE_IDS
 from rookieui.services.model_inventory import (
     discover_model_inventory,
     resolve_primary_model_selector_context,
@@ -26,7 +27,7 @@ def build_preset_payload() -> dict[str, object]:
             PresetDefinition(
                 **entry.to_preset_payload(
                     checkpoint_name=(
-                        primary_default if primary_models or profile_id in QWEN_IMAGE_21_PROFILE_IDS
+                        primary_default if primary_models or profile_id in QWEN_IMAGE_21_PROFILE_IDS | MOSS_IMAGE_PROFILE_IDS
                         else inventory.default_checkpoint
                     ),
                     vae_name=vae_default,
