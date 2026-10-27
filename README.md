@@ -1106,4 +1106,6 @@ RookieUI reads model catalogs from the host ComfyUI `folder_paths` keys. Under s
 
 This project is licensed under **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
+Copyright (c) 2024-2026 rookiestar (GitHub: rookiestar28).
+
 See [LICENSE](LICENSE).
