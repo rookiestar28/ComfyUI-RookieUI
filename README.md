@@ -25,6 +25,17 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.2.2: Registry publishing restored (maintenance)</strong></summary>
+
+- Publishes the 1.2.1 changes below to the Comfy Registry. 1.2.1 was released on GitHub, but its Registry publication was skipped after the hosted Linux test gate failed.
+- The hosted Linux test gate now runs on a pinned Ubuntu 24.04 image instead of the moving `ubuntu-latest` label, which had moved to an image where the locked Playwright version cannot install its browser.
+- Security and supply-chain policy tests now run in every full test gate.
+- No runtime behavior changed.
+
+</details>
+
+<details>
+
 <summary><strong>1.2.1: ComfyUI 0.46 and Frontend 1.61 compatibility checks (compatibility)</strong></summary>
 
 - Added source compatibility checks for ComfyUI Core 0.46, its bundled Frontend 1.59.11, standalone Frontend 1.61.8, and workflow templates 0.11.118. The checks fail if the tested host surfaces, official MOSS/Qwen/Krea-2 template graphs, or the text-generation node used by Krea-2 prompt enhancement change.
