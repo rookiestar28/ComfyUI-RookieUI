@@ -31,6 +31,16 @@ class TestSupplyChainWorkflowPolicy(unittest.TestCase):
             re.compile(r"uses: actions/dependency-review-action@[a-f0-9]{40}\b"),
         )
 
+    def test_browser_gate_runner_is_pinned_to_a_supported_image(self):
+        # The gate installs Playwright browsers with system dependencies. A moving
+        # runner label can move to an image the locked Playwright cannot install on,
+        # which fails the gate and skips Registry publishing.
+        gate_job = read_job_block(read_workflow("ci.yml"), "full-test-gate")
+
+        runners = re.findall(r"(?m)^    runs-on:\s*(\S+)\s*$", gate_job)
+
+        self.assertEqual(runners, ["ubuntu-24.04"])
+
     def test_registry_publish_is_downstream_of_the_exact_ci_gate(self):
         self.assertFalse(
             (WORKFLOW_ROOT / "publish.yml").exists(),

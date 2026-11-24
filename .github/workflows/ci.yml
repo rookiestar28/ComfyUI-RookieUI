@@ -15,7 +15,11 @@ concurrency:
 jobs:
   full-test-gate:
     name: Full Test Gate (Linux)
-    runs-on: ubuntu-latest
+    # COMPATIBILITY: keep an explicit image here; this job installs Playwright browsers with system
+    # dependencies, and a moving label (ubuntu-latest) can resolve to an image the locked Playwright
+    # cannot install on, which fails the gate and skips Registry publishing. Move it together with a
+    # Playwright version that supports the newer image.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
