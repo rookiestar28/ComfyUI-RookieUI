@@ -25,6 +25,18 @@ The core objective of this project is not merely to replicate the classic UI/UX,
 
 <details>
 
+<summary><strong>1.2.1: ComfyUI 0.46 and Frontend 1.61 compatibility checks (compatibility)</strong></summary>
+
+- Added source compatibility checks for ComfyUI Core 0.46, its bundled Frontend 1.59.11, standalone Frontend 1.61.8, and workflow templates 0.11.118. The checks fail if the tested host surfaces, official MOSS/Qwen/Krea-2 template graphs, or the text-generation node used by Krea-2 prompt enhancement change.
+- Checked the sidebar on a real Core 0.46 host with both frontend versions: panel layout and resizing, language menu and fullscreen preview layering, queue progress, previews, history, and the single-submit behavior when a request outcome is unknown.
+- Dropping an A1111-style PNG onto the ComfyUI canvas still rewrites the imported workflow to the RookieUI encoders on Frontend 1.61, which opens imported workflows in a new graph.
+- Real GPU checks on Core 0.46 covered SD (Illustrious) generation with PNG Info restore, MOSS-Image Base generation, and Krea-2 Turbo generation with prompt enhancement enabled.
+- No default host versions or runtime behavior changed. The license file was normalized and now states the copyright holder.
+
+</details>
+
+<details>
+
 <summary><strong>1.2.0: MOSS-Image generation, layout guidance, and sidebar reliability (new functionality/compatibility)</strong></summary>
 
 - Added native `MOSS-Image Base` and `MOSS-Image SFT` text-to-image presets with matching model selection, host prerequisite checks, and Skip Layer Guidance (SLG) controls.
@@ -1038,7 +1050,8 @@ Behavior and compatibility:
 - Qwen Image 2.1 has a separate scoped source contract for Core 0.37 (bundled frontend 1.53.6), standalone frontend 1.55.12, and workflow templates 0.11.66. That contract covers the Qwen node, template graph, and affected frontend API surfaces; it does not imply that unrelated newer template workflows are supported.
 - Additional source-contract checks cover Core 0.39.0, standalone frontend 1.57.0, and workflow templates 0.11.76; live compatibility remains scoped to the tested environments described here.
 - An additive source contract covers Core 0.42, standalone frontend 1.59.1, and workflow templates 0.11.96 without replacing the general compatibility basis. MOSS Base/SFT generation and Layout were checked on a real GPU with the int8 model combinations listed above, using an official Frontend 1.59.1 build from its source CI. This is a scoped host/model result, not qualification of every model variant or a statement that all older hosts support MOSS.
-- Existing SD generation and native Flux.2 Klein PNG workflow replay were also checked on that newer host. Legacy A1111-form restoration for Klein remains unsupported.
+- A further additive source contract covers Core 0.46, its bundled frontend 1.59.11, standalone frontend 1.61.8, and workflow templates 0.11.118. On a real Core 0.46 host, the sidebar, A1111 PNG canvas import, and generation tracking were checked with both frontend versions, and SD, MOSS-Image Base, and Krea-2 Turbo (with prompt enhancement) generated successfully with the tested model files. This is a scoped result and does not change the general compatibility basis.
+- Existing SD generation and native Flux.2 Klein PNG workflow replay were also checked on the Core 0.42 host. Legacy A1111-form restoration for Klein remains unsupported.
 - SD1.5 default generation and saved PNG prompt readback have also been checked on Core 0.38.0 with CyberRealistic V9 FP16.
 - RookieUI registers its sidebar through the current ComfyUI frontend sidebar-tab surface when available, including cleanup for stale RookieUI tab instances during re-registration.
 - Older or reduced host surfaces can still fall back to the legacy launcher path instead of failing the extension bootstrap.
