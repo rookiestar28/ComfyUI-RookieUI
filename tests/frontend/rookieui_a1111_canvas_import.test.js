@@ -260,6 +260,79 @@ describe("A1111 PNG direct canvas import encoder routing", () => {
     expect(rookieNodes[0].outputs[0].links).toHaveLength(1);
   });
 
+  test("rewrites the root graph activated during handleFile and leaves the previous workflow graph untouched", async () => {
+    // Frontend 1.61.6+ gives each workflow its own LGraph: the A1111 parameters fallback creates a
+    // fresh root graph and activates it before handleFile resolves. The rewrite must follow it.
+    const previousGraph = createMockGraph();
+    createNativeA1111ImportGraph(previousGraph);
+    const previousNodes = [...previousGraph._nodes];
+    const importedGraph = createMockGraph();
+    let activeGraph = previousGraph;
+    const canvas = { graph: previousGraph, setDirty: vi.fn(), setDirtyCanvas: vi.fn() };
+    const originalHandleFile = vi.fn(async () => {
+      createNativeA1111ImportGraph(importedGraph);
+      activeGraph = importedGraph;
+      canvas.graph = importedGraph;
+    });
+    const app = {
+      get rootGraph() {
+        return activeGraph;
+      },
+      canvas,
+      handleFile: originalHandleFile,
+      registerExtension(definition) {
+        return Promise.resolve(definition.setup());
+      },
+      api: {
+        clientId: "canvas-import-graph-swap-client",
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      extensionManager: {
+        registerSidebarTab() {},
+      },
+    };
+    const fetchImpl = vi.fn(async (url) => {
+      if (url === "/rookieui/capabilities") {
+        return { ok: true, status: 200, async json() { return createDefaultCapabilities(); } };
+      }
+      if (url === "/rookieui/pnginfo/inspect") {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              status: "ok",
+              source_type: "a1111",
+              target_form: "txt2img",
+              payload: { profile: "sdxl", prompt: "canvas positive prompt", negative_prompt: "canvas negative prompt", width: 832, height: 1216, steps: 20 },
+            };
+          },
+        };
+      }
+      return { ok: false, status: 404, async json() { return {}; } };
+    });
+
+    await registerRookieUIBootstrapExtension({ app, fetchImpl });
+    await app.handleFile(buildPngTextFile({
+      parameters: [
+        "canvas positive prompt",
+        "Negative prompt: canvas negative prompt",
+        "Steps: 20, Sampler: Euler a, CFG scale: 7, Seed: 3322577650, Size: 832x1216, Model: hassakuWIPV3",
+      ].join("\n"),
+    }));
+
+    expect(originalHandleFile).toHaveBeenCalledTimes(1);
+    expect(app.rootGraph).toBe(importedGraph);
+    const importedClasses = importedGraph._nodes.map((node) => node.comfyClass);
+    expect(importedClasses).not.toContain("CLIPTextEncode");
+    expect(importedClasses.filter((classType) => classType === "RookieUIA1111CLIPTextEncodeSDXL")).toHaveLength(2);
+    expect(importedGraph.setDirtyCanvas).toHaveBeenCalled();
+    expect(previousGraph._nodes).toEqual(previousNodes);
+    expect(previousGraph._nodes.filter((node) => node.comfyClass === "CLIPTextEncode")).toHaveLength(2);
+    expect(previousGraph.setDirtyCanvas).not.toHaveBeenCalled();
+  });
+
   test("does not rewrite images that already carry ComfyUI workflow metadata", async () => {
     const graph = createMockGraph();
     const app = {

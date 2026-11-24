@@ -1,0 +1,2134 @@
+{
+  "baseline_distribution": {
+    "bytes": 4120033,
+    "filename": "comfyui_workflow_templates_json-0.1.122-py3-none-any.whl",
+    "name": "comfyui-workflow-templates-json",
+    "sha256": "1b84cc7bbf73340a2af3215324c7322465f8ee240a6173e65b8fbb0e5cb1b805",
+    "version": "0.1.122"
+  },
+  "core_components": {
+    "comfyui-embedded-docs": "0.5.17",
+    "comfyui-frontend-package": "1.59.11",
+    "comfyui-workflow-templates": "0.11.118"
+  },
+  "distributions": [
+    {
+      "bytes": 11056,
+      "filename": "comfyui_workflow_templates-0.11.118-py3-none-any.whl",
+      "name": "comfyui-workflow-templates",
+      "sha256": "17ac7f404fd60b4c58f74a2f5ca737c1fb011c79d49dfcc94203850330a5a948",
+      "version": "0.11.118"
+    },
+    {
+      "bytes": 92611,
+      "filename": "comfyui_workflow_templates_core-0.3.408-py3-none-any.whl",
+      "name": "comfyui-workflow-templates-core",
+      "sha256": "0ca2becd7daf0a348d2d12bfd640ccb5f7b74e001a8aff64a3661fe89d17a04d",
+      "version": "0.3.408"
+    },
+    {
+      "bytes": 4894540,
+      "filename": "comfyui_workflow_templates_json-0.1.143-py3-none-any.whl",
+      "name": "comfyui-workflow-templates-json",
+      "sha256": "7bfd4c92afeec94b1ad1a1e46992bc382d11273bc70391ce8d209b25ce864409",
+      "version": "0.1.143"
+    }
+  ],
+  "gallery_delta": {
+    "added": [
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/3d_idol_image_to_gaussian_splat.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/3d_ultratex_texture_3d_model.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance2_5_flash_i2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance2_5_flash_r2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance2_5_flash_t2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedream_5_5_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedream_5_5_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_4_hydrogen.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_1_2_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_1_2_extend.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_1_2_i2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_1_2_r2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_google_gemini_omni_flash_1_2_t2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_heygen_avatar_6_i2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_heygen_avatar_6_id2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_heygen_decision_1.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ideogram_v4_6_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ideogram_v4_6_precise_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ideogram_v4_6_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_i2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_image_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_long_image.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_r2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_t2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_kling4_video_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ltx_video_reframe.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ltx_video_sdr2hdr.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_ltx_video_upscale.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_image_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_image_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_camera_control.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_lipsync.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_recast.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_minimax_h3_max_reframe.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_26_flare_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_26_flare_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_26_sunburst_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_gpt_image_26_sunburst_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_patina_material_extract.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_patina_material_i2m.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_patina_material_t2m.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_patina_pbr_maps.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_pika_h3_flex_t2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_pika_music.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_pika_sfx.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_pruna_p_video_upscale.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_sonilo_music1_5.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_tencent_hy4.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_topaz_image_enhance_wonder4.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_veed_dubbing.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/breeze_tts2_tts.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_fibo2_edit_dev_pe.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_fibo2_edit_turbo_pe.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_minimax_h3_image_character_swap.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_minimax_h3_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_minimax_h3_image_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_minimax_h3_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_color_depth_control.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_p_h3_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_p_h3_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_sensenova_u16_image_edit.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/image_sensenova_u16_t2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/index.he.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/index.it.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/utility_image_segment_wevisone_vl.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/utility_relayvsr_video_x2_upscale.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/utility_relayvsr_video_x4_upscale.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/utility_rmbg3_remove_background.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/video_pika_h3_flex_fl2va.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/video_pika_h3_flex_ref2va.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/video_pika_h3_flex_t2v.json"
+      }
+    ],
+    "changed": [
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/3d_hunyuan3d-v2.1.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/3d_hunyuan3d_image_to_model.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/3d_moge_panorama_to_mesh.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/3d_moge_perspective_to_mesh.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/3d_pixal3d_trellis2_image_to_model.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/Image_capybara_v0_1_image_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/Image_capybara_v0_1_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedream_5_0_lite_image_edit.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/api_ideogram_v4_5_precise_image_edit.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/api_kling_motion_control.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/api_kling_v3_flf2v.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/api_kling_v3_video.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step1_5_xl_base.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step1_5_xl_turbo.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_checkpoint.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_split.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_split_4b.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_5_split_llm.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_t2a_instrumentals.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_ace_step_1_t2a_song.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_minimax_music_3.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_stable_audio_3_medium_base.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_stable_audio_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/audio_yue2_text2music.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux1_dev_uso_reference_image_gen.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux1_krea_dev.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_canny_model_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_depth_lora_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_dev_checkpoint_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_dev_full_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_fill_inpaint_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_fill_outpaint_example.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/flux_kontext_dev_basic.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_redux_model_example.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/flux_schnell_full_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/hidream_e1_1.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/hidream_e1_full.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/hidream_i1_dev.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/hidream_i1_fast.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/hidream_i1_full.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image-qwen_image_edit_2511_lora_inflation.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_boogu_image_0_1_turbo_t2i.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_chroma1_radiance_text_to_image.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_chroma_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_chrono_edit_14B.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_firered_image_edit1_1.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux.1_fill_dev_OneReward.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_fp8.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_9b_kv_image_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_base.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_4b_distilled.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_9b_base.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_image_edit_9b_distilled.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_text_to_image.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_flux2_text_to_image_9b.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_joyai_image_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_kandinsky5_t2i.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_krea2_turbo_t2i.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_lens_t2i.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_lens_turbo_t2i.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_longcat_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_lotus_depth_v1_1.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_mage_flow_edit_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_mage_flow_edit_turbo_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_mage_flow_t2i_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_mage_flow_turbo_t2i_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_ming_image_01_design_image_edit.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_ming_image_01_design_t2i.json"
+      },
+      {
+        "classification": "moss-admitted",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_base_t2i.json"
+      },
+      {
+        "classification": "moss-admitted",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_base_t2i_bboxes.json"
+      },
+      {
+        "classification": "moss-admitted",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_t2i.json"
+      },
+      {
+        "classification": "moss-admitted",
+        "member": "comfyui_workflow_templates_json/templates/image_moss_image_t2i_bboxes.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_newbieimage_exp0_1-t2i.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_omnigen2_image_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_omnigen2_t2i.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_ovis_text_to_image.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_pixeldit_t2i.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_Image_2512.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_Image_2512_controlnet.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_2512_with_2steps_lora.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_controlnet_patch.json"
+      },
+      {
+        "classification": "legacy-compatible",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit_2509.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit_2509_relight.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit_2511.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit_2511_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_instantx_controlnet.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_instantx_inpainting_controlnet.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_layered.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_layered_control.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_qwen_image_union_control_lora.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_to_video_wan.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_z_image.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_z_image_int8.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_z_image_turbo.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_z_image_turbo_fun_union_controlnet.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/image_z_image_turbo_int8.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.ar.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.es.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.fa.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.fr.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.ja.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.ko.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.mcp.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.pt-BR.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.ru.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.tr.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.zh-TW.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index.zh.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/index_logo.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/llm_qwen3vl_text_gen.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/sd3.5_large_blur.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/sd3.5_large_canny_controlnet_example.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/sd3.5_large_depth.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/template_eric_exploded_view.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/template_ltx2_3_style_transition.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/template_qwen_Image_2512_360_lora.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/template_qwen_image_edit_2511_systms_action.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/template_qwen_image_illustration_lora.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/template_qwen_multiangle.app.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-1_click_multiple_character_angles-v1.0.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-1_click_multiple_scene_angles-v1.0.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-6-key-frames.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-all_in_one-image_edit_models.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-image_to_real.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-portrait_light_migration.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-textured_logo_elements.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/templates-textured_logotype-v2.1.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates_mjm_looped_restyler.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/templates_rob_portrait_light_migration.app.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility-gan_upscaler.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_birefnet_remove_background.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_bria_remove_image_background.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_depth_anything3_video_depth_estimation.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_image_segment_sam3.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_moge3_geometry_estimation.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_moge_depth_estimation.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_pid_latent_upscale_dit.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_sam3d_body.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_sdpose_multi_person.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_sdpose_multi_person_video.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_sdpose_ood_image_to_pose.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_sdpose_ood_video_to_pose_map.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_seedvr2_3b_int8_upscale_video.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_video_frame_interpolation.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_video_segment_sam3.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/utility_void_video_inpainting.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_capybara_v0_1_image_to_video.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_capybara_v0_1_video_edit.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_causal_forcing_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_fasth3_ominiref_r2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_fastvideo_fasth3_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_fastvideo_fasth3_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_hunyuan_video_1.5_720p_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_hunyuan_video_1.5_720p_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_kandinsky5_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_kandinsky5_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_3_flf2v.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_3_ic_lora.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_canny_to_video.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_depth_to_video.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_i2v_distilled.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_i2v_lora.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_ltx2_t2v_distilled.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_fun_controlnet_union.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_i2v_continuation.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_multiframe_reference.json"
+      },
+      {
+        "classification": "reference-only-executable-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_r2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_minimax_h3_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2.1_alpha_t2v_14B.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2.1_fun_camera_v1.1_1.3B.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2.1_fun_camera_v1.1_14B.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_flf2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_fun_camera.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_fun_control.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_fun_inpaint.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_i2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_14B_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_5B_fun_control.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_5B_fun_inpaint.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan2_2_5B_ti2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_animate2.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_animate2_distilled.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_ati.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_14B_ref2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_14B_t2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_14B_v2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_flf2v.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_inpainting.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wan_vace_outpainting.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/video_wanmove_480p.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/wan2.1_flf2v_720_f16.json"
+      },
+      {
+        "classification": "reference-only-note-change",
+        "member": "comfyui_workflow_templates_json/templates/wan2.1_fun_control.json"
+      }
+    ],
+    "removed": [
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bfl_flux_video_upscale.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance1_5_flf2v.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance1_5_image_to_video.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_bytedance_seedance1_5_text_to_video.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_image_1_i2i.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_image_1_inpaint.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_image_1_multi_inputs.json"
+      },
+      {
+        "classification": "reference-only",
+        "member": "comfyui_workflow_templates_json/templates/api_openai_image_1_t2i.json"
+      }
+    ]
+  },
+  "legacy_changes": {
+    "chroma": [],
+    "flux_kontext_dev_edit": [],
+    "hidream_i1_dev_fp8": [],
+    "hidream_i1_fast": [],
+    "hidream_i1_full": [],
+    "klein_4b": [],
+    "klein_9b": [],
+    "klein_9b_kv_image_edit": [],
+    "krea2_turbo": [],
+    "longcat_image": [],
+    "qwen_image_edit": []
+  },
+  "legacy_templates": [
+    {
+      "bytes": 21845,
+      "executable_sha256": "db971961e3ec58f371bc75dd6a468bd1d7e9779d2704bb47056b4c1b6943f4de",
+      "member": "comfyui_workflow_templates_json/templates/image_chroma_text_to_image.json",
+      "profile": "chroma",
+      "sha256": "80ebb283ac7e1df118618acbe4e05fd7c2bc6e74641f89e71438710fc819618c"
+    },
+    {
+      "bytes": 38044,
+      "executable_sha256": "b5f3d11b056fbd4dde4eac520d08d01c6e94f88945aa6aaa632a285ccf6baf6d",
+      "member": "comfyui_workflow_templates_json/templates/flux_kontext_dev_basic.json",
+      "profile": "flux_kontext_dev_edit",
+      "sha256": "1609bafff7daf3f64641e11ec5a2ea7c51937c0df56e37ae0de0f907d54f1f28"
+    },
+    {
+      "bytes": 16352,
+      "executable_sha256": "6e43869284078df7bfaf9566144a0cd518883825654b3be5f4e04ec0932748fa",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_dev.json",
+      "profile": "hidream_i1_dev_fp8",
+      "sha256": "e8bd536d3878dc019ffcb24a9a69bebc6b459f74f9df985f824008bc167317a9"
+    },
+    {
+      "bytes": 16309,
+      "executable_sha256": "c2307c21b54ec6127c2ecf4057d12f0650c5d828f5c8060b35b13bb3b282683d",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_fast.json",
+      "profile": "hidream_i1_fast",
+      "sha256": "2ddfd43104527120e9b00286e8013ff6f4ae7019d7b89ae48750cfc962277cb7"
+    },
+    {
+      "bytes": 16315,
+      "executable_sha256": "7b50be46d141250f4e228f268c0eb0432b252f55f03521774f96aae196d77be1",
+      "member": "comfyui_workflow_templates_json/templates/hidream_i1_full.json",
+      "profile": "hidream_i1_full",
+      "sha256": "efe02d61825e01729d4fdeb6bc10fbd0c3bb76987b3827b6810dd6df3024afe7"
+    },
+    {
+      "bytes": 70063,
+      "executable_sha256": "f31f3b10834b886beee8d1b3854cc29f215ccb832783904ee650b63e41d455e8",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_text_to_image.json",
+      "profile": "klein_4b",
+      "sha256": "e8e3362eca5c6f56cee9a85a459b62d62536c915677c389cea3ba7c7f48b5384"
+    },
+    {
+      "bytes": 39607,
+      "executable_sha256": "a5dfb376d3b1772afe43d459ec6b32096291c31d87f6141f022bd86efbdc0ac8",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_text_to_image_9b.json",
+      "profile": "klein_9b",
+      "sha256": "92fc5b2b708d4c9d3fa2163402c8367da1d93f4c218a5929b9d06ccd7a934b44"
+    },
+    {
+      "bytes": 46558,
+      "executable_sha256": "794bf06ff7713478363b851a4bf367df1a21a6685f9a8a2675595c1cf32b0a87",
+      "member": "comfyui_workflow_templates_json/templates/image_flux2_klein_9b_kv_image_edit.json",
+      "profile": "klein_9b_kv_image_edit",
+      "sha256": "05687132155dfdd38e8d361d9d55aa3b5fc2ddbf9b840e9a7437abf9c28441b9"
+    },
+    {
+      "bytes": 59791,
+      "executable_sha256": "d7cff1cf41c2347672b3989103eb18cf48f4874292a245fa67d0934bc9c165ac",
+      "member": "comfyui_workflow_templates_json/templates/image_krea2_turbo_t2i.json",
+      "profile": "krea2_turbo",
+      "sha256": "0f98468c96042dba128bc001e91d90b0628ade27bbe946a7fba2fe872e6687f4"
+    },
+    {
+      "bytes": 33403,
+      "executable_sha256": "9701aad5b805edd0ba3f5a2471a0f38fd50235cd2deb550f0068f88856bbe5f9",
+      "member": "comfyui_workflow_templates_json/templates/image_longcat_text_to_image.json",
+      "profile": "longcat_image",
+      "sha256": "fa6488e74bd4ec8b7fe1da1df29c54d9da7031f175d7658728bdeda44854d5da"
+    },
+    {
+      "bytes": 51715,
+      "executable_sha256": "9e94729d7d082244bfc009f89b433deab0c284bd2338035090008b2f3e6a7443",
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_edit.json",
+      "profile": "qwen_image_edit",
+      "sha256": "8e75383b9aef9abf12824e84cba4a53a0abf5957e2c459f9463d0f8a2a2313bd"
+    }
+  ],
+  "moss_changes": {
+    "base": [
+      {
+        "after_sha256": "46138a7411c6bcb67843a796e042e193a9e632a4ce8ef2ec64e39bf946a9f950",
+        "before_sha256": "c5be7e984d7c3b7ac807773b612d9fa28dbf6e7cfd6349a1050652023f993d27",
+        "classification": "template-seed",
+        "pointer": "/root/nodes/18/widgets_values/6"
+      },
+      {
+        "after_sha256": "753869dccd092af4df2558e0d43e0d167c33bbc36e3107271456cd635bcd6928",
+        "before_sha256": "cc8c51483292bd5d5fd8233a4fd6c2b5104164a5e0d1f83f9b59d26dec0cc7ff",
+        "classification": "enhancer-node-class",
+        "pointer": "/subgraphs/0/nodes/enhancer"
+      }
+    ],
+    "base_layout": [],
+    "sft": [
+      {
+        "after_sha256": "237b916a707c1dceaaa9488961a45f894e2138de5c2d1bbb69a4954b465123f3",
+        "before_sha256": "bb740646653c665282b6b3561cefb62c821f0c83881a5294f11872668e1bcf08",
+        "classification": "template-seed",
+        "pointer": "/root/nodes/18/widgets_values/6"
+      },
+      {
+        "after_sha256": "753869dccd092af4df2558e0d43e0d167c33bbc36e3107271456cd635bcd6928",
+        "before_sha256": "cc8c51483292bd5d5fd8233a4fd6c2b5104164a5e0d1f83f9b59d26dec0cc7ff",
+        "classification": "enhancer-node-class",
+        "pointer": "/subgraphs/0/nodes/enhancer"
+      }
+    ],
+    "sft_layout": [
+      {
+        "after_sha256": "c6fd505e2cc09ba8e24aacdd6a01292dfca0cb2e362e00f7eda8b43eadcd427a",
+        "before_sha256": "669789d89721ae7a6ab30de047b3e37f441b3de6d3fd32c0b7551575fa833082",
+        "classification": "model-download-url",
+        "pointer": "/subgraphs/0/nodes/1/properties/models/0/url"
+      }
+    ]
+  },
+  "moss_templates": {
+    "base": {
+      "bytes": 74771,
+      "graph_contract": {
+        "clip": [
+          "qwen3.5_9b_w4a8_gptq.safetensors",
+          "moss_image"
+        ],
+        "conditioning": [
+          "CLIPTextEncode",
+          0,
+          "CLIPTextEncode",
+          0
+        ],
+        "diffusion": "moss_image_base_int8_convrot.safetensors",
+        "latent": [
+          "EmptyFlux2LatentImage",
+          1024,
+          1024,
+          1
+        ],
+        "layout": false,
+        "prompt_path": [
+          "PreviewAny",
+          "ComfySwitchNode",
+          "PrimitiveStringMultiline",
+          "TextGenerateV2"
+        ],
+        "prompt_switch": true,
+        "resolution": [
+          "1:1 (Square)",
+          1,
+          16
+        ],
+        "sampler_defaults": [
+          25,
+          2.5,
+          "er_sde",
+          "simple",
+          1
+        ],
+        "slg_parameters": [
+          "",
+          "22",
+          0,
+          0.5
+        ],
+        "slg_path": [
+          "ComfySwitchNode",
+          "UNETLoader",
+          "SkipLayerGuidanceDiTSimple",
+          "UNETLoader"
+        ],
+        "slg_switch": true,
+        "vae": "flux2-vae_small.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_moss_image_base_t2i.json",
+      "sha256": "246c8156ee4f8ed3ac4d0b30c412eac38709671b7a2531ef7f9752a5e50c8bc5"
+    },
+    "base_layout": {
+      "bytes": 86928,
+      "graph_contract": {
+        "clip": [
+          "qwen3.5_9b_w4a8_gptq.safetensors",
+          "moss_image"
+        ],
+        "conditioning": [
+          "CLIPTextEncode",
+          0,
+          "CLIPTextEncode",
+          0
+        ],
+        "diffusion": "moss_image_base_int8_convrot.safetensors",
+        "latent": [
+          "EmptyFlux2LatentImage",
+          1024,
+          1024,
+          1
+        ],
+        "layout": true,
+        "prompt_path": [
+          "PreviewAny",
+          "ComfySwitchNode",
+          "PrimitiveStringMultiline",
+          "TextGenerate"
+        ],
+        "prompt_switch": false,
+        "resolution": [
+          "1:1 (Square)",
+          1,
+          16
+        ],
+        "sampler_defaults": [
+          25,
+          2.5,
+          "er_sde",
+          "simple",
+          1
+        ],
+        "slg_parameters": [
+          "",
+          "22",
+          0,
+          0.5
+        ],
+        "slg_path": [
+          "ComfySwitchNode",
+          "UNETLoader",
+          "SkipLayerGuidanceDiTSimple",
+          "UNETLoader"
+        ],
+        "slg_switch": true,
+        "vae": "flux2-vae_small.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_moss_image_base_t2i_bboxes.json",
+      "sha256": "6aa28ab86b41abd31f3c23b257292b03cf0e12aec428ea0052ec01dcba667c86"
+    },
+    "sft": {
+      "bytes": 75972,
+      "graph_contract": {
+        "clip": [
+          "qwen3.5_9b_w4a8_gptq.safetensors",
+          "moss_image"
+        ],
+        "conditioning": [
+          "CLIPTextEncode",
+          0,
+          "CLIPTextEncode",
+          0
+        ],
+        "diffusion": "moss_image_sft_int8_convrot.safetensors",
+        "latent": [
+          "EmptyFlux2LatentImage",
+          1024,
+          1024,
+          1
+        ],
+        "layout": false,
+        "prompt_path": [
+          "PreviewAny",
+          "ComfySwitchNode",
+          "PrimitiveStringMultiline",
+          "TextGenerateV2"
+        ],
+        "prompt_switch": true,
+        "resolution": [
+          "1:1 (Square)",
+          1,
+          16
+        ],
+        "sampler_defaults": [
+          25,
+          2.5,
+          "er_sde",
+          "simple",
+          1
+        ],
+        "slg_parameters": [
+          "",
+          "22",
+          0,
+          0.5
+        ],
+        "slg_path": [
+          "ComfySwitchNode",
+          "UNETLoader",
+          "SkipLayerGuidanceDiTSimple",
+          "UNETLoader"
+        ],
+        "slg_switch": false,
+        "vae": "flux2-vae_small.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_moss_image_t2i.json",
+      "sha256": "f6a4dac68bd5be8d4787e42912d3f2d21ad638b80c0786755cc90aef926b54dd"
+    },
+    "sft_layout": {
+      "bytes": 93448,
+      "graph_contract": {
+        "clip": [
+          "qwen3.5_9b_w4a8_gptq.safetensors",
+          "moss_image"
+        ],
+        "conditioning": [
+          "CLIPTextEncode",
+          0,
+          "CLIPTextEncode",
+          0
+        ],
+        "diffusion": "moss_image_sft_int8_convrot.safetensors",
+        "latent": [
+          "EmptyFlux2LatentImage",
+          1024,
+          1024,
+          1
+        ],
+        "layout": true,
+        "prompt_path": [
+          "PreviewAny",
+          "ComfySwitchNode",
+          "PrimitiveStringMultiline",
+          "TextGenerate"
+        ],
+        "prompt_switch": false,
+        "resolution": [
+          "1:1 (Square)",
+          1,
+          16
+        ],
+        "sampler_defaults": [
+          25,
+          2.5,
+          "er_sde",
+          "simple",
+          1
+        ],
+        "slg_parameters": [
+          "",
+          "22",
+          0,
+          0.5
+        ],
+        "slg_path": [
+          "ComfySwitchNode",
+          "UNETLoader",
+          "SkipLayerGuidanceDiTSimple",
+          "UNETLoader"
+        ],
+        "slg_switch": true,
+        "vae": "flux2-vae_small.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_moss_image_t2i_bboxes.json",
+      "sha256": "d6b2eda1379cd27bfbeb4951ac2b0a4f93bb209fe518bc1c0c5d1ac3ffdfa856"
+    }
+  },
+  "qwen_templates": {
+    "edit": {
+      "bytes": 96740,
+      "graph_contract": {
+        "cache": [
+          "QwenImage21Cache",
+          "auto",
+          "default"
+        ],
+        "clip_slot": 0,
+        "direct_prompt": [
+          "GraphInput",
+          "prompt"
+        ],
+        "encoder": "TextEncodeQwenImage21",
+        "encoder_loader": [
+          "qwen3vl_8b_int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "enhanced_prompt": [
+          "TextGenerate",
+          0
+        ],
+        "enhancer_loader": [
+          "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "model": "qwen_image_2.1_int8_convrot.safetensors",
+        "negative": [
+          "TextEncodeQwenImage21",
+          1
+        ],
+        "positive": [
+          "TextEncodeQwenImage21",
+          0
+        ],
+        "prompt_switch": [
+          "ComfySwitchNode",
+          false,
+          false
+        ],
+        "resolution": 0,
+        "sampler_defaults": [
+          25,
+          1,
+          "euler",
+          "simple",
+          1
+        ],
+        "vae": "qwen_image_2.1_vae_bf16.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_image_edit.json",
+      "sha256": "c1e6551759de131f083a040da072ac6f032c3c8401ceca202412cd912897d0fc"
+    },
+    "txt2img": {
+      "bytes": 78494,
+      "graph_contract": {
+        "cache": [
+          "QwenImage21Cache",
+          "auto",
+          "default"
+        ],
+        "clip_slot": 0,
+        "direct_prompt": [
+          "GraphInput",
+          "prompt"
+        ],
+        "encoder": "TextEncodeQwenImage21",
+        "encoder_loader": [
+          "qwen3vl_8b_int8_convrot.safetensors",
+          "qwen_image"
+        ],
+        "enhanced_prompt": [
+          "TextGenerate",
+          0
+        ],
+        "enhancer_loader": [
+          "qwen3.5_9b_qwen_image_2.1_pe_t2i.int8_convrot.safetensors",
+          "stable_diffusion"
+        ],
+        "model": "qwen_image_2.1_int8_convrot.safetensors",
+        "negative": [
+          "TextEncodeQwenImage21",
+          1
+        ],
+        "positive": [
+          "TextEncodeQwenImage21",
+          0
+        ],
+        "prompt_switch": [
+          "ComfySwitchNode",
+          false,
+          false
+        ],
+        "resolution": 1024,
+        "sampler_defaults": [
+          25,
+          1,
+          "euler",
+          "simple",
+          1
+        ],
+        "vae": "qwen_image_2.1_vae_bf16.safetensors"
+      },
+      "member": "comfyui_workflow_templates_json/templates/image_qwen_image_2_1_t2i.json",
+      "sha256": "5f2b50eeaf27e56a45456681ad5319df1ae51243d9653ac3f92c7dc05d1e1503"
+    }
+  },
+  "schema_version": "host-046-alignment-v1",
+  "scope": "source-contract-only",
+  "source_artifacts": [
+    {
+      "bytes": 128,
+      "path": "comfyui_version.py",
+      "sha256": "2ce467117439b3ba3f9259f742ba69bc7c692fa8dd82da399d68dd2897061b85",
+      "source": "core"
+    },
+    {
+      "bytes": 530,
+      "path": "requirements.txt",
+      "sha256": "06381f8c18f6220e4a2a85340edb22891f10ed15efd8133ab2133ec5505eda1f",
+      "source": "core"
+    },
+    {
+      "bytes": 71079,
+      "path": "server.py",
+      "sha256": "d002868baa85fed8802c67c928df52ad354aa957940a5f9655d224326442d3e8",
+      "source": "core"
+    },
+    {
+      "bytes": 66265,
+      "path": "execution.py",
+      "sha256": "b5b6c2bb2329733af194e55058aefb1da5b94f3a51b61933f15717f7dd0994a1",
+      "source": "core"
+    },
+    {
+      "bytes": 4200,
+      "path": "comfy_execution/media_enrichment.py",
+      "sha256": "78073f03df6c30e885ff0d287b7bb0ae7182207a4d94783084b80e0cfab6e8de",
+      "source": "core"
+    },
+    {
+      "bytes": 4708,
+      "path": "comfy_extras/nodes_upscale_model.py",
+      "sha256": "fafaf6351a15f981d40157c087490da702e096cad9fbaa85859e501fe7180564",
+      "source": "core"
+    },
+    {
+      "bytes": 11872,
+      "path": "comfy_extras/nodes_qwen.py",
+      "sha256": "54ce02aa9e167c0b497ce026ac6b558f539427d2d1ed4fc1fcc2ec8e6bc529da",
+      "source": "core"
+    },
+    {
+      "bytes": 26744,
+      "path": "comfy_extras/nodes_textgen.py",
+      "sha256": "cfda25f0733e51731c4a3302f87b68a74b6b1633c555dbd2c4b4aefb51473330",
+      "source": "core"
+    },
+    {
+      "bytes": 106208,
+      "path": "comfy_api/latest/_io.py",
+      "sha256": "c2a5aded4895a1adf1acb2df6c011fdfb74e15b0d4fd331ec00ea7562d91d91d",
+      "source": "core"
+    },
+    {
+      "bytes": 109917,
+      "path": "nodes.py",
+      "sha256": "40e9fbed11c861bdafa442c1bbb7547bcc9da15fba46d9e727e6f91def21af4e",
+      "source": "core"
+    },
+    {
+      "bytes": 27713,
+      "path": "blueprints/Text to Image (Anima).json",
+      "sha256": "ec4dde0805dbbd7a442c9e5434aa92c0dfc0a7d8818570b46f59c391f260ee51",
+      "source": "core"
+    },
+    {
+      "bytes": 57598,
+      "path": "blueprints/Text to Image (Ernie Image).json",
+      "sha256": "e39bde265f479dba2999d1722217d63158e0da037eea7ae308788f07747d2e7a",
+      "source": "core"
+    },
+    {
+      "bytes": 55927,
+      "path": "blueprints/Text to Image (Ernie Image Turbo).json",
+      "sha256": "7c9fdfe1ee760dacc49194d295b7b9d951949d804c7d3b3ba3c29d64fe7cf045",
+      "source": "core"
+    },
+    {
+      "bytes": 56268,
+      "path": "blueprints/Image Edit (FireRed Image Edit 1.1).json",
+      "sha256": "a528983426e61156d558da6c746ba6e401340dbcbcff4a2e9a530fc661972d38",
+      "source": "core"
+    },
+    {
+      "bytes": 25891,
+      "path": "blueprints/Text to Image (Flux.1 Dev).json",
+      "sha256": "d77c8ff4a8d2af64f085319ba2c8bc18bf119e8731eea75ea32656b706c9e169",
+      "source": "core"
+    },
+    {
+      "bytes": 48801,
+      "path": "blueprints/Text to Image (Flux.2 Dev).json",
+      "sha256": "a8738e78ea9000621d1a77beba05e20cd779559751bf77674913f09dbd183206",
+      "source": "core"
+    },
+    {
+      "bytes": 53697,
+      "path": "blueprints/Image Edit (Flux.2 Dev).json",
+      "sha256": "69f4d7e8c88e4d17797ca8cd3476a25d4a19051403a1b4536e99517f3c29dffb",
+      "source": "core"
+    },
+    {
+      "bytes": 25906,
+      "path": "blueprints/Text to Image (Flux.1 Krea Dev).json",
+      "sha256": "4e0bf19e4978b698c8e79695528f5780fc49b4279c26ca99232093fa0948be8f",
+      "source": "core"
+    },
+    {
+      "bytes": 64873,
+      "path": "blueprints/Text to Image (Ideogram v4).json",
+      "sha256": "3bf04919d5a87a9872363a80fe9638d5d41001980b94e4058f10208602689210",
+      "source": "core"
+    },
+    {
+      "bytes": 36260,
+      "path": "blueprints/Image Edit (LongCat Image Edit).json",
+      "sha256": "820104ccdc0804e68a34444564dd4da7a8c6ce2bd1b2d0be37122b43b6ef73cd",
+      "source": "core"
+    },
+    {
+      "bytes": 51536,
+      "path": "blueprints/Text to Image (Qwen-Image 2512).json",
+      "sha256": "60900b3da6d7cedabfecc6984a0c0b641d4d7170a1ff076b858e8c6fa3ee1c92",
+      "source": "core"
+    },
+    {
+      "bytes": 39745,
+      "path": "blueprints/Image Edit (Qwen 2511).json",
+      "sha256": "f5339d66f11772e28b2c16c47f1ab3d638c88fc0b8d5379ce9f285ad43f6ede9",
+      "source": "core"
+    },
+    {
+      "bytes": 29488,
+      "path": "blueprints/Text to Image (Z-Image-Base).json",
+      "sha256": "f2ab24adb9e35186797f06f282691baeb36cd58c0244f4986cc8e0879612b334",
+      "source": "core"
+    },
+    {
+      "bytes": 27701,
+      "path": "blueprints/Text to Image (Z-Image-Turbo).json",
+      "sha256": "b3029adb874cfc80b33fa974698f331054cf17ddc2bfbadf90b031abae84d30c",
+      "source": "core"
+    },
+    {
+      "bytes": 22255,
+      "path": "app/governance.py",
+      "sha256": "37e157559e8bd32662bbaf5ef738687e918bc5e81d77a658d2ae470c73344b8c",
+      "source": "core"
+    },
+    {
+      "bytes": 10209,
+      "path": "comfy_extras/nodes_moss_image.py",
+      "sha256": "0bf8ab501691a6da2c91d5846d0812a453c58e02d07132ec84b09ca486fccc03",
+      "source": "core"
+    },
+    {
+      "bytes": 12050,
+      "path": "comfy_extras/nodes_flux.py",
+      "sha256": "6e1fb4c4b173d96395782b0b430aa29c34bbd768be782118da5cec67b84b83fa",
+      "source": "core"
+    },
+    {
+      "bytes": 7161,
+      "path": "comfy_extras/nodes_slg.py",
+      "sha256": "3042fb89646636eea114df5fa0090bdd8de26231bcd30bbfec304041e9ee1213",
+      "source": "core"
+    },
+    {
+      "bytes": 48609,
+      "path": "comfy/latent_formats.py",
+      "sha256": "e4784eacfc243e1b820861aeecfd9eab573bdbf67eb83c804cdd425bf048b91f",
+      "source": "core"
+    },
+    {
+      "bytes": 156821,
+      "path": "comfy/model_base.py",
+      "sha256": "68bc418e1342cafd530f811046d97e0d4d6a5887f7e3cc441b87a51137505f45",
+      "source": "core"
+    },
+    {
+      "bytes": 92784,
+      "path": "comfy/supported_models.py",
+      "sha256": "1f58eab168ee7d7d0c0b13798cea205afff2bb49fe5260785151135a62862735",
+      "source": "core"
+    },
+    {
+      "bytes": 1925,
+      "path": "comfy/text_encoders/moss_image.py",
+      "sha256": "5bf5dff2669aab8fccc4a4662a0cd394fd0d7a7ea91f6757291f83e1940d9deb",
+      "source": "core"
+    },
+    {
+      "bytes": 3423,
+      "path": "comfy_extras/nodes_resolution.py",
+      "sha256": "593ca9b30cd26a700eed23d73a4b697b7695a9d4f0d15c04b8e0f8b44b9174a5",
+      "source": "core"
+    },
+    {
+      "bytes": 158919,
+      "path": "comfy/sd.py",
+      "sha256": "f65169cf94271d665a1323a786892bef3905583131f2d8f5ff13c0a399dbfcf1",
+      "source": "core"
+    },
+    {
+      "bytes": 4923,
+      "path": "comfy_extras/nodes_replacements.py",
+      "sha256": "f186ec1d67f5496436d67c02c015e2da1f2dfc3297abdbf0c4faafaddda88cf1",
+      "source": "core"
+    },
+    {
+      "bytes": 5710,
+      "path": "app/node_replace_manager.py",
+      "sha256": "f621413846ac4901e2bcd332ba2e2807580492cf3dc6a6df97d07e9d329a2c9a",
+      "source": "core"
+    },
+    {
+      "bytes": 17539,
+      "path": "comfy_execution/graph.py",
+      "sha256": "9a59b6c3ebd1aebbdae8f42aefbd6fb3462da6b7968b6046925e5c895d618388",
+      "source": "core"
+    },
+    {
+      "bytes": 6604,
+      "path": "comfy_api/feature_flags.py",
+      "sha256": "f3b3f164144a5549293a8900d39a677b79113122745ff6d89957a998e03a0a06",
+      "source": "core"
+    },
+    {
+      "bytes": 4993,
+      "path": "comfy/conds.py",
+      "sha256": "5c518583dd1322ed1b2a0a127c857968ddb605c4e63d7140ffde94934d9bd229",
+      "source": "core"
+    },
+    {
+      "bytes": 23920,
+      "path": "comfy/cli_args.py",
+      "sha256": "ab61b1abac2e5b1d0fee3dbc7c6494a6597f47c5c21a17ea1dce02a230bce35a",
+      "source": "core"
+    },
+    {
+      "bytes": 76753,
+      "path": "comfy/model_management.py",
+      "sha256": "a49f6f7b13a40316e47ebb7453006bb9262f0557af5215e755e71eca3732ace9",
+      "source": "core"
+    },
+    {
+      "bytes": 14745,
+      "path": "package.json",
+      "sha256": "a8e750a09919b6eb2c0f903e71644b7377df5734b8402d709759353d414d7c40",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1342,
+      "path": "src/scripts/api.ts",
+      "sha256": "719e9682008600d6580a47ac65fbd76cc4d69abc7cff4c5a268c9807346c49b4",
+      "source": "frontend"
+    },
+    {
+      "bytes": 103421,
+      "path": "src/scripts/app.ts",
+      "sha256": "69bce53c4b7394ade7c4c47af50691b3394d40cfd4c3daf3ab3f5fe03a0ec185",
+      "source": "frontend"
+    },
+    {
+      "bytes": 14825,
+      "path": "src/scripts/pnginfo.ts",
+      "sha256": "4fd1e63c5375deb909c60b3793e04f9af161479a56ebbdd2259a9e596f582bcc",
+      "source": "frontend"
+    },
+    {
+      "bytes": 3931,
+      "path": "src/types/extensionTypes.ts",
+      "sha256": "51aa98cd5544431645b0e8a9d8544c021b16f8aaafe6e74901c1f57285a74902",
+      "source": "frontend"
+    },
+    {
+      "bytes": 3873,
+      "path": "src/stores/workspace/sidebarTabStore.ts",
+      "sha256": "fa50be95871b7ade593753c05b05ef593f5151d71ac265430503a8625391c751",
+      "source": "frontend"
+    },
+    {
+      "bytes": 14284,
+      "path": "src/platform/extensions/services/extensionService.ts",
+      "sha256": "43dd2cf3e93b812c2acdb5988a88e6c4a129e15ebf18f47c6a77b4e78db69ba0",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1650,
+      "path": "src/components/sidebar/tabs/SidebarTabTemplate.vue",
+      "sha256": "f6867c1ba5e7abb652af1e49d80e9301ae8caa853e4ba0c30eff31d42d05c512",
+      "source": "frontend"
+    },
+    {
+      "bytes": 25653,
+      "path": "src/components/graph/GraphCanvas.vue",
+      "sha256": "a06a7fe18f82d7ad07a312a3855c04214ce00e172f3deb703a48b451fb3d19fd",
+      "source": "frontend"
+    },
+    {
+      "bytes": 17711,
+      "path": "src/components/LiteGraphCanvasSplitterOverlay.vue",
+      "sha256": "2e138f216e6dbae3aba443d6ff149c0deb7ad21ae48f8e02536e064e8fd34c05",
+      "source": "frontend"
+    },
+    {
+      "bytes": 11387,
+      "path": "src/components/sidebar/SideToolbar.vue",
+      "sha256": "669ff53d608d4690e53c735c11eb24343fac8a611a5aa20dbc46266035361287",
+      "source": "frontend"
+    },
+    {
+      "bytes": 66582,
+      "path": "packages/api-client/src/ComfyApi.ts",
+      "sha256": "720e32ea582112b6243227466eed734add1e51ef7e489d747fe0dcd0ac802e15",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1572,
+      "path": "packages/api-client/src/types.ts",
+      "sha256": "d00fcf24cd29ea25393337ca9c65ba8dee5a683ae64f124f62add52f063894d1",
+      "source": "frontend"
+    },
+    {
+      "bytes": 5706,
+      "path": "packages/api-client/src/executionTypes.ts",
+      "sha256": "a384e2a2d53cb4197e6bdbe8dabb899a04639d3d8142b51016b71189155eb2bb",
+      "source": "frontend"
+    },
+    {
+      "bytes": 6781,
+      "path": "packages/api-client/src/retryPolicy.ts",
+      "sha256": "5333983572e44b62212911012f14a61bda176edddb44f235191de95db95295b3",
+      "source": "frontend"
+    },
+    {
+      "bytes": 5020,
+      "path": "packages/api-client/src/fetchWithRetry.ts",
+      "sha256": "4d228d66d6a274b6c09a4aefa7f5fdea59e97c47f8388d69b8c0881d70122f4b",
+      "source": "frontend"
+    },
+    {
+      "bytes": 2068,
+      "path": "packages/api-client/src/abortSignal.ts",
+      "sha256": "f23355846d3ac3d3a88a898087825f59ab3495f6304ee7f9385160e57fa94dee",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1105,
+      "path": "packages/api-client/src/apiTimeouts.ts",
+      "sha256": "d82ff9bb8583d065892d2109288f9873461d1ba27e70c9a2033b33d1dd64e753",
+      "source": "frontend"
+    },
+    {
+      "bytes": 796,
+      "path": "packages/design-system/src/components/splitter/SplitterGroup.vue",
+      "sha256": "6cfaecd58585d4701ba8868a01d32ba826b1a9ad4e855b5b216818b241923334",
+      "source": "frontend"
+    },
+    {
+      "bytes": 707,
+      "path": "packages/design-system/src/components/splitter/SplitterPanel.vue",
+      "sha256": "3d78ea677df3ac93ba9819b96f8efd9e5983414bc81a0d4169dcd53b5c293b1e",
+      "source": "frontend"
+    },
+    {
+      "bytes": 1459,
+      "path": "packages/design-system/src/components/splitter/SplitterResizeHandle.vue",
+      "sha256": "9c3f7b1d766d66186335a88a698a8278edbb5431aefce5d2732c1a94262d4125",
+      "source": "frontend"
+    },
+    {
+      "bytes": 13410,
+      "path": "package.json",
+      "sha256": "ff2d30907981824d3f71784584692e13893087df791758eded4997f319c9ead1",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 65568,
+      "path": "src/scripts/api.ts",
+      "sha256": "bcd8bec6a50ed7483d58186d73a9490c63a2bd608e610e38c8d9a86001d83ce4",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 97269,
+      "path": "src/scripts/app.ts",
+      "sha256": "1a94e2422f897acbb358992aaa9e668538e03e99f7db94c94e897236cb56f7cf",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 14758,
+      "path": "src/scripts/pnginfo.ts",
+      "sha256": "f09484fce7038626be358ddea3675009a8b4bd64bcaecf1f29663e4ed4dade6c",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 3929,
+      "path": "src/types/extensionTypes.ts",
+      "sha256": "e965aa61084e6695556c106f257280f703e2e82cc061b60fdbce85df0d0f88c2",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 2941,
+      "path": "src/stores/workspace/sidebarTabStore.ts",
+      "sha256": "5dc3271dfe758ce9abb1e47d9d2ab3cc2c0fc582136829d0692bfad41fbe4910",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 11017,
+      "path": "src/services/extensionService.ts",
+      "sha256": "7ec76eb4b4f02e2c9534e53e0dcc695c32c2799ded4895aec9294d93bab7714b",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 1650,
+      "path": "src/components/sidebar/tabs/SidebarTabTemplate.vue",
+      "sha256": "f6867c1ba5e7abb652af1e49d80e9301ae8caa853e4ba0c30eff31d42d05c512",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 24925,
+      "path": "src/components/graph/GraphCanvas.vue",
+      "sha256": "554568c593f765a6ace83a0714e6c9d8a1ddf60a47a8037bf3eb3b0158309cd3",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 17671,
+      "path": "src/components/LiteGraphCanvasSplitterOverlay.vue",
+      "sha256": "438de7ad59ddbaf95c7ca1684380a66137507413daa51955b934a806e140c872",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 10784,
+      "path": "src/components/sidebar/SideToolbar.vue",
+      "sha256": "a71368bf6f233f56f03842c132cad89a23f80813ff284c65c14d2013285654aa",
+      "source": "frontend_core_package"
+    },
+    {
+      "bytes": 4416,
+      "path": "src/platform/remote/comfyui/execution/types.ts",
+      "sha256": "ded8df0842ad8147e35e29ed318b89d870335e1acc8abb945ea820ab5028e96f",
+      "source": "frontend_core_package"
+    }
+  ],
+  "sources": {
+    "core": {
+      "revision": "da8bd08e48deee74d9f6c3bc00aed365b00ec209",
+      "version": "0.46.0"
+    },
+    "frontend": {
+      "revision": "388973acb56af768df63749b90627ac767c31be0",
+      "version": "1.61.8"
+    },
+    "frontend_core_package": {
+      "revision": "28b679cb87e88f6328883feccfac737d3f7c4415",
+      "version": "1.59.11"
+    }
+  },
+  "template_components": {
+    "comfyui-workflow-templates-core": "0.3.408",
+    "comfyui-workflow-templates-json": "0.1.143",
+    "comfyui-workflow-templates-media-api": "0.3.84",
+    "comfyui-workflow-templates-media-assets-01": "0.1.48",
+    "comfyui-workflow-templates-media-assets-02": "0.1.36",
+    "comfyui-workflow-templates-media-assets-03": "0.1.2",
+    "comfyui-workflow-templates-media-image": "0.3.160",
+    "comfyui-workflow-templates-media-other": "0.3.229",
+    "comfyui-workflow-templates-media-video": "0.3.101"
+  },
+  "text_generate_tripwire": {
+    "core": {
+      "deprecated": {
+        "TextGenerate": "TextGenerateV2"
+      },
+      "registered": [
+        "TextGenerateV2",
+        "TextGenerate",
+        "TextGenerateLTX2Prompt"
+      ],
+      "replacements": [
+        [
+          "TextGenerate",
+          "TextGenerateV2"
+        ]
+      ]
+    },
+    "krea2_enhancer": "TextGenerate"
+  }
+}

@@ -21,9 +21,39 @@ if str(ROOT) not in sys.path:
 from scripts.run_current_host_contract_lane import read_pinned_git_blob
 
 CONTRACT_PATH = ROOT / "tests" / "fixtures" / "host_reference_alignment_contract.json"
+MOSS_CONTRACT_PATH = ROOT / "tests" / "fixtures" / "host_moss_alignment_contract.json"
 MAX_ARCHIVE_BYTES = 12 * 1024 * 1024
 MAX_MEMBER_BYTES = 8 * 1024 * 1024
 CURRENT_FIELDS = {"moss_templates", "baseline_distribution", "gallery_delta", "legacy_changes"}
+HOST_046_SCHEMA = "host-046-alignment-v1"
+HOST_046_FIELDS = {"moss_changes", "text_generate_tripwire"}
+SCHEMA_LEVELS = {"host-reference-alignment-v1": 0, "host-moss-alignment-v1": 1, HOST_046_SCHEMA: 2}
+# The Core-pinned frontend package is read from the standalone frontend repository at its own tag.
+SOURCE_ROOTS = {"core": "core", "frontend": "frontend", "frontend_core_package": "frontend"}
+MOSS_MODES = {"base", "sft", "base_layout", "sft_layout"}
+LEGACY_ENHANCERS = frozenset({"TextGenerate"})
+HOST_046_ENHANCERS = frozenset({"TextGenerate", "TextGenerateV2"})
+MOSS_CHANGE_CLASSES = {"enhancer-node-class", "template-seed", "model-download-url"}
+GALLERY_046_CHANGED = {"reference-only-note-change", "reference-only-executable-change"}
+# Consumed host seams that must stay in the 0.46 source sample; the retired paths moved in FE 1.60+.
+REQUIRED_046_SOURCES = frozenset({
+    ("core", "comfy_extras/nodes_textgen.py"), ("core", "comfy_extras/nodes_replacements.py"),
+    ("core", "app/node_replace_manager.py"), ("core", "server.py"), ("core", "execution.py"),
+    ("core", "comfy/cli_args.py"), ("core", "comfy/model_management.py"),
+    ("frontend", "package.json"), ("frontend", "src/scripts/app.ts"), ("frontend", "src/scripts/api.ts"),
+    ("frontend", "src/scripts/pnginfo.ts"), ("frontend", "packages/api-client/src/ComfyApi.ts"),
+    ("frontend", "packages/api-client/src/fetchWithRetry.ts"), ("frontend", "packages/api-client/src/retryPolicy.ts"),
+    ("frontend", "packages/api-client/src/executionTypes.ts"),
+    ("frontend", "src/platform/extensions/services/extensionService.ts"),
+    ("frontend", "src/stores/workspace/sidebarTabStore.ts"),
+    ("frontend", "packages/design-system/src/components/splitter/SplitterGroup.vue"),
+    ("frontend_core_package", "package.json"), ("frontend_core_package", "src/scripts/app.ts"),
+    ("frontend_core_package", "src/scripts/api.ts"),
+})
+RETIRED_046_SOURCES = frozenset({
+    ("frontend", "src/services/extensionService.ts"),
+    ("frontend", "src/platform/remote/comfyui/execution/types.ts"),
+})
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -55,18 +85,20 @@ def _check_bytes(raw: bytes, expected: Mapping[str, Any]) -> None:
 
 def load_contract(path: Path = CONTRACT_PATH) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
-    current = isinstance(payload, dict) and payload.get("schema_version") == "host-moss-alignment-v1"
+    if not isinstance(payload, dict) or payload.get("schema_version") not in SCHEMA_LEVELS:
+        raise ValueError("Unsupported host reference contract.")
+    level = SCHEMA_LEVELS[payload["schema_version"]]
+    current = level >= 1
     fields = {
         "schema_version", "scope", "sources", "source_artifacts", "distributions",
         "legacy_templates", "qwen_templates", "core_components", "template_components",
     }
-    if not isinstance(payload, dict) or set(payload) != fields | (CURRENT_FIELDS if current else set()):
+    if set(payload) != fields | (CURRENT_FIELDS if current else set()) | (HOST_046_FIELDS if level == 2 else set()):
         raise ValueError("Invalid contract fields.")
-    if not current and payload.get("schema_version") != "host-reference-alignment-v1":
-        raise ValueError("Unsupported host reference contract.")
     if payload.get("scope") != "source-contract-only":
         raise ValueError("Source verification cannot declare live support.")
-    if not isinstance(payload["sources"], dict) or set(payload["sources"]) != {"core", "frontend"}:
+    expected_sources = {"core", "frontend"} | ({"frontend_core_package"} if level == 2 else set())
+    if not isinstance(payload["sources"], dict) or set(payload["sources"]) != expected_sources:
         raise ValueError("Missing host source.")
     for field in ("source_artifacts", "distributions", "legacy_templates"):
         if not isinstance(payload[field], list) or any(not isinstance(item, dict) for item in payload[field]):
@@ -107,11 +139,12 @@ def load_contract(path: Path = CONTRACT_PATH) -> dict[str, Any]:
     if len({item["profile"] for item in payload["legacy_templates"]}) != 11:
         raise ValueError("Duplicate legacy profile.")
     if current:
-        baseline = load_contract()
+        # Each envelope compares its templates with the immediately preceding accepted envelope.
+        baseline = load_contract(MOSS_CONTRACT_PATH) if level == 2 else load_contract()
         expected_distribution, = (item for item in baseline["distributions"] if item["name"].endswith("-json"))
         if payload["baseline_distribution"] != expected_distribution:
             raise ValueError("Legacy baseline identity drifted.")
-        if not isinstance(payload["moss_templates"], dict) or set(payload["moss_templates"]) != {"base", "sft", "base_layout", "sft_layout"}:
+        if not isinstance(payload["moss_templates"], dict) or set(payload["moss_templates"]) != MOSS_MODES:
             raise ValueError("Incomplete MOSS coverage.")
         for item in payload["moss_templates"].values():
             if not isinstance(item, dict) or set(item) != {"member", "bytes", "sha256", "graph_contract"}:
@@ -126,8 +159,45 @@ def load_contract(path: Path = CONTRACT_PATH) -> dict[str, Any]:
             raise ValueError("Incomplete legacy classification.")
         if {item["profile"]: item["member"] for item in payload["legacy_templates"]} != {item["profile"]: item["member"] for item in baseline["legacy_templates"]}:
             raise ValueError("Legacy member identity drifted.")
+        if level == 2:
+            _validate_host_046_fields(payload, baseline, seen)
         validate_gallery_delta(payload)
     return payload
+
+
+def _validate_host_046_fields(
+    payload: Mapping[str, Any], baseline: Mapping[str, Any], seen: set[tuple[str, str]],
+) -> None:
+    if not REQUIRED_046_SOURCES <= seen or RETIRED_046_SOURCES & seen:
+        raise ValueError("Host source sample omits a consumed seam or keeps a retired path.")
+    if payload["sources"]["frontend_core_package"]["version"] != payload["core_components"].get("comfyui-frontend-package"):
+        raise ValueError("Core-pinned frontend package identity drifted.")
+    for field in ("moss_templates", "qwen_templates"):
+        if {key: item["member"] for key, item in payload[field].items()} != {
+                key: item["member"] for key, item in baseline[field].items()}:
+            raise ValueError("Admitted template member identity drifted.")
+    changes = payload["moss_changes"]
+    if not isinstance(changes, dict) or set(changes) != MOSS_MODES:
+        raise ValueError("Incomplete MOSS change classification.")
+    for rows in changes.values():
+        if not isinstance(rows, list):
+            raise ValueError("Invalid MOSS change classification.")
+        for row in rows:
+            if (not isinstance(row, dict) or set(row) != {"pointer", "classification", "before_sha256", "after_sha256"}
+                    or row["classification"] not in MOSS_CHANGE_CLASSES or not isinstance(row["pointer"], str)
+                    or any(not isinstance(row[key], str) or not re.fullmatch(r"[0-9a-f]{64}", row[key])
+                           for key in ("before_sha256", "after_sha256"))):
+                raise ValueError("Invalid MOSS change classification.")
+    tripwire = payload["text_generate_tripwire"]
+    if (not isinstance(tripwire, dict) or set(tripwire) != {"core", "krea2_enhancer"}
+            or not isinstance(tripwire["core"], dict) or set(tripwire["core"]) != {"registered", "deprecated", "replacements"}
+            or not isinstance(tripwire["core"]["registered"], list)):
+        raise ValueError("Invalid TextGenerate tripwire.")
+    # IMPORTANT: RookieUI's Krea-2 builder emits TextGenerate and fails closed before host
+    # node replacement can run. A contract that records its removal or a migrated official
+    # template is a migration trigger, not a requalification; refuse it here.
+    if tripwire["krea2_enhancer"] != "TextGenerate" or "TextGenerate" not in tripwire["core"]["registered"]:
+        raise ValueError("TextGenerate migration trigger reached; requalification is not sufficient.")
 
 
 def read_distribution(path: Path, expected: Mapping[str, Any]) -> zipfile.ZipFile:
@@ -164,6 +234,8 @@ def validate_gallery_delta(contract: Mapping[str, Any]) -> None:
         raise ValueError("Invalid gallery delta.")
     legacy = {item["member"] for item in contract["legacy_templates"]}
     moss = {item["member"] for item in contract["moss_templates"].values()}
+    qwen = {item["member"] for item in contract["qwen_templates"].values()}
+    host_046 = contract.get("schema_version") == HOST_046_SCHEMA
     seen: set[str] = set()
     for kind, rows in delta.items():
         if not isinstance(rows, list):
@@ -172,11 +244,22 @@ def validate_gallery_delta(contract: Mapping[str, Any]) -> None:
             if not isinstance(row, dict) or set(row) != {"member", "classification"}:
                 raise ValueError("Invalid gallery classification.")
             member = _relative_path(row["member"])
-            expected = "moss-candidate" if member in moss else "legacy-compatible" if member in legacy else "reference-only"
-            if member in seen or row["classification"] != expected or (member in moss and kind != "added"):
+            if host_046:
+                admitted = ("moss-admitted" if member in moss else "legacy-compatible" if member in legacy
+                            else "qwen-admitted" if member in qwen else None)
+                if kind != "changed":
+                    valid = admitted is None and row["classification"] == "reference-only"
+                elif admitted:
+                    valid = row["classification"] == admitted
+                else:
+                    valid = row["classification"] in GALLERY_046_CHANGED
+            else:
+                expected = "moss-candidate" if member in moss else "legacy-compatible" if member in legacy else "reference-only"
+                valid = row["classification"] == expected and not (member in moss and kind != "added")
+            if member in seen or not valid:
                 raise ValueError("Ambiguous gallery classification.")
             seen.add(member)
-    if not moss <= {row["member"] for row in delta["added"]}:
+    if not host_046 and not moss <= {row["member"] for row in delta["added"]}:
         raise ValueError("Missing MOSS gallery candidates.")
 
 
@@ -245,7 +328,10 @@ class _Graph:
         return node
 
     def origin(self, node: dict[str, Any], name: str) -> tuple[dict[str, Any], int]:
-        index, port = next((index, port) for index, port in enumerate(node["inputs"]) if port["name"] == name)
+        found = next(((index, port) for index, port in enumerate(node["inputs"]) if port["name"] == name), None)
+        if found is None:
+            raise ValueError("Missing graph input edge.")
+        index, port = found
         link = self.links[port["link"]]
         if link["target_id"] != node["id"] or link["target_slot"] != index:
             raise ValueError("Invalid graph input edge.")
@@ -255,7 +341,9 @@ class _Graph:
         return self.nodes[link["origin_id"]], link["origin_slot"]
 
 
-def summarize_moss_graph(workflow: dict[str, Any]) -> dict[str, Any]:
+def summarize_moss_graph(
+    workflow: dict[str, Any], *, enhancers: frozenset[str] = LEGACY_ENHANCERS,
+) -> dict[str, Any]:
     subgraph, = workflow["definitions"]["subgraphs"]
     graph = _Graph(subgraph)
     root = _Graph({"nodes": workflow["nodes"], "links": [dict(zip(
@@ -287,9 +375,15 @@ def summarize_moss_graph(workflow: dict[str, Any]) -> dict[str, Any]:
     preview = edge(positive, "text", "PreviewAny")
     prompt_switch = edge(preview, "source", "ComfySwitchNode")
     direct = edge(prompt_switch, "on_false", "PrimitiveStringMultiline")
-    enhancer = edge(prompt_switch, "on_true", "TextGenerate")
+    enhancer, enhancer_slot = graph.origin(prompt_switch, "on_true")
+    if enhancer["type"] not in enhancers or enhancer_slot != 0:
+        raise ValueError("Unexpected MOSS graph role or output slot.")
     if edge(enhancer, "clip", "CLIPLoader") != clip or edge(enhancer, "prompt", "PrimitiveStringMultiline") != direct:
         raise ValueError("Enhancer prompt or encoder route drifted.")
+    if enhancer["type"] == "TextGenerateV2":
+        image, _ = graph.origin(enhancer, "images.image1")
+        if image != {"type": "GraphInput", "name": "image"}:
+            raise ValueError("Enhancer image route drifted.")
     promoted(direct, "value")
     pe = promoted(prompt_switch, "switch")
     slg_switch = edge(sampler, "model", "ComfySwitchNode")
@@ -332,6 +426,168 @@ def summarize_moss_graph(workflow: dict[str, Any]) -> dict[str, Any]:
             "prompt_switch": pe, "slg_switch": slg_enabled, "slg_parameters": slg["widgets_values"],
             "slg_path": [slg_switch["type"], model["type"], slg["type"], model["type"]],
             "resolution": width_source["widgets_values"], "layout": layout}
+
+
+def canonical_graph(workflow: Mapping[str, Any]) -> dict[str, Any]:
+    """Executable identity: node roles, widgets and named input origins.
+
+    Layout, notes, groups, link IDs and derived outputs are excluded so that a re-saved
+    template with renumbered links compares equal when every executable edge is the same.
+    """
+    def link_map(rows: list[Any], listed: bool) -> dict[Any, tuple[Any, ...]]:
+        links: dict[Any, tuple[Any, ...]] = {}
+        for row in rows:
+            values = tuple(row[:5]) if listed else tuple(
+                row[key] for key in ("id", "origin_id", "origin_slot", "target_id", "target_slot"))
+            if values[0] in links:
+                raise ValueError("Duplicate graph identity.")
+            links[values[0]] = values[1:]
+        return links
+
+    def nodes_of(graph: Mapping[str, Any], links: Mapping[Any, tuple[Any, ...]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for node in graph["nodes"]:
+            if node.get("type") in {"MarkdownNote", "Note"}:
+                continue
+            key = str(node["id"])
+            if key in result:
+                raise ValueError("Duplicate graph identity.")
+            inputs: dict[str, list[Any]] = {}
+            for index, port in enumerate(node.get("inputs", [])):
+                if port.get("link") is None:
+                    continue
+                origin_id, origin_slot, target_id, target_slot = links[port["link"]]
+                if target_id != node["id"] or target_slot != index or port["name"] in inputs:
+                    raise ValueError("Invalid graph input edge.")
+                inputs[port["name"]] = [origin_id, origin_slot]
+            result[key] = {"type": node["type"], "mode": node.get("mode", 0),
+                           "widgets_values": node.get("widgets_values", []),
+                           "properties": node.get("properties", {}), "inputs": inputs}
+        return result
+
+    subgraphs = [{
+        "id": subgraph["id"],
+        "inputs": [[port["name"], port["type"]] for port in subgraph["inputs"]],
+        "outputs": [[port["name"], port["type"]] for port in subgraph.get("outputs", [])],
+        "nodes": nodes_of(subgraph, link_map(subgraph["links"], False)),
+    } for subgraph in workflow.get("definitions", {}).get("subgraphs", [])]
+    return {"root": {"nodes": nodes_of(workflow, link_map(workflow["links"], True))}, "subgraphs": subgraphs}
+
+
+def _enhancer_key(nodes: Mapping[str, Any]) -> str:
+    keys = [key for key, node in nodes.items() if node["type"] in HOST_046_ENHANCERS]
+    if len(keys) != 1:
+        raise ValueError("MOSS enhancer identity drifted.")
+    return keys[0]
+
+
+def summarize_moss_changes(before: Mapping[str, Any], after: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Classify a re-saved MOSS template against the previous envelope; anything else fails."""
+    left, right = canonical_graph(before), canonical_graph(after)
+    if len(left["subgraphs"]) != 1 or len(right["subgraphs"]) != 1:
+        raise ValueError("MOSS subgraph identity drifted.")
+    old_nodes, new_nodes = left["subgraphs"][0]["nodes"], right["subgraphs"][0]["nodes"]
+    old_key, new_key = _enhancer_key(old_nodes), _enhancer_key(new_nodes)
+    old, new = old_nodes[old_key], new_nodes[new_key]
+    rows: list[dict[str, str]] = []
+    if (old["type"], old_key) != (new["type"], new_key):
+        # IMPORTANT: only the published TextGenerate -> TextGenerateV2 node replacement is
+        # accepted: same widgets, mode and origins, with `image` renamed to `images.image1`.
+        renamed = {("images.image1" if name == "image" else name): origin for name, origin in old["inputs"].items()}
+
+        def properties(record: Mapping[str, Any]) -> dict[str, Any]:
+            return {key: value for key, value in record["properties"].items() if key != "Node name for S&R"}
+
+        if ((old["type"], new["type"]) != ("TextGenerate", "TextGenerateV2") or renamed != new["inputs"]
+                or old["widgets_values"] != new["widgets_values"] or old["mode"] != new["mode"]
+                or properties(old) != properties(new)
+                or any(record["properties"].get("Node name for S&R", record["type"]) != record["type"]
+                       for record in (old, new))):
+            raise ValueError("Unclassified MOSS enhancer change.")
+        rows.append({"pointer": "/subgraphs/0/nodes/enhancer", "classification": "enhancer-node-class",
+                     "before_sha256": _value_digest(old), "after_sha256": _value_digest(new)})
+        for nodes, key in ((old_nodes, old_key), (new_nodes, new_key)):
+            del nodes[key]
+            for record in nodes.values():
+                record["inputs"] = {name: (["enhancer", origin[1]] if str(origin[0]) == key else origin)
+                                    for name, origin in record["inputs"].items()}
+    subgraph = left["subgraphs"][0]
+    wrappers = [key for key, node in left["root"]["nodes"].items() if node["type"] == subgraph["id"]]
+    if len(wrappers) != 1:
+        raise ValueError("MOSS wrapper identity drifted.")
+    scalar = [name for name, kind in subgraph["inputs"] if kind not in {"IMAGE", "VIDEO", "AUDIO"}]
+    seeds = {f"/root/nodes/{wrappers[0]}/widgets_values/{index}" for index, name in enumerate(scalar) if name == "seed"}
+    url_pointer = re.compile(r"^/subgraphs/0/nodes/([^/]+)/properties/models/([0-9]+)/url$")
+
+    def classify(pointer: str, old_value: Any, new_value: Any) -> str:
+        if pointer in seeds and type(old_value) is int and type(new_value) is int:
+            return "template-seed"
+        match = url_pointer.match(pointer)
+        if match and isinstance(old_value, str) and isinstance(new_value, str):
+            node = new_nodes[match.group(1)]
+            model = node["properties"]["models"][int(match.group(2))]
+            if new_value.rsplit("/", 1)[-1] == model["name"] and model["name"] in node["widgets_values"]:
+                return "model-download-url"
+        raise ValueError("Unclassified MOSS executable change.")
+
+    def visit(old_value: Any, new_value: Any, pointer: str) -> None:
+        if type(old_value) is not type(new_value):
+            raise ValueError("MOSS executable structure drifted.")
+        if isinstance(old_value, dict):
+            if old_value.keys() != new_value.keys():
+                raise ValueError("MOSS executable fields drifted.")
+            for key in sorted(old_value):
+                visit(old_value[key], new_value[key], f"{pointer}/{key}")
+        elif isinstance(old_value, list):
+            if len(old_value) != len(new_value):
+                raise ValueError("MOSS executable collection drifted.")
+            for index, (left_item, right_item) in enumerate(zip(old_value, new_value, strict=True)):
+                visit(left_item, right_item, f"{pointer}/{index}")
+        elif old_value != new_value:
+            rows.append({"pointer": pointer, "classification": classify(pointer, old_value, new_value),
+                         "before_sha256": _value_digest(old_value), "after_sha256": _value_digest(new_value)})
+
+    visit(left, right, "")
+    return sorted(rows, key=lambda row: row["pointer"])
+
+
+def summarize_text_generate_sources(textgen: bytes, replacements: bytes) -> dict[str, Any]:
+    """Read Core's TextGenerate registration as inert source; never import host code."""
+    classes = [node for node in ast.parse(textgen.decode("utf-8")).body if isinstance(node, ast.ClassDef)]
+    registered: list[str] = []
+    deprecated: dict[str, str] = {}
+    for node in classes:
+        for item in node.body:
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "get_node_list":
+                for statement in ast.walk(item):
+                    if isinstance(statement, ast.Return) and isinstance(statement.value, ast.List):
+                        registered.extend(element.id for element in statement.value.elts if isinstance(element, ast.Name))
+        if any(isinstance(keyword, ast.keyword) and keyword.arg == "is_deprecated"
+               and isinstance(keyword.value, ast.Constant) and keyword.value.value is True for keyword in ast.walk(node)):
+            bases = [base.id for base in node.bases if isinstance(base, ast.Name)]
+            deprecated[node.name] = bases[0] if bases else ""
+    pairs: list[list[str]] = []
+    for call in ast.walk(ast.parse(replacements.decode("utf-8"))):
+        if isinstance(call, ast.Call):
+            ids = {keyword.arg: keyword.value.value for keyword in call.keywords
+                   if keyword.arg in {"old_node_id", "new_node_id"} and isinstance(keyword.value, ast.Constant)}
+            if set(ids) == {"old_node_id", "new_node_id"} and str(ids["old_node_id"]).startswith("TextGenerate"):
+                pairs.append([ids["old_node_id"], ids["new_node_id"]])
+    return {"registered": registered, "deprecated": deprecated, "replacements": pairs}
+
+
+def summarize_krea2_enhancer(workflow: Mapping[str, Any]) -> str:
+    """Return the node class on the optional Krea-2 enhancer branch."""
+    graph = _Graph(executable_projection(workflow)["definitions"]["subgraphs"][0])
+    found = []
+    for node in graph.nodes.values():
+        if node["type"] == "ComfySwitchNode" and any(port["name"] == "on_true" for port in node["inputs"]):
+            origin, _ = graph.origin(node, "on_true")
+            if str(origin.get("type", "")).startswith("TextGenerate"):
+                found.append(origin["type"])
+    if len(found) != 1:
+        raise ValueError("Krea-2 enhancer route drifted.")
+    return found[0]
 
 
 def executable_projection(workflow: Any) -> Any:
@@ -406,7 +662,7 @@ def verify_sources(
     for item in contract["source_artifacts"]:
         source, path = item["source"], _relative_path(item["path"])
         raw = (blob_reader(source, path) if blob_reader else
-               read_pinned_git_blob(roots[source], contract["sources"][source]["revision"], path))
+               read_pinned_git_blob(roots[SOURCE_ROOTS[source]], contract["sources"][source]["revision"], path))
         _check_bytes(raw, item)
         sampled[(source, path)] = raw
         count += 1
@@ -422,6 +678,15 @@ def verify_sources(
     requirements = sampled[("core", "requirements.txt")].decode().splitlines()
     if any(f"{name}=={version}" not in requirements for name, version in contract["core_components"].items()):
         raise ValueError("Core component version drifted.")
+    if "frontend_core_package" in contract["sources"]:
+        package = json.loads(sampled[("frontend_core_package", "package.json")], object_pairs_hook=_unique_object)
+        if package["version"] != contract["sources"]["frontend_core_package"]["version"]:
+            raise ValueError("Core-pinned frontend package version drifted.")
+    if "text_generate_tripwire" in contract:
+        summary = summarize_text_generate_sources(sampled[("core", "comfy_extras/nodes_textgen.py")],
+                                                  sampled[("core", "comfy_extras/nodes_replacements.py")])
+        if summary != contract["text_generate_tripwire"]["core"]:
+            raise ValueError("TextGenerate host contract drifted.")
     return count
 
 
@@ -452,6 +717,7 @@ def verify_distributions(contract: Mapping[str, Any], directory: Path) -> int:
     # them; verified bytes and bounded reads must precede graph inspection.
     path = wheels["comfyui-workflow-templates-json"]
     identity, = (item for item in contract["distributions"] if item["name"].endswith("-json"))
+    host_046 = contract.get("schema_version") == HOST_046_SCHEMA
     with read_distribution(path, identity) as archive:
         for item in [*contract["legacy_templates"], *contract["qwen_templates"].values()]:
             member = _relative_path(item["member"])
@@ -464,13 +730,18 @@ def verify_distributions(contract: Mapping[str, Any], directory: Path) -> int:
                 projected = json.dumps(executable_projection(workflow), sort_keys=True, separators=(",", ":")).encode()
                 if hashlib.sha256(projected).hexdigest() != item["executable_sha256"]:
                     raise ValueError("Legacy executable template drifted.")
+                if host_046 and item["profile"] == "krea2_turbo" and (
+                        summarize_krea2_enhancer(workflow) != contract["text_generate_tripwire"]["krea2_enhancer"]):
+                    raise ValueError("Official Krea-2 enhancer migrated; TextGenerate migration trigger reached.")
             elif summarize_qwen_graph(workflow) != item["graph_contract"]:
                 raise ValueError("Qwen graph role/default link drifted.")
         if "moss_templates" in contract:
             for item in contract["moss_templates"].values():
                 raw = archive.read(item["member"])
                 _check_bytes(raw, item)
-                if summarize_moss_graph(json.loads(raw, object_pairs_hook=_unique_object)) != item["graph_contract"]:
+                enhancers = HOST_046_ENHANCERS if host_046 else LEGACY_ENHANCERS
+                if summarize_moss_graph(json.loads(raw, object_pairs_hook=_unique_object),
+                                        enhancers=enhancers) != item["graph_contract"]:
                     raise ValueError("MOSS graph role/default link drifted.")
             baseline = contract["baseline_distribution"]
             with read_distribution(directory / baseline["filename"], baseline) as before:
@@ -495,6 +766,22 @@ def verify_template_delta(
             json.loads(after.read(item["member"]), object_pairs_hook=_unique_object))
         if changes != contract["legacy_changes"][item["profile"]]:
             raise ValueError("Legacy classification identity drifted.")
+    if contract.get("schema_version") != HOST_046_SCHEMA:
+        return
+
+    def pair(member: str) -> tuple[Any, Any]:
+        return (json.loads(before.read(member), object_pairs_hook=_unique_object),
+                json.loads(after.read(member), object_pairs_hook=_unique_object))
+
+    for row in contract["gallery_delta"]["changed"]:
+        if row["classification"] in GALLERY_046_CHANGED:
+            left, right = pair(row["member"])
+            same = executable_projection(left) == executable_projection(right)
+            if row["classification"] != ("reference-only-note-change" if same else "reference-only-executable-change"):
+                raise ValueError("Gallery executable classification drifted.")
+    for mode, item in contract["moss_templates"].items():
+        if summarize_moss_changes(*pair(item["member"])) != contract["moss_changes"][mode]:
+            raise ValueError("MOSS change classification drifted.")
 
 
 def main() -> int:

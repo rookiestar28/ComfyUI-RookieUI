@@ -1981,6 +1981,75 @@ class Txt2ImgTranslationTests(unittest.TestCase):
             True,
         )
 
+    def _translate_krea2_enhanced_with_host_nodes(self, mappings: dict[str, object]) -> dict[str, object]:
+        fake_nodes = mock.Mock(NODE_CLASS_MAPPINGS=mappings)
+        with mock.patch(
+            "rookieui.services.txt2img.discover_model_inventory",
+            return_value=self._krea2_turbo_inventory(),
+        ), mock.patch.dict(sys.modules, {"nodes": fake_nodes}):
+            normalized = normalize_txt2img_request(
+                {
+                    "prompt": "KREA_PROMPT_SENTINEL",
+                    "profile": "krea2_turbo",
+                    "checkpoint_name": "",
+                    "vae_name": "",
+                    "text_encoder_name": "",
+                    "prompt_enhancement_enabled": True,
+                    "seed": 123,
+                }
+            )
+            return translate_txt2img_request(normalized).to_payload()
+
+    def test_translate_krea2_accepts_core_046_deprecated_text_generate_schema(self) -> None:
+        class DeprecatedTextGenerate046:
+            """Static mirror of Core 0.46 TextGenerate (a deprecated TextGenerateV2 subclass)."""
+
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {
+                    "required": {
+                        "clip": ("CLIP", {}),
+                        "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": ""}),
+                        "max_length": ("INT", {"default": 512, "min": 1, "max": 32768}),
+                        "sampling_mode": ("COMFY_DYNAMICCOMBO_V3", {}),
+                    },
+                    "optional": {
+                        "image": ("IMAGE", {}),
+                        "video": ("IMAGE", {}),
+                        "audio": ("AUDIO", {}),
+                        "thinking": ("BOOLEAN", {"default": False}),
+                        "use_default_template": ("BOOLEAN", {"default": True}),
+                        "mtp": ("COMBO", {"default": "auto"}),
+                        "system_prompt": ("STRING", {"forceInput": True}),
+                    },
+                }
+
+        class TextGenerateV2046:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"clip": ("CLIP", {}), "images": ("COMFY_AUTOGROW_V3", {})}}
+
+        result = self._translate_krea2_enhanced_with_host_nodes(
+            {"TextGenerate": DeprecatedTextGenerate046, "TextGenerateV2": TextGenerateV2046}
+        )
+        class_types = [node["class_type"] for node in result["workflow"].values()]
+        self.assertEqual(class_types.count("TextGenerate"), 1)
+        self.assertNotIn("TextGenerateV2", class_types)
+        text_generate = next(node for node in result["workflow"].values() if node["class_type"] == "TextGenerate")
+        self.assertEqual(text_generate["inputs"]["sampling_mode"], "on")
+        self.assertEqual(text_generate["inputs"]["sampling_mode.presence_penalty"], 0)
+        self.assertNotIn("mtp", text_generate["inputs"])
+
+    def test_translate_krea2_fails_closed_when_host_only_registers_text_generate_v2(self) -> None:
+        # Tripwire: if Core removes TextGenerate, RookieUI refuses before host node replacement runs.
+        class TextGenerateV2Only:
+            @classmethod
+            def INPUT_TYPES(cls) -> dict[str, object]:
+                return {"required": {"clip": ("CLIP", {}), "prompt": ("STRING", {})}}
+
+        with self.assertRaisesRegex(ValueError, "compatible host TextGenerate inputs"):
+            self._translate_krea2_enhanced_with_host_nodes({"TextGenerateV2": TextGenerateV2Only})
+
     def test_translate_krea2_explicit_disabled_uses_only_raw_prompt_path(self) -> None:
         with mock.patch(
             "rookieui.services.txt2img.discover_model_inventory",
